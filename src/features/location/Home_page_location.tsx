@@ -1,0 +1,529 @@
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { GoogleMap } from '@react-google-maps/api';
+import { MdLocationOn, MdMyLocation, MdArrowBack } from 'react-icons/md';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { useGoogleMaps } from '../../hooks/useGoogleMaps';
+
+// List of cities where delivery is available
+const SERVICED_CITIES = [
+  "Delhi", "New Delhi", "Bengaluru", "Mumbai", "Pune", "Jaipur", 
+  "Chennai", "Hyderabad", "Chandigarh", "Surat", "Nashik", 
+  "Mysore", "Kolkata", "Coimbatore", "Lucknow", "Warangal", 
+  "Vijayawada", "Guntur"
+];
+
+// interface PlacePrediction {
+//   place_id: string;
+//   description: string;
+//   structured_formatting: {
+//     main_text: string;
+//     secondary_text: string;
+//   };
+// }
+
+
+const HomePageLocation: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const returnUrl = location.state?.returnUrl || '/Allset';
+  const [locationSearchQuery, setLocationSearchQuery] = useState('');
+  // const [, setLocationPredictions] = useState<PlacePrediction[]>([]);
+  const [selectedPosition, setSelectedPosition] = useState<{lat: number, lng: number}>({
+    lat: 20.5937,
+    lng: 78.9629
+  });
+  const [, setIsLoadingLocation] = useState(false);
+  const [isLocationServiced, setIsLocationServiced] = useState(true);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [, setShowErrorModal] = useState(false);
+  // const [useRegularMarker, setUseRegularMarker] = useState(false);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  // const markerRef = useRef<any>(null);
+
+  const { isLoaded, loadError, GOOGLE_MAPS_API_KEY } = useGoogleMaps();
+
+
+  const [selectedAddress, setSelectedAddress] = useState({
+    city: '',
+    fullAddress: '',
+    district: '',
+    state: '',
+    pincode: ''
+  });
+
+  const [addressDetails, setAddressDetails] = useState({
+    houseNo: '',
+    apartment: '',
+    directions: ''
+  });
+
+  // const [, setBottomSheetHeight] = useState('auto');
+  // const [isDragging, setIsDragging] = useState(false);
+  // const bottomSheetRef = useRef<HTMLDivElement>(null);
+  // const dragStartY = useRef(0);
+  // const dragStartHeight = useRef(0);
+
+  const [selectedLocationType, setSelectedLocationType] = useState<string>('');
+  const [otherLocationName, setOtherLocationName] = useState<string>('');
+
+  useEffect(() => {
+    if (localStorage.getItem('needLocation') === 'true') {
+      setShowLocationModal(true);
+    }
+    
+    const savedLocation = localStorage.getItem('userLocation');
+    const savedCoordinates = localStorage.getItem('userCoordinates');
+    
+    if (savedLocation && savedCoordinates) {
+      try {
+        setLocationSearchQuery(savedLocation);
+        const coords = JSON.parse(savedCoordinates);
+        setSelectedPosition(coords);
+        updateAddressDetails(coords.lat, coords.lng);
+      } catch (error) {
+        setShowErrorModal(true);
+      }
+    } else {
+      getCurrentLocation();
+    }
+  }, []);
+
+  const onLoad = useCallback((map: google.maps.Map) => {
+    mapRef.current = map;
+  }, []);
+
+  const onUnmount = useCallback(() => {
+    mapRef.current = null;
+  }, []);
+
+
+  const getCurrentLocation = () => {
+    setIsLoadingLocation(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          setSelectedPosition({ lat: latitude, lng: longitude });
+          updateMarkerPosition({ lat: latitude, lng: longitude });
+          
+          try {
+            if (!GOOGLE_MAPS_API_KEY) {
+              setShowErrorModal(true);
+              setIsLoadingLocation(false);
+              return;
+            }
+            
+            const response = await fetch(
+              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`
+            );
+            const data = await response.json();
+            if (data.results[0]) {
+              const address = data.results[0].formatted_address;
+              setLocationSearchQuery(address);
+              updateAddressDetails(latitude, longitude);
+            }
+          } catch (error) {
+            setShowErrorModal(true);
+          }
+          setIsLoadingLocation(false);
+        },
+        () => {
+          setShowErrorModal(true);
+          setIsLoadingLocation(false);
+        }
+      );
+    } else {
+      setShowErrorModal(true);
+      setIsLoadingLocation(false);
+    }
+  };
+
+  const updateMarkerPosition = (position: {lat: number, lng: number}) => {
+    if (!isLoaded || !window.google?.maps || !mapRef.current) return;
+    mapRef.current.panTo(position);
+  };
+
+  const updateAddressDetails = async (lat: number, lng: number) => {
+    if (!isLoaded || !window.google?.maps) {
+      return;
+    }
+
+    try {
+      const geocoder = new window.google.maps.Geocoder();
+      const result = await geocoder.geocode({ location: { lat, lng } });
+      
+      if (!result?.results?.[0]) {
+        return;
+      }
+
+      const addressComponents = result.results[0].address_components;
+      let city = '';
+      let district = '';
+      let state = '';
+      let pincode = '';
+      let fullAddress = result.results[0].formatted_address;
+      
+      // Extract address components
+      for (const component of addressComponents) {
+        if (component.types.includes('locality')) {
+          city = component.long_name;
+        } else if (component.types.includes('administrative_area_level_2')) {
+          district = component.long_name;
+        } else if (component.types.includes('administrative_area_level_1')) {
+          state = component.long_name;
+        } else if (component.types.includes('postal_code')) {
+          pincode = component.long_name;
+        }
+      }
+      
+      setSelectedAddress({
+        city,
+        district,
+        state,
+        pincode,
+        fullAddress
+      });
+      setLocationSearchQuery(fullAddress);
+      
+      // Check if the city is in our service area
+      const isServiced = SERVICED_CITIES.some(servicedCity => 
+        city.toLowerCase().includes(servicedCity.toLowerCase()) || 
+        state.toLowerCase().includes(servicedCity.toLowerCase()) ||
+        district.toLowerCase().includes(servicedCity.toLowerCase())
+      );
+      
+      setIsLocationServiced(isServiced);
+    } catch (error) {
+      // Only show user-friendly error message
+    }
+  };
+
+
+  const handleSaveLocation = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        navigate('/login', { state: { returnUrl: location.pathname } });
+        return;
+      }
+
+      // Save to localStorage immediately
+      localStorage.setItem('userLocation', locationSearchQuery);
+      localStorage.setItem('userCoordinates', JSON.stringify(selectedPosition));
+      localStorage.removeItem('needLocation');
+
+      // Prepare address data
+      const addressData = {
+        houseNo: addressDetails.houseNo || selectedAddress.fullAddress.split(',')[0] || '',
+        streetName: addressDetails.apartment || selectedAddress.fullAddress.split(',')[1] || '',
+        area: selectedAddress.fullAddress,
+        phoneNumber: localStorage.getItem('phoneNumber') || '',
+        coordinates: `${selectedPosition.lat},${selectedPosition.lng}`,
+        pincode: selectedAddress.pincode || '000000',
+        city: selectedAddress.city,
+        district: selectedAddress.district,
+        state: selectedAddress.state,
+        type: selectedLocationType || 'Home',
+        setAsDefault: true
+      };
+
+      // Navigate immediately if location is serviced
+      if (isLocationServiced) {
+        navigate(returnUrl);
+      } else {
+        setShowLocationModal(true);
+      }
+
+      // Save address in the background
+      fetch(`${import.meta.env.VITE_API_BASE_URL}/addresses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token
+        },
+        body: JSON.stringify(addressData)
+      }).catch((error) => {
+        console.error('Error saving address:', error);
+        // Handle error silently since user is already redirected
+      });
+
+    } catch (error) {
+      console.error('Error:', error);
+      if (isLocationServiced) {
+        navigate(returnUrl);
+      } else {
+        setShowLocationModal(true);
+      }
+    }
+  };
+  
+  const handleChangeLocation = () => {
+    setShowLocationModal(false);
+  };
+  
+  const handleViewProducts = () => {
+    // Even though we're not in the service area, allow them to browse
+    navigate('/products');
+  };
+
+  const handleMapDrag = () => {
+    if (mapRef.current) {
+      const center = mapRef.current.getCenter();
+      if (center) {
+        const newPosition = {
+          lat: center.lat(),
+          lng: center.lng()
+        };
+        setSelectedPosition(newPosition);
+        updateMarkerPosition(newPosition);
+        updateAddressDetails(newPosition.lat, newPosition.lng);
+      }
+    }
+  };
+
+
+
+
+  // Location not serviced modal
+  const LocationNotServicedException = () => {
+    return (
+      <motion.div 
+        className="fixed inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-sm p-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <motion.div 
+          className="bg-white rounded-xl w-full max-w-md py-8 px-6"
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+        >
+          <div className="text-center mb-4">
+            <h2 className="text-2xl font-bold mb-2">Sorry, We are not yet in</h2>
+            <p className="text-lg font-medium">{selectedAddress.fullAddress}</p>
+          </div>
+          
+          <div className="text-center mb-6">
+            <p className="text-gray-600">We are currently delivering in select parts of</p>
+            <div className="flex flex-wrap justify-center gap-1 mt-2 text-green-600">
+              {SERVICED_CITIES.map((city, index) => (
+                <React.Fragment key={city}>
+                  <span>{city}{index < SERVICED_CITIES.length - 1 ? "," : ""}</span>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <button 
+              onClick={handleChangeLocation}
+              className="w-full py-3 bg-green-500 text-white rounded-lg font-medium"
+            >
+              Change Location
+            </button>
+            <button 
+              onClick={handleViewProducts}
+              className="w-full py-3 border border-gray-300 text-gray-600 rounded-lg font-medium"
+            >
+              View Products
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    );
+  };
+
+  // Add loading and error states to the map component
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-white">
+        <div className="text-red-500 text-xl mb-4">
+          Unable to load map
+        </div>
+        <p className="text-gray-600 text-center mb-4">
+          {typeof loadError === 'string' && loadError.includes('ERR_BLOCKED_BY_CLIENT')
+            ? 'Please disable your ad blocker or add an exception for this website.'
+            : 'There was a problem loading the map. Please try again.'}
+        </p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="bg-green-500 text-white px-4 py-2 rounded-lg"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading map...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Move console.warn override to a separate utility
+  const setupRouterWarningSuppress = () => {
+    const originalWarn = console.warn.bind(console);
+    console.warn = (...args: any[]) => {
+      if (typeof args[0] === 'string' && args[0].includes('React Router Future Flag Warning')) return;
+      originalWarn(...args);
+    };
+    return originalWarn;
+  };
+
+  // Apply the warning suppression
+  setupRouterWarningSuppress();
+
+  return (
+    <div className="min-h-screen max-w-[800px] mx-auto flex flex-col bg-[#FFFBEB]">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-[#FFFBEB] ">
+        <div className="max-w-[800px] mx-auto px-4 py-3">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="text-gray-600 p-2 hover:bg-gray-100 rounded-full"
+          >
+            <MdArrowBack className="text-xl" />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col max-w-[800px] mx-auto w-full px-4 pb-4">
+        <h1 className="text-2xl font-semibold mb-2">Delivery Address</h1>
+        <p className="text-gray-600 mb-6">Where should we deliver your flowers?</p>
+
+        {/* Map Container */}
+        <div className="w-full h-[300px] md:h-[400px] relative rounded-lg overflow-hidden mb-6 shadow-md">
+          {isLoaded ? (
+            <>
+              <GoogleMap
+                mapContainerStyle={{
+                  width: '100%',
+                  height: '100%'
+                }}
+                center={selectedPosition}
+                zoom={15}
+                onLoad={onLoad}
+                onUnmount={onUnmount}
+                onDragEnd={handleMapDrag}
+                options={{
+                  zoomControl: false,
+                  mapTypeControl: false,
+                  streetViewControl: false,
+                  fullscreenControl: false,
+                  disableDefaultUI: true
+                }}
+              />
+              <button
+                onClick={getCurrentLocation}
+                className="absolute left-1/2 bottom-4 -translate-x-1/2 bg-white rounded-full px-4 py-2 shadow-lg z-10 hover:bg-gray-50 flex items-center gap-2 text-sm"
+              >
+                <MdMyLocation className="text-[#F15A22]" />
+                <span>Use current location</span>
+              </button>
+              {/* Single Fixed Marker */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
+                <MdLocationOn className="text-[#F15A22] text-5xl drop-shadow-lg animate-bounce" />
+              </div>
+            </>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gray-100">
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#F15A22] border-t-transparent"></div>
+            </div>
+          )}
+        </div>
+
+        {/* Address Details */}
+        <div className="space-y-4 bg-white rounded-lg p-4 md:p-6 shadow-sm">
+          <h2 className="font-medium">Complete Address</h2>
+          <div className="grid md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              placeholder="House/Flat no"
+              value={addressDetails.houseNo}
+              onChange={(e) => setAddressDetails(prev => ({ ...prev, houseNo: e.target.value }))}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#F15A22]"
+            />
+            <input
+              type="text"
+              required
+              placeholder="Street Name, Area"
+              value={addressDetails.apartment}
+              onChange={(e) => setAddressDetails(prev => ({ ...prev, apartment: e.target.value }))}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#F15A22]"
+            />
+          </div>
+          <div>
+            <h2 className="font-medium mb-2">Directions/Landmark</h2>
+            <input
+              type="text"
+              required
+              placeholder="Nearby landmark for easy location"
+              value={addressDetails.directions}
+              onChange={(e) => setAddressDetails(prev => ({ ...prev, directions: e.target.value }))}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#F15A22]"
+            />
+          </div>
+
+          {/* Address Type Selection */}
+          <div>
+            <h2 className="font-medium mb-2">Address Type</h2>
+            <div className="flex flex-wrap gap-3">
+              {['Home', 'Work', 'Others'].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => {
+                    setSelectedLocationType(type);
+                    if (type !== 'Others') {
+                      setOtherLocationName('');
+                    }
+                  }}
+                  className={`px-6 py-2 rounded-full border transition-colors ${
+                    selectedLocationType === type 
+                      ? 'border-[#F15A22] text-[#F15A22] bg-orange-50' 
+                      : 'border-gray-300 text-gray-600 hover:border-[#F15A22] hover:text-[#F15A22]'
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Other Location Name Input */}
+          {selectedLocationType === 'Others' && (
+            <input
+              type="text"
+              placeholder="Enter location name"
+              value={otherLocationName}
+              onChange={(e) => setOtherLocationName(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#F15A22]"
+            />
+          )}
+        </div>
+
+        {/* Confirm Button */}
+        <div className="max-w-[800px] w-full mx-auto px-4 mt-4 bottom-4 left-0 right-0 md:static md:px-0 md:mt-6">
+          <button
+            onClick={handleSaveLocation}
+            className="w-full py-3 bg-[#F15A22] text-white rounded-3xl font-medium hover:bg-[#F15A22]/90 transition-colors"
+          >
+            Confirm Location
+          </button>
+        </div>
+      </div>
+
+      {/* Location Not Serviced Modal */}
+      {showLocationModal && !isLocationServiced && <LocationNotServicedException />}
+    </div>
+  );
+};
+
+export default HomePageLocation;

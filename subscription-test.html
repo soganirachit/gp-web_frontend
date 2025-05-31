@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        button { padding: 10px 15px; margin: 10px 0; cursor: pointer; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 5px; overflow: auto; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Subscription API Test</h1>
+
+    <div>
+        <label for="token">Token:</label>
+        <input type="text" id="token" style="width: 100%" value="" />
+    </div>
+
+    <div>
+        <label for="basePackId">Base Pack ID:</label>
+        <input type="text" id="basePackId" value="BS0005" />
+    </div>
+
+    <div>
+        <label for="type">Type:</label>
+        <select id="type">
+            <option value="DAILY">Daily</option>
+            <option value="ALTERNATE">Alternate</option>
+        </select>
+    </div>
+
+    <div>
+        <label for="days">Days:</label>
+        <input type="number" id="days" value="7" min="1" />
+    </div>
+
+    <button id="testButton">Test Subscription API</button>
+
+    <h2>Results:</h2>
+    <pre id="results">Click the button above to test the API.</pre>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load token from localStorage if available
+            const savedToken = localStorage.getItem('token');
+            if (savedToken) {
+                document.getElementById('token').value = savedToken;
+            }
+
+            document.getElementById('testButton').addEventListener('click', async function() {
+                const resultEl = document.getElementById('results');
+                resultEl.innerHTML = 'Testing API...';
+                resultEl.className = '';
+
+                try {
+                    // Get values from form
+                    const token = document.getElementById('token').value;
+                    const basePackId = document.getElementById('basePackId').value;
+                    const type = document.getElementById('type').value;
+                    const days = parseInt(document.getElementById('days').value, 10);
+                    const startDate = new Date().toISOString();
+
+                    if (!token) {
+                        throw new Error('Token is required');
+                    }
+
+                    if (!basePackId) {
+                        throw new Error('Base Pack ID is required');
+                    }
+
+                    // Set up request data
+                    const requestData = {
+                        basePackId: basePackId,
+                        type: type,
+                        startDate: startDate,
+                        days: days
+                    };
+
+                    // Save token to localStorage for convenience
+                    localStorage.setItem('token', token);
+
+                    // Log the request
+                    console.log('Request Data:', requestData);
+                    resultEl.innerHTML = 'Sending request:\n' + JSON.stringify(requestData, null, 2);
+
+                    // Make the API call
+                    const response = await fetch('http://localhost:8000/api/v1/basepacks/subscribe', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': token,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestData)
+                    });
+
+                    // Parse response
+                    const responseData = await response.json();
+                    console.log('Response:', {
+                        status: response.status,
+                        data: responseData
+                    });
+
+                    // Display results
+                    if (response.ok) {
+                        resultEl.className = 'success';
+                        resultEl.innerHTML = 'SUCCESS! Response:\n' + JSON.stringify(responseData, null, 2);
+                    } else {
+                        resultEl.className = 'error';
+                        resultEl.innerHTML = `ERROR (${response.status}):\n` + JSON.stringify(responseData, null, 2);
+                    }
+                } catch (error) {
+                    console.error('API Test Error:', error);
+                    resultEl.className = 'error';
+                    resultEl.innerHTML = 'ERROR:\n' + error.message;
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

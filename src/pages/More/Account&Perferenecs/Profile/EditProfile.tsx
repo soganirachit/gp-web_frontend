@@ -1,0 +1,251 @@
+import React, { useState, useRef, } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  FaCamera,
+  FaUser
+} from 'react-icons/fa';
+
+import walletImage from '../../../../assets/icon/Wallet.png'; 
+import profileImage from '../../../../assets/icon/Profile.png';
+import { IoArrowBack } from 'react-icons/io5';
+
+interface UserDetails {
+  name: string;
+  email: string;
+  phone: string;
+  dob: string;
+  language: string;
+  profileImage: string | null;
+}
+
+
+const Profile: React.FC = () => {
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // User details state
+  const [userDetails, setUserDetails] = useState<UserDetails>({
+    name: '',
+    email: '',
+    phone: '',
+    dob: '',
+    language: 'English',
+    profileImage: null
+  });
+
+  // useEffect(() => {
+  //   // Fetch user details from auth service
+  //   const fetchUserDetails = async () => {
+  //     try {
+  //       const user = await authService.getCurrentUser();
+  //       if (user) {
+  //         setUserDetails({
+  //           name: user.name || '',
+  //           email: user.email || '',
+  //           phone: user.phone || '',
+  //           dob: user.dob || '',
+  //           language: user.language || 'English',
+  //           profileImage: user.profileImage || null
+  //         });
+  //       }
+  //     } catch (error) {
+  //       console.error('Error fetching user details:', error);
+  //     }
+  //   };
+  //   fetchUserDetails();
+  // }, []);
+
+  // // Handle profile image upload
+  // const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0];
+  //   if (file) {
+  //     try {
+  //       const formData = new FormData();
+  //       formData.append('image', file);
+  //       const response = await authService.updateProfileImage(formData);
+  //       setUserDetails(prev => ({
+  //         ...prev,
+  //         profileImage: response.profileImage
+  //       }));
+  //     } catch (error) {
+  //       console.error('Error uploading image:', error);
+  //     }
+  //   }
+  // };
+
+  // // Handle save changes
+  // const handleSaveChanges = async () => {
+  //   try {
+  //     await authService.updateProfile(userDetails);
+  //     // Show success message or handle navigation
+  //   } catch (error) {
+  //     console.error('Error updating profile:', error);
+  //   }
+  // };
+
+
+
+
+  // Address handlers
+
+
+
+  // Get current location
+
+  return (
+    <div className="bg-[#FFFBEB] min-h-screen">
+      <div className="max-w-[800px] mx-auto">
+        {/* Header */}
+        <div className="p-4 md:p-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate(-1)} className="hover:bg-gray-100 rounded-full p-2 transition-colors">
+              <IoArrowBack className="text-xl md:text-2xl" />
+            </button>
+            <h1 className="text-xl md:text-2xl font-medium">Edit Profile</h1>
+          </div>
+          <div className="flex items-center gap-4">
+            <img 
+              src={walletImage} 
+              alt="Wallet" 
+              className="w-10 h-10 md:w-10 md:h-10" 
+              onClick={() => navigate('/wallet')}
+            />
+            <img 
+              src={profileImage} 
+              alt="Profile" 
+              className="w-6 h-6 md:w-8 md:h-8" 
+              onClick={() => navigate('/account')}
+            />
+          </div>
+        </div>
+
+        {/* Profile Image */}
+        <div className="flex justify-center mt-6 md:mt-8">
+          <div className="relative">
+            <div className="w-24 h-24 md:w-32 md:h-32 bg-pink-100 rounded-full flex items-center justify-center overflow-hidden">
+              {userDetails.profileImage ? (
+                <img 
+                  src={userDetails.profileImage} 
+                  alt="Profile" 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <button onClick={() => fileInputRef.current?.click()} className="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center">
+                  <FaUser className="text-gray-500 w-16 h-16 md:w-20 md:h-20 text-pink-500" />
+                </button>
+              )}
+            </div>
+            <button 
+              className="absolute bottom-0 right-0 bg-white text-gray-700  p-1.5 md:p-2 rounded-full shadow-md"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <FaCamera className="text-sm md:text-base" />
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept="image/*"
+         
+            />
+          </div>
+        </div>
+
+        {/* Personal Information */}
+        <div className="bg-white rounded-lg shadow-sm p-6 md:p-8 mt-6 mx-4 md:mx-8">
+          <h2 className="text-lg md:text-xl font-medium mb-4 md:mb-6">Personal Information</h2>
+          <div className="space-y-4 md:space-y-6">
+            <div>
+              <label className="text-sm md:text-base text-gray-600">Full Name</label>
+              <input
+                type="text"
+                value={userDetails.name}
+                onChange={(e) => setUserDetails(prev => ({...prev, name: e.target.value}))}
+                className="w-full p-2 md:p-3 border-b-2 border-gray-300 text-base md:text-lg focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-sm md:text-base text-gray-600">Email Address</label>
+              <input
+                type="email"
+                value={userDetails.email}
+                onChange={(e) => setUserDetails(prev => ({...prev, email: e.target.value}))}
+                className="w-full p-2 md:p-3 border-b-2 border-gray-300 text-base md:text-lg focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-sm md:text-base text-gray-600">Phone Number</label>
+              <input
+                type="tel"
+                value={userDetails.phone}
+                onChange={(e) => setUserDetails(prev => ({...prev, phone: e.target.value}))}
+                className="w-full p-2 md:p-3 border-b-2 border-gray-300 text-base md:text-lg focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-sm md:text-base text-gray-600">Date of Birth</label>
+              <input
+                type="date"
+                value={userDetails.dob}
+                onChange={(e) => setUserDetails(prev => ({...prev, dob: e.target.value}))}
+                className="w-full p-2 md:p-3 border-b-2 border-gray-300 text-base md:text-lg focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-sm md:text-base text-gray-600">Language Preference</label>
+              <select
+                value={userDetails.language}
+                onChange={(e) => setUserDetails(prev => ({...prev, language: e.target.value}))}
+                className="w-full p-2 md:p-3 border-b-2 border-gray-300 text-base md:text-lg focus:outline-none"
+              >
+                <option>English</option>
+                <option>हिंदी</option>
+                <option>ગુજરાતી</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Change Password */}
+        <div className="bg-white rounded-lg shadow-sm p-6 md:p-8 mt-6 mx-4 md:mx-8">
+          <h2 className="text-lg md:text-xl font-medium mb-4 md:mb-6">Change Password</h2>
+          <div className="space-y-4 md:space-y-6">
+            <div>
+              <label className="text-sm md:text-base text-gray-600">Current Password</label>
+              <input
+                type="password"
+                className="w-full p-2 md:p-3 border-b-2 border-gray-300 text-base md:text-lg focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-sm md:text-base text-gray-600">New Password</label>
+              <input
+                type="password"
+                className="w-full p-2 md:p-3 border-b-2 border-gray-300 text-base md:text-lg focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-sm md:text-base text-gray-600">Confirm New Password</label>
+              <input
+                type="password"
+                className="w-full p-2 md:p-3 border-b-2 border-gray-300 text-base md:text-lg focus:outline-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Save Changes Button */}
+        <div className="p-4 md:p-8">
+          <button 
+          
+            className="w-full bg-orange-500 text-white py-3 md:py-4 rounded-3xl font-medium text-base md:text-lg hover:bg-orange-600 transition-colors"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Profile;
