@@ -1,82 +1,101 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-
-import { authService } from '../../../../services/auth.service';
-import { toast } from 'react-hot-toast';
-
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { authService } from "../../../../services/auth.service";
+import { toast } from "react-hot-toast";
 
 const NameInput: React.FC = () => {
   const navigate = useNavigate();
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [gender, setGender] = useState<'male' | 'female' | 'other' | ''>('');
-  const [customGender, setCustomGender] = useState('');
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [gender, setGender] = useState<"male" | "female" | "other" | "">("");
+  const [customGender, setCustomGender] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const handleSubmit = async () => {
+    console.log("handleSubmit called");
+
     if (!firstName.trim()) {
-      toast.error('Please enter your first name');
+      toast.error("Please enter your first name");
       return;
     }
-    
+
     if (!lastName.trim()) {
-      toast.error('Please enter your last name');
+      toast.error("Please enter your last name");
       return;
     }
 
     if (!email.trim()) {
-      toast.error('Please enter your email');
-      return;
-    }
-    
-    if (!gender) {
-      toast.error('Please select your gender');
+      toast.error("Please enter your email");
       return;
     }
 
-    if (gender === 'other' && !customGender.trim()) {
-      toast.error('Please specify your gender');
+    if (!gender) {
+      toast.error("Please select your gender");
+      return;
+    }
+
+    if (gender === "other" && !customGender.trim()) {
+      toast.error("Please specify your gender");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setError('');
-      
-      const token = localStorage.getItem('token');
-      const phoneNumber = localStorage.getItem('phoneNumber');
+      setError("");
+   
+
+      const token = localStorage.getItem("token");
+      const phoneNumber = localStorage.getItem("phoneNumber");
 
       if (!token || !phoneNumber) {
-        toast.error('Authentication required. Please login again.');
-        navigate('/login');
+        toast.error("Authentication required. Please login again.");
+        navigate("/login");
         return;
       }
 
       const fullName = `${firstName.trim()} ${lastName.trim()}`;
-      const response = await authService.completeOnboarding(fullName.trim());
-      
+      const formattedGender =
+        gender === "other" ? customGender : gender.toUpperCase();
+
+      const response = await authService.completeOnboarding(
+        firstName.trim(),
+        lastName.trim(),
+        formattedGender,
+        email.trim()
+      );
+
       if (response.success) {
-        localStorage.setItem('userName', fullName.trim());
-        localStorage.setItem('userGender', gender === 'other' ? customGender : gender);
-        localStorage.setItem('userEmail', email.trim());
-        localStorage.setItem('needLocation', 'true');
-        toast.success('Profile details saved successfully!');
-        
-        navigate('/location', { 
-          state: { 
+        localStorage.setItem("userName", fullName.trim());
+        localStorage.setItem(
+          "userGender",
+          gender === "other" ? customGender : gender
+        );
+        localStorage.setItem("userEmail", email.trim());
+        localStorage.setItem("needLocation", "true");
+
+        toast.success(
+          "Profile details saved!" +
+            (response.customerId
+              ? ` Your Customer ID: ${response.customerId}`
+              : "")
+        );
+
+        navigate("/location", {
+          state: {
             fromNameInput: true,
-            returnUrl: '/home' 
-          } 
+            returnUrl: "/home",
+          },
         });
       } else {
-        throw new Error(response.error || 'Failed to save profile details');
+        throw new Error(response.error || "Failed to save profile details");
       }
-
     } catch (err: any) {
-      const errorMessage = err.message || 'Failed to save details. Please try again.';
+      console.log("Error in onboarding:", err);
+      const errorMessage =
+        err.message || "Failed to save details. Please try again.";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -84,11 +103,9 @@ const NameInput: React.FC = () => {
     }
   };
 
-
-
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-[#FFFBEB] px-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -98,9 +115,7 @@ const NameInput: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-800 mb-2">
             Welcome to Genda Phool
           </h1>
-          <p className="text-gray-600">
-            Let's get to know you better
-          </p>
+          <p className="text-gray-600">Let's get to know you better</p>
         </div>
 
         <div className="bg-white rounded-2xl p-6 space-y-6">
@@ -141,16 +156,21 @@ const NameInput: React.FC = () => {
             <label className="block text-gray-700 mb-3">Gender</label>
             <div className="flex gap-8">
               {[
-                { value: 'male', label: 'Male' },
-                { value: 'female', label: 'Female' },
-                { value: 'other', label: 'Other' }
+                { value: "male", label: "Male" },
+                { value: "female", label: "Female" },
+                { value: "other", label: "Other" },
               ].map((option) => (
-                <label key={option.value} className="flex items-center gap-2 cursor-pointer">
+                <label
+                  key={option.value}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
                   <div className="relative flex items-center justify-center">
                     <input
                       type="radio"
                       checked={gender === option.value}
-                      onChange={() => setGender(option.value as 'male' | 'female' | 'other')}
+                      onChange={() =>
+                        setGender(option.value as "male" | "female" | "other")
+                      }
                       className="appearance-none w-5 h-5 border-2 border-gray-300 rounded-full checked:border-[#FF5722] transition-colors"
                     />
                     {gender === option.value && (
@@ -163,7 +183,7 @@ const NameInput: React.FC = () => {
             </div>
           </div>
 
-          {gender === 'other' && (
+          {gender === "other" && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -194,14 +214,12 @@ const NameInput: React.FC = () => {
               className="w-5 h-5 border-2 border-white border-t-transparent rounded-full mx-auto"
             />
           ) : (
-            'Continue'
+            "Continue"
           )}
         </motion.button>
 
         {error && (
-          <p className="mt-4 text-sm text-red-500 text-center">
-            {error}
-          </p>
+          <p className="mt-4 text-sm text-red-500 text-center">{error}</p>
         )}
       </motion.div>
     </div>
