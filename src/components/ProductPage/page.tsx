@@ -79,8 +79,8 @@ const ProductPage: React.FC = () => {
         // ]);
         // setBasePacks(packs);
         // setProducts(prods);
-      const result =  await productService.getAllProducts()
-       setProducts(result);
+        const result = await productService.getAllProducts();
+        setProducts(result);
       } catch (error) {
         console.error("Error fetching data:", error);
         setError("Failed to load products");
@@ -437,7 +437,8 @@ const ProductPage: React.FC = () => {
                         <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                           <img
                             src={
-                              item.imageUrl || "https://via.placeholder.com/160"
+                              item.imageUrl?.[0] ||
+                              "https://via.placeholder.com/160"
                             }
                             alt={item.name}
                             className="w-full h-full object-cover"
