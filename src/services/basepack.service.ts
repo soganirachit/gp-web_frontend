@@ -1,5 +1,5 @@
-import axios, { AxiosError } from 'axios';
-import { getApiUrl } from '../config/api.config';
+import axios, { AxiosError } from "axios";
+import { getApiUrl } from "../config/api.config";
 
 const API_URL = `${getApiUrl()}/basepacks`;
 
@@ -38,7 +38,7 @@ class BasePackService {
       if (error instanceof Error || error instanceof AxiosError) {
         throw error;
       }
-      throw new Error('An unknown error occurred');
+      throw new Error("An unknown error occurred");
     }
   }
 
@@ -50,7 +50,7 @@ class BasePackService {
       if (error instanceof Error || error instanceof AxiosError) {
         throw error;
       }
-      throw new Error('An unknown error occurred');
+      throw new Error("An unknown error occurred");
     }
   }
 }
