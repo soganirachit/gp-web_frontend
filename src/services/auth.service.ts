@@ -61,7 +61,7 @@ export const authService = {
    * @returns Response data from the server
    * @throws Error if token missing or request fails
    */
-  async completeOnboarding(fullName: string) {
+  async completeOnboarding({firstName,lastName,gender,email}:{firstName:string,lastName:string,email:string,gender:string}) {
     try {
       const token = localStorage.getItem('token');
       
@@ -73,8 +73,8 @@ export const authService = {
       }
       
       const response = await axios.post(
-        `${API_URL}/onboarding`,
-        { fullName },
+        `${API_URL}/create-customer`,
+        {firstName,lastName,gender,email},
         {
           headers: {
             'Authorization': token,

@@ -99,7 +99,7 @@ class WalletService {
       }
 
       const response = await axios.post(
-        `${API_URL}/create-order`,
+        `${API_URL}/add-to-order`,
         { amount },
         { headers }
       );

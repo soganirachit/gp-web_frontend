@@ -56,7 +56,7 @@ const NameInput: React.FC = () => {
       }
 
       const fullName = `${firstName.trim()} ${lastName.trim()}`;
-      const response = await authService.completeOnboarding(fullName.trim());
+      const response = await authService.completeOnboarding({firstName,lastName,email,gender:gender.toUpperCase()});
       
       if (response.success) {
         localStorage.setItem('userName', fullName.trim());
