@@ -20,8 +20,6 @@ export const productService = {
   async getAllProducts(): Promise<Product[]> {
     try {
       const response = await axios.get(API_URL);
-      console.log("Response from getAllProducts:", response.data);
-
       // Ensure we're getting an array from the response
       if (response.data && Array.isArray(response.data.data)) {
         return response.data.data;

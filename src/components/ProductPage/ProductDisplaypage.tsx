@@ -450,8 +450,6 @@ const ProductPage: React.FC = () => {
   const fetchGarlandProducts = async () => {
     try {
       const allProducts = await productService.getAllProducts();
-      console.log(allProducts);
-
       const garlandProducts = allProducts.filter(
         (product): product is GarlandProduct => product.type === "GARLAND"
       );

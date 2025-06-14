@@ -1,20 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {  FaPause, FaCalendarPlus } from 'react-icons/fa'; // cart icon FaShoppingCart,
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { FaPause, FaCalendarPlus } from "react-icons/fa"; // cart icon FaShoppingCart,
 
-
-import { MdLocationOn } from 'react-icons/md';
-import { motion } from 'framer-motion';
-import logo from '../assets/All/logo.png';
-import { walletService } from '../services/wallet.service';
-import { basePackService, BasePack } from '../services/basepack.service';
-import { subscriptionService, Subscription } from '../services/subscription.service';
-import ErrorBoundary from '../components/ErrorBoundary';
-import useGoogleMaps from '../hooks/useGoogleMaps';
-import { productService } from '../services/product.service';
-import type { Product as ProductType } from '../services/product.service';
-import { toast } from 'react-hot-toast';
-import DatePicker from 'react-datepicker';
+import { MdLocationOn } from "react-icons/md";
+import { motion } from "framer-motion";
+import logo from "../assets/All/logo.png";
+import { walletService } from "../services/wallet.service";
+import { basePackService, BasePack } from "../services/basepack.service";
+import {
+  subscriptionService,
+  Subscription,
+} from "../services/subscription.service";
+import ErrorBoundary from "../components/ErrorBoundary";
+import useGoogleMaps from "../hooks/useGoogleMaps";
+import { productService } from "../services/product.service";
+import type { Product as ProductType } from "../services/product.service";
+import { toast } from "react-hot-toast";
+import DatePicker from "react-datepicker";
 
 // Import flower images
 // import flower1 from '../assets/A1/A2.jpeg';
@@ -25,19 +27,18 @@ import DatePicker from 'react-datepicker';
 // import flower6 from '../assets/A1/A7.jpeg';
 // import flower7 from '../assets/A1/A8.jpeg';
 // import lowBalanceImg from '../assets/Low_balance.png';
-import lowBalance from '../assets/icon/LowBalance.png';
-import WalletIcon from '../assets/icon/Wallet.png'
-import searchImage from '../assets/icon/Search.png'
-import ProfileIcon from '../assets/icon/Profile.png'
-import BottomNavigation from './../components/layout/BottomNav';
-import Spinner from '../components/common/Spinner';
-
+import lowBalance from "../assets/icon/LowBalance.png";
+import WalletIcon from "../assets/icon/Wallet.png";
+import searchImage from "../assets/icon/Search.png";
+import ProfileIcon from "../assets/icon/Profile.png";
+import BottomNavigation from "./../components/layout/BottomNav";
+import Spinner from "../components/common/Spinner";
 
 interface DayInfo {
   date: string;
   day: string;
-  status: 'past' | 'active' | 'future';
-  deliveryStatus?: 'pending' | 'delivered' | 'next';
+  status: "past" | "active" | "future";
+  deliveryStatus?: "pending" | "delivered" | "next";
 }
 
 // interface CartItem {
@@ -191,7 +192,9 @@ interface DayInfo {
 const Home2: React.FC = () => {
   const navigate = useNavigate();
   const [, setDays] = useState<DayInfo[]>([]);
-  const [deliveryLocation] = useState<string>(() => localStorage.getItem('userLocation') || '');
+  const [deliveryLocation] = useState<string>(
+    () => localStorage.getItem("userLocation") || ""
+  );
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [, setIsLoadingBalance] = useState(true);
@@ -199,12 +202,15 @@ const Home2: React.FC = () => {
   const [isLoadingPacks, setIsLoadingPacks] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // const [, setCartItems] = useState<CartItem[]>([]);
-  const [activeSubscriptions, setActiveSubscriptions] = useState<Subscription[]>([]);
+  const [activeSubscriptions, setActiveSubscriptions] = useState<
+    Subscription[]
+  >([]);
   const [isLoadingSubscriptions, setIsLoadingSubscriptions] = useState(true);
-  const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null);
+  const [selectedSubscription, setSelectedSubscription] =
+    useState<Subscription | null>(null);
   const [products, setProducts] = useState<ProductType[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
-  const userName = localStorage.getItem('userName') || 'User';
+  const userName = localStorage.getItem("userName") || "User";
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
 
@@ -216,7 +222,7 @@ const Home2: React.FC = () => {
       const balance = await walletService.getWalletBalance();
       setWalletBalance(balance);
     } catch (error) {
-      console.error('Error fetching wallet balance:', error);
+      console.error("Error fetching wallet balance:", error);
     } finally {
       setIsLoadingBalance(false);
     }
@@ -225,11 +231,14 @@ const Home2: React.FC = () => {
   const fetchSubscriptions = async () => {
     try {
       setIsLoadingSubscriptions(true);
-      const fetchedSubscriptions = await subscriptionService.getCustomerSubscriptions();
+      const fetchedSubscriptions =
+        await subscriptionService.getCustomerSubscriptions();
 
       if (fetchedSubscriptions && fetchedSubscriptions.length > 0) {
         // Find active subscription
-        const active = fetchedSubscriptions.find(sub => sub.status === 'ACTIVE');
+        const active = fetchedSubscriptions.find(
+          (sub) => sub.status === "ACTIVE"
+        );
         setActiveSubscriptions(fetchedSubscriptions);
         setSelectedSubscription(active || null);
       } else {
@@ -237,7 +246,7 @@ const Home2: React.FC = () => {
         setSelectedSubscription(null);
       }
     } catch (error: any) {
-      console.error('Error fetching subscriptions:', error);
+      console.error("Error fetching subscriptions:", error);
       setActiveSubscriptions([]);
       setSelectedSubscription(null);
     } finally {
@@ -248,16 +257,17 @@ const Home2: React.FC = () => {
   const fetchActiveSubscriptions = async () => {
     try {
       setIsLoadingSubscriptions(true);
-      const subscriptions = await subscriptionService.getCustomerSubscriptions();
-      const active = subscriptions.filter(sub => sub.status === 'ACTIVE');
+      const subscriptions =
+        await subscriptionService.getCustomerSubscriptions();
+      const active = subscriptions.filter((sub) => sub.status === "ACTIVE");
       setActiveSubscriptions(active);
-      
+
       // If there are active subscriptions, set the first one as selected
       if (active.length > 0) {
         setSelectedSubscription(active[0]);
       }
     } catch (error) {
-      console.error('Error fetching subscriptions:', error);
+      console.error("Error fetching subscriptions:", error);
       setActiveSubscriptions([]);
     } finally {
       setIsLoadingSubscriptions(false);
@@ -269,20 +279,23 @@ const Home2: React.FC = () => {
       setIsLoadingPacks(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        navigate('/login', { state: { returnUrl: location.pathname } });
+        navigate("/login", { state: { returnUrl: location.pathname } });
         return;
       }
 
       const packs = await basePackService.getAllBasePacks();
       setBasePacks(packs);
     } catch (error: any) {
-      console.error('Error fetching base packs:', error);
-      if (error.message === 'Authentication required' || error.message.includes('Session expired')) {
-        navigate('/login', { state: { returnUrl: location.pathname } });
+      console.error("Error fetching base packs:", error);
+      if (
+        error.message === "Authentication required" ||
+        error.message.includes("Session expired")
+      ) {
+        navigate("/login", { state: { returnUrl: location.pathname } });
       } else {
-        setError(error.message || 'Failed to load base packs');
+        setError(error.message || "Failed to load base packs");
       }
     } finally {
       setIsLoadingPacks(false);
@@ -294,17 +307,15 @@ const Home2: React.FC = () => {
       setIsLoadingProducts(true);
       const fetchedProducts = await productService.getAllProducts();
 
-
       // Normalize product types to uppercase for consistent comparison
-      const normalizedProducts = fetchedProducts.map(product => ({
+      const normalizedProducts = fetchedProducts.map((product) => ({
         ...product,
-        type: product.type.toUpperCase()
+        type: product.type.toUpperCase(),
       }));
-
 
       setProducts(normalizedProducts);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error("Error fetching products:", error);
       setProducts([]);
     } finally {
       setIsLoadingProducts(false);
@@ -315,18 +326,18 @@ const Home2: React.FC = () => {
     // Fetch next delivery details from the backend
     // This is a placeholder function, replace with actual API call
     return {
-      date: 'Tuesday, 28 May',
-      packs: ['Brahma Pack', 'Rudra Pack'],
+      date: "Tuesday, 28 May",
+      packs: ["Brahma Pack", "Rudra Pack"],
     };
   };
 
   useEffect(() => {
-    const needLocation = localStorage.getItem('needLocation') === 'true';
+    const needLocation = localStorage.getItem("needLocation") === "true";
     if (needLocation) {
-      localStorage.removeItem('needLocation');
+      localStorage.removeItem("needLocation");
     }
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     setIsLoggedIn(!!token);
 
     if (token) {
@@ -341,7 +352,7 @@ const Home2: React.FC = () => {
 
   useEffect(() => {
     if (deliveryLocation) {
-      localStorage.setItem('userLocation', deliveryLocation);
+      localStorage.setItem("userLocation", deliveryLocation);
     }
   }, [deliveryLocation]);
 
@@ -352,14 +363,15 @@ const Home2: React.FC = () => {
   }, [isLoggedIn]);
 
   useEffect(() => {
-    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const today = new Date();
     const nextSevenDays: DayInfo[] = Array.from({ length: 7 }, (_, i) => {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
 
       // Determine delivery status based on active subscription
-      let deliveryStatus: 'pending' | 'delivered' | 'next' | undefined = undefined;
+      let deliveryStatus: "pending" | "delivered" | "next" | undefined =
+        undefined;
 
       if (selectedSubscription) {
         const subscriptionStartDate = new Date(selectedSubscription.startDate);
@@ -374,21 +386,21 @@ const Home2: React.FC = () => {
           deliveryStatus = undefined;
         } else if (currentDate.getTime() === subscriptionStartDate.getTime()) {
           // On subscription start date
-          deliveryStatus = 'next';
+          deliveryStatus = "next";
         } else if (currentDate < new Date()) {
           // Past dates
-          deliveryStatus = 'delivered';
+          deliveryStatus = "delivered";
         } else {
           // Future dates
-          deliveryStatus = 'pending';
+          deliveryStatus = "pending";
         }
       }
 
       return {
-        date: date.getDate().toString().padStart(2, '0'),
+        date: date.getDate().toString().padStart(2, "0"),
         day: weekdays[date.getDay()],
-        status: i === 0 ? 'active' : i < 0 ? 'past' : 'future',
-        deliveryStatus
+        status: i === 0 ? "active" : i < 0 ? "past" : "future",
+        deliveryStatus,
       };
     });
     setDays(nextSevenDays);
@@ -405,7 +417,6 @@ const Home2: React.FC = () => {
   const handleProductClick = (product: ProductType) => {
     navigate(`/product/${product.id}`);
   };
-
 
   // const removeFromCart = (itemId: string) => {
   //   setCartItems(prev => {
@@ -427,22 +438,21 @@ const Home2: React.FC = () => {
   //   );
   // };
 
-
   const handlePause = async () => {
     if (!selectedSubscription || !customStartDate) return;
 
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       const resumeDate = new Date(customStartDate);
       resumeDate.setHours(0, 0, 0, 0);
-      
+
       const diffTime = resumeDate.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
+
       if (diffDays < 1) {
-        toast.error('Resume date must be at least 1 day from today');
+        toast.error("Resume date must be at least 1 day from today");
         return;
       }
 
@@ -454,17 +464,16 @@ const Home2: React.FC = () => {
       if (response.success) {
         setShowPauseModal(false);
         fetchActiveSubscriptions();
-        toast.success('Subscription paused successfully');
+        toast.success("Subscription paused successfully");
       }
     } catch (error) {
-      console.error('Error pausing subscription:', error);
-      toast.error('Failed to pause subscription');
+      console.error("Error pausing subscription:", error);
+      toast.error("Failed to pause subscription");
     }
   };
 
-
   const handleAddToNextDelivery = () => {
-    navigate('/products?category=basepacks');
+    navigate("/products?category=basepacks");
   };
 
   return (
@@ -479,35 +488,41 @@ const Home2: React.FC = () => {
                 <motion.div
                   className="flex items-center space-x-2 cursor-pointer"
                   whileHover={{ scale: 1.02 }}
-                  onClick={() => navigate('/location')}
+                  onClick={() => navigate("/location")}
                 >
                   <MdLocationOn className="text-[#015D3A] text-xl mt-4" />
-                  <span className="text-[#64748B] text-lg mt-4">Delivering to Home</span>
+                  <span className="text-[#64748B] text-lg mt-4">
+                    Delivering to Home
+                  </span>
                 </motion.div>
                 <div className="text-[#64748B] text-base ml-5">
                   {deliveryLocation
-                    ? `${deliveryLocation.substring(0, 25)}${deliveryLocation.length > 25 ? '' : ''}`
-                    : 'B-149, Shilp Residency, Tarsali'}
+                    ? `${deliveryLocation.substring(0, 25)}${
+                        deliveryLocation.length > 25 ? "" : ""
+                      }`
+                    : "B-149, Shilp Residency, Tarsali"}
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-              <img 
-              src={searchImage} 
-              alt="search" 
-              className="w-6 h-6 md:w-6 md:h-6" 
-              onClick={() => navigate('/search')}
-            />
+                <img
+                  src={searchImage}
+                  alt="search"
+                  className="w-6 h-6 md:w-6 md:h-6"
+                  onClick={() => navigate("/search")}
+                />
                 <button
-                  onClick={() => navigate('/wallet')}
+                  onClick={() => navigate("/wallet")}
                   className="flex items-center"
                 >
                   <img src={WalletIcon} alt="Wallet" className="w-12 h-12" />
-                  <span className="text-[#015D3A] text-xl">₹{walletBalance}</span>
+                  <span className="text-[#015D3A] text-xl">
+                    ₹{walletBalance}
+                  </span>
                 </button>
 
                 <button
-                  onClick={() => navigate('/account')}
+                  onClick={() => navigate("/account")}
                   className="flex items-center justify-center"
                 >
                   <img src={ProfileIcon} alt="Profile" className="w-10 h-10" />
@@ -518,8 +533,12 @@ const Home2: React.FC = () => {
 
           {/* Greeting Section */}
           <div className="px-4 md:px-6 py-6">
-            <h1 className="text-2xl md:text-3xl ml-4 font-bold text-gray-800">Namaste, {userName} 🌸</h1>
-            <p className="text-sm md:text-base ml-4 text-gray-600">May your day be blessed!</p>
+            <h1 className="text-2xl md:text-3xl ml-4 font-bold text-gray-800">
+              Namaste, {userName} 🌸
+            </h1>
+            <p className="text-sm md:text-base ml-4 text-gray-600">
+              May your day be blessed!
+            </p>
           </div>
 
           {/* Alert and Promo Banner Container */}
@@ -530,12 +549,16 @@ const Home2: React.FC = () => {
                 <div className="flex items-center space-x-4">
                   <div className="flex-shrink-0">
                     <div className="rounded-full w-8 h-8">
-                      <img src={lowBalance} alt='' className='w-full h-full' />
+                      <img src={lowBalance} alt="" className="w-full h-full" />
                     </div>
                   </div>
                   <div className="flex-grow">
-                    <h3 className="text-orange-800 font-semibold">Low Balance Alert</h3>
-                    <p className="text-orange-600 text-sm">Your wallet balance is running low</p>
+                    <h3 className="text-orange-800 font-semibold">
+                      Low Balance Alert
+                    </h3>
+                    <p className="text-orange-600 text-sm">
+                      Your wallet balance is running low
+                    </p>
                   </div>
                 </div>
                 <div className="mt-4">
@@ -543,7 +566,7 @@ const Home2: React.FC = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     className="bg-orange-500 text-white px-4 py-2 rounded-2xl text-sm"
-                    onClick={() => navigate('/wallet')}
+                    onClick={() => navigate("/wallet")}
                   >
                     Recharge Now
                   </motion.button>
@@ -555,14 +578,20 @@ const Home2: React.FC = () => {
             <div className="bg-white rounded-xl p-7  shadow-sm">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800">Promo Banner</h3>
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Promo Banner
+                  </h3>
                   <p className="text-gray-600">Premium Lotus & Rose Combo</p>
                   <div className="mt-2">
-                    <span className="text-2xl font-bold text-gray-800">₹399</span>
+                    <span className="text-2xl font-bold text-gray-800">
+                      ₹399
+                    </span>
                   </div>
                 </div>
                 <div className="flex-shrink-0">
-                  <div className="bg-orange-500 text-white px-3 py-1 rounded-full">Icon</div>
+                  <div className="bg-orange-500 text-white px-3 py-1 rounded-full">
+                    Icon
+                  </div>
                 </div>
               </div>
             </div>
@@ -573,10 +602,12 @@ const Home2: React.FC = () => {
             {/* Next Delivery Card */}
             <div className="bg-white rounded-xl p-6 shadow-sm">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-semibold text-gray-500">YOUR NEXT DELIVERY</h3>
-                <button 
-                  className="text-[#006D3B] text-sm font-medium" 
-                  onClick={() => navigate('/manage-my-subscription')}
+                <h3 className="text-sm font-semibold text-gray-500">
+                  YOUR NEXT DELIVERY
+                </h3>
+                <button
+                  className="text-[#006D3B] text-sm font-medium"
+                  onClick={() => navigate("/manage-my-subscription")}
                 >
                   Manage
                 </button>
@@ -589,15 +620,18 @@ const Home2: React.FC = () => {
               ) : activeSubscriptions.length > 0 ? (
                 <>
                   <p className="text-lg font-bold text-gray-800 mb-3">
-                    Tomorrow, {new Date().toLocaleString('default', { month: 'short' })} {new Date().getDate() + 1}
+                    Tomorrow,{" "}
+                    {new Date().toLocaleString("default", { month: "short" })}{" "}
+                    {new Date().getDate() + 1}
                   </p>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {activeSubscriptions.map(subscription => (
-                      <span 
+                    {activeSubscriptions.map((subscription) => (
+                      <span
                         key={subscription.id}
                         className="bg-[#DCFCE7] text-[#166534] text-xs px-3 py-1 rounded-full"
                       >
-                        {subscription.basePackDetails?.name || 'Subscription Pack'}
+                        {subscription.basePackDetails?.name ||
+                          "Subscription Pack"}
                       </span>
                     ))}
                   </div>
@@ -611,7 +645,7 @@ const Home2: React.FC = () => {
                     >
                       <FaPause className="mr-2" /> Pause
                     </button>
-                    <button 
+                    <button
                       onClick={handleAddToNextDelivery}
                       className="text-[#006D3B] text-sm font-medium flex items-center border border-[#006D3B] rounded-full px-4 py-2"
                     >
@@ -623,7 +657,7 @@ const Home2: React.FC = () => {
                 <div className="text-center py-4">
                   <p className="text-gray-500 mb-4">No active subscriptions</p>
                   <button
-                    onClick={() => navigate('/products?category=basepacks')}
+                    onClick={() => navigate("/products?category=basepacks")}
                     className="text-[#006D3B] text-sm font-medium border border-[#006D3B] rounded-full px-6 py-2"
                   >
                     Subscribe Now
@@ -634,11 +668,14 @@ const Home2: React.FC = () => {
 
             {/* Today's Flower Wisdom Card */}
             <div className="bg-white rounded-xl p-7 shadow-sm">
-              <h3 className="text-lg text-[#8B4513] mb-4">Today's Flower Wisdom</h3>
+              <h3 className="text-lg text-[#8B4513] mb-4">
+                Today's Flower Wisdom
+              </h3>
               <div className="space-y-4">
                 <p className="text-gray-700 text-sm italic leading-relaxed">
-                  "Like the lotus flower that grows out of the mud and blossoms above the muddy water surface,
-                  we too can rise above our defilements."
+                  "Like the lotus flower that grows out of the mud and blossoms
+                  above the muddy water surface, we too can rise above our
+                  defilements."
                 </p>
                 <p className="text-gray-500">— Buddhist Teaching</p>
               </div>
@@ -650,8 +687,13 @@ const Home2: React.FC = () => {
             {/* Base Packs Section */}
             <div className="mb-8">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl md:text-2xl font-semibold text-gray-800">Base Packs</h2>
-                <button className="text-green-600 text-sm md:text-base font-medium" onClick={() => navigate('/products?category=basepacks')}>
+                <h2 className="text-xl md:text-2xl font-semibold text-gray-800">
+                  Base Packs
+                </h2>
+                <button
+                  className="text-green-600 text-sm md:text-base font-medium"
+                  onClick={() => navigate("/products?category=basepacks")}
+                >
                   View All
                 </button>
               </div>
@@ -663,36 +705,46 @@ const Home2: React.FC = () => {
               )}
 
               {error && (
-                <div className="text-red-500 text-center py-4">
-                  {error}
-                </div>
+                <div className="text-red-500 text-center py-4">{error}</div>
               )}
 
               {/* Card Layout Template - Used for all sections */}
               {!isLoadingPacks && !error && (
                 <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                  {basePacks.map(pack => (
+                  {basePacks.map((pack) => (
                     <div
                       key={pack.id}
                       className="flex-shrink-0 w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer"
-                      onClick={() => handleProductClick(pack as unknown as ProductType)}
+                      onClick={() =>
+                        handleProductClick(pack as unknown as ProductType)
+                      }
                     >
                       <div className="p-3">
                         <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                           <img
-                            src={pack.imageUrl || 'https://via.placeholder.com/160'}
+                            src={
+                              pack.imageUrl || "https://via.placeholder.com/160"
+                            }
                             alt={pack.name}
                             className="w-full h-full object-cover"
                           />
                         </div>
                         <div className="pt-3 pb-2 px-1 space-y-2">
-                          <h3 className="text-[16px] font-semibold text-gray-900 truncate">{pack.name}</h3>
-                          <p className="text-[14px] text-gray-500 truncate">{pack.description}</p>
-                          <p className="text-pink-600 text-[16px] font-bold">₹{pack.sellingPricePerPackDaily}/Day</p>
+                          <h3 className="text-[16px] font-semibold text-gray-900 truncate">
+                            {pack.name}
+                          </h3>
+                          <p className="text-[14px] text-gray-500 truncate">
+                            {pack.description}
+                          </p>
+                          <p className="text-pink-600 text-[16px] font-bold">
+                            ₹{pack.sellingPricePerPackDaily}/Day
+                          </p>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleProductClick(pack as unknown as ProductType);
+                              handleProductClick(
+                                pack as unknown as ProductType
+                              );
                             }}
                             className="text-green-600 text-[16px] mb-3 font-medium block"
                           >
@@ -710,7 +762,10 @@ const Home2: React.FC = () => {
             <div className="mb-8">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold text-gray-800">Flowers</h2>
-                <button className="text-green-600 text-sm font-medium" onClick={() => navigate('/products?category=flowers')}>
+                <button
+                  className="text-green-600 text-sm font-medium"
+                  onClick={() => navigate("/products?category=flowers")}
+                >
                   View All
                 </button>
               </div>
@@ -718,15 +773,18 @@ const Home2: React.FC = () => {
                 <div className="flex justify-center items-center h-40">
                   <Spinner size={400} />
                 </div>
-              ) : products.filter(item => item.type === 'FLOWERS').length === 0 ? (
+              ) : products.filter((item) => item.type === "FLOWERS").length ===
+                0 ? (
                 <div className="text-center py-8 text-gray-500">
                   No flowers available at the moment
                 </div>
               ) : (
                 <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
                   {products
-                    .filter(item => item.type === 'FLOWERS' && item.isAvailable)
-                    .map(item => (
+                    .filter(
+                      (item) => item.type === "FLOWERS" && item.isAvailable
+                    )
+                    .map((item) => (
                       <div
                         key={item.id}
                         className="flex-shrink-0 w-[160px] h-[280px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer"
@@ -735,15 +793,24 @@ const Home2: React.FC = () => {
                         <div className="p-3">
                           <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                             <img
-                              src={item.imageUrl || 'https://via.placeholder.com/160'}
+                              src={
+                                item.imageUrl ||
+                                "https://via.placeholder.com/160"
+                              }
                               alt={item.name}
                               className="w-full h-full object-cover"
                             />
                           </div>
                           <div className="pt-3 pb-2 px-1 space-y-2">
-                            <h3 className="text-[16px] font-semibold text-gray-900 truncate">{item.name}</h3>
-                            <p className="text-[14px] text-gray-500 truncate">{item.description}</p>
-                            <p className="text-pink-600 text-[16px] font-bold">₹{item.sellingPrice}/Day</p>
+                            <h3 className="text-[16px] font-semibold text-gray-900 truncate">
+                              {item.name}
+                            </h3>
+                            <p className="text-[14px] text-gray-500 truncate">
+                              {item.description}
+                            </p>
+                            <p className="text-pink-600 text-[16px] font-bold">
+                              ₹{item.sellingPrice}/Day
+                            </p>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -765,7 +832,10 @@ const Home2: React.FC = () => {
             <div className="mb-8">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold text-gray-800">Leaves</h2>
-                <button className="text-green-600 text-sm font-medium" onClick={() => navigate('/products?category=leaves')}>
+                <button
+                  className="text-green-600 text-sm font-medium"
+                  onClick={() => navigate("/products?category=leaves")}
+                >
                   View All
                 </button>
               </div>
@@ -773,15 +843,18 @@ const Home2: React.FC = () => {
                 <div className="flex justify-center items-center h-40">
                   <Spinner size={400} />
                 </div>
-              ) : products.filter(item => item.type === 'LEAVES').length === 0 ? (
+              ) : products.filter((item) => item.type === "LEAVES").length ===
+                0 ? (
                 <div className="text-center py-8 text-gray-500">
                   No leaves available at the moment
                 </div>
               ) : (
                 <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
                   {products
-                    .filter(item => item.type === 'LEAVES' && item.isAvailable)
-                    .map(item => (
+                    .filter(
+                      (item) => item.type === "LEAVES" && item.isAvailable
+                    )
+                    .map((item) => (
                       <div
                         key={item.id}
                         className="flex-shrink-0 w-[160px] h-[280px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer"
@@ -790,15 +863,24 @@ const Home2: React.FC = () => {
                         <div className="p-3">
                           <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                             <img
-                              src={item.imageUrl || 'https://via.placeholder.com/160'}
+                              src={
+                                item.imageUrl ||
+                                "https://via.placeholder.com/160"
+                              }
                               alt={item.name}
                               className="w-full h-full object-cover"
                             />
                           </div>
                           <div className="pt-3 pb-2 px-1 space-y-2">
-                            <h3 className="text-[16px] font-semibold text-gray-900 truncate">{item.name}</h3>
-                            <p className="text-[14px] text-gray-500 truncate">{item.description}</p>
-                            <p className="text-pink-600 text-[16px] font-bold">₹{item.sellingPrice}/Day</p>
+                            <h3 className="text-[16px] font-semibold text-gray-900 truncate">
+                              {item.name}
+                            </h3>
+                            <p className="text-[14px] text-gray-500 truncate">
+                              {item.description}
+                            </p>
+                            <p className="text-pink-600 text-[16px] font-bold">
+                              ₹{item.sellingPrice}/Day
+                            </p>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -819,20 +901,25 @@ const Home2: React.FC = () => {
             {/* Garlands Section */}
             <div className="mb-8 md:mb-10">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-800">Garlands</h2>
-                <button className="text-green-600 text-sm font-medium" onClick={() => navigate('/products?category=garlands')}>
+                <h2 className="text-xl font-semibold text-gray-800">
+                  Garlands
+                </h2>
+                <button
+                  className="text-green-600 text-sm font-medium"
+                  onClick={() => navigate("/products?category=garlands")}
+                >
                   View All
                 </button>
               </div>
               {isLoadingProducts ? (
                 <div className="flex justify-center items-center h-40">
-                    <Spinner size={400} />
+                  <Spinner size={400} />
                 </div>
               ) : (
                 <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
                   {products
-                    .filter(item => item.type === 'GARLAND')
-                    .map(item => (
+                    .filter((item) => item.type === "GARLAND")
+                    .map((item) => (
                       <div
                         key={item.id}
                         className="flex-shrink-0 w-[160px] h-[280px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer"
@@ -841,15 +928,24 @@ const Home2: React.FC = () => {
                         <div className="p-3">
                           <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                             <img
-                              src={item.imageUrl || 'https://via.placeholder.com/160'}
+                              src={
+                                item.imageUrl ||
+                                "https://via.placeholder.com/160"
+                              }
                               alt={item.name}
                               className="w-full h-full object-cover"
                             />
                           </div>
                           <div className="pt-3 pb-2 px-1 space-y-2">
-                            <h3 className="text-[16px] font-semibold text-gray-900 truncate">{item.name}</h3>
-                            <p className="text-[14px] text-gray-500 truncate">{item.description}</p>
-                            <p className="text-pink-600 text-[16px] font-bold">₹{item.sellingPrice}/Day</p>
+                            <h3 className="text-[16px] font-semibold text-gray-900 truncate">
+                              {item.name}
+                            </h3>
+                            <p className="text-[14px] text-gray-500 truncate">
+                              {item.description}
+                            </p>
+                            <p className="text-pink-600 text-[16px] font-bold">
+                              ₹{item.sellingPrice}/Day
+                            </p>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -870,70 +966,77 @@ const Home2: React.FC = () => {
         </div>
 
         {/* Bottom Navigation - Hide on desktop */}
-        <div className='mb-10 md:mb-10'>
+        <div className="mb-10 md:mb-10">
           <BottomNavigation />
         </div>
 
-         {/* Logo */}
-         <div className='flex justify-center items-center max-w-[800px] mx-auto'>
-          <img src={logo} alt='logo' className='w-32 h-32 opacity-0' />
-         </div>
+        {/* Logo */}
+        <div className="flex justify-center items-center max-w-[800px] mx-auto">
+          <img src={logo} alt="logo" className="w-32 h-32 opacity-0" />
+        </div>
 
-         {/* Pause Modal */}
-         {showPauseModal && selectedSubscription && (
-           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-             <div className="bg-white rounded-xl w-full max-w-md">
-               <div className="p-4">
-                 <div className="flex items-center justify-between mb-6">
-                   <h2 className="text-xl font-medium">Pause Subscription</h2>
-                   <button 
-                     onClick={() => setShowPauseModal(false)}
-                     className="text-gray-400 hover:text-gray-600"
-                   >
-                     ✕
-                   </button>
-                 </div>
+        {/* Pause Modal */}
+        {showPauseModal && selectedSubscription && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl w-full max-w-md">
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-medium">Pause Subscription</h2>
+                  <button
+                    onClick={() => setShowPauseModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                </div>
 
-                 <div className="mb-6">
-                   <label className="block text-gray-700 mb-2">Resume delivery from</label>
-                   <DatePicker
-                     selected={customStartDate}
-                     onChange={(date) => setCustomStartDate(date)}
-                     minDate={new Date()}
-                     placeholderText="mm/dd/yyyy"
-                     className="w-full p-3 border border-gray-300 rounded-lg"
-                   />
-                 </div>
+                <div className="mb-6">
+                  <label className="block text-gray-700 mb-2">
+                    Resume delivery from
+                  </label>
+                  <DatePicker
+                    selected={customStartDate}
+                    onChange={(date) => setCustomStartDate(date)}
+                    minDate={new Date()}
+                    placeholderText="mm/dd/yyyy"
+                    className="w-full p-3 border border-gray-300 rounded-lg"
+                  />
+                </div>
 
-                 <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                   <h3 className="font-medium mb-3">What happens when you pause?</h3>
-                   <ul className="space-y-2 text-sm text-gray-600">
-                     <li>• Your subscription will be paused immediately</li>
-                     <li>• No deliveries will be made until the resume date</li>
-                     <li>• You won't be charged during the pause period</li>
-                     <li>• Your subscription will automatically resume on the selected date</li>
-                   </ul>
-                 </div>
+                <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                  <h3 className="font-medium mb-3">
+                    What happens when you pause?
+                  </h3>
+                  <ul className="space-y-2 text-sm text-gray-600">
+                    <li>• Your subscription will be paused immediately</li>
+                    <li>• No deliveries will be made until the resume date</li>
+                    <li>• You won't be charged during the pause period</li>
+                    <li>
+                      • Your subscription will automatically resume on the
+                      selected date
+                    </li>
+                  </ul>
+                </div>
 
-                 <div className="flex gap-3">
-                   <button
-                     onClick={() => setShowPauseModal(false)}
-                     className="flex-1 py-3 rounded-xl border-2 border-gray-300 font-medium"
-                   >
-                     Cancel
-                   </button>
-                   <button
-                     onClick={handlePause}
-                     className="flex-1 py-3 rounded-xl bg-[#FF5722] text-white font-medium"
-                     disabled={!customStartDate}
-                   >
-                     Confirm
-                   </button>
-                 </div>
-               </div>
-             </div>
-           </div>
-         )}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowPauseModal(false)}
+                    className="flex-1 py-3 rounded-xl border-2 border-gray-300 font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handlePause}
+                    className="flex-1 py-3 rounded-xl bg-[#FF5722] text-white font-medium"
+                    disabled={!customStartDate}
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ErrorBoundary>
   );

@@ -20,13 +20,13 @@ export interface BasePack {
 
 class BasePackService {
   // private getHeaders() {
-  //   const token = localStorage.getItem('token');
+  //   const token = localStorage.getItem("token");
   //   if (!token) {
-  //     throw new Error('Authentication required');
+  //     throw new Error("Authentication required");
   //   }
   //   return {
   //     Authorization: token,
-  //     'Content-Type': 'application/json',
+  //     "Content-Type": "application/json",
   //   };
   // }
 
