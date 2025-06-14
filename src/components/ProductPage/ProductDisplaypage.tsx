@@ -29,10 +29,16 @@ interface BasePackContent {
   id: string;
   name: string;
   quantity: number;
+  
 }
 
 // Update BasePack interface
+<<<<<<< Updated upstream
 interface ExtendedBasePack extends Omit<BasePack, "description" | "contents"> {
+=======
+interface ExtendedBasePack extends Omit<BasePack, 'description' | 'contents'> {
+  surcharge: number;
+>>>>>>> Stashed changes
   description: string;
   contents: (BasePackContent & { description?: string })[];
   mrpPerPackDaily: number;
@@ -232,10 +238,20 @@ const ProductPage: React.FC = () => {
       const extendedData: ExtendedBasePack = {
         ...data,
         // Calculate MRP as 20% more than selling price if not provided
+<<<<<<< Updated upstream
         mrpPerPackDaily: Math.ceil(data.sellingPricePerPackDaily * 1.2),
         mrpPerPackAlternate: Math.ceil(data.sellingPricePerPackAlternate * 1.2),
         description: data.description || "",
         contents: data.contents || [],
+=======
+        mrpPerPackDaily: Math.ceil(data.sellingPrice * 1.2),
+        mrpPerPackAlternate: Math.ceil(data.sellingPrice * 1.2),
+        description: data.description || '',
+        contents: data.contents || [],
+        sellingPricePerPackDaily: 0,
+        sellingPricePerPackAlternate: 0,
+        surcharge: 0
+>>>>>>> Stashed changes
       };
       setBasePack(extendedData);
 
@@ -295,6 +311,7 @@ const ProductPage: React.FC = () => {
   // Add function to calculate price display
   const getPriceDisplay = () => {
     if (!basePack) return { price: 0, originalPrice: 0, savings: 0 };
+<<<<<<< Updated upstream
 
     const price =
       selectedType === "Daily"
@@ -306,6 +323,16 @@ const ProductPage: React.FC = () => {
         ? basePack.mrpPerPackDaily
         : basePack.mrpPerPackAlternate;
 
+=======
+    
+    const price = selectedType === 'Daily' 
+      ? basePack.sellingPrice: 0 ;
+    
+    const originalPrice = selectedType === 'Daily'
+      ? (basePack.sellingPrice  + (basePack.surcharge ?? 0))
+      : 0;
+    
+>>>>>>> Stashed changes
     const savings = originalPrice - price;
 
     return { price, originalPrice, savings };
@@ -771,6 +798,7 @@ const ProductPage: React.FC = () => {
                         className="w-full h-full object-cover"
                       />
                     </div>
+<<<<<<< Updated upstream
                     <div className="pt-3 pb-2 px-1 space-y-2">
                       <h3 className="text-[16px] font-semibold text-gray-900 truncate">
                         {pack.name}
@@ -790,6 +818,40 @@ const ProductPage: React.FC = () => {
                       >
                         View
                       </button>
+=======
+                    <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
+                      {otherBasePacks.map(pack => (
+                        <div
+                          key={pack.id}
+                          className="flex-shrink-0 w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                          onClick={() => handleProductClick(pack)}
+                        >
+                          <div className="p-3">
+                            <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
+                              <img 
+                                src={pack.imageUrl || 'https://via.placeholder.com/160'} 
+                                alt={pack.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="pt-3 pb-2 px-1 space-y-2">
+                              <h3 className="text-[16px] font-semibold text-gray-900 truncate">{pack.name}</h3>
+                              <p className="text-[14px] text-gray-500 truncate">Basepack</p>
+                              <p className="text-pink-600 text-[16px] font-bold">₹{pack.sellingPrice}/Day</p>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleProductClick(pack);
+                                }}
+                                className="text-green-600 text-[16px] mb-3 font-medium block hover:text-green-700"
+                              >
+                                View
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+>>>>>>> Stashed changes
                     </div>
                   </div>
                 </div>

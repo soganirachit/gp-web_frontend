@@ -882,6 +882,7 @@ const ConfirmSubscription: React.FC = () => {
             <div className="flex justify-between items-center">
               <span className="text-gray-600 text-sm">Pack</span>
               <span className="text-gray-800 text-sm">{subscriptionDetails?.packDetails?.name}</span>
+              <span></span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600 text-sm">Frequency</span>

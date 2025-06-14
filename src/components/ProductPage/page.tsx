@@ -40,6 +40,7 @@ const ProductPage: React.FC = () => {
   const sortProducts = (items: (Product | BasePack)[], sortType: string) => {
     return [...items].sort((a, b) => {
       switch (sortType) {
+<<<<<<< Updated upstream
         case "Price": {
           const priceA = isBasePack(a)
             ? a.sellingPricePerPackDaily
@@ -47,6 +48,11 @@ const ProductPage: React.FC = () => {
           const priceB = isBasePack(b)
             ? b.sellingPricePerPackDaily
             : b.sellingPrice;
+=======
+        case 'Price': {
+          const priceA = isBasePack(a) ? a.sellingPrice : a.sellingPrice;
+          const priceB = isBasePack(b) ? b.sellingPrice : b.sellingPrice;
+>>>>>>> Stashed changes
           return priceA - priceB;
         }
         case "Popularity":
@@ -65,7 +71,7 @@ const ProductPage: React.FC = () => {
   };
 
   const getItemPrice = (item: Product | BasePack): number => {
-    return isBasePack(item) ? item.sellingPricePerPackDaily : item.sellingPrice;
+    return isBasePack(item) ? item.sellingPrice : item.sellingPrice;
   };
 
   useEffect(() => {
