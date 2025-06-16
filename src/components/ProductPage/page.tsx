@@ -40,13 +40,9 @@ const ProductPage: React.FC = () => {
   const sortProducts = (items: (Product | BasePack)[], sortType: string) => {
     return [...items].sort((a, b) => {
       switch (sortType) {
-        case "Price": {
-          const priceA = isBasePack(a)
-            ? a.sellingPricePerPackDaily
-            : a.sellingPrice;
-          const priceB = isBasePack(b)
-            ? b.sellingPricePerPackDaily
-            : b.sellingPrice;
+        case 'Price': {
+          const priceA = isBasePack(a) ? a.sellingPrice : a.sellingPrice;
+          const priceB = isBasePack(b) ? b.sellingPrice : b.sellingPrice;
           return priceA - priceB;
         }
         case "Popularity":
@@ -65,7 +61,7 @@ const ProductPage: React.FC = () => {
   };
 
   const getItemPrice = (item: Product | BasePack): number => {
-    return isBasePack(item) ? item.sellingPricePerPackDaily : item.sellingPrice;
+    return isBasePack(item) ? item.sellingPrice : item.sellingPrice;
   };
 
   useEffect(() => {

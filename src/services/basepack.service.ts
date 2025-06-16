@@ -8,8 +8,7 @@ export interface BasePack {
   name: string;
   description: string;
   imageUrl?: string;
-  sellingPricePerPackDaily: number;
-  sellingPricePerPackAlternate: number;
+  sellingPrice: number;
   type: string;
   contents: Array<{
     id: string;

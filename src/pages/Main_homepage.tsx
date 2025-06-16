@@ -737,7 +737,7 @@ const Home2: React.FC = () => {
                             {pack.description}
                           </p>
                           <p className="text-pink-600 text-[16px] font-bold">
-                            ₹{pack.sellingPricePerPackDaily}/Day
+                            ₹{pack.sellingPrice}/Day
                           </p>
                           <button
                             onClick={(e) => {
