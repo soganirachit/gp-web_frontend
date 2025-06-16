@@ -94,7 +94,6 @@ export const authService = {
         }
       );
 
-     
       if (
         response.data.message === "Full name updated successfully" ||
         response.data.message === "User created successfully" ||

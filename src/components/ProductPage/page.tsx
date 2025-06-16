@@ -40,7 +40,7 @@ const ProductPage: React.FC = () => {
   const sortProducts = (items: (Product | BasePack)[], sortType: string) => {
     return [...items].sort((a, b) => {
       switch (sortType) {
-        case 'Price': {
+        case "Price": {
           const priceA = isBasePack(a) ? a.sellingPrice : a.sellingPrice;
           const priceB = isBasePack(b) ? b.sellingPrice : b.sellingPrice;
           return priceA - priceB;
