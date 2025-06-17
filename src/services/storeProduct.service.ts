@@ -1,7 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { getApiUrl } from "../config/api.config";
 
-const API_URL = `${getApiUrl()}/products/store/storeProducts`;
+const API_URL = `${getApiUrl()}/SubProducts/store`;
 
 export interface Product {
   id: string;
@@ -38,4 +38,3 @@ export const storeProductService = {
     }
   },
 };
-

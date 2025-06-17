@@ -20,7 +20,7 @@ export const getAddressesUrl = () => {
   return `${getApiUrl()}/addresses`;
 };
 
-export const getStoreProducts = () => {
-  return `${getApiUrl()}/products`;
-};
+// export const getStoreProducts = () => {
+//   return `${getApiUrl()}/products`;
+// };
 export default config;
