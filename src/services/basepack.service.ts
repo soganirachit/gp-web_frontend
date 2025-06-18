@@ -1,5 +1,5 @@
-import axios, { AxiosError } from 'axios';
-import { getApiUrl } from '../config/api.config';
+import axios, { AxiosError } from "axios";
+import { getApiUrl } from "../config/api.config";
 
 const API_URL = `${getApiUrl()}/basepacks`;
 
@@ -8,8 +8,7 @@ export interface BasePack {
   name: string;
   description: string;
   imageUrl?: string;
-  sellingPricePerPackDaily: number;
-  sellingPricePerPackAlternate: number;
+  sellingPrice: number;
   type: string;
   contents: Array<{
     id: string;
@@ -20,13 +19,13 @@ export interface BasePack {
 
 class BasePackService {
   // private getHeaders() {
-  //   const token = localStorage.getItem('token');
+  //   const token = localStorage.getItem("token");
   //   if (!token) {
-  //     throw new Error('Authentication required');
+  //     throw new Error("Authentication required");
   //   }
   //   return {
   //     Authorization: token,
-  //     'Content-Type': 'application/json',
+  //     "Content-Type": "application/json",
   //   };
   // }
 
@@ -38,7 +37,7 @@ class BasePackService {
       if (error instanceof Error || error instanceof AxiosError) {
         throw error;
       }
-      throw new Error('An unknown error occurred');
+      throw new Error("An unknown error occurred");
     }
   }
 
@@ -50,7 +49,7 @@ class BasePackService {
       if (error instanceof Error || error instanceof AxiosError) {
         throw error;
       }
-      throw new Error('An unknown error occurred');
+      throw new Error("An unknown error occurred");
     }
   }
 }

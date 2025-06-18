@@ -88,7 +88,7 @@
                     resultEl.innerHTML = 'Sending request:\n' + JSON.stringify(requestData, null, 2);
 
                     // Make the API call
-                    const response = await fetch('http://localhost:8000/api/v1/basepacks/subscribe', {
+                    const response = await fetch('http://localhost:8000/api/v1/basePackId/subscribe', {
                         method: 'POST',
                         headers: {
                             'Authorization': token,

@@ -5,7 +5,7 @@ interface ApiConfig {
 
 const config: ApiConfig = {
   baseUrl: import.meta.env.VITE_API_BASE_URL,
-  apiVersion: 'v1'
+  apiVersion: "v1",
 };
 
 export const getApiUrl = () => {
@@ -20,4 +20,7 @@ export const getAddressesUrl = () => {
   return `${getApiUrl()}/addresses`;
 };
 
-export default config; 
+// export const getStoreProducts = () => {
+//   return `${getApiUrl()}/products`;
+// };
+export default config;

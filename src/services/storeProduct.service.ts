@@ -1,7 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { getApiUrl } from "../config/api.config";
 
-const API_URL = `${getApiUrl()}/products`;
+const API_URL = `${getApiUrl()}/SubProducts/store`;
 
 export interface Product {
   id: string;
@@ -16,8 +16,8 @@ export interface Product {
   isAvailable: boolean;
 }
 
-export const productService = {
-  async getAllProducts(): Promise<Product[]> {
+export const storeProductService = {
+  async getAllStoreProducts(): Promise<Product[]> {
     try {
       const response = await axios.get(API_URL);
       // Ensure we're getting an array from the response

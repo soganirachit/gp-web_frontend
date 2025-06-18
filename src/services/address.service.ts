@@ -32,6 +32,7 @@ export interface AddressInput {
   societyName?: string;
   district?: string;
   setAsDefault?: boolean;
+  
 }
 
 class AddressService {

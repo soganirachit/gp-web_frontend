@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FaArrowLeft } from 'react-icons/fa';
-import { motion } from 'framer-motion';
-import { toast } from 'react-hot-toast';
-import { addressService, type Address, type AddressInput } from '../../services/address.service';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { FaArrowLeft } from "react-icons/fa";
+import { motion } from "framer-motion";
+import { toast } from "react-hot-toast";
+import {
+  addressService,
+  type Address,
+  type AddressInput,
+} from "../../services/address.service";
 
 interface AddressFormProps {
-  mode: 'add' | 'edit';
+  mode: "add" | "edit";
   initialAddress?: Address;
 }
 
@@ -14,17 +18,17 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<AddressInput>({
-    houseNo: '',
-    streetName: '',
-    area: '',
-    city: '',
-    state: '',
-    pincode: '',
-    phoneNumber: '',
+    houseNo: "",
+    streetName: "",
+    area: "",
+    city: "",
+    state: "",
+    pincode: "",
+    phoneNumber: "",
   });
 
   useEffect(() => {
-    if (mode === 'edit' && initialAddress) {
+    if (mode === "edit" && initialAddress) {
       setFormData({
         houseNo: initialAddress.houseNo,
         streetName: initialAddress.streetName,
@@ -39,7 +43,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
@@ -50,16 +54,16 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
     setLoading(true);
 
     try {
-      if (mode === 'add') {
+      if (mode === "add") {
         await addressService.createAddress(formData);
-        toast.success('Address added successfully');
-      } else if (mode === 'edit' && initialAddress) {
+        toast.success("Address added successfully");
+      } else if (mode === "edit" && initialAddress) {
         await addressService.updateAddress(initialAddress.id, formData);
-        toast.success('Address updated successfully');
+        toast.success("Address updated successfully");
       }
-      navigate('/addresses');
+      navigate("/addresses");
     } catch (error) {
-      toast.error('Failed to save address');
+      toast.error("Failed to save address");
     } finally {
       setLoading(false);
     }
@@ -79,7 +83,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
             <FaArrowLeft size={20} />
           </motion.button>
           <h1 className="text-xl font-semibold">
-            {mode === 'add' ? 'Add New Address' : 'Edit Address'}
+            {mode === "add" ? "Add New Address" : "Edit Address"}
           </h1>
         </div>
       </div>
@@ -88,7 +92,10 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
       <form onSubmit={handleSubmit} className="p-4 max-w-lg mx-auto">
         <div className="space-y-4">
           <div>
-            <label htmlFor="houseNo" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="houseNo"
+              className="block text-sm font-medium text-gray-700"
+            >
               House/Flat No.
             </label>
             <input
@@ -103,7 +110,10 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
           </div>
 
           <div>
-            <label htmlFor="streetName" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="streetName"
+              className="block text-sm font-medium text-gray-700"
+            >
               Street Name
             </label>
             <input
@@ -118,7 +128,10 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
           </div>
 
           <div>
-            <label htmlFor="area" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="area"
+              className="block text-sm font-medium text-gray-700"
+            >
               Area/Locality
             </label>
             <input
@@ -133,7 +146,10 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
           </div>
 
           <div>
-            <label htmlFor="city" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="city"
+              className="block text-sm font-medium text-gray-700"
+            >
               City
             </label>
             <input
@@ -148,7 +164,10 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
           </div>
 
           <div>
-            <label htmlFor="state" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="state"
+              className="block text-sm font-medium text-gray-700"
+            >
               State
             </label>
             <input
@@ -163,8 +182,11 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
           </div>
 
           <div>
-            <label htmlFor="pincode" className="block text-sm font-medium text-gray-700">
-              Pincode
+            <label
+              htmlFor="pincode"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Pin code
             </label>
             <input
               type="text"
@@ -180,7 +202,10 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
           </div>
 
           <div>
-            <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="phoneNumber"
+              className="block text-sm font-medium text-gray-700"
+            >
               Phone Number
             </label>
             <input
@@ -205,8 +230,10 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
           >
             {loading ? (
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            ) : mode === "add" ? (
+              "Add Address"
             ) : (
-              mode === 'add' ? 'Add Address' : 'Update Address'
+              "Update Address"
             )}
           </button>
         </div>
@@ -215,4 +242,4 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
   );
 };
 
-export default AddressForm; 
+export default AddressForm;

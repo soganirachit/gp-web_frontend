@@ -66,7 +66,7 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
       setIsLoading(true);
       // Call your backend to create an order
       const response = await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL}/wallet/add-to-wallet`,
+        `${import.meta.env.VITE_API_BASE_URL}/wallet/add-to-payment`,
         { amount },
         {
           headers: {

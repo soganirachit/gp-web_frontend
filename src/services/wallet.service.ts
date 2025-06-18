@@ -99,7 +99,7 @@ class WalletService {
       }
 
       const response = await axios.post(
-        `${API_URL}/add-to-order`,
+        `${API_URL}/add-to-payment`,
         { amount },
         { headers }
       );
@@ -141,7 +141,29 @@ class WalletService {
       throw error;
     }
   }
+   // Temporary: Directly add amount to wallet (without Razorpay)
+  async addAmountDirect(amount: number): Promise<any> {
+    try {
+      const headers = this.getAuthHeaders();
+      if (!headers) {
+        throw new Error('Authentication required');
+      }
 
+      const response = await axios.post(
+        `${API_URL}/add-to-payment`,
+        { amount },
+        { headers }
+      );
+
+      if (response.status === 200 && response.data.success) {
+        return response.data;
+      }
+      throw new Error(response.data.message || 'Failed to add amount');
+    } catch (error: any) {
+      this.handleAuthError(error);
+      throw error;
+    }
+  }
 
 }
 

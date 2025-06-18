@@ -59,6 +59,8 @@ import Wallet from '../components/Payment/Wallet/wallet';
 // Other Components
 import Refer from '../pages/Refer/Refer';
 import CustomerSupport from '../pages/More/CustomerSupport';
+import StoreProductsPages from '@/components/StoreProductsPage/page';
+
 
 
 const router = createBrowserRouter([
@@ -74,6 +76,8 @@ const router = createBrowserRouter([
       { path: '/Products', element: <Products /> },
       { path: '/product/:id', element: <ProductPage /> },
       { path: '/search', element: <Search /> },
+      { path: '/store', element: <StoreProductsPages /> },
+    
 
       // Auth Routes
 

@@ -16,14 +16,6 @@ import Spinner from "../common/Spinner";
 import { IoArrowBack } from "react-icons/io5";
 import BottomNav from "../layout/BottomNav";
 
-// Add interface for content items
-// interface ContentItem {
-//   id: string;
-//   name: string;
-//   quantity: number;
-//   description?: string;
-// }
-
 // Define base pack content type from the service
 interface BasePackContent {
   id: string;
@@ -44,22 +36,6 @@ interface ExtendedBasePack extends Omit<BasePack, "description" | "contents"> {
 
 // Define subscription types to match exactly what's expected by the API
 type SubscriptionType = "Daily" | "Alternate";
-
-// interface SubscriptionData {
-//   customerId: string;
-//   basePackId: string;
-//   type: SubscriptionType;
-//   startDate: Date;
-//   selectedDays: string[];
-// }
-
-// interface PaymentDetails {
-//   sellingPrice: number;
-//   minDays: number;
-//   recommendedDays: number;
-//   amount: number;
-//   recommendedAmount: number;
-// }
 
 // Add interface for existing subscription
 interface ExistingSubscriptionModalProps {
@@ -286,15 +262,6 @@ const ProductPage: React.FC = () => {
   useEffect(() => {
     fetchBasePack();
   }, [id, navigate]);
-
-  // Format date for display
-  // const formatDate = (date: Date): string => {
-  //   return date.toLocaleDateString('en-IN', {
-  //     day: 'numeric',
-  //     month: 'short',
-  //     year: 'numeric'
-  //   });
-  // };
 
   // Add function to calculate price display
   const getPriceDisplay = () => {
