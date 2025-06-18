@@ -4,21 +4,21 @@
  * with axios or other libraries.
  */
 
-import { getBasePacksUrl } from '../config/api.config';
+import { getBasePacksUrl } from "../config/api.config";
 
 // Define the base URL for the API
 const API_URL = getBasePacksUrl();
-const SUBSCRIPTION_API_URL = API_URL.replace('/basepacks', '/subscription');
+const SUBSCRIPTION_API_URL = API_URL.replace("/basepacks", "/subscription");
 
 // Response interfaces
 export interface Subscription {
   id: string;
   customerId: string;
-  type: 'DAILY' | 'ALTERNATE';
+  type: "DAILY" | "ALTERNATE";
   selectedDays: string[];
   startDate: Date;
   endDate?: Date;
-  status: 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'INACTIVE';
+  status: "ACTIVE" | "PAUSED" | "CANCELLED" | "INACTIVE";
   basePackId: string;
   basePackDetails?: {
     name: string;
@@ -54,7 +54,7 @@ export interface SubscriptionInitiateResponse {
   amount?: number;
   details?: {
     id: string;
-    type: 'DAILY' | 'ALTERNATE';
+    type: "DAILY" | "ALTERNATE";
     startDate: string;
     status: string;
   };
@@ -72,7 +72,7 @@ export interface SubscriptionConfirmResponse {
 // Input interfaces
 export interface SubscriptionInitiateRequest {
   basePackId: string;
-  type: 'Daily' | 'Alternate' | 'DAILY' | 'ALTERNATE';
+  type: "Daily" | "Alternate" | "DAILY" | "ALTERNATE";
   startDate: Date;
   days: number;
 }
@@ -80,7 +80,7 @@ export interface SubscriptionInitiateRequest {
 export interface SubscriptionConfirmRequest {
   basePackId: string;
   deliveryAddressId: string;
-  type: 'Daily' | 'Alternate' | 'DAILY' | 'ALTERNATE';
+  type: "Daily" | "Alternate" | "DAILY" | "ALTERNATE";
   startDate: Date;
   selectedDays: string[];
 }
@@ -90,27 +90,29 @@ class SubscriptionService {
    * Get authorization headers for API requests
    */
   private getHeaders() {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (!token) {
-      throw new Error('Authentication required');
+      throw new Error("Authentication required");
     }
-    
+
     return {
-      'Authorization': token,
-      'Content-Type': 'application/json'
+      Authorization: token,
+      "Content-Type": "application/json",
     };
   }
 
   /**
    * Normalize subscription type to uppercase
    */
-  private normalizeType(type: string): 'DAILY' | 'ALTERNATE' {
+  private normalizeType(type: string): "DAILY" | "ALTERNATE" {
     if (!type) {
-      throw new Error('Subscription type is required');
+      throw new Error("Subscription type is required");
     }
     const normalized = type.toUpperCase();
-    if (normalized !== 'DAILY' && normalized !== 'ALTERNATE') {
-      throw new Error('Invalid subscription type. Must be either Daily or Alternate');
+    if (normalized !== "DAILY" && normalized !== "ALTERNATE") {
+      throw new Error(
+        "Invalid subscription type. Must be either Daily or Alternate"
+      );
     }
     return normalized;
   }
@@ -120,79 +122,83 @@ class SubscriptionService {
    */
   private validateSubscriptionData(data: SubscriptionInitiateRequest) {
     if (!data.basePackId) {
-      throw new Error('basePackId is required');
+      throw new Error("basePackId is required");
     }
     if (!data.type) {
-      throw new Error('type is required');
+      throw new Error("type is required");
     }
     if (!data.startDate) {
-      throw new Error('startDate is required');
+      throw new Error("startDate is required");
     }
     if (!data.days || data.days <= 0) {
-      throw new Error('days must be a positive number');
+      throw new Error("days must be a positive number");
     }
   }
 
   /**
    * Initiate a subscription
    */
-  async initiateSubscription(data: SubscriptionInitiateRequest): Promise<SubscriptionInitiateResponse> {
+  async initiateSubscription(
+    data: SubscriptionInitiateRequest
+  ): Promise<SubscriptionInitiateResponse> {
     try {
       // Validate input data
       this.validateSubscriptionData(data);
 
       const headers = this.getHeaders();
       const normalizedType = this.normalizeType(data.type);
-      
-      console.log('Processing subscription initiation:', {
+
+      console.log("Processing subscription initiation:", {
         inputData: data,
         normalizedType,
-        headers
+        headers,
       });
-      
+
       const payload = {
         id: String(data.basePackId).trim(),
         type: normalizedType,
         startDate: data.startDate.toISOString(),
-        days: data.days
+        days: data.days,
       };
-      
-      console.log('Sending payload to server:', payload);
-      
+
+      console.log("Sending payload to server:", payload);
+
       const response = await fetch(`${SUBSCRIPTION_API_URL}/initiate`, {
-        method: 'POST',
+        method: "POST",
         headers: {
           ...headers,
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
-      
+
       const responseData = await response.json();
-      console.log('Server response:', {
+      console.log("Server response:", {
         status: response.status,
         ok: response.ok,
-        data: responseData
+        data: responseData,
       });
-      
+
       if (!response.ok) {
-        if (responseData.error === 'Insufficient wallet balance') {
+        if (responseData.error === "Insufficient wallet balance") {
           return {
             success: false,
-            message: 'Insufficient wallet balance',
-            error: 'Insufficient wallet balance',
-            ...responseData
+            message: "Insufficient wallet balance",
+            error: "Insufficient wallet balance",
+            ...responseData,
           };
         }
-        
-        throw new Error(responseData.error || `Request failed with status ${response.status}`);
+
+        throw new Error(
+          responseData.error || `Request failed with status ${response.status}`
+        );
       }
-      
+
       return responseData;
     } catch (error: any) {
-      console.error('Subscription initiation error:', {
+      console.error("Subscription initiation error:", {
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
       throw error;
     }
@@ -201,39 +207,46 @@ class SubscriptionService {
   /**
    * Confirm a subscription with delivery address
    */
-  async confirmSubscription(data: SubscriptionConfirmRequest): Promise<SubscriptionConfirmResponse> {
+  async confirmSubscription(
+    data: SubscriptionConfirmRequest
+  ): Promise<SubscriptionConfirmResponse> {
     try {
       const headers = this.getHeaders();
       const normalizedType = this.normalizeType(data.type);
-      
+
       const payload = {
-        basePackId: data.basePackId,
+        productId: data.basePackId,
         deliveryAddressId: data.deliveryAddressId,
         type: normalizedType,
         startDate: data.startDate.toISOString(),
-        selectedDays: data.selectedDays
+        deliveryDays: data.selectedDays,
       };
-      
+
       const response = await fetch(`${SUBSCRIPTION_API_URL}/confirm`, {
-        method: 'POST',
+        method: "POST",
         headers: headers,
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
-      
+
       const responseData = await response.json();
-      
+
       if (!response.ok) {
-        if (responseData.error === 'Customer already has an active subscription at this address') {
+        if (
+          responseData.error ===
+          "Customer already has an active subscription at this address"
+        ) {
           return {
             success: false,
             error: responseData.error,
-            ...responseData
+            ...responseData,
           };
         }
-        
-        throw new Error(responseData.error || `Request failed with status ${response.status}`);
+
+        throw new Error(
+          responseData.error || `Request failed with status ${response.status}`
+        );
       }
-      
+
       return responseData;
     } catch (error: any) {
       throw error;
@@ -247,14 +260,16 @@ class SubscriptionService {
     try {
       const headers = this.getHeaders();
       const response = await fetch(`${SUBSCRIPTION_API_URL}`, {
-        method: 'GET',
-        headers
+        method: "GET",
+        headers,
       });
-      
+
       if (!response.ok) {
-        throw new Error(`Failed to fetch subscriptions: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Failed to fetch subscriptions: ${response.status} ${response.statusText}`
+        );
       }
-      
+
       return await response.json();
     } catch (error) {
       throw error;
@@ -267,18 +282,25 @@ class SubscriptionService {
   async toggleSubscriptionStatus(subscriptionId: string, resumeDate?: Date) {
     try {
       const headers = this.getHeaders();
-      const payload = resumeDate ? { resumeDate: resumeDate.toISOString() } : {};
-      
-      const response = await fetch(`${SUBSCRIPTION_API_URL}/${subscriptionId}/toggle-status`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify(payload)
-      });
-      
+      const payload = resumeDate
+        ? { resumeDate: resumeDate.toISOString() }
+        : {};
+
+      const response = await fetch(
+        `${SUBSCRIPTION_API_URL}/${subscriptionId}/toggle-status`,
+        {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(payload),
+        }
+      );
+
       if (!response.ok) {
-        throw new Error(`Failed to toggle subscription status: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Failed to toggle subscription status: ${response.status} ${response.statusText}`
+        );
       }
-      
+
       return await response.json();
     } catch (error) {
       throw error;
@@ -291,13 +313,16 @@ class SubscriptionService {
   async cancelSubscription(subscriptionId: string) {
     try {
       const headers = this.getHeaders();
-      const response = await fetch(`${SUBSCRIPTION_API_URL}/${subscriptionId}/cancel`, {
-        method: 'PATCH',
-        headers
-      });
+      const response = await fetch(
+        `${SUBSCRIPTION_API_URL}/${subscriptionId}/cancel`,
+        {
+          method: "PATCH",
+          headers,
+        }
+      );
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to cancel subscription');
+        throw new Error(data.error || "Failed to cancel subscription");
       }
       return data;
     } catch (error) {
@@ -308,26 +333,29 @@ class SubscriptionService {
   /**
    * Pause a subscription for a specified number of days
    */
-  async pauseSubscription(subscriptionId: string, pauseDays: number): Promise<{ success: boolean; error?: string }> {
+  async pauseSubscription(
+    subscriptionId: string,
+    pauseDays: number
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       // Calculate resume date based on pause days
       const resumeDate = new Date();
       resumeDate.setDate(resumeDate.getDate() + pauseDays);
-      
+
       // Use the existing toggleSubscriptionStatus method with the resume date
       await this.toggleSubscriptionStatus(subscriptionId, resumeDate);
-      
+
       return {
-        success: true
+        success: true,
       };
     } catch (error: any) {
-      console.error('Error pausing subscription:', error);
+      console.error("Error pausing subscription:", error);
       return {
         success: false,
-        error: error.message || 'An unknown error occurred'
+        error: error.message || "An unknown error occurred",
       };
     }
   }
 }
 
-export const subscriptionService = new SubscriptionService(); 
+export const subscriptionService = new SubscriptionService();

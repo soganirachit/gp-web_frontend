@@ -45,10 +45,7 @@ const HomePageLocation: React.FC = () => {
   const [selectedPosition, setSelectedPosition] = useState<{
     lat: number;
     lng: number;
-  }>({
-    lat: 20.5937,
-    lng: 78.9629,
-  });
+  } | null>(null);
   const [, setIsLoadingLocation] = useState(false);
   const [isLocationServiced, setIsLocationServiced] = useState(true);
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -122,32 +119,40 @@ const HomePageLocation: React.FC = () => {
           updateMarkerPosition({ lat: latitude, lng: longitude });
 
           try {
-            if (!GOOGLE_MAPS_API_KEY) {
+            const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+            console.log("Using API Key:", apiKey ? "Loaded" : "Not Loaded");
+            if (!apiKey) {
+              console.error("Google Maps API key is not configured.");
               setShowErrorModal(true);
               setIsLoadingLocation(false);
               return;
             }
 
             const response = await fetch(
-              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`
+              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`
             );
             const data = await response.json();
-            if (data.results[0]) {
+            if (data.results && data.results[0]) {
               const address = data.results[0].formatted_address;
               setLocationSearchQuery(address);
               updateAddressDetails(latitude, longitude);
+            } else {
+              console.error("Geocoding API did not return results:", data);
             }
           } catch (error) {
+            console.error("Error fetching address details:", error);
             setShowErrorModal(true);
           }
           setIsLoadingLocation(false);
         },
-        () => {
+        (error) => {
+          console.error("Error getting current location:", error);
           setShowErrorModal(true);
           setIsLoadingLocation(false);
         }
       );
     } else {
+      console.error("Geolocation is not supported by this browser.");
       setShowErrorModal(true);
       setIsLoadingLocation(false);
     }
@@ -167,7 +172,10 @@ const HomePageLocation: React.FC = () => {
       const geocoder = new window.google.maps.Geocoder();
       const result = await geocoder.geocode({ location: { lat, lng } });
 
+      console.log("Geocoding API Response:", result);
+
       if (!result?.results?.[0]) {
+        console.error("No results found in geocoding response.");
         return;
       }
 
@@ -176,20 +184,41 @@ const HomePageLocation: React.FC = () => {
       let district = "";
       let state = "";
       let pincode = "";
+      let streetNumber = "";
+      let route = "";
+      let sublocality = "";
       let fullAddress = result.results[0].formatted_address;
 
       // Extract address components
       for (const component of addressComponents) {
-        if (component.types.includes("locality")) {
+        const types = component.types;
+        if (types.includes("street_number")) {
+          streetNumber = component.long_name;
+        } else if (types.includes("route")) {
+          route = component.long_name;
+        } else if (
+          types.includes("sublocality_level_1") ||
+          types.includes("sublocality")
+        ) {
+          sublocality = component.long_name;
+        } else if (types.includes("locality")) {
           city = component.long_name;
-        } else if (component.types.includes("administrative_area_level_2")) {
+        } else if (types.includes("administrative_area_level_2")) {
           district = component.long_name;
-        } else if (component.types.includes("administrative_area_level_1")) {
+        } else if (types.includes("administrative_area_level_1")) {
           state = component.long_name;
-        } else if (component.types.includes("postal_code")) {
+        } else if (types.includes("postal_code")) {
           pincode = component.long_name;
         }
       }
+
+      const newAddressDetails = {
+        houseNo: streetNumber,
+        apartment: [route, sublocality].filter(Boolean).join(", "),
+        directions: "", // Directions are not provided by geocoding
+      };
+
+      console.log("Parsed Address Details:", newAddressDetails);
 
       setSelectedAddress({
         city,
@@ -198,6 +227,9 @@ const HomePageLocation: React.FC = () => {
         pincode,
         fullAddress,
       });
+
+      setAddressDetails(newAddressDetails);
+
       setLocationSearchQuery(fullAddress);
 
       // Check if the city is in our service area
@@ -210,6 +242,7 @@ const HomePageLocation: React.FC = () => {
 
       setIsLocationServiced(isServiced);
     } catch (error) {
+      console.error("Error in updateAddressDetails:", error);
       // Only show user-friendly error message
     }
   };
@@ -228,16 +261,15 @@ const HomePageLocation: React.FC = () => {
       localStorage.setItem("userCoordinates", JSON.stringify(selectedPosition));
       localStorage.removeItem("needLocation");
 
+      if (!selectedPosition) {
+        // Or handle this case appropriately, maybe show an error to the user
+        return;
+      }
+
       // Prepare address data
       const addressData = {
-        houseNo:
-          addressDetails.houseNo ||
-          selectedAddress.fullAddress.split(",")[0] ||
-          "",
-        streetName:
-          addressDetails.apartment ||
-          selectedAddress.fullAddress.split(",")[1] ||
-          "",
+        houseNo: addressDetails.houseNo,
+        streetName: addressDetails.apartment,
         area: selectedAddress.fullAddress,
         associatedPhoneNumber: localStorage.getItem("phoneNumber") || "",
         coordinates: `${selectedPosition.lat},${selectedPosition.lng}`,
@@ -429,26 +461,41 @@ const HomePageLocation: React.FC = () => {
 
         {/* Map Container */}
         <div className="w-full h-[300px] md:h-[400px] relative rounded-lg overflow-hidden mb-6 shadow-md">
-          {isLoaded ? (
-            <>
-              <GoogleMap
-                mapContainerStyle={{
-                  width: "100%",
-                  height: "100%",
-                }}
-                center={selectedPosition}
-                zoom={15}
-                onLoad={onLoad}
-                onUnmount={onUnmount}
-                onDragEnd={handleMapDrag}
-                options={{
-                  zoomControl: false,
-                  mapTypeControl: false,
-                  streetViewControl: false,
-                  fullscreenControl: false,
-                  disableDefaultUI: true,
-                }}
-              />
+          {isLoaded && selectedPosition ? (
+            <GoogleMap
+              mapContainerStyle={{
+                width: "100%",
+                height: "100%",
+              }}
+              center={selectedPosition}
+              zoom={15}
+              onLoad={onLoad}
+              onUnmount={onUnmount}
+              onDragEnd={handleMapDrag}
+              options={{
+                zoomControl: false,
+                streetViewControl: false,
+                mapTypeControl: false,
+                fullscreenControl: false,
+              }}
+            >
+              {/* Marker */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-10">
+                <div className="flex flex-col items-center">
+                  <MdLocationOn className="text-5xl text-[#F15A22]" />
+                  <div className="w-3 h-3 -mt-2 bg-black/20 rounded-full shadow-lg"></div>
+                </div>
+              </div>
+
+              {/* Back Button */}
+              <button
+                onClick={() => navigate(-1)}
+                className="absolute top-4 left-4 bg-white rounded-full p-2 shadow-lg z-10 hover:bg-gray-50"
+              >
+                <MdArrowBack />
+              </button>
+
+              {/* Current Location Button */}
               <button
                 onClick={getCurrentLocation}
                 className="absolute left-1/2 bottom-4 -translate-x-1/2 bg-white rounded-full px-4 py-2 shadow-lg z-10 hover:bg-gray-50 flex items-center gap-2 text-sm"
@@ -456,14 +503,10 @@ const HomePageLocation: React.FC = () => {
                 <MdMyLocation className="text-[#F15A22]" />
                 <span>Use current location</span>
               </button>
-              {/* Single Fixed Marker */}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
-                <MdLocationOn className="text-[#F15A22] text-5xl drop-shadow-lg animate-bounce" />
-              </div>
-            </>
+            </GoogleMap>
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gray-100">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#F15A22] border-t-transparent"></div>
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
             </div>
           )}
         </div>
