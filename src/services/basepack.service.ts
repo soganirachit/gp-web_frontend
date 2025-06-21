@@ -7,7 +7,7 @@ export interface BasePack {
   id: string;
   name: string;
   description: string;
-  imageUrl?: string;
+  imagesUrl?: string;
   sellingPrice: number;
   type: string;
   contents: Array<{

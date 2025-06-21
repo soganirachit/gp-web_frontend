@@ -369,7 +369,7 @@ const ProductPage: React.FC = () => {
         packDetails: {
           name: basePack.name,
           description: basePack.description,
-          imageUrl: basePack.imageUrl,
+          imageUrl: basePack.imagesUrl,
           contents: basePack.contents,
         },
         deliveryCount: minDays,
@@ -527,7 +527,7 @@ const ProductPage: React.FC = () => {
             <div className="md:w-1/2">
               <div className="aspect-square w-full">
                 <img
-                  src={basePack?.imageUrl}
+                  src={basePack?.imagesUrl}
                   alt={basePack?.name}
                   className="w-full h-full object-cover"
                 />
@@ -621,7 +621,7 @@ const ProductPage: React.FC = () => {
                       <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                         <img
                           src={
-                            item.imageUrl || "https://via.placeholder.com/160"
+                            item.imagesUrl || "https://via.placeholder.com/160"
                           }
                           alt={item.name}
                           className="w-full h-full object-cover"
@@ -765,7 +765,7 @@ const ProductPage: React.FC = () => {
                   <div className="p-3">
                     <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                       <img
-                        src={pack.imageUrl || "https://via.placeholder.com/160"}
+                        src={pack.imagesUrl || "https://via.placeholder.com/160"}
                         alt={pack.name}
                         className="w-full h-full object-cover"
                       />
@@ -781,7 +781,7 @@ const ProductPage: React.FC = () => {
                             <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                               <img
                                 src={
-                                  pack.imageUrl ||
+                                  pack.imagesUrl ||
                                   "https://via.placeholder.com/160"
                                 }
                                 alt={pack.name}

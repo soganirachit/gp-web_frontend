@@ -6,8 +6,9 @@ const API_URL = `${getApiUrl()}/products`;
 export interface Product {
   id: string;
   name: string;
+  category: string;
   description: string;
-  imageUrl?: string;
+  imagesUrl?: string;
   sellingPrice: number;
   type: string;
   allowedSubscriptionType: string;
