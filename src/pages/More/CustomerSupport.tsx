@@ -13,11 +13,9 @@ const CustomerSupport: React.FC = () => {
   const [message, setMessage] = useState("");
   // const [orders, setOrders] = useState([]);
   const [selectOrders, setSelectOrders] = useState("");
-  const customerId = localStorage.getItem("customerId") || "";
-  const employeeId = localStorage.getItem("employeeId") || "";
   const token = localStorage.getItem("token");
 
-  const [orders, setOrders] = useState<Order[]>([]);
+  // const [orders, setOrders] = useState<Order[]>([]);
 
   const handleChatSupport = () => {
     // Implement chat support functionality
@@ -96,33 +94,7 @@ const CustomerSupport: React.FC = () => {
   //   if (customerId) fetchOrders();
   // }, [customerId]);
 
-  type Order = {
-    id: string; // UUID — internal use only
-    orderId: string; // GPOR-style ID — this will go to backend and show in UI
-    createdAt: string;
-  };
 
-  const dummyOrders: Order[] = [
-    {
-      id: "a9cfa2b7-1b4d-4890-8425-c50f045f1ef0",
-      orderId: "GPOR1001", // ✅ used in dropdown + backend
-      createdAt: "2025-06-21T09:30:00Z",
-    },
-    {
-      id: "2bc472a8-c003-4b6e-bd3a-0c8a370be300",
-      orderId: "GPOR1002",
-      createdAt: "2025-06-20T11:15:00Z",
-    },
-    {
-      id: "d84f8c22-3b96-4ab0-8d80-53ac6e4c122f",
-      orderId: "GPOR1003",
-      createdAt: "2025-06-19T16:45:00Z",
-    },
-  ];
-
-  useEffect(() => {
-    setOrders(dummyOrders);
-  }, []);
 
   return (
     <div className="bg-[#FFFBEB] min-h-screen">
@@ -185,7 +157,7 @@ const CustomerSupport: React.FC = () => {
             Raise a New Request
           </h2>
           <div className="space-y-4">
-            <div>
+            {/* <div>
               <label className="text-sm md:text-base text-gray-600">
                 Orders
               </label>
@@ -207,7 +179,7 @@ const CustomerSupport: React.FC = () => {
                   No previous orders found.
                 </p>
               )}
-            </div>
+            </div> */}
             <div>
               <label className="text-sm md:text-base text-gray-600">
                 Request Type
