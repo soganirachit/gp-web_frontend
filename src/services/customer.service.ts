@@ -1,6 +1,5 @@
 const baseUrl =  import.meta.env.VITE_API_BASE_URL
 const API_URL = `${baseUrl}/support-requests`;
-
 export async function submitSupportRequest(
   payload: any,
   token: string,
@@ -18,9 +17,7 @@ export async function submitSupportRequest(
         body: JSON.stringify(payload),
       }
     );
-
     const data = await response.json();
-
     if (response.ok) {
       alert("Request submitted successfully!");
       setMessage("");
@@ -34,9 +31,6 @@ export async function submitSupportRequest(
     alert("Something went wrong while submitting the request.");
   }
 }
-
-
-
  // useEffect(() => {
   //   const fetchOrders = async () => {
   //     try {
@@ -49,7 +43,6 @@ export async function submitSupportRequest(
   //         }
   //       );
   //       const data = await response.json();
-
   //       if (response.ok) {
   //         setOrders(data.orders || []); // adjust this according to your API response
   //       } else {
@@ -59,6 +52,5 @@ export async function submitSupportRequest(
   //       console.error("Error fetching orders:", error);
   //     }
   //   };
-
   //   if (customerId) fetchOrders();
   // }, [customerId]);

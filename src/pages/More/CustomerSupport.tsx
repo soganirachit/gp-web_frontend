@@ -8,7 +8,6 @@ import { IoArrowBack } from 'react-icons/io5';
 import { useEffect } from 'react';
 import { submitSupportRequest } from '@/services/customer.service';
 
-
 const CustomerSupport: React.FC = () => {
   const navigate = useNavigate();
   const [requestType, setRequestType] = useState("PAYMENT_ISSUES");
@@ -42,7 +41,6 @@ const CustomerSupport: React.FC = () => {
     await submitSupportRequest(payload, token || "", setMessage, setRequestType);
   };
 
- 
 
   type Order = {
     id: string; // UUID — internal use only
