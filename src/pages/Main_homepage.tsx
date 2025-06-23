@@ -723,7 +723,7 @@ const Home2: React.FC = () => {
                         <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                           <img
                             src={
-                              pack.imageUrl || "https://via.placeholder.com/160"
+                              pack.imagesUrl || "https://via.placeholder.com/160"
                             }
                             alt={pack.name}
                             className="w-full h-full object-cover"
@@ -794,7 +794,7 @@ const Home2: React.FC = () => {
                           <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                             <img
                               src={
-                                item.imageUrl ||
+                                item.imagesUrl ||
                                 "https://via.placeholder.com/160"
                               }
                               alt={item.name}
@@ -864,7 +864,7 @@ const Home2: React.FC = () => {
                           <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                             <img
                               src={
-                                item.imageUrl ||
+                                item.imagesUrl ||
                                 "https://via.placeholder.com/160"
                               }
                               alt={item.name}
@@ -929,7 +929,7 @@ const Home2: React.FC = () => {
                           <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                             <img
                               src={
-                                item.imageUrl ||
+                                item.imagesUrl ||
                                 "https://via.placeholder.com/160"
                               }
                               alt={item.name}

@@ -16,10 +16,10 @@ import {
   IoLogOutOutline,
   IoArrowBack
 } from 'react-icons/io5';
-
 import walletImage from '../../assets/icon/Wallet.png'
 import profileImage from '../../assets/icon/Profile.png'
 import BottomNav from '../../components/layout/BottomNav';
+import { customerService } from '@/services/getcustomer.service';
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
@@ -28,22 +28,27 @@ const Settings: React.FC = () => {
   const [userEmail, setUserEmail] = useState('');
   const [hasEmail, setHasEmail] = useState(true);
 
+  // Add loading and error state if needed
+  const [, setLoading] = useState(false);
+  const [, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    // Fetch user details from localStorage
-    const name = localStorage.getItem('userName') || 'Palash Sharma';
-    const phone = localStorage.getItem('phoneNumber') || '+91 98765 43210';
-    const email = localStorage.getItem('userEmail');
-    
-    setUserName(name);
-    setUserPhone(phone);
-    
-    if (email && email.trim() !== '') {
-      setUserEmail(email);
-      setHasEmail(true);
-    } else {
-      setUserEmail('example@gmail.com');
-      setHasEmail(false);
-    }
+    setLoading(true);
+    customerService.getAllCustomers()
+      .then((customers) => {
+        const user = customers[0]; 
+        if (user) {
+          setUserName(`${user.firstName} ${user.lastName}`);
+          setUserPhone(user.phoneNumber.toString());
+          setUserEmail(user.emailAddress);
+          setHasEmail(!!user.emailAddress);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Failed to fetch customer details.");
+        setLoading(false);
+      });
   }, []);
 
   const menuItems = [

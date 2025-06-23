@@ -203,227 +203,58 @@ const ProductPage: React.FC = () => {
             </div>
           ) : (
             <>
-              {activeTab === "Puja Flowers" && (
-                <div className="space-y-6 md:space-y-8">
-                  {/* Combo Puja Packs */}
-                  <div className="mb-8 md:mb-12">
-                    <div className="flex justify-between items-center mb-4 md:mb-6">
-                      <h2 className="text-xl md:text-2xl font-semibold text-gray-800">
-                        Combo Puja Packs
-                      </h2>
-                    </div>
-                    <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                      {sortProducts(basePacks, sortBy).map((pack) => (
-                        <div
-                          key={pack.id}
-                          className="flex-shrink-0 w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => handleProductClick(pack)}
-                        >
-                          <div className="p-3">
-                            <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
-                              <img
-                                src={
-                                  pack.imageUrl ||
-                                  "https://via.placeholder.com/160"
-                                }
-                                alt={pack.name}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="pt-3 pb-2 px-1 space-y-2">
-                              <h3 className="text-[16px] font-semibold text-gray-900 truncate">
-                                {pack.name}
-                              </h3>
-                              <p className="text-[14px] text-gray-500 truncate">
-                                Basepack
-                              </p>
-                              <p className="text-pink-600 text-[16px] font-bold">
-                                ₹{getItemPrice(pack)}/Day
-                              </p>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleProductClick(pack);
-                                }}
-                                className="text-green-600 text-[16px] mb-3 font-medium block hover:text-green-700"
-                              >
-                                View
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Flowers Section */}
-                  <div className="mb-8 md:mb-12">
-                    <div className="flex justify-between items-center mb-4 md:mb-6">
-                      <h2 className="text-xl md:text-2xl font-semibold text-gray-800">
-                        Flowers
-                      </h2>
-                    </div>
-                    <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                      {sortProducts(
-                        products.filter((item) => item.type === "FLOWERS"),
-                        sortBy
-                      ).map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex-shrink-0 w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => handleProductClick(item)}
-                        >
-                          <div className="p-3">
-                            <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
-                              <img
-                                src={
-                                  item.imageUrl ||
-                                  "https://via.placeholder.com/160"
-                                }
-                                alt={item.name}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="pt-3 pb-2 px-1 space-y-2">
-                              <h3 className="text-[16px] font-semibold text-gray-900 truncate">
-                                {item.name}
-                              </h3>
-                              <p className="text-[14px] text-gray-500 truncate">
-                                {item.description}
-                              </p>
-                              <p className="text-pink-600 text-[16px] font-bold">
-                                ₹{getItemPrice(item)}/Day
-                              </p>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleProductClick(item);
-                                }}
-                                className="text-green-600 text-[16px] mb-3 font-medium block hover:text-green-700"
-                              >
-                                View
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Fresh Leaves */}
-                  <div className="mb-8 md:mb-12">
-                    <div className="flex justify-between items-center mb-4 md:mb-6">
-                      <h2 className="text-xl md:text-2xl font-semibold text-gray-800">
-                        Fresh Leaves
-                      </h2>
-                    </div>
-                    <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                      {sortProducts(
-                        products.filter((item) => item.type === "LEAVES"),
-                        sortBy
-                      ).map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex-shrink-0 w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => handleProductClick(item)}
-                        >
-                          <div className="p-3">
-                            <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
-                              <img
-                                src={
-                                  item.imageUrl ||
-                                  "https://via.placeholder.com/160"
-                                }
-                                alt={item.name}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="pt-3 pb-2 px-1 space-y-2">
-                              <h3 className="text-[16px] font-semibold text-gray-900 truncate">
-                                {item.name}
-                              </h3>
-                              <p className="text-[14px] text-gray-500 truncate">
-                                {item.description}
-                              </p>
-                              <p className="text-pink-600 text-[16px] font-bold">
-                                ₹{getItemPrice(item)}/Day
-                              </p>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleProductClick(item);
-                                }}
-                                className="text-green-600 text-[16px] mb-3 font-medium block hover:text-green-700"
-                              >
-                                View
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Garlands */}
-                  <div className="mb-8 md:mb-12">
-                    <div className="flex justify-between items-center mb-4 md:mb-6">
-                      <h2 className="text-xl md:text-2xl font-semibold text-gray-800">
-                        Garlands
-                      </h2>
-                    </div>
-                    <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                      {sortProducts(
-                        products.filter((item) => item.type === "GARLAND"),
-                        sortBy
-                      ).map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex-shrink-0 w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => handleProductClick(item)}
-                        >
-                          <div className="p-3">
-                            <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
-                              <img
-                                src={
-                                  item.imageUrl ||
-                                  "https://via.placeholder.com/160"
-                                }
-                                alt={item.name}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="pt-3 pb-2 px-1 space-y-2">
-                              <h3 className="text-[16px] font-semibold text-gray-900 truncate">
-                                {item.name}
-                              </h3>
-                              <p className="text-[14px] text-gray-500 truncate">
-                                {item.description}
-                              </p>
-                              <p className="text-pink-600 text-[16px] font-bold">
-                                ₹{getItemPrice(item)}/Day
-                              </p>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleProductClick(item);
-                                }}
-                                className="text-green-600 text-[16px] mb-3 font-medium block hover:text-green-700"
-                              >
-                                View
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
+            {activeTab === "Puja Flowers" && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+       {sortProducts(
+      [...products].filter((item) => item.category === "PUJA"),
+      sortBy
+    ).map((item) => (
+      <div
+        key={item.id}
+        className="w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+        onClick={() => handleProductClick(item)}
+      >
+        <div className="p-3">
+          <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
+            <img
+              src={item.imagesUrl?.[0] || "https://via.placeholder.com/160"}
+              alt={item.name}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="pt-1 pb-2 px-1 space-y-2">
+            <h3 className="text-[16px] font-semibold text-gray-900 truncate">
+              {item.name}
+            </h3>
+            <p className="text-[14px] text-gray-500 truncate">
+              {"type" in item ? item.type : "Basepack"}
+            </p>
+            <p className="text-pink-600 text-[16px] font-bold">
+              ₹{getItemPrice(item)}/Day
+            </p>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleProductClick(item);
+              }}
+              className="text-white bg-[#F97316] text-sm rounded-full mb-3 p-1 px-4 py-2 text-[10px]"
+            >
+              Subscribe
+            </button>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+)}
 
               {/* Exotic Flowers - Shows all products */}
               {activeTab === "Exotic Flowers" && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {sortProducts([...products], sortBy).map((item) => (
+                   {sortProducts(
+      [...products].filter((item) => item.category === "EXOTIC"),
+      sortBy
+    ).map((item) => (
                     <div
                       key={item.id}
                       className="w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
@@ -433,7 +264,7 @@ const ProductPage: React.FC = () => {
                         <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                           <img
                             src={
-                              item.imageUrl?.[0] ||
+                              item.imagesUrl?.[0] ||
                               "https://via.placeholder.com/160"
                             }
                             alt={item.name}

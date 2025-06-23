@@ -167,7 +167,7 @@ const StoreProductsPages: React.FC = () => {
                       <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                         <img
                           src={
-                            item.imageUrl?.[0] ||
+                            item.imagesUrl?.[0] ||
                             "https://via.placeholder.com/160"
                           }
                           alt={item.name}

@@ -1,13 +1,13 @@
 import axios, { AxiosError } from "axios";
 import { getApiUrl } from "../config/api.config";
 
-const API_URL = `${getApiUrl()}/SubProducts/store`;
+const API_URL = `${getApiUrl()}/storeProducts/store`;
 
 export interface Product {
   id: string;
   name: string;
   description: string;
-  imageUrl?: string;
+  imagesUrl?: string;
   sellingPrice: number;
   type: string;
   allowedSubscriptionType: string;

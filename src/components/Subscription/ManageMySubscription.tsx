@@ -21,10 +21,10 @@ interface Subscription {
   endDate?: Date;
   selectedDays: string[];
   basePackId: string;
-  basePackDetails?: {
+  productDetails?: {
     name: string;
     description: string;
-    imageUrl?: string;
+    imagesUrl: string[];
     contents: {
       id: string;
       name: string;
@@ -239,16 +239,16 @@ const ManageMySubscription: React.FC = () => {
       >
         <div className="flex items-start gap-3">
           <div className="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-            {subscription.basePackDetails?.imageUrl ? (
+            {subscription.productDetails?.imagesUrl ? (
               <img
-                src={subscription.basePackDetails.imageUrl}
-                alt={subscription.basePackDetails.name}
+                src={subscription.productDetails.imagesUrl[0]}
+                alt={subscription.productDetails.name}
                 className="w-full h-full object-cover"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gray-200">
                 <span className="text-xl font-medium text-gray-400">
-                  {subscription.basePackDetails?.name?.charAt(0) || "M"}
+                  {subscription.productDetails?.name?.charAt(0) || "M"}
                 </span>
               </div>
             )}
@@ -259,7 +259,7 @@ const ManageMySubscription: React.FC = () => {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className="text-[15px] font-medium text-[#1A1A1A] truncate">
-                    {subscription.basePackDetails?.name || "Marigold Puja"}
+                    {subscription.productDetails?.name || "Marigold Puja"}
                   </h3>
                   {isPaused && (
                     <span className="px-2 py-0.5 bg-[#FFF3CD] text-[#664D03] text-xs font-medium rounded-full">
@@ -336,7 +336,7 @@ const ManageMySubscription: React.FC = () => {
                   >
                     Pause
                   </button>
-                  <button
+                  {/* <button
                     onClick={() => {
                       setSelectedSubscription(subscription);
                       setShowDetailsModal(true);
@@ -382,7 +382,7 @@ const ManageMySubscription: React.FC = () => {
                       </svg>
                       Modify
                     </div>
-                  </button>
+                  </button> */}
                   <button
                     onClick={() => {
                       setSelectedSubscription(subscription);
@@ -426,7 +426,9 @@ const ManageMySubscription: React.FC = () => {
                   >
                     Resume
                   </button>
-                  <button
+
+
+                  {/* <button
                     onClick={() => {
                       setSelectedSubscription(subscription);
                       setShowDetailsModal(true);
@@ -472,7 +474,8 @@ const ManageMySubscription: React.FC = () => {
                       </svg>
                       Modify
                     </div>
-                  </button>
+                  </button> */}
+
                   <button
                     onClick={() => {
                       setSelectedSubscription(subscription);
@@ -679,7 +682,7 @@ const ManageMySubscription: React.FC = () => {
         </div>
 
         {/* Details Modal */}
-        <AnimatePresence>
+        {/* <AnimatePresence>
           {showDetailsModal && selectedSubscription && (
             <motion.div
               className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -704,7 +707,6 @@ const ManageMySubscription: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* Quantity Selector */}
                   <div className="mb-6">
                     <label className="block text-gray-700 mb-2">Quantity</label>
                     <div className="flex items-center gap-4">
@@ -718,7 +720,7 @@ const ManageMySubscription: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Delivery Type */}
+                 
                   <div className="mb-6">
                     <label className="block text-gray-700 mb-2">
                       Select Delivery Type
@@ -751,7 +753,6 @@ const ManageMySubscription: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Day Selector */}
                   <div className="grid grid-cols-7 gap-2 mb-8">
                     {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
                       (day, index) => (
@@ -770,7 +771,7 @@ const ManageMySubscription: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Action Buttons */}
+               
                   <div className="flex gap-3">
                     <button
                       onClick={() => setShowDetailsModal(false)}
@@ -786,7 +787,7 @@ const ManageMySubscription: React.FC = () => {
               </motion.div>
             </motion.div>
           )}
-        </AnimatePresence>
+        </AnimatePresence> */}
 
         {/* Pause Modal */}
         <AnimatePresence>
@@ -967,7 +968,7 @@ const ManageMySubscription: React.FC = () => {
                 Subscription Paused!
               </h3>
               <p className="text-sm text-gray-600">
-                Your {selectedSubscription.basePackDetails?.name} subscription
+                Your {selectedSubscription.productDetails?.name} subscription
                 has been paused successfully.
               </p>
               <p className="text-green-600 font-medium mt-2 text-sm">
