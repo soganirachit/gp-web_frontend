@@ -6,6 +6,7 @@ import profileImage from '../../assets/icon/Profile.png';
 import BottomNav from '../../components/layout/BottomNav';
 import { IoArrowBack } from 'react-icons/io5';
 import { useEffect } from 'react';
+import { submitSupportRequest } from '@/services/customer.service';
 
 const CustomerSupport: React.FC = () => {
   const navigate = useNavigate();
@@ -34,65 +35,13 @@ const CustomerSupport: React.FC = () => {
     const payload = {
       requestCategory: requestType,
       description: message.trim(),
-      // call_back_number: "",
       orderId: selectOrders || undefined,
       attachments: [],
     };
-
-    try {
-      const response = await fetch(
-        "http://localhost:8000/api/v1/support-requests",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: token || "",
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok) {
-        alert("Request submitted successfully!");
-        setMessage("");
-        setRequestType("MISSED_DELIVERY");
-      } else {
-        console.error("Submission error:", data);
-        alert(data.error || "Failed to submit request.");
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      alert("Something went wrong while submitting the request.");
-    }
+    await submitSupportRequest(payload, token || "", setMessage, setRequestType);
   };
 
-  // useEffect(() => {
-  //   const fetchOrders = async () => {
-  //     try {
-  //       const response = await fetch(
-  //         `http://localhost:8000/api/v1/orders?customerId=${customerId}`,
-  //         {
-  //           headers: {
-  //             Authorization: token || "",
-  //           },
-  //         }
-  //       );
-  //       const data = await response.json();
 
-  //       if (response.ok) {
-  //         setOrders(data.orders || []); // adjust this according to your API response
-  //       } else {
-  //         console.error("Failed to fetch orders:", data.error);
-  //       }
-  //     } catch (error) {
-  //       console.error("Error fetching orders:", error);
-  //     }
-  //   };
-
-  //   if (customerId) fetchOrders();
-  // }, [customerId]);
 
   type Order = {
     id: string; // UUID — internal use only
