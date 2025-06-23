@@ -1,4 +1,4 @@
-import React, { useState, useRef, } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FaCamera,
@@ -8,6 +8,8 @@ import {
 import walletImage from '../../../../assets/icon/Wallet.png'; 
 import profileImage from '../../../../assets/icon/Profile.png';
 import { IoArrowBack } from 'react-icons/io5';
+import { customerService } from '@/services/getcustomer.service';
+import { editCustomerService } from '@/services/editcustomer.service';
 
 interface UserDetails {
   name: string;
@@ -18,11 +20,10 @@ interface UserDetails {
   profileImage: string | null;
 }
 
-
 const Profile: React.FC = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // User details state
   const [userDetails, setUserDetails] = useState<UserDetails>({
     name: '',
@@ -33,64 +34,54 @@ const Profile: React.FC = () => {
     profileImage: null
   });
 
-  // useEffect(() => {
-  //   // Fetch user details from auth service
-  //   const fetchUserDetails = async () => {
-  //     try {
-  //       const user = await authService.getCurrentUser();
-  //       if (user) {
-  //         setUserDetails({
-  //           name: user.name || '',
-  //           email: user.email || '',
-  //           phone: user.phone || '',
-  //           dob: user.dob || '',
-  //           language: user.language || 'English',
-  //           profileImage: user.profileImage || null
-  //         });
-  //       }
-  //     } catch (error) {
-  //       console.error('Error fetching user details:', error);
-  //     }
-  //   };
-  //   fetchUserDetails();
-  // }, []);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // // Handle profile image upload
-  // const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   const file = e.target.files?.[0];
-  //   if (file) {
-  //     try {
-  //       const formData = new FormData();
-  //       formData.append('image', file);
-  //       const response = await authService.updateProfileImage(formData);
-  //       setUserDetails(prev => ({
-  //         ...prev,
-  //         profileImage: response.profileImage
-  //       }));
-  //     } catch (error) {
-  //       console.error('Error uploading image:', error);
-  //     }
-  //   }
-  // };
+  
+  useEffect(() => {
+    const fetchCustomer = async () => {
+      try {
+        const customers = await customerService.getAllCustomers();
+        if (customers.length > 0) {
+          const customer = customers[0];
+          setUserDetails(prev => ({
+            ...prev,
+            name: `${customer.firstName} ${customer.lastName}`,
+            email: customer.emailAddress,
+            phone: customer.phoneNumber.toString(),
+            // dob, language, profileImage can be set if available in API
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to fetch customer:', error);
+      }
+    };
+    fetchCustomer();
+  }, []);
 
-  // // Handle save changes
-  // const handleSaveChanges = async () => {
-  //   try {
-  //     await authService.updateProfile(userDetails);
-  //     // Show success message or handle navigation
-  //   } catch (error) {
-  //     console.error('Error updating profile:', error);
-  //   }
-  // };
-
-
-
-
-  // Address handlers
-
-
-
-  // Get current location
+  // Add a handler for Save Changes
+  const handleSaveChanges = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Prepare data for API (split name if needed)
+      const [firstName, ...rest] = userDetails.name.split(' ');
+      const lastName = rest.join(' ');
+      await editCustomerService.editCustomer({
+        firstName: firstName || '',
+        lastName: lastName || '',
+        emailAddress: userDetails.email,
+        phoneNumber: Number(userDetails.phone),
+        // Add other fields if needed
+      });
+      // Optionally show a success message or navigate
+      alert('Profile updated successfully!');
+    } catch (err: any) {
+      setError('Failed to update profile.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="bg-[#FFFBEB] min-h-screen">
@@ -236,11 +227,13 @@ const Profile: React.FC = () => {
 
         {/* Save Changes Button */}
         <div className="p-4 md:p-8">
+          {error && <div className="text-red-500 mb-2">{error}</div>}
           <button 
-          
+            onClick={handleSaveChanges}
             className="w-full bg-orange-500 text-white py-3 md:py-4 rounded-3xl font-medium text-base md:text-lg hover:bg-orange-600 transition-colors"
+            disabled={loading}
           >
-            Save Changes
+            {loading ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </div>

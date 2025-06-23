@@ -112,11 +112,8 @@ const StorePage: React.FC = () => {
 
   const getPriceDisplay = () => {
     if (!basePack) return { price: 0, originalPrice: 0, savings: 0 };
-    // Use basePack.data for price fields
-    const price = selectedType === "Daily" ? basePack.data.sellingPrice : 0;
-    const originalPrice = selectedType === "Daily"
-      ? (basePack.data.sellingPrice ?? 0) + (basePack.surcharge ?? 0)
-      : 0;
+    const price = selectedType === "Daily" ? basePack.sellingPrice : 0;
+    const originalPrice = selectedType === "Daily" ? basePack.sellingPrice + (basePack.surcharge ?? 0) : 0;
     const savings = originalPrice - price;
     return { price, originalPrice, savings };
   };
@@ -150,10 +147,26 @@ const StorePage: React.FC = () => {
         setIsCheckingBalance(false);
         return;
       }
-
-      // Only navigate with basePackId if balance is sufficient
+      const subscriptionDetails = {
+        basePackId: id,
+        type: selectedType.toUpperCase(),
+        startDate: startDate.toISOString(),
+        amount: pricePerPack,
+        quantity: quantity,
+        packDetails: {
+          name: basePack.name,
+          description: basePack.description,
+          imageUrl: basePack.imagesUrl,
+          contents: basePack.contents,
+        },
+        deliveryCount: minDays,
+        pricePerPack: pricePerPack,
+        deliveryPattern: selectedType === "Daily" ? "Every day" : "Alternate days",
+        walletBalance: balance,
+      };
+      localStorage.setItem("currentSubscription", JSON.stringify(subscriptionDetails));
       navigate("/address-selection", {
-        state: { basePackId: id },
+        state: { subscriptionDetails, basePackId: id },
       });
       toast.success("Proceeding to address selection");
     } catch (error: any) {
@@ -321,7 +334,7 @@ const StorePage: React.FC = () => {
                 onClick={handleSubscribe}
                 className="w-full bg-[#F15A22] text-white py-3.5 rounded-full text-[15px] font-medium mb-3"
               >
-                Add Product ₹{getPriceDisplay().price}/Pack
+                Subscribe Daily for ₹{getPriceDisplay().price}/Pack
               </button>
             </div>
           </div>

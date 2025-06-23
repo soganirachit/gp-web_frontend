@@ -60,6 +60,7 @@ import Wallet from '../components/Payment/Wallet/wallet';
 import Refer from '../pages/Refer/Refer';
 import CustomerSupport from '../pages/More/CustomerSupport';
 import StoreProductsPages from '@/components/StoreProductsPage/page';
+import StorePage from '@/components/StoreProductsPage/storeProductsDisplayPage';
 
 
 
@@ -75,6 +76,7 @@ const router = createBrowserRouter([
       { path: '/NewUser', element: <Unsubscribed_User_Home /> },
       { path: '/Products', element: <Products /> },
       { path: '/product/:id', element: <ProductPage /> },
+      { path: '/store/:id', element: <StorePage /> },
       { path: '/search', element: <Search /> },
       { path: '/store', element: <StoreProductsPages /> },
     

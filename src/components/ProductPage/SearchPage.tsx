@@ -41,7 +41,7 @@ const SearchPage: React.FC = () => {
   }, [searchQuery, products, basePacks]);
 
   const getItemPrice = (item: Product | BasePack): number => {
-    return 'sellingPricePerPackDaily' in item ? item.sellingPricePerPackDaily : item.sellingPrice;
+    return 'sellingPricePerPackDaily' in item ? item.sellingPrice : item.sellingPrice;
   };
 
   const handleProductClick = (item: Product | BasePack) => {
@@ -116,7 +116,7 @@ const SearchPage: React.FC = () => {
                   <div className="p-3">
                     <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                       <img 
-                        src={item.imageUrl || 'https://via.placeholder.com/160'} 
+                        src={item.imagesUrl || 'https://via.placeholder.com/160'} 
                         alt={item.name}
                         className="w-full h-full object-cover"
                       />

@@ -2,13 +2,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import searchImage from "../../assets/icon/Search.png";
-import type { BasePack } from "../../services/basepack.service";
-import { storeProductService } from "../../services/storeProduct.service";
-import type { Product } from "../../services/product.service";
+import { Product, storeProductService } from "../../services/storeProduct.service";
 import walletImage from "../../assets/icon/Wallet.png";
 import profileImage from "../../assets/icon/Profile.png";
 import { IoArrowBack } from "react-icons/io5";
 import Spinner from "../common/Spinner";
+import { storeProducts } from "@/services/stroeProductDetails.service";
 
 const StoreProductsPages: React.FC = () => {
   const navigate = useNavigate();
@@ -18,10 +17,10 @@ const StoreProductsPages: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const isBasePack = (item: Product | BasePack): item is BasePack =>
+  const isBasePack = (item: Product | storeProducts): item is storeProducts =>
     "sellingPricePerPackDaily" in item;
 
-  const sortProducts = (items: (Product | BasePack)[], sortType: string) => {
+  const sortProducts = (items: (Product | storeProducts)[], sortType: string) => {
     return [...items].sort((a, b) => {
       switch (sortType) {
         case "Price": {
@@ -44,7 +43,7 @@ const StoreProductsPages: React.FC = () => {
     });
   };
 
-  const getItemPrice = (item: Product | BasePack): number => {
+  const getItemPrice = (item: Product | storeProducts): number => {
     return isBasePack(item) ? item.sellingPrice : item.sellingPrice;
   };
 
@@ -54,7 +53,13 @@ const StoreProductsPages: React.FC = () => {
         setIsLoading(true);
         setError(null);
         const result = await storeProductService.getAllStoreProducts();
-        setProducts(result);
+        // Ensure each product has a 'category' property (fallback to empty string if missing)
+        setProducts(
+          result.map((item: any) => ({
+            category: item.category ?? "",
+            ...item,
+          }))
+        );
       } catch (error) {
         console.error("Error fetching data:", error);
         setError("Failed to load products");
@@ -66,8 +71,8 @@ const StoreProductsPages: React.FC = () => {
     fetchData();
   }, []);
 
-  const handleProductClick = (product: Product | BasePack) => {
-    navigate(`/product/${product.id}`, { state: { product } });
+  const handleProductClick = (product: Product | storeProducts ) => {
+    navigate(`/store/${product.id}`, { state: { product } });
   };
 
   return (
@@ -85,7 +90,7 @@ const StoreProductsPages: React.FC = () => {
                   <IoArrowBack className="text-xl md:text-2xl" />
                 </button>
                 <h1 className="text-xl md:text-2xl font-medium">
-                  Subscription Packs
+                  Store Products
                 </h1>
               </div>
               <div className="flex items-center gap-4">
@@ -176,7 +181,7 @@ const StoreProductsPages: React.FC = () => {
                       </div>
                       <div className="pt-1 pb-2 px-1 space-y-2">
                         <h3 className="text-[16px] font-semibold text-gray-900 truncate">
-                          {item.name}
+                          {item.name} 
                         </h3>
                         <p className="text-[14px] text-gray-500 truncate">
                           {"type" in item ? item.type : "Basepack"}
@@ -191,7 +196,7 @@ const StoreProductsPages: React.FC = () => {
                           }}
                           className="text-white bg-[#F97316] text-sm rounded-full mb-3 p-1 px-4 py-2 text-[10px]"
                         >
-                          Subscribe
+                          Add Product
                         </button>
                       </div>
                     </div>

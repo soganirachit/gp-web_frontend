@@ -1,8 +1,10 @@
 import axios, { AxiosError } from "axios";
-import { getApiUrl } from "../config/api.config";
 
-const API_URL = `${getApiUrl()}/basepacks`;
-export interface BasePack {
+
+const baseUrl =  import.meta.env.VITE_API_BASE_URL
+
+const API_URL = `${baseUrl}/storeProducts/store`;
+export interface storeProducts {
   id: string;
   name: string;
   description: string;
@@ -16,23 +18,12 @@ export interface BasePack {
   }>;
 }
 
-class BasePackService {
-  // private getHeaders() {
-  //   const token = localStorage.getItem("token");
-  //   if (!token) {
-  //     throw new Error("Authentication required");
-  //   }
-  //   return {
-  //     Authorization: token,
-  //     "Content-Type": "application/json",
-  //   };
-  // }
+class storesProductsService {
+ 
 
-  async getAllBasePacks(): Promise<BasePack[]> {
+  async getAllStoreProducts(): Promise<storeProducts[]> {
     try {
       const response = await axios.get(API_URL);
-     
-      
       return response.data;
     } catch (error: unknown) {
       if (error instanceof Error || error instanceof AxiosError) {
@@ -42,11 +33,9 @@ class BasePackService {
     }
   }
 
-  async getBasePackById(id: string): Promise<BasePack> {
+  async getBasePackById(id: string): Promise<storeProducts> {
     try {
       const response = await axios.get(`${API_URL}/${id}`);
-   
-      
       return response.data;
     } catch (error: unknown) {
       if (error instanceof Error || error instanceof AxiosError) {
@@ -57,4 +46,4 @@ class BasePackService {
   }
 }
 
-export const basePackService = new BasePackService();
+export const storeProductGet = new storesProductsService();

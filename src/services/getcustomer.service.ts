@@ -23,8 +23,6 @@ export const customerService = {
           Authorization: token || "",
         },
       });
-      console.log("API response:", response.data); // Add this line for debugging
-      // Ensure we're getting an array from the response
       if (response.data && Array.isArray(response.data.data)) {
         return response.data.data;
       } else if (Array.isArray(response.data)) {
@@ -45,5 +43,7 @@ export const customerService = {
     }
   },
 };
+
+
 
 
