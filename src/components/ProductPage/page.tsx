@@ -28,7 +28,7 @@ import Spinner from "../common/Spinner";
 const ProductPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Puja Flowers");
-  const [basePacks, setBasePacks] = useState<BasePack[]>([]);
+  // const [basePacks, setBasePacks] = useState<BasePack[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [sortBy, setSortBy] = useState("Price");
   const [isLoading, setIsLoading] = useState(true);
@@ -45,14 +45,11 @@ const ProductPage: React.FC = () => {
           const priceB = isBasePack(b) ? b.sellingPrice : b.sellingPrice;
           return priceA - priceB;
         }
-        case "Popularity":
-          // You can add popularity logic here if you have a popularity field
+        case "Popularity": 
           return 0;
         case "New":
-          // Sort by creation date if available, otherwise by ID
           return b.id.localeCompare(a.id);
         case "Special":
-          // You can add special sorting logic here
           return 0;
         default:
           return 0;
@@ -166,9 +163,9 @@ const ProductPage: React.FC = () => {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="appearance-none bg-white border border-gray-200 rounded-full px-4 py-2 pr-8 text-sm font-medium text-gray-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#F15A22] focus:border-transparent"
+                    className="appearance-none bg-whitSort by Prie border border-gray-200 rounded-full px-4 py-2 pr-8 text-sm font-medium text-gray-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#F15A22] focus:border-transparent"
                   >
-                    <option value="Price">Sort by Price</option>
+                    <option value="Price">Sort by price</option>
                     <option value="Popularity">Sort by Popularity</option>
                     <option value="New">Sort by New</option>
                     <option value="Special">Sort by Special</option>
@@ -203,58 +200,60 @@ const ProductPage: React.FC = () => {
             </div>
           ) : (
             <>
-            {activeTab === "Puja Flowers" && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-       {sortProducts(
-      [...products].filter((item) => item.category === "PUJA"),
-      sortBy
-    ).map((item) => (
-      <div
-        key={item.id}
-        className="w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-        onClick={() => handleProductClick(item)}
-      >
-        <div className="p-3">
-          <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
-            <img
-              src={item.imagesUrl?.[0] || "https://via.placeholder.com/160"}
-              alt={item.name}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="pt-1 pb-2 px-1 space-y-2">
-            <h3 className="text-[16px] font-semibold text-gray-900 truncate">
-              {item.name}
-            </h3>
-            <p className="text-[14px] text-gray-500 truncate">
-              {"type" in item ? item.type : "Basepack"}
-            </p>
-            <p className="text-pink-600 text-[16px] font-bold">
-              ₹{getItemPrice(item)}/Day
-            </p>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleProductClick(item);
-              }}
-              className="text-white bg-[#F97316] text-sm rounded-full mb-3 p-1 px-4 py-2 text-[10px]"
-            >
-              Subscribe
-            </button>
-          </div>
-        </div>
-      </div>
-    ))}
-  </div>
-)}
-
+              {activeTab === "Puja Flowers" && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {sortProducts(
+                    [...products].filter((item) => item.category === "PUJA"),
+                    sortBy
+                  ).map((item) => (
+                    <div
+                      key={item.id}
+                      className="w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => handleProductClick(item)}
+                    >
+                      <div className="p-3">
+                        <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
+                          <img
+                            src={
+                              item.imagesUrl?.[0] ||
+                              "https://via.placeholder.com/160"
+                            }
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="pt-1 pb-2 px-1 space-y-2">
+                          <h3 className="text-[16px] font-semibold text-gray-900 truncate">
+                            {item.name}
+                          </h3>
+                          <p className="text-[14px] text-gray-500 truncate">
+                            {"type" in item ? item.type : "Basepack"}
+                          </p>
+                          <p className="text-pink-600 text-[16px] font-bold">
+                            ₹{getItemPrice(item)}/Day
+                          </p>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleProductClick(item);
+                            }}
+                            className="text-white bg-[#F97316] text-sm rounded-full mb-3 p-1 px-4 py-2 text-[10px]"
+                          >
+                            Subscribe
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {/* Exotic Flowers - Shows all products */}
               {activeTab === "Exotic Flowers" && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                   {sortProducts(
-      [...products].filter((item) => item.category === "EXOTIC"),
-      sortBy
-    ).map((item) => (
+                  {sortProducts(
+                    [...products].filter((item) => item.category === "EXOTIC"),
+                    sortBy
+                  ).map((item) => (
                     <div
                       key={item.id}
                       className="w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"

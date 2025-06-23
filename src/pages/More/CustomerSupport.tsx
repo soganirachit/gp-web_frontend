@@ -26,7 +26,7 @@ const CustomerSupport: React.FC = () => {
     // Implement call support functionality
     window.location.href = "tel:+91982812293";
   };
-
+  
   const handleSubmitRequest = async () => {
     if (!message.trim() || message.trim().length < 10) {
       alert("Please write at least 10 characters in your message.");
@@ -40,7 +40,6 @@ const CustomerSupport: React.FC = () => {
     };
     await submitSupportRequest(payload, token || "", setMessage, setRequestType);
   };
-
 
 
   type Order = {
