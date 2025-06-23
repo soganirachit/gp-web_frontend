@@ -122,7 +122,7 @@ const Profile: React.FC = () => {
                 />
               ) : (
                 <button onClick={() => fileInputRef.current?.click()} className="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center">
-                  <FaUser className="text-gray-500 w-16 h-16 md:w-20 md:h-20 text-pink-500" />
+                  <FaUser className=" w-16 h-16 md:w-20 md:h-20 text-pink-500" />
                 </button>
               )}
             </div>

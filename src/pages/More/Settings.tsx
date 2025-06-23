@@ -143,7 +143,7 @@ const Settings: React.FC = () => {
                 <IoPersonOutline className="text-2xl text-[#FF5722]" />
               </div>
               <div>
-                <h2 className="text-lg font-medium text-gray-900">{userName}</h2>
+                <h2 className="text-lg font-medium text-gray-900">{userName} </h2>
                 <p className="text-gray-500 text-[15px]">{userPhone}</p>
                 <p className={`text-[15px] ${hasEmail ? 'text-gray-500' : 'text-blue-600'}`}>
                   {userEmail}
