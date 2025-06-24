@@ -1,5 +1,7 @@
 const baseUrl =  import.meta.env.VITE_API_BASE_URL
 const API_URL = `${baseUrl}/support-requests`;
+
+
 export async function submitSupportRequest(
   payload: any,
   token: string,

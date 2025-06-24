@@ -186,28 +186,23 @@ const ManageMySubscription: React.FC = () => {
     }
   };
 
-  const handleCancel = async () => {
-    if (!cancellationReason.trim()) {
-      setShowReasonError(true);
-      return;
-    }
-
-    try {
-      // Pass cancellation reason in the correct format
-      await subscriptionService.cancelSubscription(selectedSubscription!.id);
-
-      // You might want to make a separate API call to log the reason
-      // or modify your backend to accept the reason
-      console.log("Cancellation reason:", cancellationReason);
-
-      setShowCancelModal(false);
-      setCancellationReason("");
-      // Navigate to cancel landing page instead of fetching subscriptions
-      navigate("/cancel-subscription");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to cancel subscription");
-    }
-  };
+ 
+   const handleCancel = async () => {
+     if (!cancellationReason.trim()) {
+       setShowReasonError(true);
+       return;
+     }
+     try {
+       // Pass cancellation reason in the correct format
+       await subscriptionService.cancelSubscription(selectedSubscription!.id, cancellationReason);
+       setShowCancelModal(false);
+       setCancellationReason("");
+       // Navigate to cancel landing page instead of fetching subscriptions
+       navigate("/cancel-subscription");
+     } catch (error: any) {
+       toast.error(error.message || "Failed to cancel subscription");
+     }
+   };
 
   const handleRechargeWallet = () => {
     setShowInsufficientBalanceModal(false);

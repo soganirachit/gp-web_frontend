@@ -9,6 +9,8 @@ import { IoArrowBack } from "react-icons/io5";
 import Spinner from "../common/Spinner";
 import { storeProducts } from "@/services/stroeProductDetails.service";
 
+import { getSortedProducts } from "@/services/sort.service";
+
 const StoreProductsPages: React.FC = () => {
   const navigate = useNavigate();
 
@@ -20,28 +22,22 @@ const StoreProductsPages: React.FC = () => {
   const isBasePack = (item: Product | storeProducts): item is storeProducts =>
     "sellingPricePerPackDaily" in item;
 
-  const sortProducts = (items: (Product | storeProducts)[], sortType: string) => {
-    return [...items].sort((a, b) => {
-      switch (sortType) {
-        case "Price": {
-          const priceA = isBasePack(a) ? a.sellingPrice : a.sellingPrice;
-          const priceB = isBasePack(b) ? b.sellingPrice : b.sellingPrice;
-          return priceA - priceB;
-        }
-        case "Popularity":
-          // You can add popularity logic here if you have a popularity field
-          return 0;
-        case "New":
-          // Sort by creation date if available, otherwise by ID
-          return b.id.localeCompare(a.id);
-        case "Special":
-          // You can add special sorting logic here
-          return 0;
-        default:
-          return 0;
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const products = await getSortedProducts(sortBy);
+        setProducts(products);
+      } catch (error: any) {
+        setError(error.message);
+      } finally {
+        setIsLoading(false);
       }
-    });
-  };
+    };
+
+    fetchData();
+  }, [sortBy]);
 
   const getItemPrice = (item: Product | storeProducts): number => {
     return isBasePack(item) ? item.sellingPrice : item.sellingPrice;
@@ -162,7 +158,7 @@ const StoreProductsPages: React.FC = () => {
             <>
               {/* Exotic Flowers - Shows all products */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {sortProducts([...products], sortBy).map((item) => (
+                {products.map((item) => (
                   <div
                     key={item.id}
                     className="w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"

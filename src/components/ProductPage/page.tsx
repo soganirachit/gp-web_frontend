@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import searchImage from "../../assets/icon/Search.png";
-import { basePackService } from "../../services/basepack.service";
 import type { BasePack } from "../../services/basepack.service";
 import { productService } from "../../services/product.service";
 import type { Product } from "../../services/product.service";
@@ -10,25 +9,12 @@ import walletImage from "../../assets/icon/Wallet.png";
 import profileImage from "../../assets/icon/Profile.png";
 import { IoArrowBack } from "react-icons/io5";
 import Spinner from "../common/Spinner";
+import { getDailyProducts } from "@/services/sortdailyProduct.service";
 
-// Import product images
-
-// interface CartItem {
-//   id: string;
-//   name: string;
-//   price: number;
-//   quantity: number;
-//   image: string;
-//   description?: string;
-//   category?: string;
-// }
-
-// const CART_STORAGE_KEY = 'gendaphool_cart';
 
 const ProductPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Puja Flowers");
-  // const [basePacks, setBasePacks] = useState<BasePack[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [sortBy, setSortBy] = useState("Price");
   const [isLoading, setIsLoading] = useState(true);
@@ -37,25 +23,22 @@ const ProductPage: React.FC = () => {
   const isBasePack = (item: Product | BasePack): item is BasePack =>
     "sellingPricePerPackDaily" in item;
 
-  const sortProducts = (items: (Product | BasePack)[], sortType: string) => {
-    return [...items].sort((a, b) => {
-      switch (sortType) {
-        case "Price": {
-          const priceA = isBasePack(a) ? a.sellingPrice : a.sellingPrice;
-          const priceB = isBasePack(b) ? b.sellingPrice : b.sellingPrice;
-          return priceA - priceB;
-        }
-        case "Popularity": 
-          return 0;
-        case "New":
-          return b.id.localeCompare(a.id);
-        case "Special":
-          return 0;
-        default:
-          return 0;
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const products = await getDailyProducts(sortBy);
+        setProducts(products);
+      } catch (error: any) {
+        setError(error.message);
+      } finally {
+        setIsLoading(false);
       }
-    });
-  };
+    };
+
+    fetchData();
+  }, [sortBy]);
 
   const getItemPrice = (item: Product | BasePack): number => {
     return isBasePack(item) ? item.sellingPrice : item.sellingPrice;
@@ -66,12 +49,6 @@ const ProductPage: React.FC = () => {
       try {
         setIsLoading(true);
         setError(null);
-        // const [packs, prods] = await Promise.all([
-        //   basePackService.getAllBasePacks(),
-        //   productService.getAllProducts(),
-        // ]);
-        // setBasePacks(packs);
-        // setProducts(prods);
         const result = await productService.getAllProducts();
         setProducts(result);
       } catch (error) {
@@ -88,6 +65,10 @@ const ProductPage: React.FC = () => {
   const handleProductClick = (product: Product | BasePack) => {
     navigate(`/product/${product.id}`, { state: { product } });
   };
+
+  // Filter products by category
+  const pujaProducts = products.filter((item) => item.category === "PUJA");
+  const exoticProducts = products.filter((item) => item.category === "EXOTIC");
 
   return (
     <div className="min-h-screen bg-[#FFFBEB]">
@@ -163,7 +144,7 @@ const ProductPage: React.FC = () => {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="appearance-none bg-whitSort by Prie border border-gray-200 rounded-full px-4 py-2 pr-8 text-sm font-medium text-gray-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#F15A22] focus:border-transparent"
+                    className="appearance-none bg-white border border-gray-200 rounded-full px-4 py-2 pr-8 text-sm font-medium text-gray-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#F15A22] focus:border-transparent"
                   >
                     <option value="Price">Sort by price</option>
                     <option value="Popularity">Sort by Popularity</option>
@@ -202,10 +183,7 @@ const ProductPage: React.FC = () => {
             <>
               {activeTab === "Puja Flowers" && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {sortProducts(
-                    [...products].filter((item) => item.category === "PUJA"),
-                    sortBy
-                  ).map((item) => (
+                  {pujaProducts.map((item) => (
                     <div
                       key={item.id}
                       className="w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
@@ -247,13 +225,9 @@ const ProductPage: React.FC = () => {
                   ))}
                 </div>
               )}
-              {/* Exotic Flowers - Shows all products */}
               {activeTab === "Exotic Flowers" && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {sortProducts(
-                    [...products].filter((item) => item.category === "EXOTIC"),
-                    sortBy
-                  ).map((item) => (
+                  {exoticProducts.map((item) => (
                     <div
                       key={item.id}
                       className="w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
