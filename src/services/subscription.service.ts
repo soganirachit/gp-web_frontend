@@ -310,7 +310,7 @@ class SubscriptionService {
   /**
    * Cancel subscription
    */
-  async cancelSubscription(subscriptionId: string) {
+  async cancelSubscription(subscriptionId: string, cancellationReason: string) {
     try {
       const headers = this.getHeaders();
       const response = await fetch(
@@ -318,6 +318,7 @@ class SubscriptionService {
         {
           method: "PATCH",
           headers,
+          body: JSON.stringify({ cancellationReason }), // Send reason in body
         }
       );
       const data = await response.json();

@@ -6,10 +6,10 @@ import { toast } from 'react-hot-toast';
 import { GoogleMap, } from '@react-google-maps/api';
 import { useGoogleMaps } from '../../hooks/useGoogleMaps';
 import { MdLocationOn } from 'react-icons/md';
-
 import { subscriptionService } from '../../services/subscription.service';
-
 import BottomNavigation from '../layout/BottomNav';
+import { customerService } from '@/services/getcustomer.service';
+
 
 
 interface SubscriptionDetails {
@@ -21,11 +21,12 @@ interface SubscriptionDetails {
     name: string;
     description: string;
     imageUrl: string;
+    sellingPrice: number;
     contents: Array<{ name: string; quantity: number }>;
   };
   deliveryCount: number;
   walletBalance: number;
-  pricePerPack: number;
+  sellingPrice: number;
   remainingAmount?: number;
   deliveryPattern?: string;
 }
@@ -70,9 +71,14 @@ interface MapViewProps {
 }
 
 interface UserData {
-  name: string;
+  firstName: string;
+  lastName: string;
+  emailAddress: string;
+  phoneNumber: string;
   // add other user fields if needed
 }
+
+
 
 // interface LocationState {
 //   selectedAddress?: Address;
@@ -275,6 +281,9 @@ interface UserData {
 //   </AnimatePresence>
 // );
 
+
+
+
 const SuccessCheckmark = () => (
   <motion.div 
     className="relative w-16 h-16 mx-auto mb-4"
@@ -383,7 +392,8 @@ const ConfirmSubscription: React.FC = () => {
   const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>(null);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
-  // const [successMessage] = useState('');
+  const [isConfirmed, setIsConfirmed] = useState(false); // <-- Add this line
+// const [successMessage] = useState('');
   // const [showSuccessModal, setShowSuccessModal] = useState(false);
   // const [, setWalletBalance] = useState<number>(0);
   // const [showRechargeModal, setShowRechargeModal] = useState(false);
@@ -393,6 +403,7 @@ const ConfirmSubscription: React.FC = () => {
   //   shortfall: number;
   // } | null>(null);
   // const [showExistingSubscriptionModal, setShowExistingSubscriptionModal] = useState(false);
+
   const [, setStatusModal] = useState<{
     isOpen: boolean;
     type: 'success' | 'error' | 'loading';
@@ -406,11 +417,13 @@ const ConfirmSubscription: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Get user data from localStorage or your auth service
-        const userDataStr = localStorage.getItem('userData');
-        if (userDataStr) {
-          const parsedUserData = JSON.parse(userDataStr);
-          setUserData(parsedUserData);
+        try {
+          const customers = await customerService.getAllCustomers();
+          if (customers && customers.length > 0) {
+            setUserData(customers[0]);
+          }
+        } catch (err) {
+          console.error('Failed to fetch customer data:', err);
         }
 
         // Get subscription details from multiple sources
@@ -420,13 +433,13 @@ const ConfirmSubscription: React.FC = () => {
         const queryBasePackId = urlParams.get('basePackId');
         const locationState = window.history.state?.usr;
 
+        
         // console.log('Raw data sources:', {
         //   details,
         //   address,
         //   queryBasePackId,
         //   locationState
         // });
-
         if (!details) {
           console.error('No subscription details found');
           toast.error('No subscription details found');
@@ -436,18 +449,15 @@ const ConfirmSubscription: React.FC = () => {
 
         try {
           const parsedDetails = JSON.parse(details);
-          // console.log('Parsed subscription details:', parsedDetails);
-
-          // Build normalized details by combining all sources
           const normalizedDetails: SubscriptionDetails = {
             basePackId: parsedDetails.basePackId || queryBasePackId || locationState?.basePackId,
             type: parsedDetails.type || (parsedDetails.deliveryCount === 7 ? 'DAILY' : 'ALTERNATE'),
             startDate: parsedDetails.startDate,
-            amount: parsedDetails.amount || parsedDetails.pricePerPack,
+            amount: parsedDetails.amount || parsedDetails.sellingPrice,
             packDetails: parsedDetails.packDetails,
             deliveryCount: parsedDetails.deliveryCount || 7,
             walletBalance: parsedDetails.walletBalance || 0,
-            pricePerPack: parsedDetails.pricePerPack,
+            sellingPrice: parsedDetails.sellingPrice,
             remainingAmount: parsedDetails.remainingAmount,
             deliveryPattern: parsedDetails.type === 'DAILY' ? 'Every day' : 'Alternate days'
           };
@@ -510,14 +520,6 @@ const ConfirmSubscription: React.FC = () => {
       toast.error('Missing subscription details or address');
       return;
     }
-
-    // Log the complete state before proceeding
-    console.log('Current state before confirmation:', {
-      subscriptionDetails,
-      selectedAddress,
-      startDate: new Date(subscriptionDetails.startDate)
-    });
-
     // Validate required fields
     if (!subscriptionDetails.basePackId) {
       console.error('Missing basePackId');
@@ -544,17 +546,11 @@ const ConfirmSubscription: React.FC = () => {
         days: subscriptionDetails.deliveryCount || 7
       };
 
-      // Log the exact data being sent
-      console.log('Initiate request data:', {
-        ...initiateData,
-        startDate: initiateData.startDate.toISOString(),
-        rawBasePackId: subscriptionDetails.basePackId,
-        rawType: subscriptionDetails.type
-      });
+    
 
       // First initiate the subscription
       const initiateResponse = await subscriptionService.initiateSubscription(initiateData);
-      console.log('Initiate response:', initiateResponse);
+
 
       if (!initiateResponse.success) {
         throw new Error(initiateResponse.message || 'Failed to initiate subscription');
@@ -575,12 +571,8 @@ const ConfirmSubscription: React.FC = () => {
       };
 
       // Log the confirm request data
-
-
       // Then confirm the subscription
       const confirmResponse = await subscriptionService.confirmSubscription(confirmData);
-
-
       if (confirmResponse.success) {
         const confirmedSubscription = {
           ...confirmResponse.subscription,
@@ -589,30 +581,23 @@ const ConfirmSubscription: React.FC = () => {
           packDetails: subscriptionDetails.packDetails,
           type: subscriptionDetails.type,
           deliveryCount: subscriptionDetails.deliveryCount,
-          pricePerPack: subscriptionDetails.pricePerPack
+          sellingPrice: subscriptionDetails.sellingPrice
         };
-
         localStorage.setItem('lastConfirmedSubscription', JSON.stringify(confirmedSubscription));
-
         setStatusModal({
           isOpen: true,
           type: 'success',
           message: 'Subscription confirmed successfully!'
         });
-
         toast.success('Subscription confirmed successfully!');
-        setTimeout(() => {
-          navigate('/');
-        }, 2000);
+        setIsConfirmed(true); // <-- Show thank you section
       } else {
         throw new Error(confirmResponse.error || 'Failed to confirm subscription');
       }
     } catch (error: any) {
       console.error('Subscription error:', error);
-      
       // Enhanced error handling with more specific messages
       const errorMessage = error.message || 'An error occurred while processing your subscription';
-      
       if (errorMessage.includes('P2002') || 
           errorMessage.includes('Unique constraint failed') ||
           errorMessage.includes('deliveryAddressId')) {
@@ -643,8 +628,7 @@ const ConfirmSubscription: React.FC = () => {
       setLoading(false);
     }
   };
-
-  // const handleRecharge = () => {
+ // const handleRecharge = () => {
   //   if (!rechargeDetails) return;
     
   //   // Store pending subscription
@@ -821,95 +805,11 @@ const ConfirmSubscription: React.FC = () => {
       </div>
     );
   }
-
   return (
     <div className="min-h-screen bg-[#FFFBEB] relative max-w-[800px] mx-auto">
-      {/* Main Content Card */}
       <div className="bg-[#FFFBEB] mx-4 rounded-xl pb-24">
-        {/* Header Section */}
-        <div className="pt-8 pb-6 mt-[90px] text-center">
-          <SuccessCheckmark />
-          <motion.h1 
-            className="text-2xl font-semibold mb-2"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
-          >
-            Thank you, {userData?.name || 'User'}!
-          </motion.h1>
-          <motion.p 
-            className="text-gray-600 text-sm leading-relaxed"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1 }}
-          >
-            Your subscription has been confirmed. Get<br />
-            ready for fresh flowers every morning.
-          </motion.p>
-        </div>
-
-        {/* Delivery Address Section */}
-        <motion.div 
-          className="bg-white rounded-lg mx-4 p-4 mb-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.2 }}
-        >
-          <h2 className="text-[15px] font-medium mb-3">Delivering to</h2>
-          <div className="flex items-start gap-3">
-            <FaMapMarkerAlt className="text-gray-400 mt-1" />
-            <p className="text-gray-600 text-sm leading-relaxed">
-              {selectedAddress?.street}
-              {selectedAddress?.area && `${selectedAddress.area}, `}
-              {selectedAddress?.city}
-            </p>
-          </div>
-          {/* Map View */}
-          <div className="mt-4 overflow-hidden rounded-lg">
-            <MapView address={selectedAddress} />
-          </div>
-        </motion.div>
-
-        {/* Subscription Details Section */}
-        <motion.div 
-          className="bg-white rounded-lg mx-4 p-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.4 }}
-        >
-          <h2 className="text-[15px] font-medium mb-4">Your Subscription</h2>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 text-sm">Pack</span>
-              <span className="text-gray-800 text-sm">{subscriptionDetails?.packDetails?.name}</span>
-              <span></span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 text-sm">Frequency</span>
-              <span className="text-gray-800 text-sm">
-                {subscriptionDetails?.type === 'DAILY' ? 'Daily • Mon-Sat' : 'Alternate Days'}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 text-sm">First Delivery</span>
-              <span className="text-gray-800 text-sm">
-                {new Date(subscriptionDetails?.startDate || '').toLocaleDateString('en-US', {
-                  weekday: 'short',
-                  hour: 'numeric',
-                  minute: 'numeric',
-                  hour12: true
-                })}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 text-sm">Price</span>
-              <span className="text-gray-800 text-sm">₹{subscriptionDetails?.pricePerPack}/Pack</span>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Action Buttons */}
-        <div className="mt-[90px] pb-[72px]">
+        {/* Show confirm buttons if not confirmed */}
+        {!isConfirmed && (
           <div className="px-4 pt-4">
             <button 
               onClick={handleConfirm}
@@ -925,15 +825,97 @@ const ConfirmSubscription: React.FC = () => {
               Back to Home
             </button>
           </div>
-        </div>
+        )}
+        {/* Show thank you + details if confirmed */}
+        {isConfirmed && (
+          <>
+            <div className="pt-8 pb-6 mt-[90px] text-center">
+              <SuccessCheckmark />
+              <motion.h1 
+                className="text-2xl font-semibold mb-2"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8 }}
+              >
+                Thank you, {userData ? `${userData.firstName} ${userData.lastName}` : 'User'}!
+              </motion.h1>
+              <motion.p 
+                className="text-gray-600 text-sm leading-relaxed"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1 }}
+              >
+                Your subscription has been confirmed. Get<br />
+                ready for fresh flowers every morning.
+              </motion.p>
+            </div>
+            <motion.div 
+              className="bg-white rounded-lg mx-4 p-4 mb-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.2 }}
+            >
+              <h2 className="text-[15px] font-medium mb-3">Delivering to</h2>
+              <div className="flex items-start gap-3">
+                <FaMapMarkerAlt className="text-gray-400 mt-1" />
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  {selectedAddress?.street}
+                  {selectedAddress?.area && `${selectedAddress.area}, `}
+                  {selectedAddress?.city}
+                </p>
+              </div>
+              <div className="mt-4 overflow-hidden rounded-lg">
+                <MapView address={selectedAddress} />
+              </div>
+            </motion.div>
+            <motion.div 
+              className="bg-white rounded-lg mx-4 p-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.4 }}
+            >
+              <h2 className="text-[15px] font-medium mb-4">Your Subscription</h2>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 text-sm">Pack</span>
+                  <span className="text-gray-800 text-sm">{subscriptionDetails?.packDetails?.name}</span>
+                  <span></span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 text-sm">Frequency</span>
+                  <span className="text-gray-800 text-sm">
+                    {subscriptionDetails?.type === 'DAILY' ? 'Daily • Mon-Sat' : 'Alternate Days'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 text-sm">First Delivery</span>
+                  <span className="text-gray-800 text-sm">
+                    {new Date(subscriptionDetails?.startDate || '').toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      hour: 'numeric',
+                      minute: 'numeric',
+                      hour12: true
+                    })}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 text-sm">Price</span>
+                  <span className="text-gray-800 text-sm">
+  ₹{subscriptionDetails?.packDetails?.sellingPrice ?? 'N/A'}/Pack
+</span>
+                </div>
+              </div>
+            </motion.div>
 
         {/* Bottom Navigation */}
         <div className='mb-10 md:mb-10'>
           <BottomNavigation />
         </div>
+          </>
+        )}
       </div>
     </div>
   );
 };
 
-export default ConfirmSubscription; 
+export default ConfirmSubscription;
