@@ -16,13 +16,13 @@ const AddressSelection: React.FC = () => {
   const [formData, setFormData] = useState({
     houseNo: '',
     streetName: '',
-    societyName: '',
     area: '',
-    phoneNumber: '',
+    associatedPhoneNumber: '', 
     pincode: '',
     city: '',
     district: '',
     state: '',
+    coordinates: '',
     setAsDefault: false
   });
 
@@ -78,9 +78,25 @@ const AddressSelection: React.FC = () => {
     e.preventDefault();
     try {
       setLoading(true);
+      // Call the API to create address
+      const newAddress = await addressService.createAddress(formData);
       toast.success('Address added successfully');
       setShowAddForm(false);
-      loadAddresses();
+      setFormData({
+        houseNo: '',
+        streetName: '',
+        area: '',
+        associatedPhoneNumber: '',
+        pincode: '',
+        city: '',
+        district: '',
+        state: '',
+        coordinates: '',
+        setAsDefault: false
+      });
+      await loadAddresses();
+      setSelectedAddress(newAddress);
+      localStorage.setItem('selectedDeliveryAddress', JSON.stringify(newAddress));
     } catch (error: any) {
       handleAuthError(error);
     } finally {
@@ -256,13 +272,13 @@ const AddressSelection: React.FC = () => {
               {[
                 { label: 'House Number', name: 'houseNo', required: true },
                 { label: 'Street Name', name: 'streetName', required: true },
-                { label: 'Society Name', name: 'societyName', required: false },
                 { label: 'Area', name: 'area', required: true },
-                { label: 'Phone Number', name: 'phoneNumber', required: true, type: 'tel' },
+                { label: 'Phone Number', name: 'associatedPhoneNumber', required: true, type: 'tel' },
                 { label: 'City', name: 'city', required: true },
                 { label: 'District', name: 'district', required: false },
                 { label: 'State', name: 'state', required: true },
-                { label: 'Pincode', name: 'pincode', required: true }
+                { label: 'Pincode', name: 'pincode', required: true },
+                { label: 'Coordinates', name: 'coordinates', required: true },
               ].map((field) => (
                 <div key={field.name}>
                   <label className="block text-[15px] font-medium text-gray-700 mb-1">
@@ -316,4 +332,4 @@ const AddressSelection: React.FC = () => {
   );
 };
 
-export default AddressSelection; 
+export default AddressSelection;
