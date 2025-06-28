@@ -9,7 +9,7 @@ import walletImage from "../../assets/icon/Wallet.png";
 import profileImage from "../../assets/icon/Profile.png";
 import { IoArrowBack } from "react-icons/io5";
 import Spinner from "../common/Spinner";
-
+import { useSearchParams } from "react-router-dom";
 
 const ProductPage: React.FC = () => {
   const navigate = useNavigate();
@@ -18,16 +18,24 @@ const ProductPage: React.FC = () => {
   const [sortBy, setSortBy] = useState("Price");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const category = searchParams.get("category");
 
-  const isBasePack = (item: Product | BasePack): item is BasePack =>
+  useEffect(() => {
+    if (category === "pujaflowers") {
+      setActiveTab("Puja Flowers"); // Or appropriate default
+    }
+  }, [category]);
+
+  const isCheckProducts = (item: Product | BasePack): item is BasePack =>
     "sellingPricePerPackDaily" in item;
 
- const sortProducts = (items: (Product | BasePack)[], sortType: string) => {
+  const sortProducts = (items: (Product | BasePack)[], sortType: string) => {
     return [...items].sort((a, b) => {
       switch (sortType) {
         case "Price": {
-          const priceA = isBasePack(a) ? a.sellingPrice : a.sellingPrice;
-          const priceB = isBasePack(b) ? b.sellingPrice : b.sellingPrice;
+          const priceA = isCheckProducts(a) ? a.sellingPrice : a.sellingPrice;
+          const priceB = isCheckProducts(b) ? b.sellingPrice : b.sellingPrice;
           return priceA - priceB;
         }
         case "Popularity":
@@ -45,7 +53,7 @@ const ProductPage: React.FC = () => {
     });
   };
   const getItemPrice = (item: Product | BasePack): number => {
-    return isBasePack(item) ? item.sellingPrice : item.sellingPrice;
+    return isCheckProducts(item) ? item.sellingPrice : item.sellingPrice;
   };
 
   useEffect(() => {
@@ -187,7 +195,7 @@ const ProductPage: React.FC = () => {
             <>
               {activeTab === "Puja Flowers" && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {sortProducts(pujaProducts, sortBy).map((item)=>(
+                  {sortProducts(pujaProducts, sortBy).map((item) => (
                     <div
                       key={item.id}
                       className="w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
@@ -231,7 +239,7 @@ const ProductPage: React.FC = () => {
               )}
               {activeTab === "Exotic Flowers" && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {sortProducts(exoticProducts, sortBy).map((item)=>(
+                  {sortProducts(exoticProducts, sortBy).map((item) => (
                     <div
                       key={item.id}
                       className="w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
