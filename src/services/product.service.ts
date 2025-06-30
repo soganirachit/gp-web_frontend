@@ -4,6 +4,7 @@ import { getApiUrl } from "../config/api.config";
 const API_URL = `${getApiUrl()}/products`;
 
 export interface Product {
+  isActive: unknown;
   id: string;
   name: string;
   category: string;
