@@ -11,7 +11,7 @@ export interface Address {
   city: string;
   state: string;
   pincode: string;
-  phoneNumber: string;
+  associatedPhoneNumber: string; // <-- changed
   isDefault: boolean;
   type: 'Home' | 'Work' | 'Others';
   societyName?: string;
@@ -28,7 +28,7 @@ export interface AddressInput {
   city: string;
   state: string;
   pincode: string;
-  phoneNumber: string;
+  associatedPhoneNumber: string; // <-- changed
   societyName?: string;
   district?: string;
   setAsDefault?: boolean;
@@ -163,4 +163,4 @@ class AddressService {
   }
 }
 
-export const addressService = new AddressService(); 
+export const addressService = new AddressService();

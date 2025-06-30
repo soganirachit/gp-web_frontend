@@ -55,7 +55,7 @@ const BottomNav: React.FC = () => {
             alt="Subscriptions"
             className="w-6 h-6 mb-1 text-green-800 md:w-8 md:h-8"
           />
-          <span className="text-xs md:text-sm">store</span>
+          <span className="text-xs md:text-sm">Store</span>
         </Link>
 
         <Link

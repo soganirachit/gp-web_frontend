@@ -186,23 +186,25 @@ const ManageMySubscription: React.FC = () => {
     }
   };
 
- 
-   const handleCancel = async () => {
-     if (!cancellationReason.trim()) {
-       setShowReasonError(true);
-       return;
-     }
-     try {
-       // Pass cancellation reason in the correct format
-       await subscriptionService.cancelSubscription(selectedSubscription!.id, cancellationReason);
-       setShowCancelModal(false);
-       setCancellationReason("");
-       // Navigate to cancel landing page instead of fetching subscriptions
-       navigate("/cancel-subscription");
-     } catch (error: any) {
-       toast.error(error.message || "Failed to cancel subscription");
-     }
-   };
+  const handleCancel = async () => {
+    if (!cancellationReason.trim()) {
+      setShowReasonError(true);
+      return;
+    }
+    try {
+      // Pass cancellation reason in the correct format
+      await subscriptionService.cancelSubscription(
+        selectedSubscription!.id,
+        cancellationReason
+      );
+      setShowCancelModal(false);
+      setCancellationReason("");
+      // Navigate to cancel landing page instead of fetching subscriptions
+      navigate("/cancel-subscription");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to cancel subscription");
+    }
+  };
 
   const handleRechargeWallet = () => {
     setShowInsufficientBalanceModal(false);
@@ -422,7 +424,6 @@ const ManageMySubscription: React.FC = () => {
                     Resume
                   </button>
 
-
                   {/* <button
                     onClick={() => {
                       setSelectedSubscription(subscription);
@@ -552,7 +553,7 @@ const ManageMySubscription: React.FC = () => {
               started.
             </p>
             <button
-              onClick={() => navigate("/products?category=basepacks")}
+              onClick={() => navigate("/products?category=pujaflowers")}
               className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium"
             >
               Browse Base Packs
@@ -599,7 +600,7 @@ const ManageMySubscription: React.FC = () => {
           {/* Product Button */}
           <div className="mb-6">
             <button
-              onClick={() => navigate("/products?category=basepacks")}
+              onClick={() => navigate("/products?category=pujaflowers")}
               className="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition-colors"
             >
               Browse Other Products
