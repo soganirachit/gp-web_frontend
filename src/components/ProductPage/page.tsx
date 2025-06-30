@@ -54,7 +54,8 @@ const ProductPage: React.FC = () => {
         setIsLoading(true);
         setError(null);
         const result = await productService.getAllProducts();
-        setProducts(result);
+         const activeOnly = result.filter((item: Product) => item.isActive);
+        setProducts(activeOnly);
       } catch (error) {
         console.error("Error fetching data:", error);
         setError("Failed to load products");

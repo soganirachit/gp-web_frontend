@@ -55,8 +55,9 @@ const StoreProductsPages: React.FC = () => {
         setError(null);
         const result = await storeProductService.getAllStoreProducts();
         // Ensure each product has a 'category' property (fallback to empty string if missing)
+           const activeProducts = result.filter((item: any) => item.isActive);
         setProducts(
-          result.map((item: any) => ({
+          activeProducts.map((item: any) => ({
             category: item.category ?? "",
             ...item,
           }))
