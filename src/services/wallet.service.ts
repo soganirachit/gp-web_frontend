@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getApiUrl } from "../config/api.config";
+import { TransactionType } from "@/interfaces";
 
 // Configure base URL for API calls
 const API_URL = `${getApiUrl()}/wallet`;
@@ -27,28 +28,42 @@ class WalletService {
     throw error;
   }
 
-  async getWalletBalance(): Promise<number> {
+  async getWalletBalance(): Promise<{
+    balance: number;
+    transactions: TransactionType[];
+  }> {
     try {
       const headers = this.getAuthHeaders();
       if (!headers) {
-        return 0; 
+        return {
+          balance: 0,
+          transactions: [],
+        };
       }
 
       const response = await axios.get(`${API_URL}/balance`, { headers });
 
       if (
-        response.status === 200 &&
-        typeof response.data.balance === "number"
+        response.status === 200
       ) {
-        return response.data.balance;
+        return response.data;
       }
-      return 0; 
+      return {
+        balance: 0,
+        transactions: [],
+      };
     } catch (error: any) {
       if (!localStorage.getItem("token")) {
-        return 0; 
+        return {
+          balance: 0,
+          transactions: [],
+        };
       }
       this.handleAuthError(error);
-      return 0;
+      return {
+        balance: 0,
+        transactions: [],
+      };
     }
   }
 
@@ -67,7 +82,7 @@ class WalletService {
         };
       }
 
-      const balance = await this.getWalletBalance();
+      const { balance } = await this.getWalletBalance();
       return {
         isEnough: balance >= amount,
         currentBalance: balance,

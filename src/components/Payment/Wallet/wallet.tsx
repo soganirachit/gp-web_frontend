@@ -12,6 +12,9 @@ import { IoMdArrowDown, IoMdArrowUp } from "react-icons/io";
 import walletImage from "../../../assets/icon/Wallet.png";
 import profileImage from "../../../assets/icon/Profile.png";
 import BottomNav from "../../layout/BottomNav";
+import { TransactionType } from "@/interfaces";
+import { format, parseISO } from 'date-fns'
+import { INR } from "@/components/constants";
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
 
@@ -41,6 +44,7 @@ const Wallet = () => {
   const { isLoggedIn } = useAuth();
   const [customAmount, setCustomAmount] = useState<string>("500");
   const [balance, setBalance] = useState<number>(0);
+  const [transactions, setTransactions] = useState<TransactionType[]>([]);
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
   const [showCoupons, setShowCoupons] = useState(false);
   const [, setSelectedCoupon] = useState<CouponType | null>(null);
@@ -94,8 +98,11 @@ const Wallet = () => {
   const fetchWalletBalance = async () => {
     try {
       setIsLoadingBalance(true);
-      const balance = await walletService.getWalletBalance();
+      const response: {balance: number, transactions: TransactionType[]} = await walletService.getWalletBalance();
+      const balance = response.balance;
+      const transactions = response.transactions;
       setBalance(balance);
+      setTransactions(transactions);
     } catch (error: any) {
       if (error.message.includes("Session expired")) {
         localStorage.removeItem("token");
@@ -271,23 +278,39 @@ const Wallet = () => {
           <h2 className="text-xl md:text-2xl font-medium mb-4">
             Recent Transactions
           </h2>
-          <div className="space-y-3 md:space-y-4">
-            <div className="bg-white p-4 md:p-5 rounded-lg flex items-center justify-between">
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className="p-2 md:p-3 bg-[#E8F5E9] rounded-full">
-                  <IoMdArrowDown className="text-[#4CAF50] md:text-xl" />
-                </div>
-                <div>
-                  <div className="font-medium md:text-lg">Wallet Recharge</div>
-                  <div className="text-sm md:text-base text-gray-500">
-                    10 May 2023 • 2:30 PM
+          {transactions.map((transaction: TransactionType,tdx) => {
+            return (
+              <div className="space-y-3 md:space-y-4" key={`trans+${tdx}`}>
+                <div className="bg-white p-4 md:p-5 rounded-lg flex items-center justify-between">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className="p-2 md:p-3 bg-[#FFF3E0] rounded-full">
+                      {transaction.type === 'CREDIT' ? (
+                        <IoMdArrowDown className="text-[#4CAF50] md:text-xl" />
+                      ) : (          
+                        <IoMdArrowUp className="text-[#FF5722] md:text-xl" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="font-medium md:text-lg">
+                        {transaction.description}
+                      </div>
+                      <div className="text-sm md:text-base text-gray-500">
+                        {format(parseISO(transaction.createdAt), 'dd MMM yyyy  h:mm a')}
+                      </div>
+                    </div>
+                  </div>
+                  <div className={`${transaction.type === 'CREDIT' ?  'text-[#4CAF50]' :'text-[#FF5722]' } font-medium md:text-lg`}>
+                   {transaction.type === 'CREDIT' ? `+${INR} ${transaction.amount}` : `-${INR} ${transaction.amount}`}
                   </div>
                 </div>
               </div>
-              <div className="text-[#4CAF50] font-medium md:text-lg">
-                +₹1000
-              </div>
-            </div>
+            );
+          })}
+          {transactions.length === 0 && (
+            <div className="text-center text-gray-600">No transactions yet.</div>
+          )}
+          {/* <div className="space-y-3 md:space-y-4">
+            
 
             <div className="bg-white p-4 md:p-5 rounded-lg flex items-center justify-between">
               <div className="flex items-center gap-3 md:gap-4">
@@ -322,7 +345,7 @@ const Wallet = () => {
               </div>
               <div className="text-[#4CAF50] font-medium md:text-lg">+₹500</div>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
 
