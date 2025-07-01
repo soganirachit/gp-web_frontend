@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { FaArrowLeft, FaMapMarkerAlt, FaCheck, } from 'react-icons/fa';
-import { toast } from 'react-hot-toast';
-import { addressService, Address } from '../../services/address.service';
-import WalletIcon from '../../assets/icon/Wallet.png';
-import ProfileIcon from '../../assets/icon/Profile.png';
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { FaArrowLeft, FaMapMarkerAlt, FaCheck } from "react-icons/fa";
+import { toast } from "react-hot-toast";
+import { addressService, Address } from "../../services/address.service";
+import WalletIcon from "../../assets/icon/Wallet.png";
+import ProfileIcon from "../../assets/icon/Profile.png";
 
 const AddressSelection: React.FC = () => {
   const navigate = useNavigate();
@@ -14,37 +14,41 @@ const AddressSelection: React.FC = () => {
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
-    houseNo: '',
-    streetName: '',
-    area: '',
-    associatedPhoneNumber: '', 
-    pincode: '',
-    city: '',
-    district: '',
-    state: '',
-    coordinates: '',
-    setAsDefault: false
+    houseNo: "",
+    streetName: "",
+    area: "",
+    associatedPhoneNumber: "",
+    pincode: "",
+    city: "",
+    district: "",
+    state: "",
+    coordinates: "",
+    setAsDefault: false,
   });
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (!token) {
-      handleAuthError(new Error('Authentication required. Please login to continue.'));
+      handleAuthError(
+        new Error("Authentication required. Please login to continue.")
+      );
       return;
     }
     loadAddresses();
   }, []);
 
   const handleAuthError = (error: Error) => {
-    const isAuthError = error.message.includes('login') || error.message.includes('session expired');
+    const isAuthError =
+      error.message.includes("login") ||
+      error.message.includes("session expired");
     if (isAuthError) {
-      localStorage.setItem('redirectAfterLogin', location.pathname);
-      localStorage.removeItem('selectedDeliveryAddress');
-      navigate('/login', { 
-        state: { 
+      localStorage.setItem("redirectAfterLogin", location.pathname);
+      localStorage.removeItem("selectedDeliveryAddress");
+      navigate("/login", {
+        state: {
           returnUrl: location.pathname,
-          message: error.message 
-        }
+          message: error.message,
+        },
       });
     } else {
       toast.error(error.message);
@@ -56,15 +60,17 @@ const AddressSelection: React.FC = () => {
       setLoading(true);
       const savedAddresses = await addressService.getAllAddresses();
       setAddresses(savedAddresses);
-      
-      const storedAddress = localStorage.getItem('selectedDeliveryAddress');
+
+      const storedAddress = localStorage.getItem("selectedDeliveryAddress");
       if (storedAddress) {
         const parsedAddress = JSON.parse(storedAddress);
-        const addressExists = savedAddresses.some(addr => addr.id === parsedAddress.id);
+        const addressExists = savedAddresses.some(
+          (addr) => addr.id === parsedAddress.id
+        );
         if (addressExists) {
           setSelectedAddress(parsedAddress);
         } else {
-          localStorage.removeItem('selectedDeliveryAddress');
+          localStorage.removeItem("selectedDeliveryAddress");
         }
       }
     } catch (error: any) {
@@ -80,23 +86,26 @@ const AddressSelection: React.FC = () => {
       setLoading(true);
       // Call the API to create address
       const newAddress = await addressService.createAddress(formData);
-      toast.success('Address added successfully');
+      toast.success("Address added successfully");
       setShowAddForm(false);
       setFormData({
-        houseNo: '',
-        streetName: '',
-        area: '',
-        associatedPhoneNumber: '',
-        pincode: '',
-        city: '',
-        district: '',
-        state: '',
-        coordinates: '',
-        setAsDefault: false
+        houseNo: "",
+        streetName: "",
+        area: "",
+        associatedPhoneNumber: "",
+        pincode: "",
+        city: "",
+        district: "",
+        state: "",
+        coordinates: "",
+        setAsDefault: false,
       });
       await loadAddresses();
       setSelectedAddress(newAddress);
-      localStorage.setItem('selectedDeliveryAddress', JSON.stringify(newAddress));
+      localStorage.setItem(
+        "selectedDeliveryAddress",
+        JSON.stringify(newAddress)
+      );
     } catch (error: any) {
       handleAuthError(error);
     } finally {
@@ -106,24 +115,24 @@ const AddressSelection: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
   const handleAddressSelect = (address: Address) => {
     setSelectedAddress(address);
-    localStorage.setItem('selectedDeliveryAddress', JSON.stringify(address));
-    
+    localStorage.setItem("selectedDeliveryAddress", JSON.stringify(address));
+
     // Get the current subscription data
-    const subscriptionData = localStorage.getItem('currentSubscription');
+    const subscriptionData = localStorage.getItem("currentSubscription");
     if (subscriptionData) {
       const parsedData = JSON.parse(subscriptionData);
       // Ensure basePackId is preserved
       if (!parsedData.basePackId && location.state?.basePackId) {
         parsedData.basePackId = location.state.basePackId;
-        localStorage.setItem('currentSubscription', JSON.stringify(parsedData));
+        localStorage.setItem("currentSubscription", JSON.stringify(parsedData));
       }
     }
 
@@ -132,50 +141,49 @@ const AddressSelection: React.FC = () => {
       navigate(returnUrl, {
         state: {
           basePackId: location.state?.basePackId,
-          subscriptionData: location.state?.subscriptionData
-        }
+          subscriptionData: location.state?.subscriptionData,
+        },
       });
     }
   };
 
-  const createStoreOrder = ()=>{
-    
-  }
+  const createStoreOrder = () => {};
 
   const handleContinue = () => {
     if (!selectedAddress) {
-      toast.error('Please select an address');
+      toast.error("Please select an address");
       return;
     }
 
     try {
       // Get the current subscription data
-      const subscriptionData = localStorage.getItem('currentSubscription');
+      const subscriptionData = localStorage.getItem("currentSubscription");
       if (!subscriptionData) {
-        toast.error('Subscription details not found. Please try again.');
-        navigate('/');
+        toast.error("Subscription details not found. Please try again.");
+        navigate("/");
         return;
       }
 
       const parsedData = JSON.parse(subscriptionData);
-      
+
       // Ensure basePackId is preserved
       if (!parsedData.basePackId && location.state?.basePackId) {
         parsedData.basePackId = location.state?.basePackId;
-        localStorage.setItem('currentSubscription', JSON.stringify(parsedData));
+        localStorage.setItem("currentSubscription", JSON.stringify(parsedData));
       }
 
       // Navigate to the return URL or default to confirm page
-      const returnUrl = location.state?.returnUrl || '/subscription/confirm';
+      const returnUrl = location.state?.returnUrl || "/subscription/confirm";
       navigate(returnUrl, {
         state: {
           basePackId: parsedData.basePackId,
           subscriptionData: parsedData,
-          selectedAddress: selectedAddress
-        }
+          selectedAddress: selectedAddress,
+          product: location.state?.product,
+        },
       });
     } catch (error) {
-      toast.error('An error occurred. Please try again.');
+      toast.error("An error occurred. Please try again.");
     }
   };
 
@@ -189,7 +197,9 @@ const AddressSelection: React.FC = () => {
               <button onClick={() => navigate(-1)} className="text-gray-600">
                 <FaArrowLeft className="text-xl" />
               </button>
-              <span className="text-lg font-medium">Select Delivery Address</span>
+              <span className="text-lg font-medium">
+                Select Delivery Address
+              </span>
             </div>
             <div className="flex gap-2">
               <button className="w-8 h-8 flex items-center justify-center text-[#015D3A]">
@@ -214,8 +224,8 @@ const AddressSelection: React.FC = () => {
                   key={address.id}
                   className={`bg-white rounded-xl p-4 cursor-pointer transition-all hover:shadow-md ${
                     selectedAddress?.id === address.id
-                      ? 'border-2 border-[#015D3A] bg-[#ECFDF5]'
-                      : 'border border-gray-200'
+                      ? "border-2 border-[#015D3A] bg-[#ECFDF5]"
+                      : "border border-gray-200"
                   }`}
                   onClick={() => handleAddressSelect(address)}
                 >
@@ -235,10 +245,13 @@ const AddressSelection: React.FC = () => {
                         )}
                       </div>
                       <p className="text-sm text-gray-600">
-                        {address.area}, {address.city}, {address.state} - {address.pincode}
+                        {address.area}, {address.city}, {address.state} -{" "}
+                        {address.pincode}
                       </p>
                       {address.societyName && (
-                        <p className="text-sm text-gray-600">{address.societyName}</p>
+                        <p className="text-sm text-gray-600">
+                          {address.societyName}
+                        </p>
                       )}
                     </div>
                     {selectedAddress?.id === address.id && (
@@ -274,24 +287,31 @@ const AddressSelection: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Form Fields */}
               {[
-                { label: 'House Number', name: 'houseNo', required: true },
-                { label: 'Street Name', name: 'streetName', required: true },
-                { label: 'Area', name: 'area', required: true },
-                { label: 'Phone Number', name: 'associatedPhoneNumber', required: true, type: 'tel' },
-                { label: 'City', name: 'city', required: true },
-                { label: 'District', name: 'district', required: false },
-                { label: 'State', name: 'state', required: true },
-                { label: 'Pincode', name: 'pincode', required: true },
-                { label: 'Coordinates', name: 'coordinates', required: true },
+                { label: "House Number", name: "houseNo", required: true },
+                { label: "Street Name", name: "streetName", required: true },
+                { label: "Area", name: "area", required: true },
+                {
+                  label: "Phone Number",
+                  name: "associatedPhoneNumber",
+                  required: true,
+                  type: "tel",
+                },
+                { label: "City", name: "city", required: true },
+                { label: "District", name: "district", required: false },
+                { label: "State", name: "state", required: true },
+                { label: "Pincode", name: "pincode", required: true },
+                { label: "Coordinates", name: "coordinates", required: true },
               ].map((field) => (
                 <div key={field.name}>
                   <label className="block text-[15px] font-medium text-gray-700 mb-1">
-                    {field.label} {!field.required && '(Optional)'}
+                    {field.label} {!field.required && "(Optional)"}
                   </label>
                   <input
-                    type={field.type || 'text'}
+                    type={field.type || "text"}
                     name={field.name}
-                    value={formData[field.name as keyof typeof formData] as string}
+                    value={
+                      formData[field.name as keyof typeof formData] as string
+                    }
                     onChange={handleInputChange}
                     required={field.required}
                     className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-[#015D3A] focus:ring-1 focus:ring-[#015D3A] text-gray-900"
@@ -325,7 +345,7 @@ const AddressSelection: React.FC = () => {
                   disabled={loading}
                   className="flex-1 bg-[#F15A22] text-white py-3.5 rounded-lg text-[15px] font-medium hover:bg-[#F15A22]/90 disabled:opacity-50"
                 >
-                  {loading ? 'Adding...' : 'Add Address'}
+                  {loading ? "Adding..." : "Add Address"}
                 </button>
               </div>
             </form>

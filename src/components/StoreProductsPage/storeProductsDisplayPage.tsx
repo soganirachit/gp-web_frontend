@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import "react-datepicker/dist/react-datepicker.css";
 import { walletService } from "../../services/wallet.service";
 import { toast } from "react-toastify";
@@ -46,6 +46,7 @@ type SubscriptionType = "Daily" | "Alternate";
 const StorePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [quantity, setQuantity] = useState(1);
   const [selectedType] = useState<SubscriptionType>("Daily");
   const [startDate] = useState<Date>(new Date());
@@ -66,7 +67,7 @@ const StorePage: React.FC = () => {
   const [otherStroePacks, setOtherStorePacks] = useState<storeProducts[]>([]);
   const [, setExoticFlowers] = useState<Product[]>([]);
 
-  const fetchBasePack = async () => {
+  const fetchProductsById = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -79,7 +80,7 @@ const StorePage: React.FC = () => {
         navigate("/login", { state: { returnUrl: `/store/${id}` } });
         return;
       }
-      const data = await storeProductGet.getBasePackById(id);
+      const data = await storeProductGet.getProductById(id);
 
       setBasePack(data as ExtendedBasePack);
       const response = await storeProductGet.getAllStoreProducts();
@@ -97,24 +98,24 @@ const StorePage: React.FC = () => {
       setLoading(false);
     }
   };
+  const fetchOtherPacks = async () => {
+    try {
+      const allProducts = await storeProductService.getAllStoreProducts();
+      const exoticProducts = allProducts.filter(
+        (product) => product.type === "EXOTIC"
+      );
+      setExoticFlowers(exoticProducts.slice(0, 3));
+    } catch (error) {
+      console.error("Error fetching other packs:", error);
+    }
+  };
 
   useEffect(() => {
-    const fetchOtherPacks = async () => {
-      try {
-        const allProducts = await storeProductService.getAllStoreProducts();
-        const exoticProducts = allProducts.filter(
-          (product) => product.type === "EXOTIC"
-        );
-        setExoticFlowers(exoticProducts.slice(0, 3));
-      } catch (error) {
-        console.error("Error fetching other packs:", error);
-      }
-    };
     if (id) fetchOtherPacks();
   }, [id]);
 
   useEffect(() => {
-    fetchBasePack();
+    fetchProductsById();
   }, [id, navigate]);
 
   const getPriceDisplay = () => {
@@ -138,7 +139,7 @@ const StorePage: React.FC = () => {
     const { price, originalPrice, savings } = getPriceDisplay();
     const totalPrice = price * quantity;
     navigate("/address-selection", {
-      state: { basePackId: id, totalPrice, quantity },
+      state: { product: location.state.product },
     });
   };
 

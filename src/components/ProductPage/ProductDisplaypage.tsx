@@ -228,7 +228,7 @@ const ProductPage: React.FC = () => {
         return;
       }
 
-      const data = await basePackService.getBasePackById(id);
+      const data = await basePackService.getProductById(id);
       // Transform the data to match ExtendedBasePack interface
       const extendedData: ExtendedBasePack = {
         ...data,
@@ -343,7 +343,7 @@ const ProductPage: React.FC = () => {
       const totalPrice = pricePerPack * minDays * quantity;
 
       // First ensure wallet exists and check balance
-      const { balance } = await walletService.getWalletBalance() || {};
+      const { balance } = (await walletService.getWalletBalance()) || {};
 
       if (balance < totalPrice) {
         // Update balance details and show modal
@@ -765,7 +765,9 @@ const ProductPage: React.FC = () => {
                   <div className="p-3">
                     <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                       <img
-                        src={pack.imagesUrl || "https://via.placeholder.com/160"}
+                        src={
+                          pack.imagesUrl || "https://via.placeholder.com/160"
+                        }
                         alt={pack.name}
                         className="w-full h-full object-cover"
                       />

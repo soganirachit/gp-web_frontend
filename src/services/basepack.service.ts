@@ -31,8 +31,7 @@ class BasePackService {
   async getAllBasePacks(): Promise<BasePack[]> {
     try {
       const response = await axios.get(API_URL);
-     
-      
+
       return response.data;
     } catch (error: unknown) {
       if (error instanceof Error || error instanceof AxiosError) {
@@ -42,11 +41,10 @@ class BasePackService {
     }
   }
 
-  async getBasePackById(id: string): Promise<BasePack> {
+  async getProductById(id: string): Promise<BasePack> {
     try {
       const response = await axios.get(`${API_URL}/${id}`);
-   
-      
+
       return response.data;
     } catch (error: unknown) {
       if (error instanceof Error || error instanceof AxiosError) {

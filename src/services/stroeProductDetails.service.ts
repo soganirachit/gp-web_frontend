@@ -1,7 +1,6 @@
 import axios, { AxiosError } from "axios";
 
-
-const baseUrl =  import.meta.env.VITE_API_BASE_URL
+const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
 const API_URL = `${baseUrl}/storeProducts/store`;
 export interface storeProducts {
@@ -20,8 +19,6 @@ export interface storeProducts {
 }
 
 class storesProductsService {
- 
-
   async getAllStoreProducts(): Promise<storeProducts[]> {
     try {
       const response = await axios.get(API_URL);
@@ -34,7 +31,7 @@ class storesProductsService {
     }
   }
 
-  async getBasePackById(id: string): Promise<storeProducts> {
+  async getProductById(id: string): Promise<storeProducts> {
     try {
       const response = await axios.get(`${API_URL}/${id}`);
       return response.data;
