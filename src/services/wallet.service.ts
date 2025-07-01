@@ -11,7 +11,7 @@ class WalletService {
       return null;
     }
     return {
-      Authorization: token,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     };
   }
@@ -31,7 +31,7 @@ class WalletService {
     try {
       const headers = this.getAuthHeaders();
       if (!headers) {
-        return 0; // Return 0 balance if not authenticated
+        return 0; 
       }
 
       const response = await axios.get(`${API_URL}/balance`, { headers });
@@ -42,10 +42,10 @@ class WalletService {
       ) {
         return response.data.balance;
       }
-      return 0; // Return 0 if invalid response
+      return 0; 
     } catch (error: any) {
       if (!localStorage.getItem("token")) {
-        return 0; // Return 0 if no token
+        return 0; 
       }
       this.handleAuthError(error);
       return 0;
@@ -81,12 +81,7 @@ class WalletService {
       };
     }
   }
-
- 
-
-  
-
-  
+   
   async createRazorpayOrder(amount: number): Promise<{
     order: any;
     key_id: string;

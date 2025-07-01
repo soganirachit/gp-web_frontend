@@ -20,7 +20,7 @@ export const customerService = {
     try {
       const response = await axios.get(API_URL, {
         headers: {
-          Authorization: token || "",
+          Authorization: `Bearer ${token}`,
         },
       });
       if (response.data && response.data.data) {
