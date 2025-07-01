@@ -29,7 +29,8 @@ const AddEditAddress: React.FC = () => {
     state: '',
     pincode: '',
     phoneNumber: '',
-    type: 'Home' as 'Home' | 'Work' | 'Others'
+    type: 'Home' as 'Home' | 'Work' | 'Others',
+    district:''
   });
 
   const [selectedType, setSelectedType] = useState<'Home' | 'Work' | 'Others'>('Home');
@@ -38,15 +39,16 @@ const AddEditAddress: React.FC = () => {
   useEffect(() => {
     if (isEdit && existingAddress) {
       setFormData({
-        houseNo: existingAddress.houseNo || '',
-        streetName: existingAddress.streetName || '',
-        landmark: existingAddress.landmark || '',
-        area: existingAddress.area || '',
-        city: existingAddress.city || '',
+        houseNo: existingAddress.houseNo || 'unknown',
+        streetName: existingAddress.streetName || 'unknown',
+        landmark: existingAddress.landmark || 'unknown',
+        area: existingAddress.area || 'unknown',
+        city: existingAddress.city || 'jaipur',
         state: existingAddress.state || '',
-        pincode: existingAddress.pincode || '',
-        phoneNumber: existingAddress.phoneNumber || '',
-        type: existingAddress.type || 'Home'
+        pincode: existingAddress.pincode || '302021',
+        phoneNumber: existingAddress.associatedPhoneNumber || '',
+        type: existingAddress.type || 'Home',
+        district: existingAddress.district || 'Unknown'
       });
       setSelectedType(existingAddress.type || 'Home');
     }
@@ -84,9 +86,15 @@ const AddEditAddress: React.FC = () => {
     try {
       setIsSubmitting(true);
       const addressData = {
-        ...formData,
-        type: selectedType,
-        coordinates: `${selectedPosition.lat},${selectedPosition.lng}`
+        associatedPhoneNumber:formData.phoneNumber,
+        city:formData.city || 'unknown',
+        coordinates: `${selectedPosition.lat},${selectedPosition.lng}`,
+        district:formData.district || 'unknown',
+        houseNo:formData.houseNo || 'unknown',
+        area:formData.landmark || 'unknown',
+        state:formData.state || 'Unknown',
+        pincode:formData.pincode || '302021',
+        streetName:formData.streetName || 'unknown',
       };
 
       if (isEdit && existingAddress?.id) {

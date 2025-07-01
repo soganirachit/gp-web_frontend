@@ -24,7 +24,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
     city: "",
     state: "",
     pincode: "",
-    phoneNumber: "",
+    associatedPhoneNumber: "",
   });
 
   useEffect(() => {
@@ -36,7 +36,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
         city: initialAddress.city,
         state: initialAddress.state,
         pincode: initialAddress.pincode,
-        phoneNumber: initialAddress.phoneNumber,
+        associatedPhoneNumber: initialAddress.associatedPhoneNumber,
       });
     }
   }, [mode, initialAddress]);
@@ -212,7 +212,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
               type="tel"
               id="phoneNumber"
               name="phoneNumber"
-              value={formData.phoneNumber}
+              value={formData.associatedPhoneNumber}
               onChange={handleInputChange}
               required
               pattern="[0-9]{10}"

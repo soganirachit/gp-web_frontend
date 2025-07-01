@@ -14,6 +14,7 @@ export interface Product {
   tags: string[];
   weight?: number;
   isAvailable: boolean;
+  isStore: boolean;
 }
 
 export const storeProductService = {

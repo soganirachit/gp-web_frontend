@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { getAddressesUrl } from '../config/api.config';
-
+import {headerService} from './headers.service';
 export interface Address {
   id: string;
   userId: string;
@@ -36,52 +36,11 @@ export interface AddressInput {
 }
 
 class AddressService {
-  private getToken(): string {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('Authentication required. Please login to continue.');
-    }
-    return token;
-  }
-
-  private getHeaders() {
-    try {
-      const token = this.getToken();
-      // Remove 'Bearer' prefix as it's already included in the stored token
-      return {
-        'Authorization': token,
-        'Content-Type': 'application/json',
-      };
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  private handleError(error: any) {
-    console.error('API Error:', error.response || error);
-    
-    if (error.response?.status === 401) {
-      // Clear token and throw authentication error
-      localStorage.removeItem('token');
-      localStorage.removeItem('phoneNumber');
-      throw new Error('Session expired. Please login again.');
-    }
-    
-    if (error.response?.status === 403) {
-      throw new Error('You do not have permission to perform this action.');
-    }
-    
-    if (error.response?.status === 404) {
-      throw new Error('Address not found.');
-    }
-    
-    throw new Error(error.response?.data?.message || error.message || 'An error occurred while processing your request.');
-  }
 
   async getAllAddresses(): Promise<Address[]> {
     try {
       const response = await axios.get(getAddressesUrl(), {
-        headers: this.getHeaders(),
+        headers: headerService.getHeaders(),
       });
       
       // Check if response has the expected structure
@@ -92,18 +51,18 @@ class AddressService {
       }
       return [];
     } catch (error) {
-      throw this.handleError(error);
+      throw headerService.handleError(error);
     }
   }
 
   async getAddressById(id: string): Promise<Address> {
     try {
       const response = await axios.get(`${getAddressesUrl()}/${id}`, {
-        headers: this.getHeaders(),
+        headers: headerService.getHeaders(),
       });
       return response.data.data;
     } catch (error) {
-      throw this.handleError(error);
+      throw headerService.handleError(error);
     }
   }
 
@@ -113,12 +72,12 @@ class AddressService {
         getAddressesUrl(),
         addressInput,
         {
-          headers: this.getHeaders(),
+          headers: headerService.getHeaders(),
         }
       );
       return response.data.data;
     } catch (error) {
-      throw this.handleError(error);
+      throw headerService.handleError(error);
     }
   }
 
@@ -128,22 +87,22 @@ class AddressService {
         `${getAddressesUrl()}/${id}`,
         addressInput,
         {
-          headers: this.getHeaders(),
+          headers: headerService.getHeaders(),
         }
       );
       return response.data.data;
     } catch (error) {
-      throw this.handleError(error);
+      throw headerService.handleError(error);
     }
   }
 
   async deleteAddress(id: string): Promise<void> {
     try {
       await axios.delete(`${getAddressesUrl()}/${id}`, {
-        headers: this.getHeaders(),
+        headers: headerService.getHeaders(),
       });
     } catch (error) {
-      throw this.handleError(error);
+      throw headerService.handleError(error);
     }
   }
 
@@ -153,12 +112,12 @@ class AddressService {
         `${getAddressesUrl()}/${id}/default`,
         {},
         {
-          headers: this.getHeaders(),
+          headers: headerService.getHeaders(),
         }
       );
       return response.data.data;
     } catch (error) {
-      throw this.handleError(error);
+      throw headerService.handleError(error);
     }
   }
 }

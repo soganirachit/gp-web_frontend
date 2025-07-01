@@ -10,7 +10,10 @@ import logo from "../../assets/All/logo.png";
 import Spinner from "../common/Spinner";
 import { IoArrowBack } from "react-icons/io5";
 import BottomNav from "../layout/BottomNav";
-import { storeProductGet, storeProducts } from "@/services/stroeProductDetails.service";
+import {
+  storeProductGet,
+  storeProducts,
+} from "@/services/stroeProductDetails.service";
 import { Product, storeProductService } from "@/services/storeProduct.service";
 
 interface BasePackContent {
@@ -18,7 +21,8 @@ interface BasePackContent {
   name: string;
   quantity: number;
 }
-interface ExtendedBasePack extends Omit<storeProducts, "description" | "contents"> {
+interface ExtendedBasePack
+  extends Omit<storeProducts, "description" | "contents"> {
   surcharge: number;
   description: string;
   contents: (BasePackContent & { description?: string })[];
@@ -29,17 +33,15 @@ interface ExtendedBasePack extends Omit<storeProducts, "description" | "contents
   data: {
     imagesUrl: string;
     name: string;
-    sellingPrice: number; 
+    sellingPrice: number;
     description: string;
     contents: BasePackContent[];
     id: string;
     type: string;
+    isStore: boolean;
   };
 }
 type SubscriptionType = "Daily" | "Alternate";
-
-
-
 
 const StorePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -51,7 +53,8 @@ const StorePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
-  const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] = useState(false);
+  const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
+    useState(false);
   const [balanceDetails, setBalanceDetails] = useState({
     currentBalance: 0,
     requiredAmount: 0,
@@ -83,11 +86,13 @@ const StorePage: React.FC = () => {
       const allPacks: storeProducts[] = Array.isArray(response)
         ? response
         : (response as { data: storeProducts[] }).data || [];
-      const otherPacks = allPacks.filter((pack: any) => pack.id !== id).slice(0, 3);
+      const otherPacks = allPacks
+        .filter((pack: any) => pack.id !== id)
+        .slice(0, 3);
       setOtherStorePacks(otherPacks);
     } catch (error: any) {
-      console.error('Error fetching base pack:', error);
-      setError(error.message || 'Failed to fetch product details');
+      console.error("Error fetching base pack:", error);
+      setError(error.message || "Failed to fetch product details");
     } finally {
       setLoading(false);
     }
@@ -97,7 +102,9 @@ const StorePage: React.FC = () => {
     const fetchOtherPacks = async () => {
       try {
         const allProducts = await storeProductService.getAllStoreProducts();
-        const exoticProducts = allProducts.filter((product) => product.type === "EXOTIC");
+        const exoticProducts = allProducts.filter(
+          (product) => product.type === "EXOTIC"
+        );
         setExoticFlowers(exoticProducts.slice(0, 3));
       } catch (error) {
         console.error("Error fetching other packs:", error);
@@ -114,11 +121,25 @@ const StorePage: React.FC = () => {
     if (!basePack) return { price: 0, originalPrice: 0, savings: 0 };
     // Use basePack.data for price fields
     const price = selectedType === "Daily" ? basePack.data.sellingPrice : 0;
-    const originalPrice = selectedType === "Daily"
-      ? (basePack.data.sellingPrice ?? 0) + (basePack.surcharge ?? 0)
-      : 0;
+    const originalPrice =
+      selectedType === "Daily"
+        ? (basePack.data.sellingPrice ?? 0) + (basePack.surcharge ?? 0)
+        : 0;
     const savings = originalPrice - price;
     return { price, originalPrice, savings };
+  };
+  const createStoreOrder = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast.error("Please login to continue");
+      navigate("/login", { state: { returnUrl: `/store/${id}` } });
+      return;
+    }
+    const { price, originalPrice, savings } = getPriceDisplay();
+    const totalPrice = price * quantity;
+    navigate("/address-selection", {
+      state: { basePackId: id, totalPrice, quantity },
+    });
   };
 
   const handleSubscribe = async () => {
@@ -135,9 +156,12 @@ const StorePage: React.FC = () => {
       }
       setIsCheckingBalance(true);
       const minDays = 7;
-      const pricePerPack = selectedType === "Daily" ? basePack.sellingPricePerPackDaily : basePack.sellingPricePerPackAlternate;
+      const pricePerPack =
+        selectedType === "Daily"
+          ? basePack.sellingPricePerPackDaily
+          : basePack.sellingPricePerPackAlternate;
       const totalPrice = pricePerPack * minDays * quantity;
-      const { balance } = await walletService.getWalletBalance() || {};
+      const { balance } = (await walletService.getWalletBalance()) || {};
       if (balance < totalPrice) {
         setBalanceDetails({
           currentBalance: balance,
@@ -188,8 +212,6 @@ const StorePage: React.FC = () => {
       },
     });
   };
-
-
 
   const handleProductClick = (product: Product | storeProducts) => {
     navigate(`/store/${product.id}`);
@@ -254,8 +276,11 @@ const StorePage: React.FC = () => {
             <div className="md:w-1/2">
               <div className="aspect-square w-full">
                 <img
-                  src={basePack?.data.imagesUrl?.[0] || '/default-product-image.jpg'}
-                  alt={basePack?.data.name || 'Product'}
+                  src={
+                    basePack?.data.imagesUrl?.[0] ||
+                    "/default-product-image.jpg"
+                  }
+                  alt={basePack?.data.name || "Product"}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -318,10 +343,13 @@ const StorePage: React.FC = () => {
                 </div>
               </div>
               <button
-                onClick={handleSubscribe}
+                onClick={
+                  basePack.data.isStore ? createStoreOrder : handleSubscribe
+                }
                 className="w-full bg-[#F15A22] text-white py-3.5 rounded-full text-[15px] font-medium mb-3"
               >
-                Add Product ₹{getPriceDisplay().price}/Pack
+                Buy ₹{getPriceDisplay().price}/Pack
+                {/* Add Product ₹{getPriceDisplay().price}/Pack */}
               </button>
             </div>
           </div>
@@ -344,7 +372,8 @@ const StorePage: React.FC = () => {
                         src={
                           Array.isArray(pack.imagesUrl)
                             ? pack.imagesUrl[0]
-                            : pack.imagesUrl || "https://via.placeholder.com/160"
+                            : pack.imagesUrl ||
+                              "https://via.placeholder.com/160"
                         }
                         alt={pack.name}
                         className="w-full h-full object-cover"
@@ -438,7 +467,6 @@ const StorePage: React.FC = () => {
             </motion.div>
           )}
         </AnimatePresence>
-        
       </div>
     </div>
   );

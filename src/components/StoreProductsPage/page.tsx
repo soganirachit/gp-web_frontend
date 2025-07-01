@@ -199,7 +199,7 @@ const StoreProductsPages: React.FC = () => {
                           }}
                           className="text-white bg-[#F97316] text-sm rounded-full mb-3 p-1 px-4 py-2 text-[10px]"
                         >
-                          Add Product
+                          Buy Product
                         </button>
                       </div>
                     </div>

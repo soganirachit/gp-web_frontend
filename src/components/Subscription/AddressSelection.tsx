@@ -138,6 +138,10 @@ const AddressSelection: React.FC = () => {
     }
   };
 
+  const createStoreOrder = ()=>{
+    
+  }
+
   const handleContinue = () => {
     if (!selectedAddress) {
       toast.error('Please select an address');

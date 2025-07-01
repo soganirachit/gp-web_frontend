@@ -11,6 +11,7 @@ export interface storeProducts {
   imagesUrl?: string;
   sellingPrice: number;
   type: string;
+  isStore: boolean;
   contents: Array<{
     id: string;
     name: string;
