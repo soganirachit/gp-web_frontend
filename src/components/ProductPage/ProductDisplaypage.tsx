@@ -343,7 +343,7 @@ const ProductPage: React.FC = () => {
       const totalPrice = pricePerPack * minDays * quantity;
 
       // First ensure wallet exists and check balance
-      const balance = await walletService.getWalletBalance();
+      const { balance } = await walletService.getWalletBalance() || {};
 
       if (balance < totalPrice) {
         // Update balance details and show modal

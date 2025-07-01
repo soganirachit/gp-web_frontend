@@ -556,7 +556,7 @@ const ManageMySubscription: React.FC = () => {
               onClick={() => navigate("/products?category=pujaflowers")}
               className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium"
             >
-              Browse Base Packs
+              Browse Subscribe Packs
             </button>
           </div>
         </div>

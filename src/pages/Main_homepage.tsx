@@ -219,7 +219,7 @@ const Home2: React.FC = () => {
   const fetchWalletBalance = async () => {
     try {
       setIsLoadingBalance(true);
-      const balance = await walletService.getWalletBalance();
+      const { balance } = await walletService.getWalletBalance() || {};
       setWalletBalance(balance);
     } catch (error) {
       console.error("Error fetching wallet balance:", error);
@@ -310,7 +310,7 @@ const Home2: React.FC = () => {
       // Normalize product types to uppercase for consistent comparison
       const normalizedProducts = fetchedProducts.map((product) => ({
         ...product,
-        type: product.type.toUpperCase(),
+        type: product?.type?.toUpperCase(),
       }));
 
       setProducts(normalizedProducts);
@@ -684,11 +684,11 @@ const Home2: React.FC = () => {
 
           {/* Main Content */}
           <div className="px-4 md:px-6">
-            {/* Base Packs Section */}
+            {/* Subscribe Section */}
             <div className="mb-8">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl md:text-2xl font-semibold text-gray-800">
-                  Base Packs
+                  Subscribe Packs
                 </h2>
                 <button
                   className="text-green-600 text-sm md:text-base font-medium"

@@ -52,7 +52,7 @@ const OrderManagement: React.FC = () => {
   useEffect(() => {
     const fetchWalletBalance = async () => {
       try {
-        const balance = await walletService.getWalletBalance();
+        const { balance } = await walletService.getWalletBalance();
         setWalletBalance(balance);
       } catch (error) {
         console.error('Error fetching wallet balance:', error);

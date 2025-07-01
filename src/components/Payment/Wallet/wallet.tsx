@@ -98,11 +98,9 @@ const Wallet = () => {
   const fetchWalletBalance = async () => {
     try {
       setIsLoadingBalance(true);
-      const response: {balance: number, transactions: TransactionType[]} = await walletService.getWalletBalance();
-      const balance = response.balance;
-      const transactions = response.transactions;
+      const { balance, transactions: resTransactions = [] } = await walletService.getWalletBalance() || {};
       setBalance(balance);
-      setTransactions(transactions);
+      setTransactions(resTransactions);
     } catch (error: any) {
       if (error.message.includes("Session expired")) {
         localStorage.removeItem("token");

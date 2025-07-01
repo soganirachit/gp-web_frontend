@@ -137,7 +137,7 @@ const StorePage: React.FC = () => {
       const minDays = 7;
       const pricePerPack = selectedType === "Daily" ? basePack.sellingPricePerPackDaily : basePack.sellingPricePerPackAlternate;
       const totalPrice = pricePerPack * minDays * quantity;
-      const balance = await walletService.getWalletBalance();
+      const { balance } = await walletService.getWalletBalance() || {};
       if (balance < totalPrice) {
         setBalanceDetails({
           currentBalance: balance,
