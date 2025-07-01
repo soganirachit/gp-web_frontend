@@ -1,29 +1,31 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { authService } from '../../../../services/auth.service';
+import { authService } from "../../../../services/auth.service";
 import logo from "../../../../assets/All/logo.png";
 
 const Login = () => {
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [error, setError] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (phoneNumber.length < 10) {
-      setError('Please enter a valid phone number.');
+      setError("Please enter a valid phone number.");
       return;
     }
 
     try {
       setIsLoading(true);
-      setError('');
+      setError("");
       await authService.sendOTP(phoneNumber);
-      navigate('/otp-verification', { state: { phoneNumber } });
+      navigate("/otp-verification", { state: { phoneNumber } });
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to send OTP');
+      setError(
+        err?.error || err?.response?.data?.message || "Failed to send OTP"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -31,27 +33,25 @@ const Login = () => {
 
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-gradient-to-b from-[#FFF1F2] to-[#FFFBEB] fixed inset-0">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
         className="w-full max-w-[800px] mx-auto flex flex-col items-center"
       >
         <div className="w-full max-w-md px-6">
-          <img 
-            src={logo}
-            alt="Genda Phool"
-            className="h-32 mx-auto mb-20"
-          />
-          
-          <motion.div 
+          <img src={logo} alt="Genda Phool" className="h-32 mx-auto mb-20" />
+
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
             className="w-full bg-white p-8 rounded-2xl shadow-sm"
           >
             <div className="mb-8">
-              <h1 className="text-2xl font-semibold mb-2">Login with WhatsApp</h1>
+              <h1 className="text-2xl font-semibold mb-2">
+                Login with WhatsApp
+              </h1>
               <p className="text-gray-600">Enter Phone Number</p>
             </div>
 
@@ -92,13 +92,14 @@ const Login = () => {
                 {isLoading ? (
                   <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
                 ) : (
-                  'Send OTP on WhatsApp'
+                  "Send OTP on WhatsApp"
                 )}
               </motion.button>
             </form>
 
             <p className="text-sm text-center text-gray-500 mt-6">
-              By continuing, you agree to our Terms of Service and Privacy Policy
+              By continuing, you agree to our Terms of Service and Privacy
+              Policy
             </p>
           </motion.div>
         </div>
