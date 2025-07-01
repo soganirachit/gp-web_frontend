@@ -180,6 +180,7 @@ const AddressSelection: React.FC = () => {
           subscriptionData: parsedData,
           selectedAddress: selectedAddress,
           product: location.state?.product,
+          metaData: location.state?.metaData,
         },
       });
     } catch (error) {

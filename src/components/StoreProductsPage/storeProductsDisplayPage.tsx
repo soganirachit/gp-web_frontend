@@ -139,7 +139,16 @@ const StorePage: React.FC = () => {
     const { price, originalPrice, savings } = getPriceDisplay();
     const totalPrice = price * quantity;
     navigate("/address-selection", {
-      state: { product: location.state.product },
+      state: {
+        product: location.state.product,
+        metaData: {
+          originalPrice,
+          savings,
+          price,
+          totalPrice,
+          quantity,
+        },
+      },
     });
   };
 
