@@ -12,6 +12,7 @@ import BottomNavigation from "../layout/BottomNav";
 import Low_Balance from "../../assets/icon/LowBalance.png";
 import { IoArrowBack } from "react-icons/io5";
 import Spinner from "../../components/common/Spinner";
+import { format } from "date-fns";
 interface Subscription {
   id: string;
   customerId: string;
@@ -637,27 +638,33 @@ const ManageMySubscription: React.FC = () => {
           <div className="mt-8">
             <h2 className="text-lg font-medium mb-4">Delivery History</h2>
             <div className="space-y-4">
-              {[
-                { date: "May 9, 2023", pack: "Brahma Pack", time: "6:55 AM" },
-                { date: "May 8, 2023", pack: "Brahma Pack", time: "7:02 AM" },
-                { date: "May 5, 2023", pack: "Vinayaka Pack", time: "6:50 AM" },
-              ].map((delivery, index) => (
+              {subscriptions.map((delivery: any, index) => (
                 <div
                   key={index}
                   className="bg-white rounded-xl p-4 flex items-center justify-between"
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-medium">{delivery.date}</p>
-                      <span className="text-green-600 text-sm">Delivered</span>
+                      <p className="font-medium">
+                        {format(new Date(delivery.startDate), "MMMM d, yyyy")}
+                      </p>
+                      <span
+                        className={` ${
+                          delivery.status === "ACTIVE"
+                            ? "text-green-600"
+                            : "text-red-600"
+                        } text-sm`}
+                      >
+                        {delivery.status}
+                      </span>
                     </div>
                     <p className="text-gray-600 text-sm mt-1">
-                      {delivery.pack}
+                      {delivery.productDetails.name}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-gray-500 text-sm">
-                      {delivery.time}
+                      {format(new Date(delivery.createdAt), "MMMM d, yyyy")}
                     </span>
                     <button
                       onClick={() => navigate("/support")}
