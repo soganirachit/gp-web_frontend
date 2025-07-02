@@ -61,6 +61,7 @@ import Refer from '../pages/Refer/Refer';
 import CustomerSupport from '../pages/More/CustomerSupport';
 import StoreProductsPages from '@/components/StoreProductsPage/page';
 import StorePage from '@/components/StoreProductsPage/storeProductsDisplayPage';
+import ManageMyStoreProducts from '@/components/StoreProductsPage/manageMyStoreProducts';
 
 
 
@@ -113,6 +114,7 @@ const router = createBrowserRouter([
       { path: '/orders', element: <ProtectedRoute><OrderManagement /></ProtectedRoute> },
 
       // Subscription Routes
+       { path: '/manage-my-storeProducts', element: <ProtectedRoute><ManageMyStoreProducts /></ProtectedRoute> },
       { path: '/manage-my-subscription', element: <ProtectedRoute><ManageMySubscription /></ProtectedRoute> },
       { path: '/manage-subscription', element: <ProtectedRoute><ManageMySubscription /></ProtectedRoute> },
       { path: '/address-selection', element: <ProtectedRoute><AddressSelection /></ProtectedRoute> },

@@ -45,9 +45,9 @@ const BottomNav: React.FC = () => {
         </Link>
 
         <Link
-          to="/store"
+          to="/manage-my-storeProducts"
           className={`flex flex-col items-center text-center min-w-[64px]  md:min-w-[80px] ${
-            isActive("/store") ? "text-green-700" : "text-gray-600"
+            isActive("/manage-my-storeProducts") ? "text-green-700" : "text-gray-600"
           }`}
         >
           <img
