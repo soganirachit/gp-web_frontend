@@ -14,33 +14,63 @@ import { IoArrowBack } from "react-icons/io5";
 import Spinner from "../../components/common/Spinner";
 import { format } from "date-fns";
 import { orderService } from "@/services/order.service";
-
 interface order {
   id: string;
-  orderId: string;
-  productId: string[];
-  product: {
-    id: string;
+  customerId: string;
+  type: "DAILY" | "ALTERNATE";
+  status: "ACTIVE" | "PAUSED" | "CANCELLED" | "INACTIVE";
+  startDate: Date;
+  endDate?: Date;
+  selectedDays: string[];
+  basePackId: string;
+  productDetails?: {
     name: string;
     description: string;
     imagesUrl: string[];
-    isDaily: boolean;
-    isStore: boolean;
-    productId: string;
-    sellingPrice: number;
+    contents: {
+      id: string;
+      name: string;
+      quantity: number;
+    }[];
   };
-  quantity: number;
-  status: "SCHEDULED" | "CANCELLED";
-  createdAt: string;
+  orderContents?: {
+    name: string;
+    description: string;
+    sellingPricePerPackDaily: number;
+    sellingPricePerPackAlternate: number;
+    contents: {
+      id: string;
+      name: string;
+      quantity: number;
+    }[];
+  };
+  deliveryAddress?: {
+    id: string;
+    houseNo: string;
+    streetName: string;
+    area: string;
+    city: string;
+    state: string;
+    pincode: string;
+    phoneNumber: string;
+    societyName?: string;
+    district?: string;
+    isDefault: boolean;
+  };
+  amount?: number;
+  createdAt: Date;
+  walletBalance?: number;
 }
 
 const ManageMyStoreProducts: React.FC = () => {
   const navigate = useNavigate();
+  const [subscriptions, setSubscriptions] = useState<order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showSuccessToast] = useState(false);
-  const [orders, setOrders] = useState<order[]>([]);
+
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
 
   const [selectedSubscription, setSelectedSubscription] =
@@ -63,28 +93,48 @@ const ManageMyStoreProducts: React.FC = () => {
   }, []);
 
  const fetchOrderDetails = async () => {
-    try {
-      setIsLoading(true);
+  try {
+    setIsLoading(true);
 
-      const fetchedOrders = await orderService.getOrdersByCustomerId();
+    // Fetch subscriptions
+    const fetchedSubscriptions =
+      await subscriptionService.getCustomerSubscriptions();
 
-      if (fetchedOrders && fetchedOrders.length > 0) {
-        // Sort orders by creation date, newest first
-        const sortedOrders = fetchedOrders.sort((a: order, b: order) =>
+    // ✅ Fetch customer orders
+    const fetchedOrders = await orderService.getOrdersByCustomerId();
+
+
+    if (fetchedSubscriptions && fetchedSubscriptions.length > 0) {
+      // Sort subscriptions: ACTIVE > PAUSED > CANCELLED, then newest first
+      const sortedSubscriptions = fetchedSubscriptions.sort((a, b) => {
+        if (a.status === "ACTIVE" && b.status !== "ACTIVE") return -1;
+        if (a.status !== "ACTIVE" && b.status === "ACTIVE") return 1;
+        if (a.status === "PAUSED" && b.status === "CANCELLED") return -1;
+        if (a.status === "CANCELLED" && b.status === "PAUSED") return 1;
+        return (
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
+      });
 
-        setOrders(sortedOrders);
-      } else {
-        setOrders([]);
-      }
-    } catch (error: any) {
-      console.error('Error fetching orders:', error);
-      setOrders([]);
-    } finally {
-      setIsLoading(false);
+      setSubscriptions(sortedSubscriptions);
+      setSelectedSubscription(sortedSubscriptions[0]);
+    } else {
+      setSubscriptions([]);
+      setSelectedSubscription(null);
+      toast.success("You don't have any subscriptions");
     }
-  };
+  } catch (error: any) {
+    toast.error(
+      error.message ||
+        "Failed to fetch subscription details. Please try again later."
+    );
+    setSubscriptions([]);
+    setSelectedSubscription(null);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const handlePause = async () => {
     if (!selectedSubscription || !customStartDate) return;
@@ -156,7 +206,7 @@ const ManageMyStoreProducts: React.FC = () => {
       );
       setShowCancelModal(false);
       setCancellationReason("");
-      // Navigate to cancel landing page instead of fetching orders
+      // Navigate to cancel landing page instead of fetching subscriptions
       navigate("/cancel-subscription");
     } catch (error: any) {
       toast.error(error.message || "Failed to cancel subscription");
@@ -179,10 +229,12 @@ const ManageMyStoreProducts: React.FC = () => {
   };
 
   const renderSubscriptionCard = (order: order) => {
-       const formattedDate = format(new Date(order.createdAt), 'dd MMM yyyy, HH:mm');
-        const isScheduled = order.status === "SCHEDULED";
-        const isCancelled = order.status === "CANCELLED";
-    
+    const formattedAmount = order?.amount
+      ? order.amount.toFixed(2)
+      : "0.00";
+    const isActive = order.status === "ACTIVE";
+    const isPaused =
+      order.status === "PAUSED" || order.status === "INACTIVE";
 
     return (
       <div
@@ -191,16 +243,16 @@ const ManageMyStoreProducts: React.FC = () => {
       >
         <div className="flex items-start gap-3">
           <div className="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-            {order.product.imagesUrl && order.product.imagesUrl.length > 0 ? (
+            {order.productDetails?.imagesUrl ? (
               <img
-                 src={order.product.imagesUrl[0]}
-                alt={order.product.name}
+                src={order.productDetails.imagesUrl[0]}
+                alt={order.productDetails.name}
                 className="w-full h-full object-cover"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gray-200">
                 <span className="text-xl font-medium text-gray-400">
-                  {order.product.name?.charAt(0) || "M"}
+                  {order.productDetails?.name?.charAt(0) || "M"}
                 </span>
               </div>
             )}
@@ -211,21 +263,23 @@ const ManageMyStoreProducts: React.FC = () => {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className="text-[15px] font-medium text-[#1A1A1A] truncate">
-                     {order.product.name}
+                    {order.productDetails?.name || "Marigold Puja"}
                   </h3>
-                  {isCancelled && (
+                  {isPaused && (
                     <span className="px-2 py-0.5 bg-[#FFF3CD] text-[#664D03] text-xs font-medium rounded-full">
-                      Cancelled
+                      Paused
                     </span>
                   )}
-                  {isScheduled && (
+                  {isActive && (
                     <span className="px-2 py-0.5 bg-[#DCFCE7] text-[#166534] text-xs font-medium rounded-full">
-                      Scheduled
+                      Active
                     </span>
                   )}
                 </div>
                 <p className="text-[#666666] text-sm">
-                  {order.product.isDaily}
+                  {order.type === "DAILY"
+                    ? "Daily • Mon-Sat"
+                    : "Weekly • Thursday"}
                 </p>
               </div>
             </div>
@@ -267,15 +321,15 @@ const ManageMyStoreProducts: React.FC = () => {
                   strokeLinejoin="round"
                 />
               </svg>
-              <p className="text-[#666666] text-xs">Date: {formattedDate}</p>
+              <p className="text-[#666666] text-xs">Next: Tomorrow, 7:00 AM</p>
             </div>
 
             <p className="text-[#FF5722] font-medium text-sm mb-3">
-              ₹{order.product.sellingPrice}
+              ₹{formattedAmount}/week
             </p>
 
             <div className="flex gap-2">
-              {isScheduled && (
+              {isActive && (
                 <>
                   <button
                     onClick={() => {
@@ -322,7 +376,7 @@ const ManageMyStoreProducts: React.FC = () => {
                   </button>
                 </>
               )}
-              {isCancelled && (
+              {isPaused && (
                 <>
                   <button
                     onClick={() => handleResume(order.id)}
@@ -381,7 +435,7 @@ const ManageMyStoreProducts: React.FC = () => {
     );
   }
 
-  if (orders.length === 0) {
+  if (subscriptions.length === 0) {
     return (
       <div className="min-h-screen bg-[#FFFBEB]">
         <div className="max-w-md mx-auto p-4">
@@ -406,9 +460,10 @@ const ManageMyStoreProducts: React.FC = () => {
                 d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
               />
             </svg>
-            <h2 className="text-xl font-semibold mb-2">No Store Products</h2>
+            <h2 className="text-xl font-semibold mb-2">No Subscriptions</h2>
             <p className="text-gray-600 mb-6">
-              You don't have any Store Products. 
+              You don't have any subscriptions. Subscribe to a base pack to get
+              started.
             </p>
             <button
               onClick={() => navigate("/store")}
@@ -465,27 +520,27 @@ const ManageMyStoreProducts: React.FC = () => {
             </button>
           </div>
 
-       {/* SCHEDULED Orders */}
-          {orders.some((order) => order.status === "SCHEDULED") && (
+          {/* Active Subscriptions */}
+          {subscriptions.some((sub) => sub.status === "ACTIVE") && (
             <>
               <h2 className="text-lg font-medium mb-3">Active store products</h2>
-              {orders
-                .filter((order) => order.status === "SCHEDULED")
+              {subscriptions
+                .filter((sub) => sub.status === "ACTIVE")
                 .map(renderSubscriptionCard)}
             </>
           )}
 
-          {/* Paused orders */}
-          {orders.some(
-            (sub) => sub.status === "CANCELLED" 
+          {/* Paused Subscriptions */}
+          {subscriptions.some(
+            (sub) => sub.status === "PAUSED" || sub.status === "INACTIVE"
           ) && (
             <>
               <h2 className="text-lg font-medium mt-6 mb-3">
-                Paused orders
+                Paused Subscriptions
               </h2>
-              {orders
+              {subscriptions
                 .filter(
-                  (sub) => sub.status === "CANCELLED" 
+                  (sub) => sub.status === "PAUSED" || sub.status === "INACTIVE"
                 )
                 .map(renderSubscriptionCard)}
             </>
@@ -495,7 +550,7 @@ const ManageMyStoreProducts: React.FC = () => {
           <div className="mt-8">
             <h2 className="text-lg font-medium mb-4">Delivery History</h2>
             <div className="space-y-4">
-              {orders.map((delivery: any, index) => (
+              {subscriptions.map((delivery: any, index) => (
                 <div
                   key={index}
                   className="bg-white rounded-xl p-4 flex items-center justify-between"
@@ -778,5 +833,3 @@ const ManageMyStoreProducts: React.FC = () => {
 };
 
 export default ManageMyStoreProducts;
-
-
