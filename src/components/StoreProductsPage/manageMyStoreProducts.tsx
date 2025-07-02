@@ -477,7 +477,7 @@ const ManageMyStoreProducts: React.FC = () => {
 
           {/* Paused orders */}
           {orders.some(
-            (sub) => sub.status === "CANCELLED" 
+            (sub) => sub.status === "PAUSHED" 
           ) && (
             <>
               <h2 className="text-lg font-medium mt-6 mb-3">
@@ -485,7 +485,7 @@ const ManageMyStoreProducts: React.FC = () => {
               </h2>
               {orders
                 .filter(
-                  (sub) => sub.status === "CANCELLED" 
+                  (sub) => sub.status === "PAUSHED" 
                 )
                 .map(renderSubscriptionCard)}
             </>
@@ -493,7 +493,7 @@ const ManageMyStoreProducts: React.FC = () => {
 
           {/* Delivery History */}
           <div className="mt-8">
-            <h2 className="text-lg font-medium mb-4">Delivery History</h2>
+            <h2 className="text-lg font-medium mb-4"> Paused Delivery History</h2>
             <div className="space-y-4">
               {orders.map((delivery: any, index) => (
                 <div

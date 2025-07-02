@@ -56,10 +56,13 @@ class OrderService {
             });
             if (
                 response.status === 200
-            ) {
-                const activeOrders = response.data.data.filter((order: any) => order.status !== "CANCELLED" && order.status !== "REFUNDED");
-                return activeOrders;
-            }
+            )
+            return response.data.data
+            //  {
+            //     const activeOrders = response.data.data.filter((order: any) => order.status !== "CANCELLED" && order.status !== "REFUNDED");
+            //     return activeOrders;                
+                
+            // }
             return [];
         } catch (error: any) {
             if (!localStorage.getItem("token")) {
