@@ -11,6 +11,7 @@ import {
   subscriptionService,
   Subscription,
 } from "../services/subscription.service";
+import { orderService } from "@/services/order.service";
 import ErrorBoundary from "../components/ErrorBoundary";
 import useGoogleMaps from "../hooks/useGoogleMaps";
 import { productService } from "../services/product.service";
@@ -33,6 +34,7 @@ import searchImage from "../assets/icon/Search.png";
 import ProfileIcon from "../assets/icon/Profile.png";
 import BottomNavigation from "./../components/layout/BottomNav";
 import Spinner from "../components/common/Spinner";
+import { parseISO, addDays, format, isToday } from "date-fns";
 
 interface DayInfo {
   date: string;
@@ -205,7 +207,9 @@ const Home2: React.FC = () => {
   const [activeSubscriptions, setActiveSubscriptions] = useState<
     Subscription[]
   >([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [isLoadingSubscriptions, setIsLoadingSubscriptions] = useState(true);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [selectedSubscription, setSelectedSubscription] =
     useState<Subscription | null>(null);
   const [products, setProducts] = useState<ProductType[]>([]);
@@ -219,7 +223,7 @@ const Home2: React.FC = () => {
   const fetchWalletBalance = async () => {
     try {
       setIsLoadingBalance(true);
-      const { balance } = await walletService.getWalletBalance() || {};
+      const { balance } = (await walletService.getWalletBalance()) || {};
       setWalletBalance(balance);
     } catch (error) {
       console.error("Error fetching wallet balance:", error);
@@ -269,8 +273,21 @@ const Home2: React.FC = () => {
     } catch (error) {
       console.error("Error fetching subscriptions:", error);
       setActiveSubscriptions([]);
+      setIsLoadingSubscriptions(false);
     } finally {
       setIsLoadingSubscriptions(false);
+    }
+  };
+  const fetchOrdersByCustomerId = async () => {
+    try {
+      setIsLoadingOrders(true);
+      const orders = await orderService.getOrdersByCustomerId();
+      setOrders(orders);
+    } catch (error) {
+      console.error("Error fetching subscriptions:", error);
+      setOrders([]);
+    } finally {
+      setIsLoadingOrders(false);
     }
   };
 
@@ -344,6 +361,7 @@ const Home2: React.FC = () => {
       fetchWalletBalance();
       fetchSubscriptions();
       fetchActiveSubscriptions();
+      fetchOrdersByCustomerId();
     }
 
     fetchBasePacks();
@@ -474,6 +492,18 @@ const Home2: React.FC = () => {
 
   const handleAddToNextDelivery = () => {
     navigate("/products?category=basepacks");
+  };
+  const handleCancelOrder = async (orderId: string) => {
+    try {
+      const response = await orderService.cancelOrder(orderId);
+      if (response.success) {
+        fetchOrdersByCustomerId();
+        toast.success("Order cancelled successfully");
+      }
+    } catch (error) {
+      console.error("Error cancelling order:", error);
+      toast.error("Failed to cancel order");
+    }
   };
 
   return (
@@ -612,6 +642,72 @@ const Home2: React.FC = () => {
                   Manage
                 </button>
               </div>
+              {isLoadingOrders ? (
+                <div className="flex justify-center items-center h-32">
+                  <Spinner size={40} />
+                </div>
+              ) : (
+                <>
+                  {orders.length > 0 ? (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
+                        {orders.map((order) => (
+                          <div
+                            key={order.orderId}
+                            className="bg-white rounded-lg p-4"
+                          >
+                            <div className="flex justify-between items-center mb-2">
+                              <p className="text-sm font-medium text-gray-500">
+                                Order ID: {order.orderId}
+                              </p>
+                              <span
+                                className={`text-sm font-medium px-2 py-1 rounded-full ${
+                                  order.status === "DELIVERED"
+                                    ? "bg-green-100 text-green-800"
+                                    : order.status === "PENDING" ||
+                                      order.status === "SCHEDULED"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {order.status}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center mb-2">
+                              <p className="text-sm font-medium text-gray-500">
+                                Tommorrow {format(order.createdAt, "MMM d")}
+                              </p>
+                              <p className="text-sm font-medium text-green-600">
+                                ₹{order.quantity * order.product.sellingPrice}
+                              </p>
+                            </div>
+                            {(order.status === "PENDING" || order.status === "SCHEDULED") && (
+                              <button
+                                onClick={() => handleCancelOrder(order.id)}
+                                className="text-[#FF5722] text-sm font-medium flex items-center border border-[#FF5722] rounded-full px-4 py-2"
+                              >
+                                Cancel Order
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500 text-lg mb-4">
+                        No orders yet
+                      </p>
+                      <button
+                        onClick={() => navigate("/products")}
+                        className="text-[#006D3B] text-sm font-medium border border-[#006D3B] rounded-full px-6 py-2 hover:bg-[#006D3B] hover:text-white transition-colors"
+                      >
+                        Start Shopping
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
 
               {isLoadingSubscriptions ? (
                 <div className="flex justify-center items-center h-32">
@@ -723,7 +819,8 @@ const Home2: React.FC = () => {
                         <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
                           <img
                             src={
-                              pack.imagesUrl || "https://via.placeholder.com/160"
+                              pack.imagesUrl ||
+                              "https://via.placeholder.com/160"
                             }
                             alt={pack.name}
                             className="w-full h-full object-cover"
