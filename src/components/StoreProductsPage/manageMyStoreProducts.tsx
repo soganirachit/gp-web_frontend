@@ -30,7 +30,7 @@ interface order {
     sellingPrice: number;
   };
   quantity: number;
-  status: "SCHEDULED" | "CANCELLED";
+  status: "SCHEDULED" | "CANCELLED" | "PAUSED";
   createdAt: string;
 }
 
@@ -43,8 +43,9 @@ const ManageMyStoreProducts: React.FC = () => {
   const [orders, setOrders] = useState<order[]>([]);
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
 
-  const [selectedSubscription, setSelectedSubscription] =
+  const [selectedOrder, setSelectedOrder] =
     useState<order | null>(null);
+
   const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
     useState(false);
   const [balanceDetails] = useState({
@@ -56,7 +57,7 @@ const ManageMyStoreProducts: React.FC = () => {
   });
 
   const [cancellationReason, setCancellationReason] = useState("");
-  const [, setShowReasonError] = useState(false);
+
 
   useEffect(() => {
     fetchOrderDetails();
@@ -87,7 +88,7 @@ const ManageMyStoreProducts: React.FC = () => {
   };
 
   const handlePause = async () => {
-    if (!selectedSubscription || !customStartDate) return;
+    if (!selectedOrder || !customStartDate) return;
 
     try {
       setIsLoading(true);
@@ -110,7 +111,7 @@ const ManageMyStoreProducts: React.FC = () => {
 
       // Call the API to pause the subscription
       const response = await subscriptionService.pauseSubscription(
-        selectedSubscription.id,
+        selectedOrder.id,
         diffDays
       );
 
@@ -143,25 +144,29 @@ const ManageMyStoreProducts: React.FC = () => {
     }
   };
 
-  const handleCancel = async () => {
-    if (!cancellationReason.trim()) {
-      setShowReasonError(true);
+const handleCancel = async () => {
+  try {
+    const orderId = selectedOrder?.id;
+
+    if (!orderId) {
+      toast.error("Order ID not found");
       return;
     }
-    try {
-      // Pass cancellation reason in the correct format
-      await subscriptionService.cancelSubscription(
-        selectedSubscription!.id,
-        cancellationReason
-      );
+
+    const response = await orderService.cancelOrder(orderId);
+
+    if (response.success) {
       setShowCancelModal(false);
       setCancellationReason("");
-      // Navigate to cancel landing page instead of fetching orders
       navigate("/cancel-subscription");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to cancel subscription");
+    } else {
+      toast.error(response.error || "Failed to cancel order");
     }
-  };
+  } catch (error: any) {
+    toast.error(error.message || "Failed to cancel subscription");
+  }
+};
+
 
   const handleRechargeWallet = () => {
     setShowInsufficientBalanceModal(false);
@@ -169,10 +174,10 @@ const ManageMyStoreProducts: React.FC = () => {
       state: {
         requiredAmount: balanceDetails.shortageAmount,
         currentBalance: balanceDetails.currentBalance,
-        returnUrl: `/product/${selectedSubscription?.id}`,
-        subscriptionType: selectedSubscription?.type,
+        returnUrl: `/product/${selectedOrder?.id}`,
+        subscriptionType: selectedOrder?.type,
         minimumDays: 7,
-        maximumDays: selectedSubscription?.type === "DAILY" ? 30 : 14,
+        maximumDays: selectedOrder?.type === "DAILY" ? 30 : 14,
         totalRequired: balanceDetails.requiredAmount,
       },
     });
@@ -279,7 +284,7 @@ const ManageMyStoreProducts: React.FC = () => {
                 <>
                   <button
                     onClick={() => {
-                      setSelectedSubscription(order);
+                      setSelectedOrder(order);
                       setShowPauseModal(true);
                     }}
                     className="flex-1 py-1.5 rounded-full bg-[#FFF3CD] text-[#FF5722] text-sm font-medium"
@@ -289,7 +294,7 @@ const ManageMyStoreProducts: React.FC = () => {
 
                   <button
                     onClick={() => {
-                      setSelectedSubscription(order);
+                      setSelectedOrder(order);
                       setShowCancelModal(true);
                     }}
                     className="flex-1 py-1.5 rounded-full border border-red-500 text-red-500 text-sm font-medium"
@@ -333,7 +338,7 @@ const ManageMyStoreProducts: React.FC = () => {
 
                   <button
                     onClick={() => {
-                      setSelectedSubscription(order);
+                      setSelectedOrder(order);
                       setShowCancelModal(true);
                     }}
                     className="flex-1 py-1.5 rounded-full border border-red-500 text-red-500 text-sm font-medium"
@@ -477,7 +482,7 @@ const ManageMyStoreProducts: React.FC = () => {
 
           {/* Paused orders */}
           {orders.some(
-            (sub) => sub.status === "PAUSHED" 
+            (sub) => sub.status === "PAUSED" 
           ) && (
             <>
               <h2 className="text-lg font-medium mt-6 mb-3">
@@ -485,7 +490,7 @@ const ManageMyStoreProducts: React.FC = () => {
               </h2>
               {orders
                 .filter(
-                  (sub) => sub.status === "PAUSHED" 
+                  (sub) => sub.status === "PAUSED" 
                 )
                 .map(renderSubscriptionCard)}
             </>
@@ -543,7 +548,7 @@ const ManageMyStoreProducts: React.FC = () => {
 
         {/* Pause Modal */}
         <AnimatePresence>
-          {showPauseModal && selectedSubscription && (
+          {showPauseModal && selectedOrder && (
             <motion.div
               className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
               initial={{ opacity: 0 }}
@@ -620,7 +625,7 @@ const ManageMyStoreProducts: React.FC = () => {
 
         {/* Cancel Modal */}
         <AnimatePresence>
-          {showCancelModal && selectedSubscription && (
+          {showCancelModal && selectedOrder && (
             <motion.div
               className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
               initial={{ opacity: 0 }}
@@ -709,7 +714,7 @@ const ManageMyStoreProducts: React.FC = () => {
 
         {/* Success Toast */}
         <AnimatePresence>
-          {showSuccessToast && selectedSubscription && (
+          {showSuccessToast && selectedOrder && (
             <motion.div
               className="fixed top-4 left-4 right-4 bg-white rounded-xl p-4 shadow-lg max-w-sm mx-auto"
               initial={{ opacity: 0, y: -20 }}
@@ -720,7 +725,7 @@ const ManageMyStoreProducts: React.FC = () => {
                 Subscription Paused!
               </h3>
               <p className="text-sm text-gray-600">
-                Your {selectedSubscription.product?.name} subscription
+                Your {selectedOrder.product?.name} subscription
                 has been paused successfully.
               </p>
               <p className="text-green-600 font-medium mt-2 text-sm">

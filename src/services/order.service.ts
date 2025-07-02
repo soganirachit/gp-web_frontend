@@ -57,12 +57,12 @@ class OrderService {
             if (
                 response.status === 200
             )
-            return response.data.data
-            //  {
-            //     const activeOrders = response.data.data.filter((order: any) => order.status !== "CANCELLED" && order.status !== "REFUNDED");
-            //     return activeOrders;                
+            // return response.data.data
+             {
+                const activeOrders = response.data.data.filter((order: any) => order.status !== "CANCELLED" && order.status !== "REFUNDED");
+                return activeOrders;                
                 
-            // }
+            }
             return [];
         } catch (error: any) {
             if (!localStorage.getItem("token")) {
@@ -71,6 +71,8 @@ class OrderService {
             return [];
         }
     }
+
+    
     async cancelOrder(orderId: string) {
         try {
             const headers = this.getAuthHeaders();
