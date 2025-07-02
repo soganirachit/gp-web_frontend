@@ -43,8 +43,7 @@ const ManageMyStoreProducts: React.FC = () => {
   const [orders, setOrders] = useState<order[]>([]);
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
 
-  const [selectedOrder, setSelectedOrder] =
-    useState<order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<order | null>(null);
 
   const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
     useState(false);
@@ -58,12 +57,11 @@ const ManageMyStoreProducts: React.FC = () => {
 
   const [cancellationReason, setCancellationReason] = useState("");
 
-
   useEffect(() => {
     fetchOrderDetails();
   }, []);
 
- const fetchOrderDetails = async () => {
+  const fetchOrderDetails = async () => {
     try {
       setIsLoading(true);
 
@@ -71,8 +69,9 @@ const ManageMyStoreProducts: React.FC = () => {
 
       if (fetchedOrders && fetchedOrders.length > 0) {
         // Sort orders by creation date, newest first
-        const sortedOrders = fetchedOrders.sort((a: order, b: order) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        const sortedOrders = fetchedOrders.sort(
+          (a: order, b: order) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
 
         setOrders(sortedOrders);
@@ -80,55 +79,55 @@ const ManageMyStoreProducts: React.FC = () => {
         setOrders([]);
       }
     } catch (error: any) {
-      console.error('Error fetching orders:', error);
+      console.error("Error fetching orders:", error);
       setOrders([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handlePause = async () => {
-    if (!selectedOrder || !customStartDate) return;
+  // const handlePause = async () => {
+  //   if (!selectedOrder || !customStartDate) return;
 
-    try {
-      setIsLoading(true);
+  //   try {
+  //     setIsLoading(true);
 
-      // Calculate pause duration in days
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+  //     // Calculate pause duration in days
+  //     const today = new Date();
+  //     today.setHours(0, 0, 0, 0);
 
-      const resumeDate = new Date(customStartDate);
-      resumeDate.setHours(0, 0, 0, 0);
+  //     const resumeDate = new Date(customStartDate);
+  //     resumeDate.setHours(0, 0, 0, 0);
 
-      // Calculate the difference in days
-      const diffTime = resumeDate.getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  //     // Calculate the difference in days
+  //     const diffTime = resumeDate.getTime() - today.getTime();
+  //     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      if (diffDays < 1) {
-        alert("Resume date must be at least 1 day from today");
-        return;
-      }
+  //     if (diffDays < 1) {
+  //       alert("Resume date must be at least 1 day from today");
+  //       return;
+  //     }
 
-      // Call the API to pause the subscription
-      const response = await subscriptionService.pauseSubscription(
-        selectedOrder.id,
-        diffDays
-      );
+  //     // Call the API to pause the subscription
+  //     const response = await subscriptionService.pauseSubscription(
+  //       selectedOrder.id,
+  //       diffDays
+  //     );
 
-      if (response.success) {
-        setShowPauseModal(false);
-        // Navigate to the paused subscription landing page
-        navigate("/Pause-Subscription");
-      } else {
-        alert(response.error || "Failed to pause subscription");
-      }
-    } catch (error) {
-      console.error("Error pausing subscription:", error);
-      alert("An error occurred while pausing your subscription");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  //     if (response.success) {
+  //       setShowPauseModal(false);
+  //       // Navigate to the paused subscription landing page
+  //       navigate("/Pause-Subscription");
+  //     } else {
+  //       alert(response.error || "Failed to pause subscription");
+  //     }
+  //   } catch (error) {
+  //     console.error("Error pausing subscription:", error);
+  //     alert("An error occurred while pausing your subscription");
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
 
   const handleResume = async (subscriptionId: string) => {
     try {
@@ -144,29 +143,28 @@ const ManageMyStoreProducts: React.FC = () => {
     }
   };
 
-const handleCancel = async () => {
-  try {
-    const orderId = selectedOrder?.id;
+  const handleCancel = async () => {
+    try {
+      const orderId = selectedOrder?.id;
 
-    if (!orderId) {
-      toast.error("Order ID not found");
-      return;
+      if (!orderId) {
+        toast.error("Order ID not found");
+        return;
+      }
+
+      const response = await orderService.cancelOrder(orderId);
+
+      if (response.success) {
+        setShowCancelModal(false);
+        setCancellationReason("");
+        navigate("/cancel-subscription");
+      } else {
+        toast.error(response.error || "Failed to cancel order");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to cancel subscription");
     }
-
-    const response = await orderService.cancelOrder(orderId);
-
-    if (response.success) {
-      setShowCancelModal(false);
-      setCancellationReason("");
-      navigate("/cancel-subscription");
-    } else {
-      toast.error(response.error || "Failed to cancel order");
-    }
-  } catch (error: any) {
-    toast.error(error.message || "Failed to cancel subscription");
-  }
-};
-
+  };
 
   const handleRechargeWallet = () => {
     setShowInsufficientBalanceModal(false);
@@ -175,19 +173,21 @@ const handleCancel = async () => {
         requiredAmount: balanceDetails.shortageAmount,
         currentBalance: balanceDetails.currentBalance,
         returnUrl: `/product/${selectedOrder?.id}`,
-        subscriptionType: selectedOrder?.type,
+        // subscriptionType: selectedOrder?.type,
         minimumDays: 7,
-        maximumDays: selectedOrder?.type === "DAILY" ? 30 : 14,
+        // maximumDays: selectedOrder?.type === "DAILY" ? 30 : 14,
         totalRequired: balanceDetails.requiredAmount,
       },
     });
   };
 
   const renderSubscriptionCard = (order: order) => {
-       const formattedDate = format(new Date(order.createdAt), 'dd MMM yyyy, HH:mm');
-        const isScheduled = order.status === "SCHEDULED";
-        const isCancelled = order.status === "CANCELLED";
-    
+    const formattedDate = format(
+      new Date(order.createdAt),
+      "dd MMM yyyy, HH:mm"
+    );
+    const isScheduled = order.status === "SCHEDULED";
+    const isCancelled = order.status === "CANCELLED";
 
     return (
       <div
@@ -198,7 +198,7 @@ const handleCancel = async () => {
           <div className="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
             {order.product.imagesUrl && order.product.imagesUrl.length > 0 ? (
               <img
-                 src={order.product.imagesUrl[0]}
+                src={order.product.imagesUrl[0]}
                 alt={order.product.name}
                 className="w-full h-full object-cover"
               />
@@ -216,7 +216,7 @@ const handleCancel = async () => {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className="text-[15px] font-medium text-[#1A1A1A] truncate">
-                     {order.product.name}
+                    {order.product.name}
                   </h3>
                   {isCancelled && (
                     <span className="px-2 py-0.5 bg-[#FFF3CD] text-[#664D03] text-xs font-medium rounded-full">
@@ -413,7 +413,7 @@ const handleCancel = async () => {
             </svg>
             <h2 className="text-xl font-semibold mb-2">No Store Products</h2>
             <p className="text-gray-600 mb-6">
-              You don't have any Store Products. 
+              You don't have any Store Products.
             </p>
             <button
               onClick={() => navigate("/store")}
@@ -470,10 +470,12 @@ const handleCancel = async () => {
             </button>
           </div>
 
-       {/* SCHEDULED Orders */}
+          {/* SCHEDULED Orders */}
           {orders.some((order) => order.status === "SCHEDULED") && (
             <>
-              <h2 className="text-lg font-medium mb-3">Active store products</h2>
+              <h2 className="text-lg font-medium mb-3">
+                Active store products
+              </h2>
               {orders
                 .filter((order) => order.status === "SCHEDULED")
                 .map(renderSubscriptionCard)}
@@ -481,24 +483,18 @@ const handleCancel = async () => {
           )}
 
           {/* Paused orders */}
-          {orders.some(
-            (sub) => sub.status === "PAUSED" 
-          ) && (
+          {orders.some((sub) => sub.status === "PAUSED") && (
             <>
-              <h2 className="text-lg font-medium mt-6 mb-3">
-                Paused orders
-              </h2>
+              <h2 className="text-lg font-medium mt-6 mb-3">Paused orders</h2>
               {orders
-                .filter(
-                  (sub) => sub.status === "PAUSED" 
-                )
+                .filter((sub) => sub.status === "PAUSED")
                 .map(renderSubscriptionCard)}
             </>
           )}
 
           {/* Delivery History */}
           <div className="mt-8">
-            <h2 className="text-lg font-medium mb-4"> Paused Delivery History</h2>
+            <h2 className="text-lg font-medium mb-4"> Delivery History</h2>
             <div className="space-y-4">
               {orders.map((delivery: any, index) => (
                 <div
@@ -511,10 +507,15 @@ const handleCancel = async () => {
                         {format(new Date(delivery.createdAt), "MMMM d, yyyy")}
                       </p>
                       <span
-                        className={` ${
+                        className={`${
                           delivery.status === "SCHEDULED"
+                            ? "text-yellow-600"
+                            : delivery.status === "DELIVERED"
                             ? "text-green-600"
-                            : "text-red-600"
+                            : delivery.status === "REJECTED" ||
+                              delivery.status === "CANCELLED"
+                            ? "text-red-600"
+                            : "text-gray-600"
                         } text-sm`}
                       >
                         {delivery.status}
@@ -547,7 +548,7 @@ const handleCancel = async () => {
         </div>
 
         {/* Pause Modal */}
-        <AnimatePresence>
+        {/* <AnimatePresence>
           {showPauseModal && selectedOrder && (
             <motion.div
               className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -621,7 +622,7 @@ const handleCancel = async () => {
               </motion.div>
             </motion.div>
           )}
-        </AnimatePresence>
+        </AnimatePresence> */}
 
         {/* Cancel Modal */}
         <AnimatePresence>
@@ -725,8 +726,8 @@ const handleCancel = async () => {
                 Subscription Paused!
               </h3>
               <p className="text-sm text-gray-600">
-                Your {selectedOrder.product?.name} subscription
-                has been paused successfully.
+                Your {selectedOrder.product?.name} subscription has been paused
+                successfully.
               </p>
               <p className="text-green-600 font-medium mt-2 text-sm">
                 Awesome!
@@ -783,5 +784,3 @@ const handleCancel = async () => {
 };
 
 export default ManageMyStoreProducts;
-
-
