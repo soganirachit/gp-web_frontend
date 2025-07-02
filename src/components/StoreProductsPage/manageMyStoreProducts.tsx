@@ -503,11 +503,11 @@ const ManageMyStoreProducts: React.FC = () => {
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-medium">
-                        {format(new Date(delivery.startDate), "MMMM d, yyyy")}
+                        {format(new Date(delivery.createdAt), "MMMM d, yyyy")}
                       </p>
                       <span
                         className={` ${
-                          delivery.status === "ACTIVE"
+                          delivery.status === "SCHEDULED"
                             ? "text-green-600"
                             : "text-red-600"
                         } text-sm`}
@@ -516,7 +516,7 @@ const ManageMyStoreProducts: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-gray-600 text-sm mt-1">
-                      {delivery.productDetails.name}
+                      {delivery?.product.name}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -720,7 +720,7 @@ const ManageMyStoreProducts: React.FC = () => {
                 Subscription Paused!
               </h3>
               <p className="text-sm text-gray-600">
-                Your {selectedSubscription.productDetails?.name} subscription
+                Your {selectedSubscription.product?.name} subscription
                 has been paused successfully.
               </p>
               <p className="text-green-600 font-medium mt-2 text-sm">
