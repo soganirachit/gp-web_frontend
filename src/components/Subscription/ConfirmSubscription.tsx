@@ -9,6 +9,7 @@ import { MdLocationOn } from "react-icons/md";
 import { subscriptionService } from "../../services/subscription.service";
 import BottomNavigation from "../layout/BottomNav";
 import { customerService } from "@/services/getcustomer.service";
+import { orderService } from "@/services/order.service";
 
 interface SubscriptionDetails {
   basePackId: string;
@@ -520,136 +521,173 @@ const ConfirmSubscription: React.FC = () => {
   }, [navigate, location.state]);
 
   const handleConfirm = async () => {
-    if (!subscriptionDetails || !selectedAddress) {
-      toast.error("Missing subscription details or address");
-      return;
-    }
-    // Validate required fields
-    if (!subscriptionDetails.basePackId) {
-      console.error("Missing basePackId");
-      toast.error("Missing base pack ID");
-      return;
-    }
-
-    if (!subscriptionDetails.type) {
-      console.error("Missing type");
-      toast.error("Missing subscription type");
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const startDate = new Date(subscriptionDetails.startDate);
-
-      // Prepare initiate request data with explicit type conversion
-      const initiateData = {
-        basePackId: String(subscriptionDetails.basePackId),
-        type: subscriptionDetails.type.toUpperCase() as "DAILY" | "ALTERNATE",
-        startDate: startDate,
-        days: subscriptionDetails.deliveryCount || 7,
-      };
-
-      // First initiate the subscription
-      const initiateResponse = await subscriptionService.initiateSubscription(
-        initiateData
-      );
-
-      if (!initiateResponse.success) {
-        throw new Error(
-          initiateResponse.message || "Failed to initiate subscription"
-        );
+    const isStoreProduct = location.state.product.isStore;
+    if (!isStoreProduct) {
+      if (!subscriptionDetails || !selectedAddress) {
+        toast.error("Missing subscription details or address");
+        return;
+      }
+      // Validate required fields
+      if (!subscriptionDetails.basePackId) {
+        console.error("Missing basePackId");
+        toast.error("Missing base pack ID");
+        return;
       }
 
-      // Format selected days based on subscription type
-      const selectedDays =
-        subscriptionDetails.type.toUpperCase() === "DAILY"
-          ? [
-              "MONDAY",
-              "TUESDAY",
-              "WEDNESDAY",
-              "THURSDAY",
-              "FRIDAY",
-              "SATURDAY",
-              "SUNDAY",
-            ]
-          : ["MONDAY", "WEDNESDAY", "FRIDAY", "SUNDAY"];
+      if (!subscriptionDetails.type) {
+        console.error("Missing type");
+        toast.error("Missing subscription type");
+        return;
+      }
 
-      // Prepare confirm request data
-      const confirmData = {
-        basePackId: subscriptionDetails.basePackId,
-        deliveryAddressId: selectedAddress.id,
-        type: subscriptionDetails.type.toUpperCase() as "DAILY" | "ALTERNATE",
-        startDate: startDate,
-        selectedDays: selectedDays,
-      };
+      try {
+        setLoading(true);
 
-      // Log the confirm request data
-      // Then confirm the subscription
-      const confirmResponse = await subscriptionService.confirmSubscription(
-        confirmData
-      );
-      if (confirmResponse.success) {
-        const confirmedSubscription = {
-          ...confirmResponse.subscription,
-          deliveryAddress: selectedAddress,
-          confirmedAt: new Date().toISOString(),
-          packDetails: subscriptionDetails.packDetails,
-          type: subscriptionDetails.type,
-          deliveryCount: subscriptionDetails.deliveryCount,
-          sellingPrice: subscriptionDetails.sellingPrice,
+        const startDate = new Date(subscriptionDetails.startDate);
+
+        // Prepare initiate request data with explicit type conversion
+        const initiateData = {
+          basePackId: String(subscriptionDetails.basePackId),
+          type: subscriptionDetails.type.toUpperCase() as "DAILY" | "ALTERNATE",
+          startDate: startDate,
+          days: subscriptionDetails.deliveryCount || 7,
         };
-        localStorage.setItem(
-          "lastConfirmedSubscription",
-          JSON.stringify(confirmedSubscription)
+
+        // First initiate the subscription
+        const initiateResponse = await subscriptionService.initiateSubscription(
+          initiateData
         );
-        setStatusModal({
-          isOpen: true,
-          type: "success",
-          message: "Subscription confirmed successfully!",
-        });
-        toast.success("Subscription confirmed successfully!");
-        setIsConfirmed(true); // <-- Show thank you section
-      } else {
-        throw new Error(
-          confirmResponse.error || "Failed to confirm subscription"
+
+        if (!initiateResponse.success) {
+          throw new Error(
+            initiateResponse.message || "Failed to initiate subscription"
+          );
+        }
+
+        // Format selected days based on subscription type
+        const selectedDays =
+          subscriptionDetails.type.toUpperCase() === "DAILY"
+            ? [
+                "MONDAY",
+                "TUESDAY",
+                "WEDNESDAY",
+                "THURSDAY",
+                "FRIDAY",
+                "SATURDAY",
+                "SUNDAY",
+              ]
+            : ["MONDAY", "WEDNESDAY", "FRIDAY", "SUNDAY"];
+
+        // Prepare confirm request data
+        const confirmData = {
+          basePackId: subscriptionDetails.basePackId,
+          deliveryAddressId: selectedAddress.id,
+          type: subscriptionDetails.type.toUpperCase() as "DAILY" | "ALTERNATE",
+          startDate: startDate,
+          selectedDays: selectedDays,
+        };
+
+        // Log the confirm request data
+        // Then confirm the subscription
+        const confirmResponse = await subscriptionService.confirmSubscription(
+          confirmData
         );
+        if (confirmResponse.success) {
+          const confirmedSubscription = {
+            ...confirmResponse.subscription,
+            deliveryAddress: selectedAddress,
+            confirmedAt: new Date().toISOString(),
+            packDetails: subscriptionDetails.packDetails,
+            type: subscriptionDetails.type,
+            deliveryCount: subscriptionDetails.deliveryCount,
+            sellingPrice: subscriptionDetails.sellingPrice,
+          };
+          localStorage.setItem(
+            "lastConfirmedSubscription",
+            JSON.stringify(confirmedSubscription)
+          );
+          setStatusModal({
+            isOpen: true,
+            type: "success",
+            message: "Subscription confirmed successfully!",
+          });
+          toast.success("Subscription confirmed successfully!");
+          setIsConfirmed(true); // <-- Show thank you section
+        } else {
+          throw new Error(
+            confirmResponse.error || "Failed to confirm subscription"
+          );
+        }
+      } catch (error: any) {
+        console.error("Subscription error:", error);
+        // Enhanced error handling with more specific messages
+        const errorMessage =
+          error.message ||
+          "An error occurred while processing your subscription";
+        if (
+          errorMessage.includes("P2002") ||
+          errorMessage.includes("Unique constraint failed") ||
+          errorMessage.includes("deliveryAddressId")
+        ) {
+          toast.error(
+            "You already have an active subscription at this address"
+          );
+          navigate("/");
+        } else if (errorMessage.includes("Authentication required")) {
+          toast.error("Please login to continue");
+          navigate("/login", {
+            state: { returnUrl: "/subscription/confirm" },
+          });
+        } else if (errorMessage.includes("Insufficient wallet balance")) {
+          toast.error("Insufficient wallet balance");
+          navigate("/wallet", {
+            state: {
+              returnUrl: "/subscription/confirm",
+              requiredAmount: subscriptionDetails.amount,
+            },
+          });
+        } else {
+          console.error("Detailed error:", {
+            message: errorMessage,
+            subscriptionDetails,
+            selectedAddress,
+          });
+          toast.error(errorMessage);
+        }
+      } finally {
+        setLoading(false);
       }
-    } catch (error: any) {
-      console.error("Subscription error:", error);
-      // Enhanced error handling with more specific messages
-      const errorMessage =
-        error.message || "An error occurred while processing your subscription";
-      if (
-        errorMessage.includes("P2002") ||
-        errorMessage.includes("Unique constraint failed") ||
-        errorMessage.includes("deliveryAddressId")
-      ) {
-        toast.error("You already have an active subscription at this address");
-        navigate("/");
-      } else if (errorMessage.includes("Authentication required")) {
-        toast.error("Please login to continue");
-        navigate("/login", {
-          state: { returnUrl: "/subscription/confirm" },
-        });
-      } else if (errorMessage.includes("Insufficient wallet balance")) {
-        toast.error("Insufficient wallet balance");
-        navigate("/wallet", {
-          state: {
-            returnUrl: "/subscription/confirm",
-            requiredAmount: subscriptionDetails.amount,
-          },
-        });
-      } else {
-        console.error("Detailed error:", {
-          message: errorMessage,
-          subscriptionDetails,
-          selectedAddress,
-        });
-        toast.error(errorMessage);
+    } else {
+      const storeProductPayload = {
+        customerId: location.state.selectedAddress.customerId,
+        subscriptionId: "",
+        productId: location.state.product.id,
+        quantity: location.state.metaData.quantity,
+        addressId: location.state.selectedAddress.id,
+        deliveredBy: "",
+        routeId: "",
+        isStore: location.state.product.isStore,
+      };
+      try {
+        if (!selectedAddress) {
+          toast.error("Missing subscription details or address");
+          return;
+        }
+        const { success } = await orderService.createOrder(
+          storeProductPayload
+        );
+        if (success) {
+          setStatusModal({
+            isOpen: true,
+            type: "success",
+            message: "Order created successfully!",
+          });
+          toast.success("Order created successfully!");
+          setIsConfirmed(true);
+        }
+      } catch (error) {
+        console.error("Error creating order:", error);
       }
-    } finally {
-      setLoading(false);
     }
   };
   // const handleRecharge = () => {

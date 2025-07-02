@@ -12,50 +12,36 @@ class OrderService {
             "Content-Type": "application/json",
         };
     }
-    async createOrder(order: {
-        amount: number;
-        couponCode: string;
-        paymentMethod: string;
-    }): Promise<{
+    async createOrder(orderPayload: any): Promise<{
+        success: boolean;
         orderId: string;
     }> {
         try {
             const headers = this.getAuthHeaders();
             if (!headers) {
-                return {
-                    orderId: "",
-                };
+                throw new Error("Authentication Failed");
             }
-            const orderPayload = {
-                "subscriptionId": "",
-                "productId": "DPRD1000",
-                "quantity": 1,
-                "addressId": "7c1fd7c9-c2fd-44a0-97bf-c271e034a972",
-                "deliveredBy": "Rahul",
-                "routeId": "test-id",
-                "couponCode": order.couponCode,
-                "paymentMethod": order.paymentMethod,
+
+            try {
+                const { data: { success, ...rest } } = await axios.post(
+                    `${getApiUrl()}/order/create-order`,
+                    orderPayload,
+                    { headers }
+                );
+
+                if (!success) {
+                    throw new Error("Failed to create order");
+                }
+
+                return { success, ...rest };
+            } catch (error: any) {
+                if (!localStorage.getItem("token")) {
+                    throw new Error("Authentication token is not configured");
+                }
+                throw new Error(error.response?.data?.message || error.message || "Unknown error occurred");
             }
-            const response = await axios.post(`${getApiUrl()}/create-order`, orderPayload, {
-                headers,
-            });
-            if (
-                response.status === 200
-            ) {
-                return response.data;
-            }
-            return {
-                orderId: "",
-            };
         } catch (error: any) {
-            if (!localStorage.getItem("token")) {
-                return {
-                    orderId: "",
-                };
-            }
-            return {
-                orderId: "",
-            };
+            throw new Error(error.message || "Unknown error occurred");
         }
     }
 
