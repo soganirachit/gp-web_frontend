@@ -491,20 +491,21 @@ const Home2: React.FC = () => {
   };
 
   const handleAddToNextDelivery = () => {
-    navigate("/products?category=basepacks");
+    navigate("/store");
   };
-  const handleCancelOrder = async (orderId: string) => {
-    try {
-      const response = await orderService.cancelOrder(orderId);
-      if (response.success) {
-        fetchOrdersByCustomerId();
-        toast.success("Order cancelled successfully");
-      }
-    } catch (error) {
-      console.error("Error cancelling order:", error);
-      toast.error("Failed to cancel order");
-    }
-  };
+
+  // const handleCancelOrder = async (orderId: string) => {
+  //   try {
+  //     const response = await orderService.cancelOrder(orderId);
+  //     if (response.success) {
+  //       fetchOrdersByCustomerId();
+  //       toast.success("Order cancelled successfully");
+  //     }
+  //   } catch (error) {
+  //     console.error("Error cancelling order:", error);
+  //     toast.error("Failed to cancel order");
+  //   }
+  // };
 
   return (
     <ErrorBoundary>
@@ -628,154 +629,138 @@ const Home2: React.FC = () => {
           </div>
 
           {/* Delivery and Wisdom Container */}
-          <div className="grid grid-cols-1 gap-4 px-4 md:px-6 mb-6">
-            {/* Next Delivery Card */}
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-semibold text-gray-500">
-                  YOUR NEXT DELIVERY
-                </h3>
-                <button
-                  className="text-[#006D3B] text-sm font-medium"
-                  onClick={() => navigate("/manage-my-subscription")}
-                >
-                  Manage
-                </button>
+          <div className="bg-white rounded-xl p-6 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-sm font-semibold text-gray-500">
+                YOUR NEXT DELIVERY
+              </h3>
+            
+            </div>
+
+            {isLoadingOrders ? (
+              <div className="flex justify-center items-center h-32">
+                <Spinner size={40} />
               </div>
-              {isLoadingOrders ? (
-                <div className="flex justify-center items-center h-32">
-                  <Spinner size={40} />
-                </div>
-              ) : (
-                <>
-                  {orders.length > 0 ? (
-                    <>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
-                        {orders.map((order) => (
-                          <div
-                            key={order.orderId}
-                            className="bg-white rounded-lg p-4"
-                          >
-                            <div className="flex justify-between items-center mb-2">
-                              <p className="text-sm font-medium text-gray-500">
-                                Order ID: {order.orderId}
-                              </p>
-                              <span
-                                className={`text-sm font-medium px-2 py-1 rounded-full ${
-                                  order.status === "DELIVERED"
-                                    ? "bg-green-100 text-green-800"
-                                    : order.status === "PENDING" ||
-                                      order.status === "SCHEDULED"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-gray-100 text-gray-800"
-                                }`}
-                              >
-                                {order.status}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center mb-2">
-                              <p className="text-sm font-medium text-gray-500">
-                                Tommorrow {format(order.createdAt, "MMM d")}
-                              </p>
-                              <p className="text-sm font-medium text-green-600">
-                                ₹{order.quantity * order.product.sellingPrice}
-                              </p>
-                            </div>
-                            {(order.status === "PENDING" || order.status === "SCHEDULED") && (
-                              <button
-                                onClick={() => handleCancelOrder(order.id)}
-                                className="text-[#FF5722] text-sm font-medium flex items-center border border-[#FF5722] rounded-full px-4 py-2"
-                              >
-                                Cancel Order
-                              </button>
+            ) : orders.filter((order) => order.status === "SCHEDULED").length >
+              0 ? (
+              <div className="flex flex-col gap-4">
+                {orders
+                  .filter((order) => order.status === "SCHEDULED")
+                  .map((order) => {
+                    const formattedDate = format(
+                      new Date(order.createdAt),
+                      "MMM d, yyyy"
+                    );
+                    const isScheduled = order.status === "SCHEDULED";
+                  
+                    return (
+                      <div
+                        key={order.orderId}
+                        className="bg-white rounded-[16px] p-4 shadow-sm"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
+                            {order.product.imagesUrl?.length > 0 ? (
+                              <img
+                                src={order.product.imagesUrl[0]}
+                                alt={order.product.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                <span className="text-xl font-medium text-gray-400">
+                                  {order.product.name?.charAt(0) || "M"}
+                                </span>
+                              </div>
                             )}
                           </div>
-                        ))}
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between mb-1">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="text-[15px] font-medium text-[#1A1A1A] truncate">
+                                    {order.product.name}
+                                  </h3>
+                                  
+                                  {isScheduled && (
+                                    <span className="px-2 py-0.5 bg-[#DCFCE7] text-yellow-600 text-xs font-medium rounded-full">
+                                      Scheduled
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[#666666] text-sm">
+                                  {order.product.isDaily ? "Daily" : "One-time"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 mb-3">
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M15.8333 3.33337H4.16667C3.24619 3.33337 2.5 4.07957 2.5 5.00004V16.6667C2.5 17.5872 3.24619 18.3334 4.16667 18.3334H15.8333C16.7538 18.3334 17.5 17.5872 17.5 16.6667V5.00004C17.5 4.07957 16.7538 3.33337 15.8333 3.33337Z"
+                                  stroke="#666666"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                                <path
+                                  d="M13.3333 1.66663V4.99996"
+                                  stroke="#666666"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                                <path
+                                  d="M6.66669 1.66663V4.99996"
+                                  stroke="#666666"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                                <path
+                                  d="M2.5 8.33337H17.5"
+                                  stroke="#666666"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                              <p className="text-[#666666] text-xs">
+                                Date: {formattedDate}
+                              </p>
+                            </div>
+
+                            <p className="text-[#FF5722] font-medium text-sm mb-3">
+                              ₹{order.quantity * order.product.sellingPrice}
+                            </p>
+
+                           
+                          </div>
+                        </div>
                       </div>
-                    </>
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500 text-lg mb-4">
-                        No orders yet
-                      </p>
-                      <button
-                        onClick={() => navigate("/products")}
-                        className="text-[#006D3B] text-sm font-medium border border-[#006D3B] rounded-full px-6 py-2 hover:bg-[#006D3B] hover:text-white transition-colors"
-                      >
-                        Start Shopping
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {isLoadingSubscriptions ? (
-                <div className="flex justify-center items-center h-32">
-                  <Spinner size={40} />
-                </div>
-              ) : activeSubscriptions.length > 0 ? (
-                <>
-                  <p className="text-lg font-bold text-gray-800 mb-3">
-                    Tomorrow,{" "}
-                    {new Date().toLocaleString("default", { month: "short" })}{" "}
-                    {new Date().getDate() + 1}
-                  </p>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {activeSubscriptions.map((subscription) => (
-                      <span
-                        key={subscription.id}
-                        className="bg-[#DCFCE7] text-[#166534] text-xs px-3 py-1 rounded-full"
-                      >
-                        {subscription.basePackDetails?.name ||
-                          "Subscription Pack"}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      onClick={() => {
-                        setSelectedSubscription(activeSubscriptions[0]);
-                        setShowPauseModal(true);
-                      }}
-                      className="text-[#FF5722] text-sm font-medium flex items-center border border-[#FF5722] rounded-full px-4 py-2"
-                    >
-                      <FaPause className="mr-2" /> Pause
-                    </button>
-                    {/* <button
-                      onClick={handleAddToNextDelivery}
-                      className="text-[#006D3B] text-sm font-medium flex items-center border border-[#006D3B] rounded-full px-4 py-2"
-                    >
-                      <FaCalendarPlus className="mr-2" /> Add to next delivery
-                    </button> */}
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-gray-500 mb-4">No active subscriptions</p>
-                  <button
-                    onClick={() => navigate("/products?category=basepacks")}
-                    className="text-[#006D3B] text-sm font-medium border border-[#006D3B] rounded-full px-6 py-2"
-                  >
-                    Subscribe Now
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Today's Flower Wisdom Card */}
-            <div className="bg-white rounded-xl p-7 shadow-sm">
-              <h3 className="text-lg text-[#8B4513] mb-4">
-                Today's Flower Wisdom
-              </h3>
-              <div className="space-y-4">
-                <p className="text-gray-700 text-sm italic leading-relaxed">
-                  "Like the lotus flower that grows out of the mud and blossoms
-                  above the muddy water surface, we too can rise above our
-                  defilements."
-                </p>
-                <p className="text-gray-500">— Buddhist Teaching</p>
+                    );
+                  })}
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500 text-lg mb-4">
+                  No scheduled orders
+                </p>
+                <button
+                  onClick={handleAddToNextDelivery}
+                  className="text-[#006D3B] text-sm font-medium border border-[#006D3B] rounded-full px-6 py-2 hover:bg-[#006D3B] hover:text-white transition-colors"
+                >
+                  Start Shopping
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Main Content */}

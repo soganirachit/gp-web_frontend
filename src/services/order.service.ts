@@ -56,9 +56,12 @@ class OrderService {
             });
             if (
                 response.status === 200
-            ) {
-                const activeOrders = response.data.data.filter((order: any) => order.status !== "CANCELLED" && order.status !== "REFUNDED");
-                return activeOrders;
+            )
+            // return response.data.data
+             {
+                const orders = response.data.data;
+                return orders;                
+                
             }
             return [];
         } catch (error: any) {
@@ -68,6 +71,8 @@ class OrderService {
             return [];
         }
     }
+
+
     async cancelOrder(orderId: string) {
         try {
             const headers = this.getAuthHeaders();
