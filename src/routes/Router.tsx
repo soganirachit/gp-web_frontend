@@ -48,6 +48,7 @@ import OrderManagement from '../features/orders/components/OrderManagement';
 // Subscription Components
 import ManageMySubscription from '../components/Subscription/ManageMySubscription';
 import AddressSelection from '../components/Subscription/AddressSelection';
+import StoreAddress from '../components/StoreProductsPage/storeAddress';
 import ConfirmSubscription from '../components/Subscription/ConfirmSubscription';
 import ModifySubscription from '../components/Subscription/Page/Modify_subscription';
 import PausedSubscriptionLanding from '../components/Subscription/Page/Paused_susbcription_Landing';
@@ -62,6 +63,7 @@ import CustomerSupport from '../pages/More/CustomerSupport';
 import StoreProductsPages from '@/components/StoreProductsPage/page';
 import StorePage from '@/components/StoreProductsPage/storeProductsDisplayPage';
 import ManageMyStoreProducts from '@/components/StoreProductsPage/manageMyStoreProducts';
+import ConfirmStoreProducts from '@/components/StoreProductsPage/confirmStoreProducts';
 
 
 
@@ -118,12 +120,14 @@ const router = createBrowserRouter([
       { path: '/manage-my-subscription', element: <ProtectedRoute><ManageMySubscription /></ProtectedRoute> },
       { path: '/manage-subscription', element: <ProtectedRoute><ManageMySubscription /></ProtectedRoute> },
       { path: '/address-selection', element: <ProtectedRoute><AddressSelection /></ProtectedRoute> },
+      { path: '/storeAddress-selection', element: <ProtectedRoute><StoreAddress /></ProtectedRoute> },
       { path: '/subscription/confirm', element: <ProtectedRoute><ConfirmSubscription /></ProtectedRoute> },
+      { path: '/storeProduct/confirm', element: <ProtectedRoute><ConfirmStoreProducts /></ProtectedRoute> },
       { path: '/modify-Subscription', element: <ProtectedRoute><ModifySubscription /></ProtectedRoute> },
       { path: '/Pause-Subscription', element: <ProtectedRoute><PausedSubscriptionLanding /></ProtectedRoute> },
       { path: '/Cancel-Subscription', element: <ProtectedRoute><CancelSubscriptionLanding /></ProtectedRoute> },
 
-      // Payment Routes
+      // Payment Routes 
       { path: '/wallet', element: <ProtectedRoute><Wallet /></ProtectedRoute> },
 
       // Other Protected Routes

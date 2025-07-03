@@ -648,46 +648,13 @@ const ManageMyStoreProducts: React.FC = () => {
                       </div>
                       <div>
                         <h2 className="text-xl font-medium text-gray-900 mb-1">
-                          Cancel Subscription?
+                          Cancel store product?
                         </h2>
                         <p className="text-gray-600 text-sm">
-                          Your subscription will be cancelled immediately and
-                          you won't receive any further deliveries.
+                          This store product will be removed right away and
+                          won’t appear in your listings.
                         </p>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Help us improve section */}
-                  <div className="mb-6">
-                    <h3 className="text-xl font-medium text-gray-900 mb-3">
-                      Help us improve
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                      Why are you cancelling?
-                    </p>
-
-                    <div className="space-y-3">
-                      {[
-                        "Too expensive",
-                        "Quality issues",
-                        "Delivery timing issues",
-                        "Moving to a different location",
-                        "Taking a break",
-                        "Other",
-                      ].map((reason) => (
-                        <button
-                          key={reason}
-                          onClick={() => setCancellationReason(reason)}
-                          className={`w-full p-4 rounded-2xl text-left transition-all ${
-                            cancellationReason === reason
-                              ? "bg-[#FFF3CD] border-[#FF5722] border text-[#FF5722]"
-                              : "bg-white border border-gray-200 text-gray-700 hover:border-gray-300"
-                          }`}
-                        >
-                          {reason}
-                        </button>
-                      ))}
                     </div>
                   </div>
 

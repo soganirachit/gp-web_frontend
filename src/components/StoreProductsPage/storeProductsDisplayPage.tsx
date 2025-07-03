@@ -138,7 +138,7 @@ const StorePage: React.FC = () => {
     }
     const { price, originalPrice, savings } = getPriceDisplay();
     const totalPrice = price * quantity;
-    navigate("/address-selection", {
+    navigate("/storeAddress-selection", {
       state: {
         product: location.state.product,
         metaData: {
@@ -186,7 +186,7 @@ const StorePage: React.FC = () => {
       }
 
       // Only navigate with basePackId if balance is sufficient
-      navigate("/address-selection", {
+      navigate("/storeAddress-selection", {
         state: { basePackId: id },
       });
       toast.success("Proceeding to address selection");
