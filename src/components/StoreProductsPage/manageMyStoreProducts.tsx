@@ -282,7 +282,7 @@ const ManageMyStoreProducts: React.FC = () => {
             <div className="flex gap-2">
               {isScheduled && (
                 <>
-                  <button
+                  {/* <button
                     onClick={() => {
                       setSelectedOrder(order);
                       setShowPauseModal(true);
@@ -290,7 +290,7 @@ const ManageMyStoreProducts: React.FC = () => {
                     className="flex-1 py-1.5 rounded-full bg-[#FFF3CD] text-[#FF5722] text-sm font-medium"
                   >
                     Pause
-                  </button>
+                  </button> */}
 
                   <button
                     onClick={() => {
@@ -483,14 +483,14 @@ const ManageMyStoreProducts: React.FC = () => {
           )}
 
           {/* Paused orders */}
-          {orders.some((sub) => sub.status === "PAUSED") && (
+          {/* {orders.some((sub) => sub.status === "PAUSED") && (
             <>
               <h2 className="text-lg font-medium mt-6 mb-3">Paused orders</h2>
               {orders
                 .filter((sub) => sub.status === "PAUSED")
                 .map(renderSubscriptionCard)}
             </>
-          )}
+          )} */}
 
           {/* Delivery History */}
           <div className="mt-8">
@@ -681,7 +681,7 @@ const ManageMyStoreProducts: React.FC = () => {
         </AnimatePresence>
 
         {/* Success Toast */}
-        <AnimatePresence>
+        {/* <AnimatePresence>
           {showSuccessToast && selectedOrder && (
             <motion.div
               className="fixed top-4 left-4 right-4 bg-white rounded-xl p-4 shadow-lg max-w-sm mx-auto"
@@ -701,7 +701,7 @@ const ManageMyStoreProducts: React.FC = () => {
               </p>
             </motion.div>
           )}
-        </AnimatePresence>
+        </AnimatePresence> */}
 
         {/* Insufficient Balance Modal */}
         <AnimatePresence>
