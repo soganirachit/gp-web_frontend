@@ -55,7 +55,7 @@ const ManageMyStoreProducts: React.FC = () => {
     days: 7,
   });
 
-  const [cancellationReason, setCancellationReason] = useState("");
+  // const [cancellationReason, setCancellationReason] = useState("");
 
   useEffect(() => {
     fetchOrderDetails();
@@ -156,8 +156,8 @@ const ManageMyStoreProducts: React.FC = () => {
 
       if (response.success) {
         setShowCancelModal(false);
-        setCancellationReason("");
-        navigate("/cancel-subscription");
+        // setCancellationReason("");
+        navigate("/store");
       } else {
         toast.error(response.error || "Failed to cancel order");
       }
@@ -663,7 +663,7 @@ const ManageMyStoreProducts: React.FC = () => {
                     <button
                       onClick={handleCancel}
                       className="flex-1 py-3.5 rounded-full border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                      disabled={!cancellationReason}
+                      // disabled={!cancellationReason}
                     >
                       Cancel
                     </button>

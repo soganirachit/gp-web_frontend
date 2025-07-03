@@ -49,7 +49,7 @@ const StorePage: React.FC = () => {
   const location = useLocation();
   const [quantity, setQuantity] = useState(1);
   const [selectedType] = useState<SubscriptionType>("Daily");
-  const [startDate] = useState<Date>(new Date());
+  // const [startDate] = useState<Date>(new Date());
   const [basePack, setBasePack] = useState<ExtendedBasePack | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

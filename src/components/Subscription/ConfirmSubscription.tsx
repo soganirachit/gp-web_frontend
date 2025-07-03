@@ -42,29 +42,6 @@ interface Address {
   coordinates?: string;
 }
 
-// interface RechargeModalProps {
-//   currentBalance: number;
-//   requiredAmount: number;
-//   shortfall: number;
-//   onClose: () => void;
-//   onRecharge: () => void;
-// }
-
-// interface ExistingSubscriptionModalProps {
-//   isOpen: boolean;
-//   onClose: () => void;
-//   onGoHome: () => void;
-// }
-
-// interface StatusModalProps {
-//   isOpen: boolean;
-//   type: 'success' | 'error' | 'loading';
-//   message: string;
-//   onClose?: () => void;
-//   onAction?: () => void;
-//   actionLabel?: string;
-// }
-
 interface MapViewProps {
   address: Address | null;
 }
@@ -77,206 +54,6 @@ interface UserData {
   // add other user fields if needed
 }
 
-// interface LocationState {
-//   selectedAddress?: Address;
-//   basePackId?: string;
-//   subscriptionData?: any;
-//   returnUrl?: string;
-// }
-
-// const RechargeModal: React.FC<RechargeModalProps> = ({
-//   currentBalance,
-//   requiredAmount,
-//   shortfall,
-//   onClose,
-//   onRecharge
-// }) => (
-//   <AnimatePresence>
-//     <motion.div
-//       className="fixed inset-0 flex backdrop bg-opacity-50 backdrop-blur-sm items-center justify-center z-50"
-//       initial={{ opacity: 0 }}
-//       animate={{ opacity: 1 }}
-//       exit={{ opacity: 0 }}
-//     >
-//       <motion.div
-//         className="bg-white rounded-lg p-6 w-[90%] max-w-md m-4"
-//         initial={{ scale: 0.8, opacity: 0 }}
-//         animate={{ scale: 1, opacity: 1 }}
-//         transition={{ type: "spring", damping: 20 }}
-//       >
-//         <div className="flex flex-col items-center">
-//           <FaWallet className="text-4xl text-orange-500 mb-4" />
-//           <h2 className="text-xl font-semibold mb-2 text-center">Insufficient Balance</h2>
-//           <p className="text-gray-600 mb-6 text-center">
-//             Your wallet balance is low. Please recharge to continue with the subscription.
-//           </p>
-//           <div className="w-full bg-orange-50 rounded-lg p-4 mb-6">
-//             <div className="flex justify-between items-center">
-//               <span className="text-gray-600">Required Amount:</span>
-//               <span className="font-semibold">₹{requiredAmount}</span>
-//             </div>
-//             <div className="flex justify-between items-center mt-2">
-//               <span className="text-gray-600">Current Balance:</span>
-//               <span className="font-semibold">₹{currentBalance}</span>
-//             </div>
-//             <div className="border-t border-orange-200 my-2" />
-//             <div className="flex justify-between items-center">
-//               <span className="text-gray-600">Shortage:</span>
-//               <span className="font-semibold text-red-500">₹{shortfall}</span>
-//             </div>
-//           </div>
-//           <div className="flex gap-3 w-full">
-//             <motion.button
-//               whileHover={{ scale: 1.02 }}
-//               whileTap={{ scale: 0.98 }}
-//               onClick={onClose}
-//               className="flex-1 border border-gray-300 text-gray-600 py-3 rounded-lg"
-//             >
-//               Cancel
-//             </motion.button>
-//             <motion.button
-//               whileHover={{ scale: 1.02 }}
-//               whileTap={{ scale: 0.98 }}
-//               onClick={onRecharge}
-//               className="flex-1 bg-green-600 text-white py-3 rounded-lg"
-//             >
-//               Recharge Now
-//             </motion.button>
-//           </div>
-//         </div>
-//       </motion.div>
-//     </motion.div>
-//   </AnimatePresence>
-// );
-
-// const ExistingSubscriptionModal: React.FC<ExistingSubscriptionModalProps> = ({
-//   isOpen,
-//   onClose,
-//   onGoHome
-// }) => (
-//   <AnimatePresence>
-//     {isOpen && (
-//       <motion.div
-//         className="fixed inset-0 flex  bg-opacity-50 backdrop-blur-sm items-center justify-center z-50"
-//         initial={{ opacity: 0 }}
-//         animate={{ opacity: 1 }}
-//         exit={{ opacity: 0 }}
-//       >
-//         <motion.div
-//           className="bg-white rounded-lg p-6 w-[90%] max-w-md m-4"
-//           initial={{ scale: 0.8, opacity: 0 }}
-//           animate={{ scale: 1, opacity: 1 }}
-//           transition={{ type: "spring", damping: 20 }}
-//         >
-//           <div className="flex flex-col items-center">
-//             <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4">
-//               <FaBox className="text-3xl text-orange-500" />
-//             </div>
-//             <h2 className="text-xl font-semibold mb-2 text-center">Existing Subscription Found</h2>
-//             <p className="text-gray-600 text-center mb-6">
-//               You already have an active subscription at this address. Please manage your existing subscription from the home page.
-//             </p>
-//             <div className="flex gap-3 w-full">
-//               <motion.button
-//                 whileHover={{ scale: 1.02 }}
-//                 whileTap={{ scale: 0.98 }}
-//                 onClick={onClose}
-//                 className="flex-1 border border-gray-300 text-gray-600 py-3 rounded-lg"
-//               >
-//                 Cancel
-//               </motion.button>
-//               <motion.button
-//                 whileHover={{ scale: 1.02 }}
-//                 whileTap={{ scale: 0.98 }}
-//                 onClick={onGoHome}
-//                 className="flex-1 bg-green-600 text-white py-3 rounded-lg"
-//               >
-//                 Go to Home
-//               </motion.button>
-//             </div>
-//           </div>
-//         </motion.div>
-//       </motion.div>
-//     )}
-//   </AnimatePresence>
-// );
-
-// const StatusModal: React.FC<StatusModalProps> = ({
-//   isOpen,
-//   type,
-//   message,
-//   onClose,
-//   onAction,
-//   actionLabel
-// }) => (
-//   <AnimatePresence>
-//     {isOpen && (
-//       <motion.div
-//         className="fixed inset-0 flex  bg-opacity-50 backdrop-blur-sm items-center justify-center z-50"
-//         initial={{ opacity: 0 }}
-//         animate={{ opacity: 1 }}
-//         exit={{ opacity: 0 }}
-//       >
-//         <motion.div
-//           className="bg-white rounded-lg p-6 w-[90%] max-w-md m-4"
-//           initial={{ scale: 0.8, opacity: 0 }}
-//           animate={{ scale: 1, opacity: 1 }}
-//           transition={{ type: "spring", damping: 20 }}
-//         >
-//           <div className="flex flex-col items-center">
-//             <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
-//               type === 'success' ? 'bg-green-100' :
-//               type === 'error' ? 'bg-red-100' :
-//               'bg-blue-100'
-//             }`}>
-//               {type === 'success' && <FaCheck className="text-3xl text-green-500" />}
-//               {type === 'error' && <FaBox className="text-3xl text-red-500" />}
-//               {type === 'loading' && (
-//                 <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-//               )}
-//             </div>
-//             <h2 className={`text-xl font-semibold mb-2 text-center ${
-//               type === 'success' ? 'text-green-600' :
-//               type === 'error' ? 'text-red-600' :
-//               'text-blue-600'
-//             }`}>
-//               {type === 'success' ? 'Success!' :
-//                type === 'error' ? 'Error' :
-//                'Processing...'}
-//             </h2>
-//             <p className="text-gray-600 text-center mb-6">{message}</p>
-//             <div className="flex gap-3 w-full">
-//               {onClose && (
-//                 <motion.button
-//                   whileHover={{ scale: 1.02 }}
-//                   whileTap={{ scale: 0.98 }}
-//                   onClick={onClose}
-//                   className="flex-1 border border-gray-300 text-gray-600 py-3 rounded-lg"
-//                 >
-//                   Close
-//                 </motion.button>
-//               )}
-//               {onAction && actionLabel && (
-//                 <motion.button
-//                   whileHover={{ scale: 1.02 }}
-//                   whileTap={{ scale: 0.98 }}
-//                   onClick={onAction}
-//                   className={`flex-1 py-3 rounded-lg text-white ${
-//                     type === 'success' ? 'bg-green-600' :
-//                     type === 'error' ? 'bg-red-600' :
-//                     'bg-blue-600'
-//                   }`}
-//                 >
-//                   {actionLabel}
-//                 </motion.button>
-//               )}
-//             </div>
-//           </div>
-//         </motion.div>
-//       </motion.div>
-//     )}
-//   </AnimatePresence>
-// );
 
 const SuccessCheckmark = () => (
   <motion.div
@@ -388,17 +165,7 @@ const ConfirmSubscription: React.FC = () => {
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isConfirmed, setIsConfirmed] = useState(false); // <-- Add this line
-  // const [successMessage] = useState('');
-  // const [showSuccessModal, setShowSuccessModal] = useState(false);
-  // const [, setWalletBalance] = useState<number>(0);
-  // const [showRechargeModal, setShowRechargeModal] = useState(false);
-  // const [rechargeDetails, ] = useState<{
-  //   currentBalance: number;
-  //   requiredAmount: number;
-  //   shortfall: number;
-  // } | null>(null);
-  // const [showExistingSubscriptionModal, setShowExistingSubscriptionModal] = useState(false);
-
+ 
   const [, setStatusModal] = useState<{
     isOpen: boolean;
     type: "success" | "error" | "loading";
@@ -688,176 +455,7 @@ const ConfirmSubscription: React.FC = () => {
       }
     }
   };
-  // const handleRecharge = () => {
-  //   if (!rechargeDetails) return;
-
-  //   // Store pending subscription
-  //   localStorage.setItem('pendingSubscription', JSON.stringify({
-  //     ...subscriptionDetails,
-  //     deliveryAddress: selectedAddress,
-  //     requiredAmount: rechargeDetails.requiredAmount,
-  //     currentBalance: rechargeDetails.currentBalance,
-  //     shortfall: rechargeDetails.shortfall
-  //   }));
-
-  //   // Navigate to wallet with required amount
-  //   navigate('/wallet', {
-  //     state: {
-  //       requiredAmount: rechargeDetails.shortfall,
-  //       returnUrl: '/subscription/confirm',
-  //       subscriptionType: subscriptionDetails?.type,
-  //       days: subscriptionDetails?.type === 'Daily' ? 30 : 15
-  //     }
-  //   });
-  // };
-
-  // Success Modal Component
-  // const SuccessModal = () => (
-  //   <AnimatePresence>
-  //     <motion.div
-  //       className="fixed inset-0 flex  bg-opacity-50 backdrop-blur-sm items-center justify-center z-50"
-  //       initial={{ opacity: 0 }}
-  //       animate={{ opacity: 1 }}
-  //       exit={{ opacity: 0 }}
-  //     >
-  //       <motion.div
-  //         className="bg-white rounded-lg p-6 w-[90%] max-w-md m-4"
-  //         initial={{ scale: 0.8, opacity: 0 }}
-  //         animate={{ scale: 1, opacity: 1 }}
-  //         transition={{ type: "spring", damping: 20 }}
-  //       >
-  //         <div className="flex flex-col items-center">
-  //           <motion.div
-  //             className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-4"
-  //             initial={{ scale: 0 }}
-  //             animate={{ scale: 1 }}
-  //             transition={{
-  //               type: "spring",
-  //               stiffness: 200,
-  //               damping: 15,
-  //               delay: 0.2
-  //             }}
-  //           >
-  //             <motion.div
-  //               initial={{ scale: 0 }}
-  //               animate={{ scale: 1, rotate: 360 }}
-  //               transition={{ delay: 0.4, duration: 0.6 }}
-  //             >
-  //               <FaCheck className="text-green-600 text-4xl" />
-  //             </motion.div>
-  //           </motion.div>
-
-  //           <motion.h2
-  //             className="text-2xl font-semibold mb-2 text-center text-green-600"
-  //             initial={{ opacity: 0, y: 20 }}
-  //             animate={{ opacity: 1, y: 0 }}
-  //             transition={{ delay: 0.5 }}
-  //           >
-  //             Subscription Confirmed!
-  //           </motion.h2>
-
-  //           <motion.p
-  //             className="text-gray-600 mb-6 text-center"
-  //             initial={{ opacity: 0, y: 20 }}
-  //             animate={{ opacity: 1, y: 0 }}
-  //             transition={{ delay: 0.6 }}
-  //           >
-  //             {subscriptionDetails?.deliveryPattern
-  //               ? `Your ${subscriptionDetails.deliveryPattern.toLowerCase()} subscription has been confirmed!`
-  //               : 'Your subscription has been confirmed successfully!'}
-  //           </motion.p>
-
-  //           <motion.div
-  //             className="w-full bg-green-50 rounded-lg p-4 mb-6"
-  //             initial={{ opacity: 0, y: 20 }}
-  //             animate={{ opacity: 1, y: 0 }}
-  //             transition={{ delay: 0.7 }}
-  //           >
-  //             <p className="text-sm text-green-800 font-medium mb-2">Subscription Details</p>
-  //             <p className="text-sm text-gray-600">
-  //               Type: {subscriptionDetails?.type}<br />
-  //               Start Date: {new Date(subscriptionDetails?.startDate || '').toLocaleDateString()}<br />
-  //               Pack: {subscriptionDetails?.packDetails.name}
-  //             </p>
-  //           </motion.div>
-
-  //           <motion.p
-  //             className="text-sm text-gray-500 text-center"
-  //             initial={{ opacity: 0 }}
-  //             animate={{ opacity: 1 }}
-  //             transition={{ delay: 0.8 }}
-  //           >
-  //             Redirecting to home page...
-  //           </motion.p>
-  //         </div>
-  //       </motion.div>
-  //     </motion.div>
-  //   </AnimatePresence>
-  // );
-
-  // const renderDeliveryAddress = () => {
-  //   if (!selectedAddress) {
-  //     return (
-  //       <div className="text-center py-6">
-  //         <div className="text-red-500 mb-4">Please select a delivery address</div>
-  //         <button
-  //           onClick={() => navigate('/address-selection')}
-  //           className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium"
-  //         >
-  //           Select Address
-  //         </button>
-  //       </div>
-  //     );
-  //   }
-
-  //   return (
-  //     <div className="space-y-4">
-  //       {/* Selected Address Card */}
-  //       <div className="bg-gray-50 rounded-lg p-4">
-  //         <div className="flex items-start justify-between">
-  //           <div className="flex-1">
-  //             {/* Address Details */}
-  //             <div className="space-y-2">
-  //               <div className="flex items-start gap-3">
-  //                 <div>
-  //                   <div className="mt-2 space-y-1">
-  //                     <p className="text-gray-800">{selectedAddress.street}</p>
-  //                     {selectedAddress.societyName && (
-  //                       <p className="text-gray-600">{selectedAddress.societyName}</p>
-  //                     )}
-  //                     <p className="text-gray-600">
-  //                       {selectedAddress.area && `${selectedAddress.area}, `}
-  //                       {selectedAddress.city}
-  //                     </p>
-  //                     <p className="text-gray-600">
-  //                       {selectedAddress.state} - {selectedAddress.pincode}
-  //                     </p>
-  //                     {selectedAddress.phoneNumber && (
-  //                       <p className="text-gray-600 mt-2">
-  //                         <span className="font-medium">Phone: </span>
-  //                         {selectedAddress.phoneNumber}
-  //                       </p>
-  //                     )}
-  //                   </div>
-  //                 </div>
-  //               </div>
-  //             </div>
-  //           </div>
-  //         </div>
-  //       </div>
-
-  //       {/* Change Address Button */}
-  //       <button
-  //         onClick={() => navigate('/address-selection')}
-  //         className="w-full border-2 border-green-500 text-green-600 py-2 rounded-lg text-sm font-medium
-  //           hover:bg-green-50 transition-colors"
-  //       >
-  //         Change Delivery Address
-  //       </button>
-  //     </div>
-  //   );
-  // };
-
+ 
   if (!subscriptionDetails || !selectedAddress) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -866,93 +464,140 @@ const ConfirmSubscription: React.FC = () => {
     );
   }
   return (
-    <div className="min-h-screen bg-[#FFFBEB] relative max-w-[800px] mx-auto">
-      <div className="bg-[#FFFBEB] mx-4 rounded-xl pb-24">
-        {/* Show confirm buttons if not confirmed */}
-        {!isConfirmed && (
-          <div className="px-4 pt-4">
-            <button
-              onClick={handleConfirm}
-              disabled={loading}
-              className="w-full bg-[#F15A22] text-white py-3.5 rounded-full text-[15px] font-medium mb-3 hover:bg-[#E04D15] transition-colors disabled:opacity-50"
-            >
-              {loading
-                ? "Confirming..."
-                : isStoreProduct
-                ? "Confirm Order"
-                : "Confirm Subscription"}
-            </button>
-            <button
-              onClick={() => navigate("/")}
-              className="w-full text-[#015D3A] text-[15px] mt-3 font-medium hover:opacity-80 transition-opacity"
-            >
-              Back to Home
-            </button>
+   <div className="min-h-screen bg-[#FFFBEB] relative max-w-[800px] mx-auto">
+  <div className="bg-[#FFFBEB] mx-4 rounded-xl pb-24">
+    {/* Show confirm buttons if not confirmed */}
+    {!isConfirmed && (
+      <div className="px-4 pt-4">
+        <button
+          onClick={handleConfirm}
+          disabled={loading}
+          className="w-full bg-[#F15A22] text-white py-3.5 rounded-full text-[15px] font-medium mb-3 hover:bg-[#E04D15] transition-colors disabled:opacity-50"
+        >
+          {loading
+            ? "Confirming..."
+            : isStoreProduct
+            ? "Confirm Order"
+            : "Confirm Subscription"}
+        </button>
+        <button
+          onClick={() => navigate("/")}
+          className="w-full text-[#015D3A] text-[15px] mt-3 font-medium hover:opacity-80 transition-opacity"
+        >
+          Back to Home
+        </button>
+      </div>
+    )}
+
+    {/* Show thank you + details if confirmed */}
+    {isConfirmed && (
+      <>
+        <div className="pt-8 pb-6 mt-[90px] text-center">
+          <SuccessCheckmark />
+          <motion.h1
+            className="text-2xl font-semibold mb-2"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+          >
+            Thank you,{" "}
+            {userData
+              ? `${userData.firstName} ${userData.lastName}`
+              : "User"}
+            !
+          </motion.h1>
+          <motion.p
+            className="text-gray-600 text-sm leading-relaxed"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1 }}
+          >
+            {isStoreProduct
+              ? "Your order has been placed successfully!"
+              : "Your subscription has been confirmed. Get ready for fresh flowers every morning."}
+          </motion.p>
+        </div>
+
+        {/* Address Block */}
+        <motion.div
+          className="bg-white rounded-lg mx-4 p-4 mb-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.2 }}
+        >
+          <h2 className="text-[15px] font-medium mb-3">Delivering to</h2>
+          <div className="flex items-start gap-3">
+            <FaMapMarkerAlt className="text-gray-400 mt-1" />
+            <p className="text-gray-600 text-sm leading-relaxed">
+              {selectedAddress?.street}
+              {selectedAddress?.area && `, ${selectedAddress.area}`}
+              {selectedAddress?.city && `, ${selectedAddress.city}`}
+            </p>
           </div>
-        )}
-        {/* Show thank you + details if confirmed */}
-        {isConfirmed && (
-          <>
-            <div className="pt-8 pb-6 mt-[90px] text-center">
-              <SuccessCheckmark />
-              <motion.h1
-                className="text-2xl font-semibold mb-2"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8 }}
-              >
-                Thank you,{" "}
-                {userData
-                  ? `${userData.firstName} ${userData.lastName}`
-                  : "User"}
-                !
-              </motion.h1>
-              <motion.p
-                className="text-gray-600 text-sm leading-relaxed"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1 }}
-              >
-                Your subscription has been confirmed. Get
-                <br />
-                ready for fresh flowers every morning.
-              </motion.p>
-            </div>
-            <motion.div
-              className="bg-white rounded-lg mx-4 p-4 mb-4"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.2 }}
-            >
-              <h2 className="text-[15px] font-medium mb-3">Delivering to</h2>
-              <div className="flex items-start gap-3">
-                <FaMapMarkerAlt className="text-gray-400 mt-1" />
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  {selectedAddress?.street}
-                  {selectedAddress?.area && `${selectedAddress.area}, `}
-                  {selectedAddress?.city}
-                </p>
-              </div>
-              <div className="mt-4 overflow-hidden rounded-lg">
-                <MapView address={selectedAddress} />
-              </div>
-            </motion.div>
-            <motion.div
-              className="bg-white rounded-lg mx-4 p-4"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.4 }}
-            >
-              <h2 className="text-[15px] font-medium mb-4">
-                Your Subscription
-              </h2>
-              <div className="space-y-4">
+          <div className="mt-4 overflow-hidden rounded-lg">
+            <MapView address={selectedAddress} />
+          </div>
+        </motion.div>
+
+        {/* Info Block for Order / Subscription */}
+        <motion.div
+          className="bg-white rounded-lg mx-4 p-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.4 }}
+        >
+          <h2 className="text-[15px] font-medium mb-4">
+            {isStoreProduct ? "Your Order Details" : "Your Subscription"}
+          </h2>
+          <div className="space-y-4">
+            {isStoreProduct ? (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 text-sm">Product</span>
+                  <span className="text-gray-800 text-sm">
+                    {location.state?.product?.name}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 text-sm">Quantity</span>
+                  <span className="text-gray-800 text-sm">
+                    {location.state?.metaData?.quantity}
+                  </span>
+               
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 text-sm"> Delivery</span>
+                  <span className="text-gray-800 text-sm">
+                    {new Date(
+                      location.state?.startDate || ""
+                    ).toLocaleDateString("en-US", {
+                      weekday: "short",
+                      hour: "numeric",
+                      minute: "numeric",
+                      hour12: true,
+                    })}
+                  </span>
+                </div>
+
+                  <div className="flex justify-between items-center">
+                  <span className="text-gray-600 text-sm">Price</span>
+                  <span className="text-gray-800 text-sm">
+                    ₹
+                    {location?.state?.sellingPrice ??
+                      location?.state?.sellingPrice ??
+                      "N/A"}
+                    /Pack
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600 text-sm">Pack</span>
                   <span className="text-gray-800 text-sm">
                     {subscriptionDetails?.packDetails?.name}
                   </span>
-                  <span></span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600 text-sm">Frequency</span>
@@ -978,21 +623,27 @@ const ConfirmSubscription: React.FC = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600 text-sm">Price</span>
                   <span className="text-gray-800 text-sm">
-                    ₹{subscriptionDetails?.packDetails?.sellingPrice ?? "N/A"}
+                    ₹
+                    {subscriptionDetails?.packDetails?.sellingPrice ??
+                      subscriptionDetails?.sellingPrice ??
+                      "N/A"}
                     /Pack
                   </span>
                 </div>
-              </div>
-            </motion.div>
+              </>
+            )}
+          </div>
+        </motion.div>
 
-            {/* Bottom Navigation */}
-            <div className="mb-10 md:mb-10">
-              <BottomNavigation />
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+        {/* Bottom Navigation */}
+        <div className="mb-10 md:mb-10">
+          <BottomNavigation />
+        </div>
+      </>
+    )}
+  </div>
+</div>
+
   );
 };
 
