@@ -408,6 +408,7 @@ const ConfirmSubscription: React.FC = () => {
     type: "loading",
     message: "",
   });
+  const isStoreProduct = location?.state?.product?.isStore;
 
   useEffect(() => {
     const loadData = async () => {
@@ -521,7 +522,6 @@ const ConfirmSubscription: React.FC = () => {
   }, [navigate, location.state]);
 
   const handleConfirm = async () => {
-    const isStoreProduct = location.state.product.isStore;
     if (!isStoreProduct) {
       if (!subscriptionDetails || !selectedAddress) {
         toast.error("Missing subscription details or address");
@@ -673,9 +673,7 @@ const ConfirmSubscription: React.FC = () => {
           toast.error("Missing subscription details or address");
           return;
         }
-        const { success } = await orderService.createOrder(
-          storeProductPayload
-        );
+        const { success } = await orderService.createOrder(storeProductPayload);
         if (success) {
           setStatusModal({
             isOpen: true,
@@ -878,7 +876,11 @@ const ConfirmSubscription: React.FC = () => {
               disabled={loading}
               className="w-full bg-[#F15A22] text-white py-3.5 rounded-full text-[15px] font-medium mb-3 hover:bg-[#E04D15] transition-colors disabled:opacity-50"
             >
-              {loading ? "Confirming..." : "Confirm Subscription11"}
+              {loading
+                ? "Confirming..."
+                : isStoreProduct
+                ? "Confirm Order"
+                : "Confirm Subscription"}
             </button>
             <button
               onClick={() => navigate("/")}

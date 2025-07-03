@@ -741,12 +741,12 @@ const Home2: React.FC = () => {
                     >
                       <FaPause className="mr-2" /> Pause
                     </button>
-                    <button
+                    {/* <button
                       onClick={handleAddToNextDelivery}
                       className="text-[#006D3B] text-sm font-medium flex items-center border border-[#006D3B] rounded-full px-4 py-2"
                     >
                       <FaCalendarPlus className="mr-2" /> Add to next delivery
-                    </button>
+                    </button> */}
                   </div>
                 </>
               ) : (
