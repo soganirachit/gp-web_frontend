@@ -219,12 +219,12 @@ const ManageMyStoreProducts: React.FC = () => {
                     {order.product.name}
                   </h3>
                   {isCancelled && (
-                    <span className="px-2 py-0.5 bg-[#FFF3CD] text-[#664D03] text-xs font-medium rounded-full">
+                    <span className="px-2 py-0.5 bg-[#FFF3CD] text-red-600 text-xs font-medium rounded-full">
                       Cancelled
                     </span>
                   )}
                   {isScheduled && (
-                    <span className="px-2 py-0.5 bg-[#DCFCE7] text-[#166534] text-xs font-medium rounded-full">
+                    <span className="px-2 py-0.5 bg-[#DCFCE7] text-yellow-600 text-xs font-medium rounded-full">
                       Scheduled
                     </span>
                   )}
