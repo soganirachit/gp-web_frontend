@@ -521,7 +521,7 @@ const ConfirmSubscription: React.FC = () => {
   }, [navigate, location.state]);
 
   const handleConfirm = async () => {
-    const isStoreProduct = location.state.product.isStore;
+    const isStoreProduct = location?.state?.product?.isStore;
     if (!isStoreProduct) {
       if (!subscriptionDetails || !selectedAddress) {
         toast.error("Missing subscription details or address");
