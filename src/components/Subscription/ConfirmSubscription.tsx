@@ -28,6 +28,7 @@ interface SubscriptionDetails {
   sellingPrice: number;
   remainingAmount?: number;
   deliveryPattern?: string;
+
 }
 
 interface Address {
@@ -563,30 +564,13 @@ const ConfirmSubscription: React.FC = () => {
                   <span className="text-gray-800 text-sm">
                     {location.state?.metaData?.quantity}
                   </span>
+                </div>
                
-                </div>
-
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-sm"> Delivery</span>
-                  <span className="text-gray-800 text-sm">
-                    {new Date(
-                      location.state?.startDate || ""
-                    ).toLocaleDateString("en-US", {
-                      weekday: "short",
-                      hour: "numeric",
-                      minute: "numeric",
-                      hour12: true,
-                    })}
-                  </span>
-                </div>
-
-                  <div className="flex justify-between items-center">
                   <span className="text-gray-600 text-sm">Price</span>
                   <span className="text-gray-800 text-sm">
                     ₹
-                    {location?.state?.sellingPrice ??
-                      location?.state?.sellingPrice ??
-                      "N/A"}
+                    {location?.state?.product?.sellingPrice ?? "N/A"}
                     /Pack
                   </span>
                 </div>
@@ -620,16 +604,7 @@ const ConfirmSubscription: React.FC = () => {
                     })}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-sm">Price</span>
-                  <span className="text-gray-800 text-sm">
-                    ₹
-                    {subscriptionDetails?.packDetails?.sellingPrice ??
-                      subscriptionDetails?.sellingPrice ??
-                      "N/A"}
-                    /Pack
-                  </span>
-                </div>
+               
               </>
             )}
           </div>
