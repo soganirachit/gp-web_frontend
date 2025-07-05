@@ -224,7 +224,7 @@ const ManageMyStoreProducts: React.FC = () => {
                     </span>
                   )}
                   {isScheduled && (
-                    <span className="px-2 py-0.5 bg-[#DCFCE7] text-yellow-600 text-xs font-medium rounded-full">
+                    <span className="px-2 py-0.5 bg-yellow-200 text-yellow-600 text-xs font-medium rounded-full">
                       Scheduled
                     </span>
                   )}
