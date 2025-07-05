@@ -25,6 +25,7 @@ const AddressSelection: React.FC = () => {
     coordinates: "",
     setAsDefault: false,
   });
+  const isStoreProduct = location.state?.product?.isStore;
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -147,7 +148,7 @@ const AddressSelection: React.FC = () => {
     }
   };
 
-  const createStoreOrder = () => {};
+  const createStoreOrder = () => { };
 
   const handleContinue = () => {
     if (!selectedAddress) {
@@ -158,13 +159,13 @@ const AddressSelection: React.FC = () => {
     try {
       // Get the current subscription data
       const subscriptionData = localStorage.getItem("currentSubscription");
-      if (!subscriptionData) {
+      if (!subscriptionData && !isStoreProduct) {
         toast.error("Subscription details not found. Please try again.");
         navigate("/");
         return;
       }
 
-      const parsedData = JSON.parse(subscriptionData);
+      const parsedData = JSON.parse(subscriptionData || "{}");
 
       // Ensure basePackId is preserved
       if (!parsedData.basePackId && location.state?.basePackId) {
@@ -223,11 +224,10 @@ const AddressSelection: React.FC = () => {
               {addresses.map((address) => (
                 <div
                   key={address.id}
-                  className={`bg-white rounded-xl p-4 cursor-pointer transition-all hover:shadow-md ${
-                    selectedAddress?.id === address.id
-                      ? "border-2 border-[#015D3A] bg-[#ECFDF5]"
-                      : "border border-gray-200"
-                  }`}
+                  className={`bg-white rounded-xl p-4 cursor-pointer transition-all hover:shadow-md ${selectedAddress?.id === address.id
+                    ? "border-2 border-[#015D3A] bg-[#ECFDF5]"
+                    : "border border-gray-200"
+                    }`}
                   onClick={() => handleAddressSelect(address)}
                 >
                   <div className="flex items-start">
