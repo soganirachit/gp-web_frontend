@@ -28,7 +28,6 @@ interface SubscriptionDetails {
   sellingPrice: number;
   remainingAmount?: number;
   deliveryPattern?: string;
-
 }
 
 interface Address {
@@ -278,7 +277,6 @@ interface UserData {
 //   </AnimatePresence>
 // );
 
-
 const SuccessCheckmark = () => (
   <motion.div
     className="relative w-16 h-16 mx-auto mb-4"
@@ -398,7 +396,7 @@ const ConfirmSubscription: React.FC = () => {
   //   requiredAmount: number;
   //   shortfall: number;
   // } | null>(null);
-  // const [showExistingSubscriptionModal, setShowExistingSubscriptionModal] = useState(false);  
+  // const [showExistingSubscriptionModal, setShowExistingSubscriptionModal] = useState(false);
 
   const [, setStatusModal] = useState<{
     isOpen: boolean;
@@ -569,14 +567,14 @@ const ConfirmSubscription: React.FC = () => {
         const selectedDays =
           subscriptionDetails.type.toUpperCase() === "DAILY"
             ? [
-              "MONDAY",
-              "TUESDAY",
-              "WEDNESDAY",
-              "THURSDAY",
-              "FRIDAY",
-              "SATURDAY",
-              "SUNDAY",
-            ]
+                "MONDAY",
+                "TUESDAY",
+                "WEDNESDAY",
+                "THURSDAY",
+                "FRIDAY",
+                "SATURDAY",
+                "SUNDAY",
+              ]
             : ["MONDAY", "WEDNESDAY", "FRIDAY", "SUNDAY"];
 
         // Prepare confirm request data
@@ -881,8 +879,8 @@ const ConfirmSubscription: React.FC = () => {
               {loading
                 ? "Confirming..."
                 : isStoreProduct
-                  ? "Confirm Order"
-                  : "Confirm Subscription"}
+                ? "Confirm Order"
+                : "Confirm Subscription"}
             </button>
             <button
               onClick={() => navigate("/")}
@@ -972,8 +970,7 @@ const ConfirmSubscription: React.FC = () => {
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600 text-sm">Price</span>
                       <span className="text-gray-800 text-sm">
-                        ₹
-                        {location?.state?.product?.sellingPrice ?? "N/A"}
+                        ₹{location?.state?.product?.sellingPrice ?? "N/A"}
                         /Pack
                       </span>
                     </div>
@@ -995,19 +992,20 @@ const ConfirmSubscription: React.FC = () => {
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">First Delivery</span>
+                      <span className="text-gray-600 text-sm">
+                        First Delivery
+                      </span>
                       <span className="text-gray-800 text-sm">
                         {new Date(
                           subscriptionDetails?.startDate || ""
                         ).toLocaleDateString("en-US", {
                           weekday: "short",
-                          hour: "numeric",
-                          minute: "numeric",
-                          hour12: true,
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
                         })}
                       </span>
                     </div>
-
                   </>
                 )}
               </div>
@@ -1021,7 +1019,6 @@ const ConfirmSubscription: React.FC = () => {
         )}
       </div>
     </div>
-
   );
 };
 
