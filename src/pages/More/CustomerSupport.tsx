@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import {  FaPhoneAlt, FaRegCommentDots, FaPaperPlane } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
-import walletImage from '../../assets/icon/Wallet.png';
-import profileImage from '../../assets/icon/Profile.png';
-import BottomNav from '../../components/layout/BottomNav';
-import { IoArrowBack } from 'react-icons/io5';
-import { useEffect } from 'react';
-import { submitSupportRequest } from '@/services/customer.service';
+import React, { useState } from "react";
+import { FaPhoneAlt, FaRegCommentDots, FaPaperPlane } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
+import walletImage from "../../assets/icon/Wallet.png";
+import profileImage from "../../assets/icon/Profile.png";
+import BottomNav from "../../components/layout/BottomNav";
+import { IoArrowBack } from "react-icons/io5";
+import { useEffect } from "react";
+import { submitSupportRequest } from "@/services/customer.service";
+import { orderService } from "@/services/order.service";
 
 const CustomerSupport: React.FC = () => {
   const navigate = useNavigate();
@@ -18,6 +19,19 @@ const CustomerSupport: React.FC = () => {
 
   const [orders, setOrders] = useState<Order[]>([]);
 
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const data = await orderService.getOrdersByCustomerId();
+        setOrders(data); // Replace dummy orders
+      } catch (err) {
+        console.error("Failed to fetch orders:", err);
+      }
+    };
+
+    fetchOrders();
+  }, []);
+
   const handleChatSupport = () => {
     // Implement chat support functionality
   };
@@ -26,7 +40,7 @@ const CustomerSupport: React.FC = () => {
     // Implement call support functionality
     window.location.href = "tel:+91982812293";
   };
-  
+
   const handleSubmitRequest = async () => {
     if (!message.trim() || message.trim().length < 10) {
       alert("Please write at least 10 characters in your message.");
@@ -38,37 +52,19 @@ const CustomerSupport: React.FC = () => {
       orderId: selectOrders || undefined,
       attachments: [],
     };
-    await submitSupportRequest(payload, token || "", setMessage, setRequestType);
+    await submitSupportRequest(
+      payload,
+      token || "",
+      setMessage,
+      setRequestType
+    );
   };
-
 
   type Order = {
     id: string; // UUID — internal use only
-    orderId: string; 
+    orderId: string;
     createdAt: string;
   };
-
-  const dummyOrders: Order[] = [
-    {
-      id: "a9cfa2b7-1b4d-4890-8425-c50f045f1ef0",
-      orderId: "GPOR1001", 
-      createdAt: "2025-06-21T09:30:00Z",
-    },
-    {
-      id: "2bc472a8-c003-4b6e-bd3a-0c8a370be300",
-      orderId: "GPOR1002",
-      createdAt: "2025-06-20T11:15:00Z",
-    },
-    {
-      id: "d84f8c22-3b96-4ab0-8d80-53ac6e4c122f",
-      orderId: "GPOR1003",
-      createdAt: "2025-06-19T16:45:00Z",
-    },
-  ];
-
-  useEffect(() => {
-    setOrders(dummyOrders);
-  }, []);
 
   return (
     <div className="bg-[#FFFBEB] min-h-screen">
@@ -143,15 +139,13 @@ const CustomerSupport: React.FC = () => {
                 >
                   <option value="">Select an order</option>
                   {orders.map((order) => (
-                    <option key={order.orderId} value={order.orderId}>
+                    <option key={order.id} value={order.orderId}>
                       {order.orderId}
                     </option>
                   ))}
                 </select>
               ) : (
-                <p className="text-sm text-gray-500 mt-1">
-                  No previous orders found.
-                </p>
+                <p>No previous orders found.</p>
               )}
             </div>
             <div>
