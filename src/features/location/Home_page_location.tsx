@@ -4,6 +4,7 @@ import { MdLocationOn, MdMyLocation, MdArrowBack } from "react-icons/md";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
+import axios from "axios";
 
 // List of cities where delivery is available
 const SERVICED_CITIES = [
@@ -53,6 +54,7 @@ const HomePageLocation: React.FC = () => {
   // const [useRegularMarker, setUseRegularMarker] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
   // const markerRef = useRef<any>(null);
+  const [polygon, setPolygon] = useState<Array<{ lat: number; lng: number }>>([]);
 
   const { isLoaded, loadError, GOOGLE_MAPS_API_KEY } = useGoogleMaps();
 
@@ -78,6 +80,45 @@ const HomePageLocation: React.FC = () => {
 
   const [selectedLocationType, setSelectedLocationType] = useState<string>("");
   const [otherLocationName, setOtherLocationName] = useState<string>("");
+
+  // Fetch polygon on mount
+  useEffect(() => {
+    const fetchPolygon = async () => {
+      try {
+        const apiBase = import.meta.env.VITE_API_BASE_URL;
+        const res = await axios.get(`${apiBase}/polygon`);
+        if (res.data && Array.isArray(res.data.points)) {
+          // points is expected to be array of {lat, lng} or [lat, lng]
+          // Normalize to array of {lat, lng}
+          const points = res.data.points.map((pt: any) => {
+            if (Array.isArray(pt)) {
+              return { lat: pt[0], lng: pt[1] };
+            }
+            return pt;
+          });
+          setPolygon(points);
+        }
+      } catch (err) {
+        // If polygon not found, fallback to city-based check
+        setPolygon([]);
+      }
+    };
+    fetchPolygon();
+  }, []);
+
+  // Point-in-polygon (ray-casting) algorithm
+  function isPointInPolygon(point: { lat: number; lng: number }, polygon: Array<{ lat: number; lng: number }>) {
+    let x = point.lat, y = point.lng;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      let xi = polygon[i].lat, yi = polygon[i].lng;
+      let xj = polygon[j].lat, yj = polygon[j].lng;
+      let intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / (yj - yi + 0.0000001) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
 
   useEffect(() => {
     if (localStorage.getItem("needLocation") === "true") {
@@ -232,14 +273,19 @@ const HomePageLocation: React.FC = () => {
 
       setLocationSearchQuery(fullAddress);
 
-      // Check if the city is in our service area
-      const isServiced = SERVICED_CITIES.some(
-        (servicedCity) =>
-          city.toLowerCase().includes(servicedCity.toLowerCase()) ||
-          state.toLowerCase().includes(servicedCity.toLowerCase()) ||
-          district.toLowerCase().includes(servicedCity.toLowerCase())
-      );
-
+      // Check if the point is inside the polygon
+      let isServiced = true;
+      if (polygon && polygon.length > 2) {
+        isServiced = isPointInPolygon({ lat, lng }, polygon);
+      } else {
+        // fallback to city-based check if no polygon
+        isServiced = SERVICED_CITIES.some(
+          (servicedCity) =>
+            city.toLowerCase().includes(servicedCity.toLowerCase()) ||
+            state.toLowerCase().includes(servicedCity.toLowerCase()) ||
+            district.toLowerCase().includes(servicedCity.toLowerCase())
+        );
+      }
       setIsLocationServiced(isServiced);
     } catch (error) {
       console.error("Error in updateAddressDetails:", error);
@@ -377,12 +423,9 @@ const HomePageLocation: React.FC = () => {
             >
               Change Location
             </button>
-            <button
-              onClick={handleViewProducts}
-              className="w-full py-3 border border-gray-300 text-gray-600 rounded-lg font-medium"
-            >
-              View Products
-            </button>
+            <div className="w-full py-3 border border-gray-300 text-gray-600 rounded-lg font-medium text-center bg-gray-100 cursor-not-allowed">
+              You cannot view products outside our service area.
+            </div>
           </div>
         </motion.div>
       </motion.div>
