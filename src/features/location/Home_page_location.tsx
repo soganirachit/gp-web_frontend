@@ -4,7 +4,7 @@ import { MdLocationOn, MdMyLocation, MdArrowBack } from "react-icons/md";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
-import axios from "axios";
+import { addressService } from "../../services/address.service";
 
 // List of cities where delivery is available
 const SERVICED_CITIES = [
@@ -55,6 +55,7 @@ const HomePageLocation: React.FC = () => {
   const mapRef = useRef<google.maps.Map | null>(null);
   // const markerRef = useRef<any>(null);
   const [polygon, setPolygon] = useState<Array<{ lat: number; lng: number }>>([]);
+  const [polygonDataAvailable, setPolygonDataAvailable] = useState(false);
 
   const { isLoaded, loadError, GOOGLE_MAPS_API_KEY } = useGoogleMaps();
 
@@ -81,30 +82,21 @@ const HomePageLocation: React.FC = () => {
   const [selectedLocationType, setSelectedLocationType] = useState<string>("");
   const [otherLocationName, setOtherLocationName] = useState<string>("");
 
-  // Fetch polygon on mount
-  useEffect(() => {
-    const fetchPolygon = async () => {
-      try {
-        const apiBase = import.meta.env.VITE_API_BASE_URL;
-        const res = await axios.get(`${apiBase}/polygon`);
-        if (res.data && Array.isArray(res.data.points)) {
-          // points is expected to be array of {lat, lng} or [lat, lng]
-          // Normalize to array of {lat, lng}
-          const points = res.data.points.map((pt: any) => {
-            if (Array.isArray(pt)) {
-              return { lat: pt[0], lng: pt[1] };
-            }
-            return pt;
-          });
-          setPolygon(points);
-        }
-      } catch (err) {
-        // If polygon not found, fallback to city-based check
-        setPolygon([]);
-      }
-    };
-    fetchPolygon();
-  }, []);
+useEffect(() => {
+  const fetchPolygon = async () => {
+    try {
+      const res = await addressService.getPolygonData();
+      setPolygon(res.points);
+      setPolygonDataAvailable(true);
+    } catch (err) {
+      setPolygon([]);
+      setPolygonDataAvailable(false);
+    }
+  };
+
+  fetchPolygon();
+}, []);
+
 
   // Point-in-polygon (ray-casting) algorithm
   function isPointInPolygon(point: { lat: number; lng: number }, polygon: Array<{ lat: number; lng: number }>) {
@@ -323,7 +315,7 @@ const HomePageLocation: React.FC = () => {
         city: selectedAddress.city,
         district: selectedAddress.district,
         state: selectedAddress.state,
-        // type: selectedLocationType || "Home",
+        type: (selectedLocationType || "Home") as 'Home' | 'Work' | 'Others',
         setAsDefault: true,
       };
 
@@ -334,18 +326,15 @@ const HomePageLocation: React.FC = () => {
         setShowLocationModal(true);
       }
 
-      // Save address in the background
-      fetch(`${import.meta.env.VITE_API_BASE_URL}/addresses`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token,
-        },
-        body: JSON.stringify(addressData),
-      }).catch((error) => {
-        console.error("Error saving address:", error);
-        // Handle error silently since user is already redirected
-      });
+      // Save address in the background only if polygon data is available
+      if (polygonDataAvailable) {
+        addressService.createAddress(addressData).catch((error) => {
+          console.error("Error saving address:", error);
+          // Handle error silently since user is already redirected
+        });
+      } else {
+        console.log("Address not created - polygon data not available");
+      }
     } catch (error) {
       console.error("Error:", error);
       if (isLocationServiced) {
