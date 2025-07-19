@@ -35,6 +35,11 @@ const AddEditAddress: React.FC = () => {
 
   const [selectedType, setSelectedType] = useState<'Home' | 'Work' | 'Others'>('Home');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isValidatingLocation, setIsValidatingLocation] = useState(false);
+  const [locationValidation, setLocationValidation] = useState<{
+    isValid: boolean;
+    message?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (isEdit && existingAddress) {
@@ -80,8 +85,46 @@ const AddEditAddress: React.FC = () => {
     return true;
   };
 
+  const validateLocation = async (): Promise<boolean> => {
+    try {
+      setIsValidatingLocation(true);
+      const coordinates = `${selectedPosition.lat},${selectedPosition.lng}`;
+      
+      // First validate coordinates format
+      if (!addressService.validateCoordinatesFormat(coordinates)) {
+        toast.error('Invalid coordinates format');
+        setLocationValidation({ isValid: false, message: 'Invalid coordinates format' });
+        return false;
+      }
+      
+      const validation = await addressService.validateAddressInDeliveryArea(coordinates);
+      setLocationValidation(validation);
+      
+      if (!validation.isValid) {
+        toast.error(validation.message || 'Address is outside delivery area');
+        return false;
+      }
+      
+      toast.success('Address is within delivery area!');
+      return true;
+    } catch (error) {
+      console.error('Error validating location:', error);
+      toast.error('Failed to validate address location');
+      setLocationValidation({ isValid: false, message: 'Failed to validate address location' });
+      return false;
+    } finally {
+      setIsValidatingLocation(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!validateForm()) return;
+
+    // Validate location before saving
+    const isLocationValid = await validateLocation();
+    if (!isLocationValid) {
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -124,25 +167,55 @@ const AddEditAddress: React.FC = () => {
           }
           
           try {
+             const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
             const response = await fetch(
-              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`
+              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`
             );
             const data = await response.json();
             
-            if (data.results && data.results[0]) {
-              const addressComponents = data.results[0].address_components;
+            if (data.results && data.results.length > 0) {
               const formattedAddress: any = {};
               
-              addressComponents.forEach((component: any) => {
-                const type = component.types[0];
-                if (type === 'street_number') formattedAddress.houseNo = component.long_name;
-                if (type === 'route') formattedAddress.streetName = component.long_name;
-                if (type === 'sublocality_level_1') formattedAddress.area = component.long_name;
-                if (type === 'locality') formattedAddress.city = component.long_name;
-                if (type === 'administrative_area_level_1') formattedAddress.state = component.long_name;
-                if (type === 'postal_code') formattedAddress.pincode = component.long_name;
+              // Loop through all results to find address components
+              data.results.forEach((result: any) => {
+                if (result.address_components) {
+                  result.address_components.forEach((component: any) => {
+                    // Check all types for each component
+                    component.types.forEach((type: string) => {
+                      if (type === 'street_number' && !formattedAddress.houseNo) {
+                        formattedAddress.houseNo = component.long_name;
+                      }
+                      if (type === 'route' && !formattedAddress.streetName) {
+                        formattedAddress.streetName = component.long_name;
+                      }
+                      if (type === 'sublocality_level_1' && !formattedAddress.area) {
+                        formattedAddress.area = component.long_name;
+                      }
+                      if (type === 'locality' && !formattedAddress.city) {
+                        formattedAddress.city = component.long_name;
+                      }
+                      if (type === 'administrative_area_level_1' && !formattedAddress.state) {
+                        formattedAddress.state = component.long_name;
+                      }
+                      if (type === 'postal_code' && !formattedAddress.pincode) {
+                        formattedAddress.pincode = component.long_name;
+                      }
+                      if (type === 'administrative_area_level_2' && !formattedAddress.district) {
+                        formattedAddress.district = component.long_name;
+                      }
+                    });
+                  });
+                }
               });
 
+              // Also try to get formatted address from the first result
+              if (data.results[0].formatted_address) {
+                const fullAddress = data.results[0].formatted_address;
+                console.log('Full formatted address:', fullAddress);
+              }
+
+              console.log('Extracted address components:', formattedAddress);
+              
               setFormData(prev => ({
                 ...prev,
                 ...formattedAddress
@@ -173,6 +246,8 @@ const AddEditAddress: React.FC = () => {
           lng: center.lng()
         };
         setSelectedPosition(newPosition);
+        // Clear previous validation when user moves the map
+        setLocationValidation(null);
       }
     }
   };
@@ -254,6 +329,22 @@ const AddEditAddress: React.FC = () => {
           </div>
         </div>
 
+        {/* Location Validation Status */}
+        {locationValidation && (
+          <div className={`mb-4 p-3 rounded-lg text-sm ${
+            locationValidation.isValid 
+              ? 'bg-green-50 text-green-700 border border-green-200' 
+              : 'bg-red-50 text-red-700 border border-red-200'
+          }`}>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${
+                locationValidation.isValid ? 'bg-green-500' : 'bg-red-500'
+              }`}></div>
+              <span>{locationValidation.message}</span>
+            </div>
+          </div>
+        )}
+
         {/* Complete Address Section */}
         <div className="space-y-4 md:space-y-6">
           <div>
@@ -322,14 +413,15 @@ const AddEditAddress: React.FC = () => {
         <div className="mt-6 md:mb-9">
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isValidatingLocation}
             className={`w-full py-4 rounded-full font-medium transition-colors ${
-              isSubmitting
+              isSubmitting || isValidatingLocation
                 ? 'bg-gray-400 text-white cursor-not-allowed'
                 : 'bg-orange-500 hover:bg-orange-600 text-white'
             }`}
           >
-            Confirm Location
+            {isValidatingLocation ? 'Validating Location...' : 
+             isSubmitting ? 'Saving Address...' : 'Confirm Location'}
           </button>
         </div>
       </div>

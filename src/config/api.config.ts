@@ -20,6 +20,10 @@ export const getAddressesUrl = () => {
   return `${getApiUrl()}/addresses`;
 };
 
+export const getPolygonUrl = () => {
+  return `${getApiUrl()}/polygon`;
+};
+
 // export const getStoreProducts = () => {
 //   return `${getApiUrl()}/products`;
 // };

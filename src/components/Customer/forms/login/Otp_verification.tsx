@@ -114,7 +114,7 @@ const OTPVerification: React.FC = () => {
           }
           navigate('/location', { 
             state: { 
-              returnUrl: '/home' 
+              returnUrl: '/' 
             } 
           });
         } else {

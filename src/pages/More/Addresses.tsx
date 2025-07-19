@@ -258,7 +258,7 @@ const Addresses: React.FC = () => {
                         <p className="text-gray-600 text-[15px]">{address.houseNo}, {address.streetName}</p>
                         <p className="text-gray-600 text-[15px]">{address.area}, {address.city}</p>
                         <p className="text-gray-600 text-[15px]">{address.state} - {address.pincode}</p>
-                        <p className="text-gray-600 text-[15px] mt-2">+91 {address.phoneNumber}</p>
+                        <p className="text-gray-600 text-[15px] mt-2">+91 {address.associatedPhoneNumber}</p>
                       </div>
                       {address.coordinates ? (
                         <AddressMap coordinates={address.coordinates} />

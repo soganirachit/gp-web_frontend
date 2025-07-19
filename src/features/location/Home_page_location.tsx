@@ -4,6 +4,7 @@ import { MdLocationOn, MdMyLocation, MdArrowBack } from "react-icons/md";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
+import { addressService } from "../../services/address.service";
 
 // List of cities where delivery is available
 const SERVICED_CITIES = [
@@ -48,11 +49,13 @@ const HomePageLocation: React.FC = () => {
   } | null>(null);
   const [, setIsLoadingLocation] = useState(false);
   const [isLocationServiced, setIsLocationServiced] = useState(true);
+  const [isValidatingDeliveryZone, setIsValidatingDeliveryZone] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [, setShowErrorModal] = useState(false);
   // const [useRegularMarker, setUseRegularMarker] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
   // const markerRef = useRef<any>(null);
+  const [deliveryZoneAvailable, setDeliveryZoneAvailable] = useState(true);
 
   const { isLoaded, loadError, GOOGLE_MAPS_API_KEY } = useGoogleMaps();
 
@@ -78,6 +81,16 @@ const HomePageLocation: React.FC = () => {
 
   const [selectedLocationType, setSelectedLocationType] = useState<string>("");
   const [otherLocationName, setOtherLocationName] = useState<string>("");
+
+  useEffect(() => {
+    // Since we're now using the delivery zone validation API directly,
+    // we don't need to fetch polygon data anymore
+    setDeliveryZoneAvailable(true);
+  }, []);
+
+
+
+
 
   useEffect(() => {
     if (localStorage.getItem("needLocation") === "true") {
@@ -172,7 +185,7 @@ const HomePageLocation: React.FC = () => {
       const geocoder = new window.google.maps.Geocoder();
       const result = await geocoder.geocode({ location: { lat, lng } });
 
-      console.log("Geocoding API Response:", result);
+ 
 
       if (!result?.results?.[0]) {
         console.error("No results found in geocoding response.");
@@ -232,15 +245,25 @@ const HomePageLocation: React.FC = () => {
 
       setLocationSearchQuery(fullAddress);
 
-      // Check if the city is in our service area
-      const isServiced = SERVICED_CITIES.some(
-        (servicedCity) =>
-          city.toLowerCase().includes(servicedCity.toLowerCase()) ||
-          state.toLowerCase().includes(servicedCity.toLowerCase()) ||
-          district.toLowerCase().includes(servicedCity.toLowerCase())
-      );
-
-      setIsLocationServiced(isServiced);
+      // Check if the point is within delivery zone using the new API
+      setIsValidatingDeliveryZone(true);
+      try {
+        const coordinates = `${lat},${lng}`;
+        const validation = await addressService.validateAddressInDeliveryArea(coordinates);
+        setIsLocationServiced(validation.isValid);
+      } catch (error) {
+        console.error("Error validating delivery zone:", error);
+        // Fallback to city-based check if API fails
+        const isServiced = SERVICED_CITIES.some(
+          (servicedCity) =>
+            city.toLowerCase().includes(servicedCity.toLowerCase()) ||
+            state.toLowerCase().includes(servicedCity.toLowerCase()) ||
+            district.toLowerCase().includes(servicedCity.toLowerCase())
+        );
+        setIsLocationServiced(isServiced);
+      } finally {
+        setIsValidatingDeliveryZone(false);
+      }
     } catch (error) {
       console.error("Error in updateAddressDetails:", error);
       // Only show user-friendly error message
@@ -277,7 +300,7 @@ const HomePageLocation: React.FC = () => {
         city: selectedAddress.city,
         district: selectedAddress.district,
         state: selectedAddress.state,
-        // type: selectedLocationType || "Home",
+        type: (selectedLocationType || "Home") as 'Home' | 'Work' | 'Others',
         setAsDefault: true,
       };
 
@@ -289,14 +312,7 @@ const HomePageLocation: React.FC = () => {
       }
 
       // Save address in the background
-      fetch(`${import.meta.env.VITE_API_BASE_URL}/addresses`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token,
-        },
-        body: JSON.stringify(addressData),
-      }).catch((error) => {
+      addressService.createAddress(addressData).catch((error) => {
         console.error("Error saving address:", error);
         // Handle error silently since user is already redirected
       });
@@ -377,12 +393,9 @@ const HomePageLocation: React.FC = () => {
             >
               Change Location
             </button>
-            <button
-              onClick={handleViewProducts}
-              className="w-full py-3 border border-gray-300 text-gray-600 rounded-lg font-medium"
-            >
-              View Products
-            </button>
+            <div className="w-full py-3 border border-gray-300 text-gray-600 rounded-lg font-medium text-center bg-gray-100 cursor-not-allowed">
+              You cannot view products outside our service area.
+            </div>
           </div>
         </motion.div>
       </motion.div>
@@ -513,7 +526,23 @@ const HomePageLocation: React.FC = () => {
 
         {/* Address Details */}
         <div className="space-y-4 bg-white rounded-lg p-4 md:p-6 shadow-sm">
-          <h2 className="font-medium">Complete Address</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-medium">Complete Address</h2>
+            {isValidatingDeliveryZone ? (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-[#F15A22]"></div>
+                <span>Checking delivery zone...</span>
+              </div>
+            ) : (
+              <div className={`text-sm px-2 py-1 rounded-full ${
+                isLocationServiced 
+                  ? 'bg-green-100 text-green-700' 
+                  : 'bg-red-100 text-red-700'
+              }`}>
+                {isLocationServiced ? '✓ Delivery Available' : '✗ Outside Delivery Area'}
+              </div>
+            )}
+          </div>
           <div className="grid md:grid-cols-2 gap-4">
             <input
               type="text"

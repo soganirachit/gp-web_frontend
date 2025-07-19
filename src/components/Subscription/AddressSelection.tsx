@@ -13,6 +13,11 @@ const AddressSelection: React.FC = () => {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isValidatingAddress, setIsValidatingAddress] = useState(false);
+  const [addressValidation, setAddressValidation] = useState<{
+    isValid: boolean;
+    message?: string;
+  } | null>(null);
   const [formData, setFormData] = useState({
     houseNo: "",
     streetName: "",
@@ -122,7 +127,49 @@ const AddressSelection: React.FC = () => {
     }));
   };
 
-  const handleAddressSelect = (address: Address) => {
+  const validateAddressInDeliveryArea = async (address: Address): Promise<boolean> => {
+    if (!address.coordinates) {
+      toast.error('Address coordinates not available');
+      return false;
+    }
+
+    try {
+      setIsValidatingAddress(true);
+      
+      // First validate coordinates format
+      if (!addressService.validateCoordinatesFormat(address.coordinates)) {
+        toast.error('Invalid coordinates format');
+        setAddressValidation({ isValid: false, message: 'Invalid coordinates format' });
+        return false;
+      }
+      
+      const validation = await addressService.validateAddressInDeliveryArea(address.coordinates);
+      setAddressValidation(validation);
+      
+      if (!validation.isValid) {
+        toast.error(validation.message || 'Address is outside delivery area');
+        return false;
+      }
+      
+      toast.success('Address is within delivery area!');
+      return true;
+    } catch (error) {
+      console.error('Error validating address:', error);
+      toast.error('Failed to validate address location');
+      setAddressValidation({ isValid: false, message: 'Failed to validate address location' });
+      return false;
+    } finally {
+      setIsValidatingAddress(false);
+    }
+  };
+
+  const handleAddressSelect = async (address: Address) => {
+    // Validate address before selecting
+    const isAddressValid = await validateAddressInDeliveryArea(address);
+    if (!isAddressValid) {
+      return;
+    }
+
     setSelectedAddress(address);
     localStorage.setItem("selectedDeliveryAddress", JSON.stringify(address));
 
@@ -150,9 +197,15 @@ const AddressSelection: React.FC = () => {
 
   const createStoreOrder = () => { };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!selectedAddress) {
       toast.error("Please select an address");
+      return;
+    }
+
+    // Validate address is within delivery area
+    const isAddressValid = await validateAddressInDeliveryArea(selectedAddress);
+    if (!isAddressValid) {
       return;
     }
 
@@ -263,6 +316,22 @@ const AddressSelection: React.FC = () => {
               ))}
             </div>
 
+            {/* Address Validation Status */}
+            {addressValidation && (
+              <div className={`mb-4 p-3 rounded-lg text-sm ${
+                addressValidation.isValid 
+                  ? 'bg-green-50 text-green-700 border border-green-200' 
+                  : 'bg-red-50 text-red-700 border border-red-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    addressValidation.isValid ? 'bg-green-500' : 'bg-red-500'
+                  }`}></div>
+                  <span>{addressValidation.message}</span>
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 md:relative md:border-t-0 md:bg-transparent md:p-0">
               <div className="max-w-[800px] mx-auto space-y-3">
@@ -275,10 +344,10 @@ const AddressSelection: React.FC = () => {
 
                 <button
                   onClick={handleContinue}
-                  disabled={!selectedAddress}
+                  disabled={!selectedAddress || isValidatingAddress}
                   className="w-full bg-[#F15A22] text-white py-3.5 rounded-lg text-[15px] font-medium hover:bg-[#F15A22]/90 disabled:opacity-50"
                 >
-                  Continue
+                  {isValidatingAddress ? "Validating Address..." : "Continue"}
                 </button>
               </div>
             </div>
