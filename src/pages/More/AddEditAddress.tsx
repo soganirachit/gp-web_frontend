@@ -89,8 +89,15 @@ const AddEditAddress: React.FC = () => {
     try {
       setIsValidatingLocation(true);
       const coordinates = `${selectedPosition.lat},${selectedPosition.lng}`;
-      const validation = await addressService.validateAddressInDeliveryArea(coordinates);
       
+      // First validate coordinates format
+      if (!addressService.validateCoordinatesFormat(coordinates)) {
+        toast.error('Invalid coordinates format');
+        setLocationValidation({ isValid: false, message: 'Invalid coordinates format' });
+        return false;
+      }
+      
+      const validation = await addressService.validateAddressInDeliveryArea(coordinates);
       setLocationValidation(validation);
       
       if (!validation.isValid) {
@@ -103,6 +110,7 @@ const AddEditAddress: React.FC = () => {
     } catch (error) {
       console.error('Error validating location:', error);
       toast.error('Failed to validate address location');
+      setLocationValidation({ isValid: false, message: 'Failed to validate address location' });
       return false;
     } finally {
       setIsValidatingLocation(false);

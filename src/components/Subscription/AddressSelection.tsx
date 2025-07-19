@@ -135,8 +135,15 @@ const AddressSelection: React.FC = () => {
 
     try {
       setIsValidatingAddress(true);
-      const validation = await addressService.validateAddressInDeliveryArea(address.coordinates);
       
+      // First validate coordinates format
+      if (!addressService.validateCoordinatesFormat(address.coordinates)) {
+        toast.error('Invalid coordinates format');
+        setAddressValidation({ isValid: false, message: 'Invalid coordinates format' });
+        return false;
+      }
+      
+      const validation = await addressService.validateAddressInDeliveryArea(address.coordinates);
       setAddressValidation(validation);
       
       if (!validation.isValid) {
@@ -149,6 +156,7 @@ const AddressSelection: React.FC = () => {
     } catch (error) {
       console.error('Error validating address:', error);
       toast.error('Failed to validate address location');
+      setAddressValidation({ isValid: false, message: 'Failed to validate address location' });
       return false;
     } finally {
       setIsValidatingAddress(false);

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getAddressesUrl, getPolygonUrl } from "../config/api.config";
+import { getAddressesUrl, getPolygonUrl, getApiUrl } from "../config/api.config";
 import { headerService } from "./headers.service";
 
 export interface Address {
@@ -41,24 +41,7 @@ export interface PolygonData {
   points: Array<{ lat: number; lng: number }>;
 }
 
-// Point-in-polygon validation function
-function isPointInPolygon(point: { lat: number; lng: number }, polygon: Array<{ lat: number; lng: number }>): boolean {
-  const { lat, lng } = point;
-  let inside = false;
-  
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].lng;
-    const yi = polygon[i].lat;
-    const xj = polygon[j].lng;
-    const yj = polygon[j].lat;
-    
-    if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
-      inside = !inside;
-    }
-  }
-  
-  return inside;
-}
+
 
 class AddressService {
   async getAllAddresses(): Promise<Address[]> {
@@ -143,48 +126,56 @@ class AddressService {
     }
   }
 
-  async getPolygonData(): Promise<PolygonData> {
-    try {
-      const response = await axios.get(getPolygonUrl());
-      const rawPoints = response.data.points;
-      const points = Array.isArray(rawPoints)
-        ? rawPoints.map((pt: any) =>
-            Array.isArray(pt) ? { lat: pt[0], lng: pt[1] } : pt
-          )
-        : [];
-      return { points };
-    } catch (error) {
-      throw headerService.handleError(error);
-    }
-  }
-
+ 
   async validateAddressInDeliveryArea(coordinates: string): Promise<{ isValid: boolean; message?: string }> {
     try {
-      
       const [lat, lng] = coordinates.split(',').map(Number);
       
       if (isNaN(lat) || isNaN(lng)) {
         return { isValid: false, message: 'Invalid coordinates format' };
       }
 
-      // Get polygon data
-      const polygonData = await this.getPolygonData();
-      
-      if (!polygonData.points || polygonData.points.length === 0) {
-        return { isValid: false, message: 'Delivery area not configured' };
-      }
+      // Use the new delivery zone check API
+      const response = await axios.post(
+        `${getApiUrl()}/polygon/check-delivery-zone`,
+        {
+          latitude: lat,
+          longitude: lng
+        },
+        {
+          headers: headerService.getHeaders(),
+        }
+      );
 
-      // Check if point is inside polygon
-      const isInside = isPointInPolygon({ lat, lng }, polygonData.points);
+      const { isDeliverable, message } = response.data;
       
       return {
-        isValid: isInside,
-        message: isInside ? 'Address is within delivery area' : 'Address is outside delivery area'
+        isValid: isDeliverable,
+        message: message || (isDeliverable ? 'Address is within delivery area' : 'Address is outside delivery area')
       };
     } catch (error) {
       console.error('Error validating address:', error);
       return { isValid: false, message: 'Failed to validate address location' };
     }
+  }
+
+  // Helper method to validate coordinates format
+  validateCoordinatesFormat(coordinates: string): boolean {
+    const [lat, lng] = coordinates.split(',').map(Number);
+    return !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+  }
+
+  // Method to validate address before saving
+  async validateAddressBeforeSave(addressInput: AddressInput): Promise<{ isValid: boolean; message?: string }> {
+    if (!addressInput.coordinates) {
+      return { isValid: false, message: 'Coordinates are required for address validation' };
+    }
+
+    if (!this.validateCoordinatesFormat(addressInput.coordinates)) {
+      return { isValid: false, message: 'Invalid coordinates format' };
+    }
+
+    return await this.validateAddressInDeliveryArea(addressInput.coordinates);
   }
 }
 

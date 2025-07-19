@@ -86,7 +86,7 @@ const NameInput: React.FC = () => {
         navigate("/location", {
           state: {
             fromNameInput: true,
-            returnUrl: "/home",
+            returnUrl: "/",
           },
         });
       } else {

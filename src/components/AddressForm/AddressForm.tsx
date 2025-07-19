@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaMapMarkerAlt } from "react-icons/fa";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 import {
@@ -17,6 +17,11 @@ interface AddressFormProps {
 const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [validatingCoordinates, setValidatingCoordinates] = useState(false);
+  const [validationResult, setValidationResult] = useState<{
+    isValid: boolean;
+    message?: string;
+  } | null>(null);
   const [formData, setFormData] = useState<AddressInput>({
     houseNo: "",
     streetName: "",
@@ -25,6 +30,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
     state: "",
     pincode: "",
     associatedPhoneNumber: "",
+    coordinates: "",
   });
 
   useEffect(() => {
@@ -37,6 +43,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
         state: initialAddress.state,
         pincode: initialAddress.pincode,
         associatedPhoneNumber: initialAddress.associatedPhoneNumber,
+        coordinates: initialAddress.coordinates || "",
       });
     }
   }, [mode, initialAddress]);
@@ -47,6 +54,34 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
       ...prev,
       [name]: value,
     }));
+    // Clear validation result when coordinates change
+    if (name === "coordinates") {
+      setValidationResult(null);
+    }
+  };
+
+  const validateCoordinates = async () => {
+    if (!formData.coordinates) {
+      toast.error("Please enter coordinates first");
+      return;
+    }
+
+    try {
+      setValidatingCoordinates(true);
+      const validation = await addressService.validateAddressInDeliveryArea(formData.coordinates);
+      setValidationResult(validation);
+      
+      if (validation.isValid) {
+        toast.success(validation.message || "Coordinates are valid!");
+      } else {
+        toast.error(validation.message || "Coordinates are outside delivery area");
+      }
+    } catch (error) {
+      toast.error("Failed to validate coordinates");
+      setValidationResult({ isValid: false, message: "Validation failed" });
+    } finally {
+      setValidatingCoordinates(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,6 +89,16 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
     setLoading(true);
 
     try {
+      // Validate address before saving if coordinates are available
+      if (formData.coordinates) {
+        const validation = await addressService.validateAddressBeforeSave(formData);
+        if (!validation.isValid) {
+          toast.error(validation.message || "Address validation failed");
+          setLoading(false);
+          return;
+        }
+      }
+
       if (mode === "add") {
         await addressService.createAddress(formData);
         toast.success("Address added successfully");
@@ -219,6 +264,47 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
               maxLength={10}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
             />
+          </div>
+
+          <div>
+            <label
+              htmlFor="coordinates"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Coordinates (Optional)
+            </label>
+            <div className="mt-1 flex gap-2">
+              <input
+                type="text"
+                id="coordinates"
+                name="coordinates"
+                value={formData.coordinates || ""}
+                onChange={handleInputChange}
+                placeholder="latitude,longitude (e.g., 26.9124,75.7873)"
+                className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+              />
+              <button
+                type="button"
+                onClick={validateCoordinates}
+                disabled={validatingCoordinates || !formData.coordinates}
+                className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                <FaMapMarkerAlt size={12} />
+                {validatingCoordinates ? "Validating..." : "Validate"}
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              Format: latitude,longitude (e.g., 26.9124,75.7873)
+            </p>
+            {validationResult && (
+              <div className={`mt-2 p-2 rounded text-xs ${
+                validationResult.isValid 
+                  ? 'bg-green-50 text-green-700 border border-green-200' 
+                  : 'bg-red-50 text-red-700 border border-red-200'
+              }`}>
+                {validationResult.message}
+              </div>
+            )}
           </div>
         </div>
 

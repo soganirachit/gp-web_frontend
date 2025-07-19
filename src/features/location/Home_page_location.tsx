@@ -49,13 +49,13 @@ const HomePageLocation: React.FC = () => {
   } | null>(null);
   const [, setIsLoadingLocation] = useState(false);
   const [isLocationServiced, setIsLocationServiced] = useState(true);
+  const [isValidatingDeliveryZone, setIsValidatingDeliveryZone] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [, setShowErrorModal] = useState(false);
   // const [useRegularMarker, setUseRegularMarker] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
   // const markerRef = useRef<any>(null);
-  const [polygon, setPolygon] = useState<Array<{ lat: number; lng: number }>>([]);
-  const [polygonDataAvailable, setPolygonDataAvailable] = useState(false);
+  const [deliveryZoneAvailable, setDeliveryZoneAvailable] = useState(true);
 
   const { isLoaded, loadError, GOOGLE_MAPS_API_KEY } = useGoogleMaps();
 
@@ -82,35 +82,15 @@ const HomePageLocation: React.FC = () => {
   const [selectedLocationType, setSelectedLocationType] = useState<string>("");
   const [otherLocationName, setOtherLocationName] = useState<string>("");
 
-useEffect(() => {
-  const fetchPolygon = async () => {
-    try {
-      const res = await addressService.getPolygonData();
-      setPolygon(res.points);
-      setPolygonDataAvailable(true);
-    } catch (err) {
-      setPolygon([]);
-      setPolygonDataAvailable(false);
-    }
-  };
-
-  fetchPolygon();
-}, []);
+  useEffect(() => {
+    // Since we're now using the delivery zone validation API directly,
+    // we don't need to fetch polygon data anymore
+    setDeliveryZoneAvailable(true);
+  }, []);
 
 
-  // Point-in-polygon (ray-casting) algorithm
-  function isPointInPolygon(point: { lat: number; lng: number }, polygon: Array<{ lat: number; lng: number }>) {
-    let x = point.lat, y = point.lng;
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      let xi = polygon[i].lat, yi = polygon[i].lng;
-      let xj = polygon[j].lat, yj = polygon[j].lng;
-      let intersect = ((yi > y) !== (yj > y)) &&
-        (x < (xj - xi) * (y - yi) / (yj - yi + 0.0000001) + xi);
-      if (intersect) inside = !inside;
-    }
-    return inside;
-  }
+
+
 
   useEffect(() => {
     if (localStorage.getItem("needLocation") === "true") {
@@ -205,7 +185,7 @@ useEffect(() => {
       const geocoder = new window.google.maps.Geocoder();
       const result = await geocoder.geocode({ location: { lat, lng } });
 
-      console.log("Geocoding API Response:", result);
+ 
 
       if (!result?.results?.[0]) {
         console.error("No results found in geocoding response.");
@@ -265,20 +245,25 @@ useEffect(() => {
 
       setLocationSearchQuery(fullAddress);
 
-      // Check if the point is inside the polygon
-      let isServiced = true;
-      if (polygon && polygon.length > 2) {
-        isServiced = isPointInPolygon({ lat, lng }, polygon);
-      } else {
-        // fallback to city-based check if no polygon
-        isServiced = SERVICED_CITIES.some(
+      // Check if the point is within delivery zone using the new API
+      setIsValidatingDeliveryZone(true);
+      try {
+        const coordinates = `${lat},${lng}`;
+        const validation = await addressService.validateAddressInDeliveryArea(coordinates);
+        setIsLocationServiced(validation.isValid);
+      } catch (error) {
+        console.error("Error validating delivery zone:", error);
+        // Fallback to city-based check if API fails
+        const isServiced = SERVICED_CITIES.some(
           (servicedCity) =>
             city.toLowerCase().includes(servicedCity.toLowerCase()) ||
             state.toLowerCase().includes(servicedCity.toLowerCase()) ||
             district.toLowerCase().includes(servicedCity.toLowerCase())
         );
+        setIsLocationServiced(isServiced);
+      } finally {
+        setIsValidatingDeliveryZone(false);
       }
-      setIsLocationServiced(isServiced);
     } catch (error) {
       console.error("Error in updateAddressDetails:", error);
       // Only show user-friendly error message
@@ -326,15 +311,11 @@ useEffect(() => {
         setShowLocationModal(true);
       }
 
-      // Save address in the background only if polygon data is available
-      if (polygonDataAvailable) {
-        addressService.createAddress(addressData).catch((error) => {
-          console.error("Error saving address:", error);
-          // Handle error silently since user is already redirected
-        });
-      } else {
-        console.log("Address not created - polygon data not available");
-      }
+      // Save address in the background
+      addressService.createAddress(addressData).catch((error) => {
+        console.error("Error saving address:", error);
+        // Handle error silently since user is already redirected
+      });
     } catch (error) {
       console.error("Error:", error);
       if (isLocationServiced) {
@@ -545,7 +526,23 @@ useEffect(() => {
 
         {/* Address Details */}
         <div className="space-y-4 bg-white rounded-lg p-4 md:p-6 shadow-sm">
-          <h2 className="font-medium">Complete Address</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-medium">Complete Address</h2>
+            {isValidatingDeliveryZone ? (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-[#F15A22]"></div>
+                <span>Checking delivery zone...</span>
+              </div>
+            ) : (
+              <div className={`text-sm px-2 py-1 rounded-full ${
+                isLocationServiced 
+                  ? 'bg-green-100 text-green-700' 
+                  : 'bg-red-100 text-red-700'
+              }`}>
+                {isLocationServiced ? '✓ Delivery Available' : '✗ Outside Delivery Area'}
+              </div>
+            )}
+          </div>
           <div className="grid md:grid-cols-2 gap-4">
             <input
               type="text"

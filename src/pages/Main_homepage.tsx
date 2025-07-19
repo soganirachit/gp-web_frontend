@@ -16,6 +16,7 @@ import ErrorBoundary from "../components/ErrorBoundary";
 import useGoogleMaps from "../hooks/useGoogleMaps";
 import { productService } from "../services/product.service";
 import type { Product as ProductType } from "../services/product.service";
+import { addressService } from "../services/address.service";
 import { toast } from "react-hot-toast";
 import DatePicker from "react-datepicker";
 
@@ -217,6 +218,11 @@ const Home2: React.FC = () => {
   const userName = localStorage.getItem("userName") || "User";
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
+  const [deliveryZoneStatus, setDeliveryZoneStatus] = useState<{
+    isValid: boolean;
+    message?: string;
+  } | null>(null);
+  const [isValidatingDeliveryZone, setIsValidatingDeliveryZone] = useState(false);
 
   useGoogleMaps();
 
@@ -348,6 +354,50 @@ const Home2: React.FC = () => {
     };
   };
 
+  const validateDeliveryZone = async (showToast = false) => {
+    try {
+      setIsValidatingDeliveryZone(true);
+      // Get coordinates from localStorage
+      const storedCoordinates = localStorage.getItem("userCoordinates");
+      if (storedCoordinates) {
+        let coordinates: string;
+        
+        // Handle both string format and JSON object format
+        try {
+          const parsedCoords = JSON.parse(storedCoordinates);
+          if (parsedCoords.lat && parsedCoords.lng) {
+            coordinates = `${parsedCoords.lat},${parsedCoords.lng}`;
+          } else {
+            coordinates = storedCoordinates; // Use as is if it's already a string
+          }
+        } catch {
+          coordinates = storedCoordinates; // Use as is if parsing fails
+        }
+        
+        const validation = await addressService.validateAddressInDeliveryArea(coordinates);
+        setDeliveryZoneStatus(validation);
+        
+        // Show toast only for manual refreshes
+        if (showToast) {
+          if (validation.isValid) {
+            toast.success("Delivery zone validated successfully!");
+          } else {
+            toast.error(validation.message || "Address is outside delivery area");
+          }
+        }
+      } else if (showToast) {
+        toast.error("No location coordinates found. Please set your location first.");
+      }
+    } catch (error) {
+      console.error("Error validating delivery zone:", error);
+      if (showToast) {
+        toast.error("Failed to validate delivery zone");
+      }
+    } finally {
+      setIsValidatingDeliveryZone(false);
+    }
+  };
+
   useEffect(() => {
     const needLocation = localStorage.getItem("needLocation") === "true";
     if (needLocation) {
@@ -366,11 +416,14 @@ const Home2: React.FC = () => {
 
     fetchBasePacks();
     fetchProducts();
+    validateDeliveryZone(false);
   }, []);
 
   useEffect(() => {
     if (deliveryLocation) {
       localStorage.setItem("userLocation", deliveryLocation);
+      // Re-validate delivery zone when location changes
+      validateDeliveryZone(false);
     }
   }, [deliveryLocation]);
 
@@ -526,6 +579,14 @@ const Home2: React.FC = () => {
                     Delivering to Home
                   </span>
                 </motion.div>
+                <button
+                  onClick={() => validateDeliveryZone(true)}
+                  disabled={isValidatingDeliveryZone}
+                  className="ml-2 text-xs text-[#015D3A] hover:text-[#015D3A]/80 disabled:opacity-50"
+                  title="Refresh delivery zone status"
+                >
+                  ↻
+                </button>
                 <div className="text-[#64748B] text-base ml-5">
                   {deliveryLocation
                     ? `${deliveryLocation.substring(0, 25)}${
@@ -533,6 +594,20 @@ const Home2: React.FC = () => {
                       }`
                     : "B-149, Shilp Residency, Tarsali"}
                 </div>
+                {isValidatingDeliveryZone ? (
+                  <div className="ml-5 flex items-center gap-1 text-xs text-gray-600">
+                    <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-[#015D3A]"></div>
+                    <span>Checking delivery zone...</span>
+                  </div>
+                ) : deliveryZoneStatus && (
+                  <div className={`ml-5 text-xs px-2 py-1 rounded-full ${
+                    deliveryZoneStatus.isValid 
+                      ? 'bg-green-100 text-green-700' 
+                      : 'bg-red-100 text-red-700'
+                  }`}>
+                    {deliveryZoneStatus.isValid ? '✓ Delivery Available' : '✗ Outside Delivery Area'}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-3">

@@ -378,7 +378,7 @@ const OrderManagement: React.FC = () => {
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     setShowSuccessModal(false);
-                    navigate('/home');
+                    navigate('/');
                   }}
                   className="w-full bg-green-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg"
                   initial={{ y: 20, opacity: 0 }}
