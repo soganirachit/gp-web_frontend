@@ -222,7 +222,8 @@ const Home2: React.FC = () => {
     isValid: boolean;
     message?: string;
   } | null>(null);
-  const [isValidatingDeliveryZone, setIsValidatingDeliveryZone] = useState(false);
+  const [isValidatingDeliveryZone, setIsValidatingDeliveryZone] =
+    useState(false);
 
   useGoogleMaps();
 
@@ -361,7 +362,7 @@ const Home2: React.FC = () => {
       const storedCoordinates = localStorage.getItem("userCoordinates");
       if (storedCoordinates) {
         let coordinates: string;
-        
+
         // Handle both string format and JSON object format
         try {
           const parsedCoords = JSON.parse(storedCoordinates);
@@ -373,20 +374,26 @@ const Home2: React.FC = () => {
         } catch {
           coordinates = storedCoordinates; // Use as is if parsing fails
         }
-        
-        const validation = await addressService.validateAddressInDeliveryArea(coordinates);
+
+        const validation = await addressService.validateAddressInDeliveryArea(
+          coordinates
+        );
         setDeliveryZoneStatus(validation);
-        
+
         // Show toast only for manual refreshes
         if (showToast) {
           if (validation.isValid) {
             toast.success("Delivery zone validated successfully!");
           } else {
-            toast.error(validation.message || "Address is outside delivery area");
+            toast.error(
+              validation.message || "Address is outside delivery area"
+            );
           }
         }
       } else if (showToast) {
-        toast.error("No location coordinates found. Please set your location first.");
+        toast.error(
+          "No location coordinates found. Please set your location first."
+        );
       }
     } catch (error) {
       console.error("Error validating delivery zone:", error);
@@ -566,75 +573,63 @@ const Home2: React.FC = () => {
         <div className="max-w-[800px] mx-auto">
           {/* Header */}
           <header className="p-4 md:p-6 bg-[#FFFBEB] z-50">
-            <div className="flex items-center justify-between max-w-[800px] mx-auto">
-              <div className="flex-1">
-                {/* Location section */}
-                <motion.div
-                  className="flex items-center space-x-2 cursor-pointer"
-                  whileHover={{ scale: 1.02 }}
-                  onClick={() => navigate("/location")}
-                >
-                  <MdLocationOn className="text-[#015D3A] text-xl mt-4" />
-                  <span className="text-[#64748B] text-lg mt-4">
-                    Delivering to Home
-                  </span>
-                </motion.div>
+          
+            <div className="flex-1 space-y-1">
+              {/* Location clickable row */}
+              <motion.div
+                className="flex items-center gap-2 cursor-pointer"
+                whileHover={{ scale: 1.02 }}
+                onClick={() => navigate("/location")}
+              >
+                <MdLocationOn className="text-[#015D3A] text-xl mt-1" />
+                <span className="text-[#64748B] text-lg mt-1">
+                  Delivering to Home
+                </span>
+              </motion.div>
+
+              {/* Refresh Button and Address */}
+              <div className="flex items-center gap-2 ml-6">
                 <button
                   onClick={() => validateDeliveryZone(true)}
                   disabled={isValidatingDeliveryZone}
-                  className="ml-2 text-xs text-[#015D3A] hover:text-[#015D3A]/80 disabled:opacity-50"
+                  className="text-[#015D3A] hover:text-[#015D3A]/80 disabled:opacity-50"
                   title="Refresh delivery zone status"
                 >
-                  ↻
+                  <MdLocationOn  className="text-lg" />
                 </button>
-                <div className="text-[#64748B] text-base ml-5">
-                  {deliveryLocation
-                    ? `${deliveryLocation.substring(0, 25)}${
-                        deliveryLocation.length > 25 ? "" : ""
-                      }`
-                    : "B-149, Shilp Residency, Tarsali"}
+
+                <div className="text-[#64748B] text-sm truncate max-w-xs">
+                  {deliveryLocation || "B-149, Shilp Residency, Tarsali"}
                 </div>
+              </div>
+
+              {/* Delivery Zone Status */}
+              <div className="ml-6">
                 {isValidatingDeliveryZone ? (
-                  <div className="ml-5 flex items-center gap-1 text-xs text-gray-600">
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
                     <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-[#015D3A]"></div>
                     <span>Checking delivery zone...</span>
                   </div>
-                ) : deliveryZoneStatus && (
-                  <div className={`ml-5 text-xs px-2 py-1 rounded-full ${
-                    deliveryZoneStatus.isValid 
-                      ? 'bg-green-100 text-green-700' 
-                      : 'bg-red-100 text-red-700'
-                  }`}>
-                    {deliveryZoneStatus.isValid ? '✓ Delivery Available' : '✗ Outside Delivery Area'}
-                  </div>
+                ) : (
+                  deliveryZoneStatus && (
+                    <div
+                      className={`text-xs px-3 py-1 rounded-full inline-block ${
+                        deliveryZoneStatus.isValid
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {deliveryZoneStatus.isValid
+                        ? " Delivery Available"
+                        : "Outside Delivery Area"}
+                    </div>
+                  )
                 )}
               </div>
-
-              <div className="flex items-center gap-3">
-                <img
-                  src={searchImage}
-                  alt="search"
-                  className="w-6 h-6 md:w-6 md:h-6"
-                  onClick={() => navigate("/search")}
-                />
-                <button
-                  onClick={() => navigate("/wallet")}
-                  className="flex items-center"
-                >
-                  <img src={WalletIcon} alt="Wallet" className="w-12 h-12" />
-                  <span className="text-[#015D3A] text-xl">
-                    ₹{walletBalance}
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => navigate("/account")}
-                  className="flex items-center justify-center"
-                >
-                  <img src={ProfileIcon} alt="Profile" className="w-10 h-10" />
-                </button>
-              </div>
             </div>
+
+
+
           </header>
 
           {/* Greeting Section */}
@@ -709,7 +704,6 @@ const Home2: React.FC = () => {
               <h3 className="text-sm font-semibold text-gray-500">
                 YOUR NEXT DELIVERY
               </h3>
-            
             </div>
 
             {isLoadingOrders ? (
@@ -727,7 +721,7 @@ const Home2: React.FC = () => {
                       "MMM d, yyyy"
                     );
                     const isScheduled = order.status === "SCHEDULED";
-                  
+
                     return (
                       <div
                         key={order.orderId}
@@ -757,7 +751,7 @@ const Home2: React.FC = () => {
                                   <h3 className="text-[15px] font-medium text-[#1A1A1A] truncate">
                                     {order.product.name}
                                   </h3>
-                                  
+
                                   {isScheduled && (
                                     <span className="px-2 py-0.5 bg-yellow-200 text-yellow-600 text-xs font-medium rounded-full">
                                       Scheduled
@@ -815,8 +809,6 @@ const Home2: React.FC = () => {
                             <p className="text-[#FF5722] font-medium text-sm mb-3">
                               ₹{order.quantity * order.product.sellingPrice}
                             </p>
-
-                           
                           </div>
                         </div>
                       </div>
