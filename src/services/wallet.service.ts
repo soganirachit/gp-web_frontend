@@ -6,6 +6,8 @@ import { TransactionType } from "@/interfaces";
 const API_URL = `${getApiUrl()}/wallet`;
 
 class WalletService {
+  private readonly TIMEOUT_MS = 30000; // 30 seconds timeout
+
   private getAuthHeaders() {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -43,9 +45,7 @@ class WalletService {
 
       const response = await axios.get(`${API_URL}/balance`, { headers });
 
-      if (
-        response.status === 200
-      ) {
+      if (response.status === 200) {
         return response.data;
       }
       return {
@@ -96,7 +96,7 @@ class WalletService {
       };
     }
   }
-   
+
   async createRazorpayOrder(amount: number): Promise<{
     order: any;
     key_id: string;
@@ -105,7 +105,7 @@ class WalletService {
     try {
       const headers = this.getAuthHeaders();
       if (!headers) {
-        throw new Error('Authentication required');
+        throw new Error("Authentication required");
       }
 
       const response = await axios.post(
@@ -113,12 +113,11 @@ class WalletService {
         { amount },
         { headers }
       );
-   
 
       if (response.status === 200 && response.data.success) {
         return response.data;
       }
-      throw new Error(response.data.message || 'Failed to create order');
+      throw new Error(response.data.message || "Failed to create order");
     } catch (error: any) {
       this.handleAuthError(error);
       throw error;
@@ -133,7 +132,7 @@ class WalletService {
     try {
       const headers = this.getAuthHeaders();
       if (!headers) {
-        throw new Error('Authentication required');
+        throw new Error("Authentication required");
       }
 
       const response = await axios.post(
@@ -145,36 +144,161 @@ class WalletService {
       if (response.status === 200 && response.data.success) {
         return response.data;
       }
-      throw new Error(response.data.message || 'Payment verification failed');
+      throw new Error(response.data.message || "Payment verification failed");
     } catch (error: any) {
       this.handleAuthError(error);
       throw error;
     }
   }
-   // Temporary: Directly add amount to wallet (without Razorpay)
-  async addAmountDirect(amount: number): Promise<any> {
+
+  async verifyPayment(paymentData: {
+    razorpay_payment_id: string;
+    razorpay_order_id: string;
+    razorpay_signature: string;
+    amount: number;
+  }): Promise<any> {
     try {
       const headers = this.getAuthHeaders();
       if (!headers) {
-        throw new Error('Authentication required');
+        throw new Error("Authentication required");
       }
 
       const response = await axios.post(
         `${API_URL}/add-to-payment`,
-        { amount },
-        { headers }
+        paymentData,
+        {
+          headers,
+          timeout: this.TIMEOUT_MS,
+        }
       );
 
       if (response.status === 200 && response.data.success) {
         return response.data;
       }
-      throw new Error(response.data.message || 'Failed to add amount');
+      throw new Error(response.data.message || "Payment verification failed");
     } catch (error: any) {
       this.handleAuthError(error);
       throw error;
     }
   }
 
+  // Temporary: Directly add amount to wallet (without Razorpay)
+  async addAmountDirect(amount: number): Promise<any> {
+    try {
+      const headers = this.getAuthHeaders();
+      if (!headers) {
+        throw new Error("Authentication required");
+      }
+
+      const response = await axios.post(
+        `${API_URL}/add-to-payment`,
+        { amount },
+        {
+          headers,
+          timeout: this.TIMEOUT_MS,
+        }
+      );
+
+      if (response.status === 200 && response.data.success) {
+        return response.data;
+      }
+      throw new Error(response.data.message || "Failed to add amount");
+    } catch (error: any) {
+      this.handleAuthError(error);
+      throw error;
+    }
+  }
+
+  async checkPaymentStatus(orderId: string): Promise<{
+    status: "pending" | "completed" | "failed";
+    amount?: number;
+  }> {
+    try {
+      const headers = this.getAuthHeaders();
+      if (!headers) {
+        throw new Error("Authentication required");
+      }
+
+      const response = await axios.get(`${API_URL}/payment-status/${orderId}`, {
+        headers,
+        timeout: this.TIMEOUT_MS,
+      });
+
+      if (response.status === 200) {
+        return response.data;
+      }
+      return { status: "failed" };
+    } catch (error: any) {
+      this.handleAuthError(error);
+      return { status: "failed" };
+    }
+  }
+
+  async pollPaymentStatus(
+    orderId: string,
+    maxAttempts: number = 10
+  ): Promise<boolean> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const status = await this.checkPaymentStatus(orderId);
+
+        if (status.status === "completed") {
+          return true;
+        }
+
+        if (status.status === "failed") {
+          return false;
+        }
+
+        // Wait 2 seconds before next attempt
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      } catch (error) {
+        console.error(
+          `Payment status check attempt ${attempt + 1} failed:`,
+          error
+        );
+      }
+    }
+
+    return false; // Timeout reached
+  }
+
+  async recoverPendingPayment(paymentData: {
+    razorpay_payment_id: string;
+    razorpay_order_id: string;
+    razorpay_signature: string;
+    amount: number;
+  }): Promise<boolean> {
+    try {
+      await this.verifyPayment(paymentData);
+      console.log(
+        "Pending payment recovered successfully:",
+        paymentData.razorpay_payment_id
+      );
+      return true;
+    } catch (error) {
+      console.error("Failed to recover pending payment:", error);
+
+      // Try polling as backup
+      try {
+        const isCompleted = await this.pollPaymentStatus(
+          paymentData.razorpay_order_id,
+          3
+        );
+        if (isCompleted) {
+          console.log(
+            "Payment recovered via polling:",
+            paymentData.razorpay_payment_id
+          );
+          return true;
+        }
+      } catch (pollError) {
+        console.error("Payment polling also failed:", pollError);
+      }
+
+      return false;
+    }
+  }
 }
 
 export const walletService = new WalletService();
