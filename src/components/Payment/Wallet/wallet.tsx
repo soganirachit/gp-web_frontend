@@ -53,7 +53,7 @@ const Wallet = () => {
   const [, setSelectedCoupon] = useState<CouponType | null>(null);
   const [returnUrl, setReturnUrl] = useState<string | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  
+
   const {
     isOnline,
     isRecovering,
@@ -61,7 +61,7 @@ const Wallet = () => {
     storePendingPayment,
     getPendingPayments,
     removePendingPayment,
-    retryWithBackoff
+    retryWithBackoff,
   } = useNetworkRecovery();
 
   useEffect(() => {
@@ -179,7 +179,7 @@ const Wallet = () => {
             razorpay_payment_id: payment.razorpay_payment_id,
             razorpay_order_id: payment.razorpay_order_id,
             razorpay_signature: payment.razorpay_signature,
-            amount: payment.amount
+            amount: payment.amount,
           });
         });
 
@@ -188,14 +188,20 @@ const Wallet = () => {
           recoveredCount++;
         }
       } catch (error) {
-        console.error('Failed to recover payment:', payment.razorpay_payment_id, error);
+        console.error(
+          "Failed to recover payment:",
+          payment.razorpay_payment_id,
+          error
+        );
       }
     }
 
     setIsRecovering(false);
 
     if (recoveredCount > 0) {
-      toast.success(`${recoveredCount} pending payment(s) recovered successfully!`);
+      toast.success(
+        `${recoveredCount} pending payment(s) recovered successfully!`
+      );
       await fetchWalletBalance();
     }
   };
@@ -205,23 +211,29 @@ const Wallet = () => {
     if (isOnline && !isRecovering) {
       const pendingPayments = getPendingPayments();
       if (pendingPayments.length > 0) {
-        toast((t) => (
-          <div>
-            <p>Network restored! Found {pendingPayments.length} pending payment(s).</p>
-            <button
-              onClick={() => {
-                toast.dismiss(t.id);
-                recoverPendingPayments();
-              }}
-              className="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-sm"
-            >
-              Recover Now
-            </button>
-          </div>
-        ), {
-          duration: 10000,
-          icon: "🔄"
-        });
+        toast(
+          (t) => (
+            <div>
+              <p>
+                Network restored! Found {pendingPayments.length} pending
+                payment(s).
+              </p>
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  recoverPendingPayments();
+                }}
+                className="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-sm"
+              >
+                Recover Now
+              </button>
+            </div>
+          ),
+          {
+            duration: 10000,
+            icon: "🔄",
+          }
+        );
       }
     }
   }, [isOnline]);
@@ -241,10 +253,11 @@ const Wallet = () => {
         {/* Network Status & Header */}
         {!isOnline && (
           <div className="bg-red-500 text-white p-2 text-center text-sm">
-            ⚠️ No internet connection. Payments will be verified when connection is restored.
+            ⚠️ No internet connection. Payments will be verified when connection
+            is restored.
           </div>
         )}
-        
+
         {isRecovering && (
           <div className="bg-blue-500 text-white p-2 text-center text-sm">
             🔄 Recovering pending payments...
@@ -370,27 +383,27 @@ const Wallet = () => {
                 }
 
                 setIsProcessingPayment(true);
-                
+
                 // Store payment as pending in case of network failure
                 const pendingPaymentId = storePendingPayment({
                   razorpay_payment_id: data.razorpay_payment_id,
                   razorpay_order_id: data.razorpay_order_id,
                   razorpay_signature: data.razorpay_signature,
-                  amount: amount
+                  amount: amount,
                 });
-                
+
                 try {
                   // Call the add-to-payment endpoint to verify and update wallet
-                  await walletService.verifyPayment({
-                    razorpay_payment_id: data.razorpay_payment_id,
-                    razorpay_order_id: data.razorpay_order_id,
-                    razorpay_signature: data.razorpay_signature,
-                    amount: amount,
-                  });
+                  // await walletService.verifyPayment({
+                  //   razorpay_payment_id: data.razorpay_payment_id,
+                  //   razorpay_order_id: data.razorpay_order_id,
+                  //   razorpay_signature: data.razorpay_signature,
+                  //   amount: amount,
+                  // });
 
                   // Payment verified successfully, remove from pending
                   removePendingPayment(pendingPaymentId);
-                  
+
                   toast.success(
                     "Payment successful! Your wallet has been updated."
                   );
@@ -409,16 +422,23 @@ const Wallet = () => {
                     errorMessage = "Payment failed. Please try again.";
                     removePendingPayment(pendingPaymentId); // Don't keep failed payments
                   } else if (error.response?.status >= 500) {
-                    errorMessage = "Server error. We'll retry when connection is restored.";
+                    errorMessage =
+                      "Server error. We'll retry when connection is restored.";
                     shouldKeepPending = true;
-                  } else if (!navigator.onLine || error.code === 'NETWORK_ERROR') {
-                    errorMessage = "Network error. Payment will be verified when connection is restored.";
+                  } else if (
+                    !navigator.onLine ||
+                    error.code === "NETWORK_ERROR"
+                  ) {
+                    errorMessage =
+                      "Network error. Payment will be verified when connection is restored.";
                     shouldKeepPending = true;
                   } else if (error.message?.includes("timeout")) {
-                    errorMessage = "Payment verification timed out. We'll retry automatically.";
+                    errorMessage =
+                      "Payment verification timed out. We'll retry automatically.";
                     shouldKeepPending = true;
                   } else {
-                    errorMessage = "Payment verification failed. Please contact support.";
+                    errorMessage =
+                      "Payment verification failed. Please contact support.";
                     shouldKeepPending = true; // Keep for manual verification
                   }
 

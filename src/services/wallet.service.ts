@@ -109,7 +109,7 @@ class WalletService {
       }
 
       const response = await axios.post(
-        `${API_URL}/add-to-payment`,
+        `${API_URL}/create-razorpay-order`,
         { amount },
         { headers }
       );
@@ -209,7 +209,7 @@ class WalletService {
     }
   }
 
-  async checkPaymentStatus(orderId: string): Promise<{
+  async checkPaymentStatus(paymentId: string): Promise<{
     status: "pending" | "completed" | "failed";
     amount?: number;
   }> {
@@ -219,7 +219,8 @@ class WalletService {
         throw new Error("Authentication required");
       }
 
-      const response = await axios.get(`${API_URL}/payment-status/${orderId}`, {
+      // Check if payment exists in our database
+      const response = await axios.get(`${API_URL}/payment-status/${paymentId}`, {
         headers,
         timeout: this.TIMEOUT_MS,
       });
@@ -229,18 +230,22 @@ class WalletService {
       }
       return { status: "failed" };
     } catch (error: any) {
+      // If endpoint doesn't exist, assume payment is still pending
+      if (error.response?.status === 404) {
+        return { status: "pending" };
+      }
       this.handleAuthError(error);
       return { status: "failed" };
     }
   }
 
   async pollPaymentStatus(
-    orderId: string,
+    paymentId: string,
     maxAttempts: number = 10
   ): Promise<boolean> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        const status = await this.checkPaymentStatus(orderId);
+        const status = await this.checkPaymentStatus(paymentId);
 
         if (status.status === "completed") {
           return true;
@@ -270,19 +275,48 @@ class WalletService {
     amount: number;
   }): Promise<boolean> {
     try {
-      await this.verifyPayment(paymentData);
-      console.log(
-        "Pending payment recovered successfully:",
-        paymentData.razorpay_payment_id
-      );
-      return true;
-    } catch (error) {
-      console.error("Failed to recover pending payment:", error);
+      const headers = this.getAuthHeaders();
+      if (!headers) {
+        throw new Error("Authentication required");
+      }
 
-      // Try polling as backup
+      const response = await axios.post(
+        `${API_URL}/recover-payment`,
+        paymentData,
+        {
+          headers,
+          timeout: this.TIMEOUT_MS,
+        }
+      );
+
+      if (response.status === 200 && response.data.success) {
+        console.log(
+          "Pending payment recovered successfully:",
+          paymentData.razorpay_payment_id
+        );
+        return true;
+      }
+      
+      throw new Error(response.data.message || "Payment recovery failed");
+    } catch (error: any) {
+      console.error("Failed to recover pending payment:", error);
+      
+      // If specific recovery endpoint fails, try the original verification
+      try {
+        await this.verifyPayment(paymentData);
+        console.log(
+          "Pending payment recovered via verification:",
+          paymentData.razorpay_payment_id
+        );
+        return true;
+      } catch (verifyError) {
+        console.error("Verification fallback also failed:", verifyError);
+      }
+
+      // Try polling as last resort
       try {
         const isCompleted = await this.pollPaymentStatus(
-          paymentData.razorpay_order_id,
+          paymentData.razorpay_payment_id,
           3
         );
         if (isCompleted) {

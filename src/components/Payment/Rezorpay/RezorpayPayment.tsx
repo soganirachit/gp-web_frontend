@@ -72,7 +72,7 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
         { amount },
         {
           headers: {
-            Authorization: localStorage.getItem("token"), // Your auth token
+            Authorization: `Bearer ${localStorage.getItem("token")}`, // Your auth token
           },
           timeout: 30000, // 30 seconds timeout
         }
@@ -98,17 +98,22 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
         },
         notes: order.notes,
         theme: {
-          color: "#3399cc",
+          color: "#FFFBEB",
         },
         handler: function (response: RazorpayResponse) {
-          // Since we're using webhooks for verification,
-          // just pass payment details to the parent component
+          // Payment completed successfully on Razorpay side
           onSuccess({
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_order_id: response.razorpay_order_id,
             razorpay_signature: response.razorpay_signature,
-            payment_status: "initiated",
+            payment_status: "completed",
           });
+        },
+        modal: {
+          ondismiss: function () {
+            // Payment modal was closed by user
+            onError(new Error("Payment cancelled by user"));
+          },
         },
       };
 
@@ -140,9 +145,9 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
   }, []);
 
   return (
-    <button 
-      onClick={handlePayment} 
-      className={className} 
+    <button
+      onClick={handlePayment}
+      className={className}
       disabled={isLoading || disabled}
     >
       {isLoading ? (
