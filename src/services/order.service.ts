@@ -45,6 +45,62 @@ class OrderService {
         }
     }
 
+    async createStoreOrderWithPayment(orderPayload: any): Promise<{
+        success: boolean;
+        orderId: string;
+        paymentId: string;
+        amount: number;
+    }> {
+        try {
+            const headers = this.getAuthHeaders();
+            if (!headers) {
+                throw new Error("Authentication Failed");
+            }
+
+            try {
+                const { data } = await axios.post(
+                    `${getApiUrl()}/order/create-store-order`,
+                    orderPayload,
+                    { headers }
+                );
+
+                if (!data.success) {
+                    throw new Error("Failed to create store order");
+                }
+
+                return data;
+            } catch (error: any) {
+                if (!localStorage.getItem("token")) {
+                    throw new Error("Authentication token is not configured");
+                }
+                throw new Error(error.response?.data?.error || error.message || "Unknown error occurred");
+            }
+        } catch (error: any) {
+            throw new Error(error.message || "Unknown error occurred");
+        }
+    }
+
+    async getOrderById(orderId: string) {
+        try {
+            const headers = this.getAuthHeaders();
+            if (!headers) {
+                return null;
+            }
+            const response = await axios.get(`${getApiUrl()}/order/${orderId}`, {
+                headers,
+            });
+            if (response.status === 200) {
+                return response.data.data;
+            }
+            return null;
+        } catch (error: any) {
+            if (!localStorage.getItem("token")) {
+                return null;
+            }
+            return null;
+        }
+    }
+
     async getOrdersByCustomerId() {
         try {
             const headers = this.getAuthHeaders();

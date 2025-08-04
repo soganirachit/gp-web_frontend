@@ -41,6 +41,7 @@ interface RazorpayInstance {
 
 interface RazorpayPaymentProps {
   amount: number;
+  purpose?: string;
   onSuccess: (data: {
     razorpay_payment_id: string;
     razorpay_order_id: string;
@@ -55,6 +56,7 @@ interface RazorpayPaymentProps {
 
 const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
   amount,
+  purpose = "wallet_recharge",
   onSuccess,
   onError,
   className = "w-full py-3 bg-[#FF5722] text-white rounded-lg font-medium",
@@ -69,7 +71,7 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
       // Call your backend to create an order
       const response = await axios.post(
         `${import.meta.env.VITE_API_BASE_URL}/wallet/create-razorpay-order`,
-        { amount },
+        { amount, purpose },
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`, // Your auth token
@@ -89,7 +91,7 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
         amount: order.amount,
         currency: order.currency,
         name: "Genda Phool",
-        description: "Wallet Recharge",
+        description: purpose === "store_product_payment" ? "Store Product Payment" : "Wallet Recharge",
         order_id: order.id,
         prefill: {
           name: customer.name,
