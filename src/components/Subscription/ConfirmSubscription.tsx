@@ -10,6 +10,7 @@ import { subscriptionService } from "../../services/subscription.service";
 import BottomNavigation from "../layout/BottomNav";
 import { customerService } from "@/services/getcustomer.service";
 import { orderService } from "@/services/order.service";
+import RazorpayPayment from "../Payment/Rezorpay/RezorpayPayment";
 
 interface SubscriptionDetails {
   basePackId: string;
@@ -386,17 +387,8 @@ const ConfirmSubscription: React.FC = () => {
     useState<SubscriptionDetails | null>(null);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [isConfirmed, setIsConfirmed] = useState(false); // <-- Add this line
-  // const [successMessage] = useState('');
-  // const [showSuccessModal, setShowSuccessModal] = useState(false);
-  // const [, setWalletBalance] = useState<number>(0);
-  // const [showRechargeModal, setShowRechargeModal] = useState(false);
-  // const [rechargeDetails, ] = useState<{
-  //   currentBalance: number;
-  //   requiredAmount: number;
-  //   shortfall: number;
-  // } | null>(null);
-  // const [showExistingSubscriptionModal, setShowExistingSubscriptionModal] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const [, setStatusModal] = useState<{
     isOpen: boolean;
@@ -656,7 +648,19 @@ const ConfirmSubscription: React.FC = () => {
       } finally {
         setLoading(false);
       }
-    } else {
+    }
+    // For store products, we don't create order here - it will be created after payment
+  };
+
+  const handleStoreProductPayment = async (paymentData: any) => {
+    if (!isStoreProduct || !selectedAddress) {
+      toast.error("Missing order details or address");
+      return;
+    }
+
+    setIsProcessingPayment(true);
+
+    try {
       const storeProductPayload = {
         customerId: location.state.selectedAddress.customerId,
         subscriptionId: "",
@@ -666,25 +670,40 @@ const ConfirmSubscription: React.FC = () => {
         deliveredBy: "",
         routeId: "",
         isStore: location.state.product.isStore,
+        paymentDetails: {
+          razorpay_payment_id: paymentData.razorpay_payment_id,
+          razorpay_order_id: paymentData.razorpay_order_id,
+          razorpay_signature: paymentData.razorpay_signature,
+        }
       };
-      try {
-        if (!selectedAddress) {
-          toast.error("Missing subscription details or address");
-          return;
-        }
-        const { success } = await orderService.createOrder(storeProductPayload);
-        if (success) {
-          setStatusModal({
-            isOpen: true,
-            type: "success",
-            message: "Order created successfully!",
-          });
-          toast.success("Order created successfully!");
-          setIsConfirmed(true);
-        }
-      } catch (error) {
-        console.error("Error creating order:", error);
+
+      const { success, orderId, paymentId, amount } = await orderService.createStoreOrderWithPayment(storeProductPayload);
+      if (success) {
+        setStatusModal({
+          isOpen: true,
+          type: "success",
+          message: "Order created successfully!",
+        });
+        toast.success("Order created successfully!");
+        setIsConfirmed(true);
+        
+        // Store order details for reference
+        localStorage.setItem("lastStoreOrder", JSON.stringify({
+          orderId,
+          paymentId,
+          amount,
+          product: location.state.product,
+          address: selectedAddress,
+          createdAt: new Date().toISOString()
+        }));
+      } else {
+        throw new Error("Failed to create order");
       }
+    } catch (error: any) {
+      console.error("Error creating order:", error);
+      toast.error(error.message || "Failed to create order. Please try again.");
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -871,23 +890,45 @@ const ConfirmSubscription: React.FC = () => {
         {/* Show confirm buttons if not confirmed */}
         {!isConfirmed && (
           <div className="px-4 pt-4">
-            <button
-              onClick={handleConfirm}
-              disabled={loading}
-              className="w-full bg-[#F15A22] text-white py-3.5 rounded-full text-[15px] font-medium mb-3 hover:bg-[#E04D15] transition-colors disabled:opacity-50"
-            >
-              {loading
-                ? "Confirming..."
-                : isStoreProduct
-                ? "Confirm Order"
-                : "Confirm Subscription"}
-            </button>
-            <button
-              onClick={() => navigate("/")}
-              className="w-full text-[#015D3A] text-[15px] mt-3 font-medium hover:opacity-80 transition-opacity"
-            >
-              Back to Home
-            </button>
+            {isStoreProduct ? (
+              <>
+                <RazorpayPayment
+                  amount={location.state?.product?.sellingPrice * location.state?.metaData?.quantity || 0}
+                  purpose="store_product_payment"
+                  onSuccess={handleStoreProductPayment}
+                  onError={(error) => {
+                    toast.error(error.message || "Payment failed. Please try again.");
+                  }}
+                  className="w-full bg-[#F15A22] text-white py-3.5 rounded-full text-[15px] font-medium mb-3 hover:bg-[#E04D15] transition-colors disabled:opacity-50"
+                  buttonText={
+                    isProcessingPayment ? "Processing..." : "Pay & Confirm Order"
+                  }
+                  disabled={isProcessingPayment}
+                />
+                <button
+                  onClick={() => navigate("/")}
+                  className="w-full text-[#015D3A] text-[15px] mt-3 font-medium hover:opacity-80 transition-opacity"
+                >
+                  Back to Home
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleConfirm}
+                  disabled={loading}
+                  className="w-full bg-[#F15A22] text-white py-3.5 rounded-full text-[15px] font-medium mb-3 hover:bg-[#E04D15] transition-colors disabled:opacity-50"
+                >
+                  {loading ? "Confirming..." : "Confirm Subscription"}
+                </button>
+                <button
+                  onClick={() => navigate("/")}
+                  className="w-full text-[#015D3A] text-[15px] mt-3 font-medium hover:opacity-80 transition-opacity"
+                >
+                  Back to Home
+                </button>
+              </>
+            )}
           </div>
         )}
 
@@ -915,7 +956,7 @@ const ConfirmSubscription: React.FC = () => {
                 transition={{ delay: 1 }}
               >
                 {isStoreProduct
-                  ? "Your order has been placed successfully!"
+                  ? "Your order has been placed successfully! Payment completed. You will receive a confirmation shortly."
                   : "Your subscription has been confirmed. Get ready for fresh flowers every morning."}
               </motion.p>
             </div>
@@ -972,6 +1013,18 @@ const ConfirmSubscription: React.FC = () => {
                       <span className="text-gray-800 text-sm">
                         ₹{location?.state?.product?.sellingPrice ?? "N/A"}
                         /Pack
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 text-sm">Total Amount</span>
+                      <span className="text-gray-800 text-sm font-medium">
+                        ₹{(location?.state?.product?.sellingPrice ?? 0) * (location?.state?.metaData?.quantity ?? 1)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 text-sm">Order ID</span>
+                      <span className="text-gray-800 text-sm font-medium">
+                        {localStorage.getItem("lastStoreOrder") ? JSON.parse(localStorage.getItem("lastStoreOrder")!).orderId : "Processing..."}
                       </span>
                     </div>
                   </>
