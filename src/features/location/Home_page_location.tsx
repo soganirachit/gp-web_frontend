@@ -73,6 +73,8 @@ const HomePageLocation: React.FC = () => {
     directions: "",
   });
 
+  const [error, setError] = useState<string | null>(null);
+
   // const [, setBottomSheetHeight] = useState('auto');
   // const [isDragging, setIsDragging] = useState(false);
   // const bottomSheetRef = useRef<HTMLDivElement>(null);
@@ -272,56 +274,66 @@ const HomePageLocation: React.FC = () => {
 
   const handleSaveLocation = async () => {
     try {
-      const token = localStorage.getItem("token");
+      // Clear previous errors
+      setError(null);
 
-      if (!token) {
-        navigate("/login", { state: { returnUrl: location.pathname } });
+      // Basic validation
+      if (!addressDetails.houseNo.trim()) {
+        setError("Please enter house/flat number");
+        return;
+      }
+      
+      if (!addressDetails.apartment.trim()) {
+        setError("Please enter street name and area");
         return;
       }
 
-      // Save to localStorage immediately
-      localStorage.setItem("userLocation", locationSearchQuery);
-      localStorage.setItem("userCoordinates", JSON.stringify(selectedPosition));
-      localStorage.removeItem("needLocation");
+      if (!selectedAddress.city) {
+        setError("Please select a valid location from the map");
+        return;
+      }
 
       if (!selectedPosition) {
-        // Or handle this case appropriately, maybe show an error to the user
+        setError("Please select a valid location on the map");
         return;
       }
 
-      // Prepare address data
+      // Validate pincode if required
+      if (!selectedAddress.pincode || !/^\d{6}$/.test(selectedAddress.pincode)) {
+        setError("Please enter a valid 6-digit pincode");
+        return;
+      }
+
+      // If we reach here, all validations passed
       const addressData = {
         houseNo: addressDetails.houseNo,
         streetName: addressDetails.apartment,
-        area: `${selectedAddress.city} ${selectedAddress.pincode || ''}`.trim().substring(0, 20), // Ensure area is at most 20 characters
+        area: `${selectedAddress.city} ${selectedAddress.pincode || ''}`.trim().substring(0, 20),
         city: selectedAddress.city,
         state: selectedAddress.state,
-        pincode: selectedAddress.pincode || "000000",
+        pincode: selectedAddress.pincode,
         district: selectedAddress.district,
         associatedPhoneNumber: localStorage.getItem("phoneNumber") || "",
         coordinates: `${selectedPosition.lat},${selectedPosition.lng}`,
         setAsDefault: true
       };
 
-      // Navigate immediately if location is serviced
-      if (isLocationServiced) {
-        navigate(returnUrl);
-      } else {
-        setShowLocationModal(true);
-      }
-
       // Save address in the background
-      addressService.createAddress(addressData).catch((error) => {
-        console.error("Error saving address:", error);
-        // Handle error silently since user is already redirected
-      });
-    } catch (error) {
-      console.error("Error:", error);
+      await addressService.createAddress(addressData);
+      
+      // Notify parent components about the address update
+      window.dispatchEvent(new Event('addressUpdated'));
+      
+      // Navigate if location is serviced
       if (isLocationServiced) {
         navigate(returnUrl);
       } else {
         setShowLocationModal(true);
       }
+      
+    } catch (error) {
+      console.error("Error saving address:", error);
+      setError("Failed to save address. Please try again.");
     }
   };
 
@@ -622,6 +634,13 @@ const HomePageLocation: React.FC = () => {
             />
           )}
         </div>
+
+        {/* Error Message Display */}
+        {error && (
+          <div className="text-red-500 text-sm mt-2 p-2 bg-red-50 rounded">
+            {error}
+          </div>
+        )}
 
         {/* Confirm Button */}
         <div className="max-w-[800px] w-full mx-auto px-4 mt-4 bottom-4 left-0 right-0 md:static md:px-0 md:mt-6">
