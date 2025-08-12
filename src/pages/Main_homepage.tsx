@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaPause, FaCalendarPlus } from "react-icons/fa"; // cart icon FaShoppingCart,
 
@@ -195,9 +195,8 @@ interface DayInfo {
 const Home2: React.FC = () => {
   const navigate = useNavigate();
   const [, setDays] = useState<DayInfo[]>([]);
-  const [deliveryLocation] = useState<string>(
-    () => localStorage.getItem("userLocation") || ""
-  );
+  const [deliveryLocation, setDeliveryLocation] = useState<string>("");
+  const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [, setIsLoadingBalance] = useState(true);
@@ -405,6 +404,40 @@ const Home2: React.FC = () => {
     }
   };
 
+  // Function to fetch the latest address from API
+  const fetchLatestAddress = useCallback(async () => {
+    try {
+      setIsLoadingAddress(true);
+      const addresses = await addressService.getAllAddresses();
+      
+      // Sort by updatedAt in descending order and get the most recent address
+      const latestAddress = addresses
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        [0];
+      
+      if (latestAddress) {
+        const formattedAddress = [
+          latestAddress.houseNo,
+          latestAddress.streetName,
+          latestAddress.area,
+          latestAddress.city,
+          latestAddress.state,
+          latestAddress.pincode
+        ].filter(Boolean).join(', ');
+        
+        setDeliveryLocation(formattedAddress);
+      } else {
+        setDeliveryLocation("");
+      }
+    } catch (error) {
+      console.error("Error fetching address:", error);
+      // Fallback to localStorage if API fails
+      setDeliveryLocation(localStorage.getItem("userLocation") || "");
+    } finally {
+      setIsLoadingAddress(false);
+    }
+  }, []);
+
   useEffect(() => {
     const needLocation = localStorage.getItem("needLocation") === "true";
     if (needLocation) {
@@ -424,7 +457,36 @@ const Home2: React.FC = () => {
     fetchBasePacks();
     fetchProducts();
     validateDeliveryZone(false);
-  }, []);
+    fetchLatestAddress();
+  }, [fetchLatestAddress]);
+
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "userLocation") {
+        setDeliveryLocation(e.newValue || "");
+      }
+    };
+
+    // Listen for storage events (changes from other tabs/windows)
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check for changes in the current tab
+    const checkLocalStorage = () => {
+      const location = localStorage.getItem("userLocation") || "";
+      if (location !== deliveryLocation) {
+        setDeliveryLocation(location);
+      }
+    };
+    
+    // Check every second for changes
+    const interval = setInterval(checkLocalStorage, 1000);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [deliveryLocation]);
 
   useEffect(() => {
     if (deliveryLocation) {
@@ -599,7 +661,7 @@ const Home2: React.FC = () => {
                 </button>
 
                 <div className="text-[#64748B] text-sm truncate max-w-xs">
-                  {deliveryLocation || "B-149, Shilp Residency, Tarsali"}
+                  {deliveryLocation}
                 </div>
               </div>
 

@@ -292,7 +292,7 @@ const AddEditAddress: React.FC = () => {
                 Edit/Add Address
               </span>
             </h1>
-            <p className="text-gray-600 mb-4 md:mb-6 ml-10 md:ml-9 text-sm md:text-base">Where should we deliver your flowers?</p>
+            <p className="text-gray-600 mb-4 md:mb-6 ml-10 md:ml-9 text-sm md:text-base"></p>
           </div>
         </div>
 

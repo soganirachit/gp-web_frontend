@@ -293,15 +293,14 @@ const HomePageLocation: React.FC = () => {
       const addressData = {
         houseNo: addressDetails.houseNo,
         streetName: addressDetails.apartment,
-        area: selectedAddress.fullAddress,
+        area: `${selectedAddress.city} ${selectedAddress.pincode || ''}`.trim().substring(0, 20), // Ensure area is at most 20 characters
+        city: selectedAddress.city,
+        state: selectedAddress.state,
+        pincode: selectedAddress.pincode || "000000",
+        district: selectedAddress.district,
         associatedPhoneNumber: localStorage.getItem("phoneNumber") || "",
         coordinates: `${selectedPosition.lat},${selectedPosition.lng}`,
-        pincode: selectedAddress.pincode || "000000",
-        city: selectedAddress.city,
-        district: selectedAddress.district,
-        state: selectedAddress.state,
-        type: (selectedLocationType || "Home") as 'Home' | 'Work' | 'Others',
-        setAsDefault: true,
+        setAsDefault: true
       };
 
       // Navigate immediately if location is serviced
