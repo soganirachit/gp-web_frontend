@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { FaArrowLeft, FaMapMarkerAlt, FaCheck } from "react-icons/fa";
 import { MdLocationOn, MdMyLocation } from "react-icons/md";
 import { toast } from "react-hot-toast";
@@ -420,12 +420,16 @@ const AddressSelection: React.FC = () => {
             </div>
             {!showAddForm && (
               <div className="flex gap-2">
+                <Link to="/wallet">
                 <button className="w-8 h-8 flex items-center justify-center text-[#015D3A]">
                   <img src={WalletIcon} alt="Wallet" className="w-6 h-6" />
                 </button>
+                </Link>
+                <Link to="/account">
                 <button className="w-8 h-8 flex items-center justify-center text-[#015D3A]">
                   <img src={ProfileIcon} alt="Profile" className="w-6 h-6" />
                 </button>
+                </Link>
               </div>
             )}
           </div>
