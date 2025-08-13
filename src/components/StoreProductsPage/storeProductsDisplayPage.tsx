@@ -41,7 +41,7 @@ interface ExtendedBasePack
     isStore: boolean;
   };
 }
-type SubscriptionType = "Daily" | "Alternate";
+type SubscriptionType = "Daily" | "custom";
 
 const StorePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();

@@ -43,7 +43,7 @@ interface ExtendedBasePack extends Omit<BasePack, "description" | "contents"> {
 }
 
 // Define subscription types to match exactly what's expected by the API
-type SubscriptionType = "Daily" | "Alternate";
+type SubscriptionType = "DAILY" | "CUSTOM";
 
 // interface SubscriptionData {
 //   customerId: string;
@@ -163,7 +163,7 @@ const ProductPage: React.FC = () => {
   const [quantity, setQuantity] = useState(1);
 
   // State management
-  const [selectedType] = useState<SubscriptionType>("Daily");
+  const [selectedType, setSelectedType] = useState<SubscriptionType>("DAILY");
   const [startDate] = useState<Date>(new Date());
   // const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [basePack, setBasePack] = useState<ExtendedBasePack | null>(null);
@@ -182,7 +182,7 @@ const ProductPage: React.FC = () => {
     currentBalance: 0,
     requiredAmount: 0,
     shortageAmount: 0,
-    subscriptionType: "Daily",
+    subscriptionType: "DAILY",
     days: 7,
   });
   // const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
@@ -298,23 +298,30 @@ const ProductPage: React.FC = () => {
 
   // Add function to calculate price display
   const getPriceDisplay = () => {
-    if (!basePack) return { price: 0, originalPrice: 0, savings: 0 };
+  if (!basePack) return { price: 0, originalPrice: 0, savings: 0 };
 
-    const price = selectedType === "Daily" ? basePack.sellingPrice : 0;
+  let price = 0;
+  let originalPrice = 0;
 
-    const originalPrice =
-      selectedType === "Daily"
-        ? basePack.sellingPrice + (basePack.surcharge ?? 0)
-        : 0;
+  if (selectedType === "DAILY") {
+    price = basePack.sellingPrice;
+    originalPrice = basePack.sellingPrice + (basePack.surcharge ?? 0);
+  } else if (selectedType === "CUSTOM") {
+    price = selectedDays.length * basePack.sellingPrice;
+    originalPrice = selectedDays.length * (basePack.sellingPrice + (basePack.surcharge ?? 0));
+  }
 
-    const savings = originalPrice - price;
+  const savings = originalPrice - price;
 
-    return { price, originalPrice, savings };
-  };
+  return { price, originalPrice, savings };
+};
+
 
   // Handle subscription initiation
   const handleSubscribe = async () => {
     try {
+      // const { id } = useParams<{ id: string }>();
+
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error("Please login to continue");
@@ -334,18 +341,22 @@ const ProductPage: React.FC = () => {
       setIsCheckingBalance(true);
 
       // Set minimum days and calculate price
-      const minDays = 7;
+      const minDays = selectedType === "CUSTOM" ? selectedDays.length : 7;
       const pricePerPack =
-        selectedType === "Daily"
+        selectedType === "DAILY"
           ? basePack.sellingPricePerPackDaily
           : basePack.sellingPricePerPackAlternate;
 
       const totalPrice = pricePerPack * minDays * quantity;
 
+     
+
       // First ensure wallet exists and check balance
-      const { balance } = (await walletService.getWalletBalance()) || {};
+      const walletResponse = await walletService.getWalletBalance();
+      const { balance } = walletResponse || {};
 
       if (balance < totalPrice) {
+     
         // Update balance details and show modal
         setBalanceDetails({
           currentBalance: balance,
@@ -362,7 +373,7 @@ const ProductPage: React.FC = () => {
       // If we have sufficient balance, prepare subscription details
       const subscriptionDetails = {
         basePackId: id,
-        type: selectedType.toUpperCase(),
+        type: selectedType, // This will be either "DAILY" or "CUSTOM"
         startDate: startDate.toISOString(),
         amount: pricePerPack,
         quantity: quantity,
@@ -374,10 +385,21 @@ const ProductPage: React.FC = () => {
         },
         deliveryCount: minDays,
         pricePerPack: pricePerPack,
-        deliveryPattern:
-          selectedType === "Daily" ? "Every day" : "Alternate days",
+        deliveryPattern: selectedType === "DAILY"
+          ? "Every day"
+          : `Custom (${selectedDays.join(", ")})`,
         walletBalance: balance,
+        // Format days to uppercase and ensure they match backend expectations
+        selectedDays: selectedType === "CUSTOM"
+          ? selectedDays.map((day) => day.toUpperCase())
+          : ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"],
       };
+
+      // Validate CUSTOM subscription has at least one delivery day
+      if (selectedType === "CUSTOM" && (!selectedDays || selectedDays.length === 0)) {
+        toast.error("Please select at least one delivery day for custom subscription");
+        return;
+      }
 
       localStorage.setItem(
         "currentSubscription",
@@ -422,7 +444,7 @@ const ProductPage: React.FC = () => {
         returnUrl: `/product/${id}`,
         subscriptionType: balanceDetails.subscriptionType,
         minimumDays: 7,
-        maximumDays: selectedType === "Daily" ? 30 : 14,
+        maximumDays: selectedType === "DAILY" ? 30 : 14,
         totalRequired: balanceDetails.requiredAmount,
       },
     });
@@ -691,9 +713,7 @@ const ProductPage: React.FC = () => {
                       {weekDays.map((day) => (
                         <button
                           key={day.day}
-                          onClick={() =>
-                            day.enabled && handleDaySelection(day.day)
-                          }
+                          onClick={() => day.enabled && handleDaySelection(day.day)}
                           className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium transition-colors
                             ${
                               !day.enabled
@@ -712,15 +732,22 @@ const ProductPage: React.FC = () => {
 
                   {/* Subscribe Button */}
                   <button
-                    onClick={handleSubscribe}
+                    onClick={() => {
+                      setSelectedType("CUSTOM");
+                      handleSubscribe();
+                    }}
                     className="w-full bg-[#F15A22] text-white py-3.5 rounded-lg text-[15px] font-medium mb-3"
+                    disabled={selectedDays.length === 0}
                   >
-                    Subscribe for ₹{getPriceDisplay().price}/Pack
+                    Subscribe {selectedDays.length} days/wk for ₹{getPriceDisplay().price}/Pack
                   </button>
 
                   {/* Toggle Days Button */}
                   <button
-                    onClick={() => setShowDeliveryDays(false)}
+                    onClick={() => {
+                      setSelectedType("DAILY");
+                      setShowDeliveryDays(false);
+                    }}
                     className="w-full text-[#015D3A] text-[15px] font-medium"
                   >
                     Subscribe Daily
@@ -730,7 +757,10 @@ const ProductPage: React.FC = () => {
                 <>
                   {/* Subscribe Button */}
                   <button
-                    onClick={handleSubscribe}
+                    onClick={() => {
+                      setSelectedType("DAILY");
+                      handleSubscribe();
+                    }}
                     className="w-full bg-[#F15A22] text-white py-3.5 rounded-full text-[15px] font-medium mb-3"
                   >
                     Subscribe Daily for ₹{getPriceDisplay().price}/Pack
@@ -738,7 +768,10 @@ const ProductPage: React.FC = () => {
 
                   {/* Toggle Days Button */}
                   <button
-                    onClick={() => setShowDeliveryDays(true)}
+                    onClick={() => {
+                      setSelectedType("CUSTOM");
+                      setShowDeliveryDays(true);
+                    }}
                     className="w-full text-[#015D3A] text-[15px] font-medium"
                   >
                     Customise Days

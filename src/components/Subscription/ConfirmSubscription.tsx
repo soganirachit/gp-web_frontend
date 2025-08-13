@@ -14,7 +14,7 @@ import RazorpayPayment from "../Payment/Rezorpay/RezorpayPayment";
 
 interface SubscriptionDetails {
   basePackId: string;
-  type: "DAILY" | "ALTERNATE" | "Daily" | "Alternate";
+  type: "DAILY" | "CUSTOM" | "Daily" | "custom";
   startDate: string;
   amount: number;
   packDetails: {
@@ -29,6 +29,7 @@ interface SubscriptionDetails {
   sellingPrice: number;
   remainingAmount?: number;
   deliveryPattern?: string;
+  selectedDays?: string[];
 }
 
 interface Address {
@@ -42,6 +43,7 @@ interface Address {
   phoneNumber?: string;
   coordinates?: string;
 }
+
 // interface RechargeModalProps {
 //   currentBalance: number;
 //   requiredAmount: number;
@@ -76,6 +78,7 @@ interface UserData {
   phoneNumber: string;
   // add other user fields if needed
 }
+
 
 // interface LocationState {
 //   selectedAddress?: Address;
@@ -278,6 +281,7 @@ interface UserData {
 //   </AnimatePresence>
 // );
 
+
 const SuccessCheckmark = () => (
   <motion.div
     className="relative w-16 h-16 mx-auto mb-4"
@@ -442,7 +446,7 @@ const ConfirmSubscription: React.FC = () => {
               locationState?.basePackId,
             type:
               parsedDetails.type ||
-              (parsedDetails.deliveryCount === 7 ? "DAILY" : "ALTERNATE"),
+              (parsedDetails.deliveryCount === 7 ? "DAILY" : "CUSTOM"),
             startDate: parsedDetails.startDate,
             amount: parsedDetails.amount || parsedDetails.sellingPrice,
             packDetails: parsedDetails.packDetails,
@@ -451,7 +455,11 @@ const ConfirmSubscription: React.FC = () => {
             sellingPrice: parsedDetails.sellingPrice,
             remainingAmount: parsedDetails.remainingAmount,
             deliveryPattern:
-              parsedDetails.type === "DAILY" ? "Every day" : "Alternate days",
+              parsedDetails.type === "DAILY" ? "Every day" : "Custom days",
+            // Ensure selectedDays is properly included
+            selectedDays: parsedDetails.selectedDays || 
+              (parsedDetails.type === "CUSTOM" ? [] : 
+               ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"])
           };
 
           // console.log('Normalized subscription details:', normalizedDetails);
@@ -539,10 +547,16 @@ const ConfirmSubscription: React.FC = () => {
         // Prepare initiate request data with explicit type conversion
         const initiateData = {
           basePackId: String(subscriptionDetails.basePackId),
-          type: subscriptionDetails.type.toUpperCase() as "DAILY" | "ALTERNATE",
+          type: subscriptionDetails.type.toUpperCase() as "DAILY" | "CUSTOM",
           startDate: startDate,
           days: subscriptionDetails.deliveryCount || 7,
+          // Include selectedDays for CUSTOM subscriptions
+          ...(subscriptionDetails.type.toUpperCase() === "CUSTOM" && subscriptionDetails.selectedDays && {
+            selectedDays: subscriptionDetails.selectedDays
+          })
         };
+
+      
 
         // First initiate the subscription
         const initiateResponse = await subscriptionService.initiateSubscription(
@@ -556,24 +570,21 @@ const ConfirmSubscription: React.FC = () => {
         }
 
         // Format selected days based on subscription type
-        const selectedDays =
-          subscriptionDetails.type.toUpperCase() === "DAILY"
-            ? [
-                "MONDAY",
-                "TUESDAY",
-                "WEDNESDAY",
-                "THURSDAY",
-                "FRIDAY",
-                "SATURDAY",
-                "SUNDAY",
-              ]
-            : ["MONDAY", "WEDNESDAY", "FRIDAY", "SUNDAY"];
+        const selectedDays = subscriptionDetails.selectedDays || 
+          (subscriptionDetails.type.toUpperCase() === "DAILY"
+            ? ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+            : []);
+
+        // Validate custom subscription has delivery days
+        if (subscriptionDetails.type.toUpperCase() === "CUSTOM" && (!selectedDays || selectedDays.length === 0)) {
+          throw new Error("Please select at least one delivery day for custom subscription");
+        }
 
         // Prepare confirm request data
         const confirmData = {
           basePackId: subscriptionDetails.basePackId,
           deliveryAddressId: selectedAddress.id,
-          type: subscriptionDetails.type.toUpperCase() as "DAILY" | "ALTERNATE",
+          type: subscriptionDetails.type.toUpperCase() as "DAILY" | "CUSTOM",
           startDate: startDate,
           selectedDays: selectedDays,
         };
@@ -707,7 +718,7 @@ const ConfirmSubscription: React.FC = () => {
     }
   };
 
-  // const handleRecharge = () => {
+   // const handleRecharge = () => {
   //   if (!rechargeDetails) return;
 
   //   // Store pending subscription
@@ -876,7 +887,6 @@ const ConfirmSubscription: React.FC = () => {
   //     </div>
   //   );
   // };
-
   if (!subscriptionDetails || !selectedAddress) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -1041,7 +1051,7 @@ const ConfirmSubscription: React.FC = () => {
                       <span className="text-gray-800 text-sm">
                         {subscriptionDetails?.type === "DAILY"
                           ? "Daily • Mon-Sat"
-                          : "Alternate Days"}
+                          : "Custom Days"}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
