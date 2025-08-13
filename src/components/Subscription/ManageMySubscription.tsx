@@ -16,7 +16,7 @@ import { format } from "date-fns";
 interface Subscription {
   id: string;
   customerId: string;
-  type: "DAILY" | "ALTERNATE";
+  type: "DAILY" | "CUSTOM";
   status: "ACTIVE" | "PAUSED" | "CANCELLED" | "INACTIVE";
   startDate: Date;
   endDate?: Date;
@@ -80,7 +80,7 @@ const ManageMySubscription: React.FC = () => {
     currentBalance: 0,
     requiredAmount: 0,
     shortageAmount: 0,
-    subscriptionType: "Daily" as "DAILY" | "ALTERNATE",
+    subscriptionType: "Daily" as "DAILY" | "CUSTOM",
     days: 7,
   });
 

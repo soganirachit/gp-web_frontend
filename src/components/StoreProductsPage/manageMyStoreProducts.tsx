@@ -51,7 +51,7 @@ const ManageMyStoreProducts: React.FC = () => {
     currentBalance: 0,
     requiredAmount: 0,
     shortageAmount: 0,
-    subscriptionType: "Daily" as "DAILY" | "ALTERNATE",
+    subscriptionType: "Daily" as "DAILY" | "CUSTOM",
     days: 7,
   });
 

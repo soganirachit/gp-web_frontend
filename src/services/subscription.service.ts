@@ -14,7 +14,7 @@ const SUBSCRIPTION_API_URL = API_URL.replace("/basepacks", "/subscription");
 export interface Subscription {
   id: string;
   customerId: string;
-  type: "DAILY" | "ALTERNATE";
+  type: "DAILY" | "CUSTOM";
   selectedDays: string[];
   startDate: Date;
   endDate?: Date;
@@ -54,7 +54,7 @@ export interface SubscriptionInitiateResponse {
   amount?: number;
   details?: {
     id: string;
-    type: "DAILY" | "ALTERNATE";
+    type: "DAILY" | "CUSTOM";
     startDate: string;
     status: string;
   };
@@ -72,15 +72,16 @@ export interface SubscriptionConfirmResponse {
 // Input interfaces
 export interface SubscriptionInitiateRequest {
   basePackId: string;
-  type: "Daily" | "Alternate" | "DAILY" | "ALTERNATE";
+  type: "Daily" | "custom" | "DAILY" | "CUSTOM";
   startDate: Date;
   days: number;
+  selectedDays?: string[];
 }
 
 export interface SubscriptionConfirmRequest {
   basePackId: string;
   deliveryAddressId: string;
-  type: "Daily" | "Alternate" | "DAILY" | "ALTERNATE";
+  type: "Daily" | "custom" | "DAILY" | "CUSTOM";
   startDate: Date;
   selectedDays: string[];
 }
@@ -104,14 +105,14 @@ class SubscriptionService {
   /**
    * Normalize subscription type to uppercase
    */
-  private normalizeType(type: string): "DAILY" | "ALTERNATE" {
+  private normalizeType(type: string): "DAILY" | "CUSTOM" {
     if (!type) {
       throw new Error("Subscription type is required");
     }
     const normalized = type.toUpperCase();
-    if (normalized !== "DAILY" && normalized !== "ALTERNATE") {
+    if (normalized !== "DAILY" && normalized !== "CUSTOM") {
       throw new Error(
-        "Invalid subscription type. Must be either Daily or Alternate"
+        "Invalid subscription type. Must be either Daily or custom"
       );
     }
     return normalized;
@@ -154,12 +155,32 @@ class SubscriptionService {
         headers,
       });
 
-      const payload = {
+      // Define a type for the payload
+      type SubscriptionPayload = {
+        id: string;
+        type: "DAILY" | "CUSTOM";
+        startDate: string;
+        days?: number;
+        deliveryDays?: string[];
+      };
+
+      // Initialize payload with common fields
+      const payload: SubscriptionPayload = {
         id: String(data.basePackId).trim(),
         type: normalizedType,
         startDate: data.startDate.toISOString(),
-        days: data.days,
       };
+
+      // Only include deliveryDays for CUSTOM type and ensure it's not empty
+      if (normalizedType === 'CUSTOM') {
+        if (!data.selectedDays || data.selectedDays.length === 0) {
+          throw new Error('For custom subscription, deliveryDays must be provided as a non-empty array');
+        }
+        payload.deliveryDays = data.selectedDays;
+      } else {
+        // For DAILY subscription, include days parameter
+        payload.days = data.days || 7; // Default to 7 days if not provided
+      }
 
       console.log("Sending payload to server:", payload);
 
