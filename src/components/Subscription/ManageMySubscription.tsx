@@ -59,6 +59,8 @@ interface Subscription {
   amount?: number;
   createdAt: Date;
   walletBalance?: number;
+  deliveryPreference?: string;
+  deliveryDays?: string[];
 }
 
 const ManageMySubscription: React.FC = () => {
@@ -271,8 +273,10 @@ const ManageMySubscription: React.FC = () => {
                   )}
                 </div>
                 <p className="text-[#666666] text-sm">
-                  {subscription.type === "DAILY"
+                  {subscription.deliveryPreference === "DAILY"
                     ? "Daily • Mon-Sat"
+                    : subscription.deliveryPreference === "CUSTOM" && subscription.deliveryDays?.length
+                    ? `Custom • ${subscription.deliveryDays.map(day => day.toLowerCase()).join(", ")}`
                     : "Weekly • Thursday"}
                 </p>
               </div>
