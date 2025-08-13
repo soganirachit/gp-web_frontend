@@ -135,7 +135,7 @@ const HomePageLocation: React.FC = () => {
 
           try {
             const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-            console.log("Using API Key:", apiKey ? "Loaded" : "Not Loaded");
+           
             if (!apiKey) {
               console.error("Google Maps API key is not configured.");
               setShowErrorModal(true);
@@ -233,7 +233,7 @@ const HomePageLocation: React.FC = () => {
         directions: "", // Directions are not provided by geocoding
       };
 
-      console.log("Parsed Address Details:", newAddressDetails);
+      
 
       setSelectedAddress({
         city,

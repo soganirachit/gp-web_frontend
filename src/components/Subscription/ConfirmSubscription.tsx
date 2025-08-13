@@ -556,7 +556,7 @@ const ConfirmSubscription: React.FC = () => {
           })
         };
 
-        console.log("Initiating subscription with data:", initiateData);
+      
 
         // First initiate the subscription
         const initiateResponse = await subscriptionService.initiateSubscription(
