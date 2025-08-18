@@ -5,4 +5,5 @@ export interface TransactionType {
   walletId: string;
   balanceAfter: number;
   createdAt: string;
+  referenceId: string;
 }

@@ -46,13 +46,14 @@ const Refer: React.FC = () => {
         >
           <FaGift className="w-full h-full" />
         </motion.div>
-        <h1 className="text-2xl font-bold text-center mb-2">Invite Friends & Earn</h1>
-        <p className="text-center text-green-100">Get ₹100 for every friend who joins</p>
+        {/* <h1 className="text-2xl font-bold text-center mb-2">Invite Friends & Earn</h1> */}
+        <h1 className="text-2xl font-bold text-center mb-2">Invite Friends</h1>
+        {/* <p className="text-center text-green-100">Get ₹100 for every friend who joins</p> */}
       </motion.div>
 
       {/* Referral Code Section */}
       <div className="p-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm mb-8">
+        {/* <div className="bg-white rounded-xl p-6 shadow-sm mb-8">
           <p className="text-gray-600 text-sm mb-3">Your Referral Code</p>
           <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
             <span className="font-mono text-xl font-semibold">{referralCode}</span>
@@ -65,7 +66,7 @@ const Refer: React.FC = () => {
               {copied ? 'Copied!' : 'Copy'}
             </motion.button>
           </div>
-        </div>
+        </div> */}
 
         {/* Share Options */}
         <div className="bg-white rounded-xl p-6 shadow-sm">
@@ -86,7 +87,7 @@ const Refer: React.FC = () => {
         </div>
 
         {/* How it Works */}
-        <div className="mt-8">
+        {/* <div className="mt-8">
           <h2 className="text-lg font-semibold mb-4">How it Works</h2>
           <div className="space-y-4">
             {[
@@ -108,7 +109,7 @@ const Refer: React.FC = () => {
               </motion.div>
             ))}
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );

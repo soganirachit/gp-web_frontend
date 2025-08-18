@@ -96,6 +96,115 @@ const ManageMySubscription: React.FC = () => {
     fetchSubscriptionDetails();
   }, []);
 
+  // Helper function to calculate next delivery date
+  const calculateNextDeliveryDate = (subscription: Subscription) => {
+    // If subscription is paused or inactive, return null
+    if (subscription.status === "PAUSED" || subscription.status === "INACTIVE") {
+      return null;
+    }
+
+    const today = new Date();
+    const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+
+    // Map days to numbers for calculation - handle various formats
+    const dayMap: { [key: string]: number } = {
+      'sunday': 0, 'sun': 0,
+      'monday': 1, 'mon': 1,
+      'tuesday': 2, 'tue': 2, 'tues': 2,
+      'wednesday': 3, 'wed': 3,
+      'thursday': 4, 'thu': 4, 'thur': 4, 'thurs': 4,
+      'friday': 5, 'fri': 5,
+      'saturday': 6, 'sat': 6
+    };
+
+    // For DAILY delivery preference or type
+    if (subscription.deliveryPreference === "DAILY" || subscription.type === "DAILY") {
+      // For daily delivery (Mon-Sat), find next weekday
+      let nextDeliveryDate = new Date(today);
+      nextDeliveryDate.setDate(today.getDate() + 1);
+      
+      // If tomorrow is Sunday, skip to Monday
+      if (nextDeliveryDate.getDay() === 0) {
+        nextDeliveryDate.setDate(nextDeliveryDate.getDate() + 1);
+      }
+      
+      return nextDeliveryDate;
+    } 
+    
+    // For CUSTOM delivery preference or type
+    if (subscription.deliveryPreference === "CUSTOM" || subscription.type === "CUSTOM") {
+      let subscribedDays: number[] = [];
+      
+      // Try to get delivery days from multiple possible sources
+      const deliveryDays = subscription.deliveryDays || subscription.selectedDays || [];
+      
+      if (deliveryDays.length > 0) {
+        subscribedDays = deliveryDays.map(day => {
+          const dayKey = day.toLowerCase().trim();
+          return dayMap[dayKey] !== undefined ? dayMap[dayKey] : -1;
+        }).filter(day => day !== -1);
+      }
+      
+      // If no custom days found, default to Mon-Sun for custom subscriptions
+      if (subscribedDays.length === 0) {
+        subscribedDays = [1, 2, 3, 4, 5, 6, 7]; // Mon-Sun
+      }
+
+      // Find the next delivery day
+      let daysToAdd = 1;
+      
+      // Look for the next subscribed day within the next 7 days
+      while (daysToAdd <= 7) {
+        const nextDay = (currentDay + daysToAdd) % 7;
+        if (subscribedDays.includes(nextDay)) {
+          const nextDeliveryDate = new Date(today);
+          nextDeliveryDate.setDate(today.getDate() + daysToAdd);
+          return nextDeliveryDate;
+        }
+        daysToAdd++;
+      }
+    }
+
+    // Fallback: if no specific preference, default to tomorrow (skip Sunday)
+    let nextDeliveryDate = new Date(today);
+    nextDeliveryDate.setDate(today.getDate() + 1);
+    
+    // If tomorrow is Sunday, skip to Monday
+    if (nextDeliveryDate.getDay() === 0) {
+      nextDeliveryDate.setDate(nextDeliveryDate.getDate() + 1);
+    }
+    
+    return nextDeliveryDate;
+  };
+
+  // Helper function to format next delivery display
+  const getNextDeliveryDisplay = (subscription: Subscription) => {
+    const nextDate = calculateNextDeliveryDate(subscription);
+    
+    if (!nextDate) {
+      // Only show "No upcoming delivery" for paused/inactive subscriptions
+      if (subscription.status === "PAUSED" || subscription.status === "INACTIVE") {
+        return "No upcoming delivery";
+      }
+      // For active subscriptions, show default message
+      return "Next: Tomorrow, 7:00 AM";
+    }
+
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    // Check if it's tomorrow
+    if (nextDate.toDateString() === tomorrow.toDateString()) {
+      return "Next: Tomorrow, 7:00 AM";
+    } else {
+      // Format the date
+      const dayName = nextDate.toLocaleDateString('en-US', { weekday: 'long' });
+      const formattedDate = format(nextDate, 'MMM d');
+      return `Next: ${dayName}, ${formattedDate}, 7:00 AM`;
+    }
+  };
+
   const fetchSubscriptionDetails = async () => {
     try {
       setIsLoading(true);
@@ -123,7 +232,7 @@ const ManageMySubscription: React.FC = () => {
     } catch (error: any) {
       toast.error(
         error.message ||
-          "Failed to fetch subscription details. Please try again later."
+        "Failed to fetch subscription details. Please try again later."
       );
       setSubscriptions([]);
       setSelectedSubscription(null);
@@ -274,56 +383,104 @@ const ManageMySubscription: React.FC = () => {
                 </div>
                 <p className="text-[#666666] text-sm">
                   {subscription.deliveryPreference === "DAILY"
-                    ? "Daily • Mon-Sat"
+                    ? "Daily • mon-sun"
                     : subscription.deliveryPreference === "CUSTOM" && subscription.deliveryDays?.length
-                    ? `Custom • ${subscription.deliveryDays.map(day => day.toLowerCase()).join(", ")}`
-                    : "Weekly • Thursday"}
+                      ? `Custom • ${subscription.deliveryDays.map(day => day.toLowerCase()).join(", ")}`
+                      : "Custom • No specific days"}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 mb-3">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 20 20"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M15.8333 3.33337H4.16667C3.24619 3.33337 2.5 4.07957 2.5 5.00004V16.6667C2.5 17.5872 3.24619 18.3334 4.16667 18.3334H15.8333C16.7538 18.3334 17.5 17.5872 17.5 16.6667V5.00004C17.5 4.07957 16.7538 3.33337 15.8333 3.33337Z"
-                  stroke="#666666"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M13.3333 1.66663V4.99996"
-                  stroke="#666666"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M6.66669 1.66663V4.99996"
-                  stroke="#666666"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M2.5 8.33337H17.5"
-                  stroke="#666666"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <p className="text-[#666666] text-xs">Next: Tomorrow, 7:00 AM</p>
-            </div>
+            {/* Next delivery section - only show for active subscriptions */}
+            {isActive && (
+              <div className="flex items-center gap-2 mb-3">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M15.8333 3.33337H4.16667C3.24619 3.33337 2.5 4.07957 2.5 5.00004V16.6667C2.5 17.5872 3.24619 18.3334 4.16667 18.3334H15.8333C16.7538 18.3334 17.5 17.5872 17.5 16.6667V5.00004C17.5 4.07957 16.7538 3.33337 15.8333 3.33337Z"
+                    stroke="#666666"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M13.3333 1.66663V4.99996"
+                    stroke="#666666"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M6.66669 1.66663V4.99996"
+                    stroke="#666666"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M2.5 8.33337H17.5"
+                    stroke="#666666"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <p className="text-[#666666] text-xs">
+                  {getNextDeliveryDisplay(subscription)}
+                </p>
+              </div>
+            )}
+
+            {/* Commented out the hardcoded next delivery for paused subscriptions */}
+            {/* {isPaused && (
+              <div className="flex items-center gap-2 mb-3">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M15.8333 3.33337H4.16667C3.24619 3.33337 2.5 4.07957 2.5 5.00004V16.6667C2.5 17.5872 3.24619 18.3334 4.16667 18.3334H15.8333C16.7538 18.3334 17.5 17.5872 17.5 16.6667V5.00004C17.5 4.07957 16.7538 3.33337 15.8333 3.33337Z"
+                    stroke="#666666"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M13.3333 1.66663V4.99996"
+                    stroke="#666666"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M6.66669 1.66663V4.99996"
+                    stroke="#666666"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M2.5 8.33337H17.5"
+                    stroke="#666666"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <p className="text-[#666666] text-xs">Next: Tomorrow, 7:00 AM</p>
+              </div>
+            )} */}
 
             <p className="text-[#FF5722] font-medium text-sm mb-3">
-              ₹{formattedAmount}/week
+              ₹{formattedAmount}/pack
             </p>
 
             <div className="flex gap-2">
@@ -587,12 +744,6 @@ const ManageMySubscription: React.FC = () => {
           </div>
           <div className="flex items-center gap-4">
             <img
-              src={walletImage}
-              alt="Wallet"
-              className="w-10 h-10 md:w-10 md:h-10"
-              onClick={() => navigate("/wallet")}
-            />
-            <img
               src={profileImage}
               alt="Profile"
               className="w-6 h-6 md:w-8 md:h-8"
@@ -626,61 +777,72 @@ const ManageMySubscription: React.FC = () => {
           {subscriptions.some(
             (sub) => sub.status === "PAUSED" || sub.status === "INACTIVE"
           ) && (
-            <>
-              <h2 className="text-lg font-medium mt-6 mb-3">
-                Paused Subscriptions
-              </h2>
-              {subscriptions
-                .filter(
-                  (sub) => sub.status === "PAUSED" || sub.status === "INACTIVE"
-                )
-                .map(renderSubscriptionCard)}
-            </>
+              <>
+                <h2 className="text-lg font-medium mt-6 mb-3">
+                  Paused Subscriptions
+                </h2>
+                {subscriptions
+                  .filter(
+                    (sub) => sub.status === "PAUSED" || sub.status === "INACTIVE"
+                  )
+                  .map(renderSubscriptionCard)}
+              </>
+            )}
+
+          {/* Delivery History - Only show completed or cancelled subscriptions */}
+          {subscriptions.some(
+            (sub) => sub.status === "CANCELLED"
+          ) && (
+            <div className="mt-8">
+              <h2 className="text-lg font-medium mb-4">Delivery History</h2>
+              <div className="space-y-4">
+                {subscriptions
+                  .filter((delivery: any) => delivery.status === "CANCELLED")
+                  .map((delivery: any, index) => (
+                    <div
+                      key={index}
+                      className="bg-white rounded-xl p-4 grid grid-cols-3 items-center"
+                    >
+                      {/* Column 1: Product Name and Date (Date below Name) */}
+                      <div>
+                        {/* Product Name styled with font-medium */}
+                        <p className="font-medium">{delivery.productDetails.name}</p>
+                        {/* Date styled with text-sm */}
+                        <p className="text-sm text-gray-600 mt-1">
+                          {format(new Date(delivery.startDate), "MMMM d, yyyy")}
+                        </p>
+                      </div>
+
+                      {/* Column 2: Status */}
+                      <div className="text-center">
+                        <span
+                          className={`text-sm font-medium ${delivery.status === "ACTIVE" ? "text-green-600" : "text-red-600"
+                            }`}
+                        >
+                          {delivery.status}
+                        </span>
+                      </div>
+
+                      {/* Column 3: Created Date and Support Button */}
+                      <div className="text-right">
+                        {/* <span className="text-gray-500 text-sm">
+                {format(new Date(delivery.createdAt), "MMMM d, yyyy")}
+              </span> */}
+                        <div className="mt-2">
+                          <button
+                            onClick={() => navigate("/support")}
+                            className="text-red-500 text-sm font-medium"
+                          >
+                            Support
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
           )}
 
-          {/* Delivery History */}
-          <div className="mt-8">
-            <h2 className="text-lg font-medium mb-4">Delivery History</h2>
-            <div className="space-y-4">
-              {subscriptions.map((delivery: any, index) => (
-                <div
-                  key={index}
-                  className="bg-white rounded-xl p-4 flex items-center justify-between"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">
-                        {format(new Date(delivery.startDate), "MMMM d, yyyy")}
-                      </p>
-                      <span
-                        className={` ${
-                          delivery.status === "ACTIVE"
-                            ? "text-green-600"
-                            : "text-red-600"
-                        } text-sm`}
-                      >
-                        {delivery.status}
-                      </span>
-                    </div>
-                    <p className="text-gray-600 text-sm mt-1">
-                      {delivery.productDetails.name}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-gray-500 text-sm">
-                      {format(new Date(delivery.createdAt), "MMMM d, yyyy")}
-                    </span>
-                    <button
-                      onClick={() => navigate("/support")}
-                      className="text-red-500 text-sm font-medium"
-                    >
-                      Support
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Bottom Navigation */}
@@ -928,11 +1090,10 @@ const ManageMySubscription: React.FC = () => {
                         <button
                           key={reason}
                           onClick={() => setCancellationReason(reason)}
-                          className={`w-full p-4 rounded-2xl text-left transition-all ${
-                            cancellationReason === reason
+                          className={`w-full p-4 rounded-2xl text-left transition-all ${cancellationReason === reason
                               ? "bg-[#FFF3CD] border-[#FF5722] border text-[#FF5722]"
                               : "bg-white border border-gray-200 text-gray-700 hover:border-gray-300"
-                          }`}
+                            }`}
                         >
                           {reason}
                         </button>

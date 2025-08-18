@@ -334,11 +334,10 @@ const Wallet = () => {
                 type="text"
                 value={customAmount}
                 onChange={handleAmountChange}
-                className={`w-full p-3 md:p-4 border rounded-lg text-lg md:text-xl ${
-                  customAmount && parseInt(customAmount) < MIN_AMOUNT
-                    ? "border-red-300 bg-red-50"
-                    : "border-gray-200"
-                }`}
+                className={`w-full p-3 md:p-4 border rounded-lg text-lg md:text-xl ${customAmount && parseInt(customAmount) < MIN_AMOUNT
+                  ? "border-red-300 bg-red-50"
+                  : "border-gray-200"
+                  }`}
                 placeholder="1000"
               />
               {customAmount && parseInt(customAmount) < MIN_AMOUNT && (
@@ -359,11 +358,10 @@ const Wallet = () => {
                 <button
                   key={amount}
                   onClick={() => handleQuickAmount(amount)}
-                  className={`py-2 md:py-3 rounded-lg border ${
-                    customAmount === amount.toString()
-                      ? "border-[#FF5722] text-[#FF5722]"
-                      : "border-gray-200 text-gray-600"
-                  } md:text-lg`}
+                  className={`py-2 md:py-3 rounded-lg border ${customAmount === amount.toString()
+                    ? "border-[#FF5722] text-[#FF5722]"
+                    : "border-gray-200 text-gray-600"
+                    } md:text-lg`}
                 >
                   ₹{amount}
                 </button>
@@ -533,9 +531,22 @@ const Wallet = () => {
                       )}
                     </div>
                     <div>
-                      <div className="font-medium md:text-lg">
+                      {/* <div className="font-medium md:text-lg">
                         {transaction.description}
+                      </div> */}
+                      <div>
+                        <div className="font-medium md:text-lg">
+                          {transaction.type === "CREDIT" ? "Credit" : "Debit"}
+                        </div>
+
+                        {transaction.referenceId && (
+                          <div className="text-xs md:text-sm text-gray-400">
+                            Txn ID: {transaction.referenceId}
+                          </div>
+                        )}
+
                       </div>
+
                       <div className="text-sm md:text-base text-gray-500">
                         {format(
                           parseISO(transaction.createdAt),
@@ -545,11 +556,10 @@ const Wallet = () => {
                     </div>
                   </div>
                   <div
-                    className={`${
-                      transaction.type === "CREDIT"
-                        ? "text-[#4CAF50]"
-                        : "text-[#FF5722]"
-                    } font-medium md:text-lg`}
+                    className={`${transaction.type === "CREDIT"
+                      ? "text-[#4CAF50]"
+                      : "text-[#FF5722]"
+                      } font-medium md:text-lg`}
                   >
                     {transaction.type === "CREDIT"
                       ? `+${INR} ${transaction.amount}`

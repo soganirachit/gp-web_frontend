@@ -190,7 +190,7 @@ const StoreProductsPages: React.FC = () => {
                           {"type" in item ? item.type : "Basepack"}
                         </p>
                         <p className="text-pink-600 text-[16px] font-bold">
-                          ₹{getItemPrice(item)}/Day
+                          ₹{getItemPrice(item)}
                         </p>
                         <button
                           onClick={(e) => {
@@ -199,7 +199,7 @@ const StoreProductsPages: React.FC = () => {
                           }}
                           className="text-white bg-[#F97316] text-sm rounded-full mb-3 p-1 px-4 py-2 text-[10px]"
                         >
-                          Buy Product
+                          Buy
                         </button>
                       </div>
                     </div>

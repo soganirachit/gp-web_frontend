@@ -30,6 +30,7 @@ interface SubscriptionDetails {
   remainingAmount?: number;
   deliveryPattern?: string;
   selectedDays?: string[];
+  days?: string[];
 }
 
 interface Address {
@@ -457,9 +458,9 @@ const ConfirmSubscription: React.FC = () => {
             deliveryPattern:
               parsedDetails.type === "DAILY" ? "Every day" : "Custom days",
             // Ensure selectedDays is properly included
-            selectedDays: parsedDetails.selectedDays || 
-              (parsedDetails.type === "CUSTOM" ? [] : 
-               ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"])
+            selectedDays: parsedDetails.selectedDays ||
+              (parsedDetails.type === "CUSTOM" ? [] :
+                ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"])
           };
 
           // console.log('Normalized subscription details:', normalizedDetails);
@@ -556,7 +557,7 @@ const ConfirmSubscription: React.FC = () => {
           })
         };
 
-      
+
 
         // First initiate the subscription
         const initiateResponse = await subscriptionService.initiateSubscription(
@@ -570,7 +571,7 @@ const ConfirmSubscription: React.FC = () => {
         }
 
         // Format selected days based on subscription type
-        const selectedDays = subscriptionDetails.selectedDays || 
+        const selectedDays = subscriptionDetails.selectedDays ||
           (subscriptionDetails.type.toUpperCase() === "DAILY"
             ? ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
             : []);
@@ -697,7 +698,7 @@ const ConfirmSubscription: React.FC = () => {
         });
         toast.success("Order created successfully!");
         setIsConfirmed(true);
-        
+
         // Store order details for reference
         localStorage.setItem("lastStoreOrder", JSON.stringify({
           orderId,
@@ -718,7 +719,7 @@ const ConfirmSubscription: React.FC = () => {
     }
   };
 
-   // const handleRecharge = () => {
+  // const handleRecharge = () => {
   //   if (!rechargeDetails) return;
 
   //   // Store pending subscription
@@ -895,8 +896,8 @@ const ConfirmSubscription: React.FC = () => {
     );
   }
   return (
-    <div className="min-h-screen bg-[#FFFBEB] relative max-w-[800px] mx-auto">
-      <div className="bg-[#FFFBEB] mx-4 rounded-xl pb-24">
+    <div className="min-h-screen bg-[#FFFBEB] flex justify-center items-center px-4">
+      <div className="bg-[#FFFBEB] w-full max-w-[800px] rounded-xl pb-24">
         {/* Show confirm buttons if not confirmed */}
         {!isConfirmed && (
           <div className="px-4 pt-4">
@@ -981,11 +982,18 @@ const ConfirmSubscription: React.FC = () => {
               <h2 className="text-[15px] font-medium mb-3">Delivering to</h2>
               <div className="flex items-start gap-3">
                 <FaMapMarkerAlt className="text-gray-400 mt-1" />
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  {selectedAddress?.street}
-                  {selectedAddress?.area && `, ${selectedAddress.area}`}
-                  {selectedAddress?.city && `, ${selectedAddress.city}`}
+                <p className="text-gray-600 text-sm leading-relaxed break-words">
+                  {[
+                    selectedAddress?.street,
+                    selectedAddress?.area,
+                    selectedAddress?.city,
+                    selectedAddress?.state,
+                    selectedAddress?.pincode,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
                 </p>
+
               </div>
               <div className="mt-4 overflow-hidden rounded-lg">
                 <MapView address={selectedAddress} />
@@ -1050,7 +1058,7 @@ const ConfirmSubscription: React.FC = () => {
                       <span className="text-gray-600 text-sm">Frequency</span>
                       <span className="text-gray-800 text-sm">
                         {subscriptionDetails?.type === "DAILY"
-                          ? "Daily • Mon-Sat"
+                          ? "Daily • mon-sun"
                           : "Custom Days"}
                       </span>
                     </div>
@@ -1059,14 +1067,66 @@ const ConfirmSubscription: React.FC = () => {
                         First Delivery
                       </span>
                       <span className="text-gray-800 text-sm">
-                        {new Date(
-                          subscriptionDetails?.startDate || ""
-                        ).toLocaleDateString("en-US", {
-                          weekday: "short",
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
+                        {(() => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0); // normalize to midnight
+
+                          const daysMap = {
+                            SUNDAY: 0,
+                            MONDAY: 1,
+                            TUESDAY: 2,
+                            WEDNESDAY: 3,
+                            THURSDAY: 4,
+                            FRIDAY: 5,
+                            SATURDAY: 6,
+                          };
+
+                          type DayName = keyof typeof daysMap;
+
+                          let nextDate: Date | undefined;
+
+                          if (subscriptionDetails?.type === "DAILY") {
+                            // Start from tomorrow
+                            for (let i = 1; i <= 7; i++) {
+                              const date = new Date(today);
+                              date.setDate(date.getDate() + i);
+                              const day = date.getDay();
+                              if (day >= 1 && day <= 7) { // Mon-Sun
+                                nextDate = date;
+                                break;
+                              }
+                            }
+                          } else if (
+                            subscriptionDetails?.type === "CUSTOM" &&
+                            "days" in subscriptionDetails &&
+                            Array.isArray(subscriptionDetails.days)
+                          ) {
+                            // Normalize and filter valid days only
+                            const selectedDays = subscriptionDetails.days
+                              .map((day) => day.toUpperCase())
+                              .filter((day): day is DayName => day in daysMap)
+                              .map((day) => daysMap[day]);
+
+                            for (let i = 1; i <= 7; i++) {
+                              const date = new Date(today);
+                              date.setDate(date.getDate() + i);
+                              const day = date.getDay();
+                              if (selectedDays.includes(day)) {
+                                nextDate = date;
+                                break;
+                              }
+                            }
+                          }
+
+                          return nextDate
+                            ? nextDate.toLocaleDateString("en-US", {
+                              weekday: "short",
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })
+                            : "Calculating...";
+                        })()}
                       </span>
                     </div>
                   </>

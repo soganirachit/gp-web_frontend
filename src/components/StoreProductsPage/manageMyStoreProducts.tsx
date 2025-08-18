@@ -30,7 +30,7 @@ interface order {
     sellingPrice: number;
   };
   quantity: number;
-  status: "SCHEDULED" | "CANCELLED" | "PAUSED";
+  status: "SCHEDULED" | "CANCELLED" | "PAUSED" | "COMPLETED" | "DELIVERED" | "REJECTED";
   createdAt: string;
 }
 
@@ -378,6 +378,14 @@ const ManageMyStoreProducts: React.FC = () => {
     );
   };
 
+  // Filter orders for delivery history - only show completed/cancelled/delivered/rejected orders
+  const deliveryHistoryOrders = orders.filter((order) => 
+    order.status === "COMPLETED" || 
+    order.status === "CANCELLED" || 
+    order.status === "DELIVERED" || 
+    order.status === "REJECTED"
+  );
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -440,7 +448,7 @@ const ManageMyStoreProducts: React.FC = () => {
               <IoArrowBack className="text-xl md:text-2xl" />
             </button>
             <h1 className="text-xl md:text-2xl font-medium">
-              Manage store products
+              Manage Store 
             </h1>
           </div>
           <div className="flex items-center gap-4">
@@ -492,54 +500,55 @@ const ManageMyStoreProducts: React.FC = () => {
             </>
           )} */}
 
-          {/* Delivery History */}
-          <div className="mt-8">
-            <h2 className="text-lg font-medium mb-4"> Delivery History</h2>
-            <div className="space-y-4">
-              {orders.map((delivery: any, index) => (
-                <div
-                  key={index}
-                  className="bg-white rounded-xl p-4 flex items-center justify-between"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">
+          {/* Delivery History - Only show completed/cancelled/delivered/rejected orders */}
+          {deliveryHistoryOrders.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-lg font-medium mb-4">Delivery History</h2>
+              <div className="space-y-4">
+                {deliveryHistoryOrders.map((delivery: any, index) => (
+                  <div
+                    key={index}
+                    className="bg-white rounded-xl p-4 grid grid-cols-3 items-center"
+                  >
+                    {/* Column 1: Product Name and Date */}
+                    <div>
+                      <p className="font-medium">{delivery?.product.name}</p>
+                      <p className="text-gray-600 text-sm mt-1">
                         {format(new Date(delivery.createdAt), "MMMM d, yyyy")}
                       </p>
+                    </div>
+
+                    {/* Column 2: Status */}
+                    <div className="text-center">
                       <span
-                        className={`${
-                          delivery.status === "SCHEDULED"
+                        className={`text-sm font-medium ${delivery.status === "SCHEDULED"
                             ? "text-yellow-600"
-                            : delivery.status === "DELIVERED"
-                            ? "text-green-600"
-                            : delivery.status === "REJECTED" ||
-                              delivery.status === "CANCELLED"
-                            ? "text-red-600"
-                            : "text-gray-600"
-                        } text-sm`}
+                            : delivery.status === "DELIVERED" || delivery.status === "COMPLETED"
+                              ? "text-green-600"
+                              : delivery.status === "REJECTED" || delivery.status === "CANCELLED"
+                                ? "text-red-600"
+                                : "text-gray-600"
+                          }`}
                       >
                         {delivery.status}
                       </span>
                     </div>
-                    <p className="text-gray-600 text-sm mt-1">
-                      {delivery?.product.name}
-                    </p>
+
+                    {/* Column 3: Support Button */}
+                    <div className="text-right">
+                      <button
+                        onClick={() => navigate("/customer-support")}
+                        className="text-red-500 text-sm font-medium"
+                      >
+                        Support
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-gray-500 text-sm">
-                      {format(new Date(delivery.createdAt), "MMMM d, yyyy")}
-                    </span>
-                    <button
-                      onClick={() => navigate("/support")}
-                      className="text-red-500 text-sm font-medium"
-                    >
-                      Support
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
         </div>
 
         {/* Bottom Navigation */}
@@ -652,7 +661,7 @@ const ManageMyStoreProducts: React.FC = () => {
                         </h2>
                         <p className="text-gray-600 text-sm">
                           This store product will be removed right away and
-                          won’t appear in your listings.
+                          won't appear in your listings.
                         </p>
                       </div>
                     </div>
@@ -663,7 +672,7 @@ const ManageMyStoreProducts: React.FC = () => {
                     <button
                       onClick={handleCancel}
                       className="flex-1 py-3.5 rounded-full border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                      // disabled={!cancellationReason}
+                    // disabled={!cancellationReason}
                     >
                       Cancel
                     </button>

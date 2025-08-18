@@ -221,7 +221,7 @@ const ProductPage: React.FC = () => {
                             {"type" in item ? item.type : "Basepack"}
                           </p>
                           <p className="text-pink-600 text-[16px] font-bold">
-                            ₹{getItemPrice(item)}/Day
+                            ₹{getItemPrice(item)}
                           </p>
                           <button
                             onClick={(e) => {
@@ -265,7 +265,7 @@ const ProductPage: React.FC = () => {
                             {"type" in item ? item.type : "Basepack"}
                           </p>
                           <p className="text-pink-600 text-[16px] font-bold">
-                            ₹{getItemPrice(item)}/Day
+                            ₹{getItemPrice(item)}
                           </p>
                           <button
                             onClick={(e) => {

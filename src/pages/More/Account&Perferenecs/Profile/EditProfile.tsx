@@ -198,7 +198,7 @@ const Profile: React.FC = () => {
         </div>
 
         {/* Change Password */}
-        <div className="bg-white rounded-lg shadow-sm p-6 md:p-8 mt-6 mx-4 md:mx-8">
+        {/* <div className="bg-white rounded-lg shadow-sm p-6 md:p-8 mt-6 mx-4 md:mx-8">
           <h2 className="text-lg md:text-xl font-medium mb-4 md:mb-6">Change Password</h2>
           <div className="space-y-4 md:space-y-6">
             <div>
@@ -223,7 +223,7 @@ const Profile: React.FC = () => {
               />
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Save Changes Button */}
         <div className="p-4 md:p-8">

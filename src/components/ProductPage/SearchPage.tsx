@@ -124,7 +124,7 @@ const SearchPage: React.FC = () => {
                     <div className="pt-3 pb-2 px-1 space-y-2">
                       <h3 className="text-[16px] font-semibold text-gray-900 truncate">{item.name}</h3>
                       <p className="text-[14px] text-gray-500 truncate">{'type' in item ? item.type : 'Basepack'}</p>
-                      <p className="text-pink-600 text-[16px] font-bold">₹{getItemPrice(item)}/Day</p>
+                      <p className="text-pink-600 text-[16px] font-bold">₹{getItemPrice(item)}</p>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

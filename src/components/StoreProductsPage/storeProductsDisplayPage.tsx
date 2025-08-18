@@ -397,7 +397,7 @@ const StorePage: React.FC = () => {
                         Basepack
                       </p>
                       <p className="text-pink-600 text-[16px] font-bold">
-                        ₹{pack.sellingPrice}/Day
+                        ₹{pack.sellingPrice}
                       </p>
                       <button
                         onClick={(e) => {

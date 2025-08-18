@@ -204,7 +204,7 @@ const ProductPage: React.FC = () => {
     { day: "Thu", enabled: true },
     { day: "Fri", enabled: true },
     { day: "Sat", enabled: true },
-    { day: "Sun", enabled: false },
+    { day: "Sun", enabled: true },
   ];
 
   // Fetch base pack data
@@ -298,23 +298,23 @@ const ProductPage: React.FC = () => {
 
   // Add function to calculate price display
   const getPriceDisplay = () => {
-  if (!basePack) return { price: 0, originalPrice: 0, savings: 0 };
+    if (!basePack) return { price: 0, originalPrice: 0, savings: 0 };
 
-  let price = 0;
-  let originalPrice = 0;
+    let price = 0;
+    let originalPrice = 0;
 
-  if (selectedType === "DAILY") {
-    price = basePack.sellingPrice;
-    originalPrice = basePack.sellingPrice + (basePack.surcharge ?? 0);
-  } else if (selectedType === "CUSTOM") {
-    price = selectedDays.length * basePack.sellingPrice;
-    originalPrice = selectedDays.length * (basePack.sellingPrice + (basePack.surcharge ?? 0));
-  }
+    if (selectedType === "DAILY") {
+      price = basePack.sellingPrice;
+      originalPrice = basePack.sellingPrice + (basePack.surcharge ?? 0);
+    } else if (selectedType === "CUSTOM") {
+      price = selectedDays.length * basePack.sellingPrice;
+      originalPrice = selectedDays.length * (basePack.sellingPrice + (basePack.surcharge ?? 0));
+    }
 
-  const savings = originalPrice - price;
+    const savings = originalPrice - price;
 
-  return { price, originalPrice, savings };
-};
+    return { price, originalPrice, savings };
+  };
 
 
   // Handle subscription initiation
@@ -349,14 +349,14 @@ const ProductPage: React.FC = () => {
 
       const totalPrice = pricePerPack * minDays * quantity;
 
-     
+
 
       // First ensure wallet exists and check balance
       const walletResponse = await walletService.getWalletBalance();
       const { balance } = walletResponse || {};
 
       if (balance < totalPrice) {
-     
+
         // Update balance details and show modal
         setBalanceDetails({
           currentBalance: balance,
@@ -573,15 +573,14 @@ const ProductPage: React.FC = () => {
                     {basePack?.contents?.map((item, index) => (
                       <span
                         key={index}
-                        className={`text-sm px-3 py-1 rounded-full ${
-                          index % 4 === 0
+                        className={`text-sm px-3 py-1 rounded-full ${index % 4 === 0
                             ? "bg-[#FFF7E6] text-[#664D03]"
                             : index % 4 === 1
-                            ? "bg-[#FFF1F2] text-[#881337]"
-                            : index % 4 === 2
-                            ? "bg-[#FFF7ED] text-[#9A3412]"
-                            : "bg-[#ECFDF5] text-[#065F46]"
-                        }`}
+                              ? "bg-[#FFF1F2] text-[#881337]"
+                              : index % 4 === 2
+                                ? "bg-[#FFF7ED] text-[#9A3412]"
+                                : "bg-[#ECFDF5] text-[#065F46]"
+                          }`}
                       >
                         {item.name}
                       </span>
@@ -622,59 +621,6 @@ const ProductPage: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* Garlands Section */}
-          <div className="mb-8 md:mb-12 ml-4">
-            <div className="flex justify-between items-center mb-4 md:mb-6">
-              <h2 className="text-xl md:text-2xl font-semibold text-gray-800 ml-4 mt-4">
-                Garlands
-              </h2>
-            </div>
-            <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-              {products
-                .filter((item) => item.type === "GARLAND")
-                .map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex-shrink-0 w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => handleProductClick(item)}
-                  >
-                    <div className="p-3">
-                      <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
-                        <img
-                          src={
-                            item.imagesUrl || "https://via.placeholder.com/160"
-                          }
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="pt-3 pb-2 px-1 space-y-2">
-                        <h3 className="text-[16px] font-semibold text-gray-900 truncate">
-                          {item.name}
-                        </h3>
-                        <p className="text-[14px] text-gray-500 truncate">
-                          {item.description}
-                        </p>
-                        <p className="text-pink-600 text-[16px] font-bold">
-                          ₹{item.sellingPrice}/Day
-                        </p>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleProductClick(item);
-                          }}
-                          className="text-green-600 text-[16px] mb-3 font-medium block hover:text-green-700"
-                        >
-                          View
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-
           {/* Quantity and Delivery Selection */}
           <div className="px-4 mt-6">
             <div className="bg-white rounded-xl p-6 shadow-sm">
@@ -715,10 +661,9 @@ const ProductPage: React.FC = () => {
                           key={day.day}
                           onClick={() => day.enabled && handleDaySelection(day.day)}
                           className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium transition-colors
-                            ${
-                              !day.enabled
-                                ? "bg-gray-100 text-gray-400"
-                                : selectedDays.includes(day.day)
+                            ${!day.enabled
+                              ? "bg-gray-100 text-gray-400"
+                              : selectedDays.includes(day.day)
                                 ? "bg-[#015D3A] text-white"
                                 : "bg-white border border-gray-200 text-gray-700 hover:border-[#015D3A]"
                             }`}
@@ -732,15 +677,21 @@ const ProductPage: React.FC = () => {
 
                   {/* Subscribe Button */}
                   <button
-                    onClick={() => {
-                      setSelectedType("CUSTOM");
-                      handleSubscribe();
-                    }}
-                    className="w-full bg-[#F15A22] text-white py-3.5 rounded-lg text-[15px] font-medium mb-3"
-                    disabled={selectedDays.length === 0}
-                  >
-                    Subscribe {selectedDays.length} days/wk for ₹{getPriceDisplay().price}/Pack
-                  </button>
+  onClick={() => {
+    setSelectedType("CUSTOM");
+    handleSubscribe();
+  }}
+  className={`w-full py-3.5 rounded-lg text-[15px] font-medium mb-3
+    ${selectedDays.length >= 3 
+      ? "bg-[#F15A22] text-white" 
+      : "bg-gray-200 text-gray-500 cursor-not-allowed"}`}
+  disabled={selectedDays.length < 3} // ✅ Require minimum 3 days
+>
+  {selectedDays.length >= 3
+    ? `Subscribe ${selectedDays.length} days/wk for ₹${getPriceDisplay().price}/Pack`
+    : "Select at least 3 days to subscribe"}
+</button>
+
 
                   {/* Toggle Days Button */}
                   <button
@@ -780,6 +731,59 @@ const ProductPage: React.FC = () => {
               )}
             </div>
           </div>
+          {/* Garlands Section */}
+          <div className="mb-8 md:mb-12 ml-4">
+            <div className="flex justify-between items-center mb-4 md:mb-6">
+              <h2 className="text-xl md:text-2xl font-semibold text-gray-800 ml-4 mt-4">
+                Garlands
+              </h2>
+            </div>
+            <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
+              {products
+                .filter((item) => item.type === "GARLAND")
+                .map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex-shrink-0 w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => handleProductClick(item)}
+                  >
+                    <div className="p-3">
+                      <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
+                        <img
+                          src={
+                            item.imagesUrl || "https://via.placeholder.com/160"
+                          }
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="pt-3 pb-2 px-1 space-y-2">
+                        <h3 className="text-[16px] font-semibold text-gray-900 truncate">
+                          {item.name}
+                        </h3>
+                        <p className="text-[14px] text-gray-500 truncate">
+                          {item.description}
+                        </p>
+                        <p className="text-pink-600 text-[16px] font-bold">
+                          ₹{item.sellingPrice}
+                        </p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleProductClick(item);
+                          }}
+                          className="text-green-600 text-[16px] mb-3 font-medium block hover:text-green-700"
+                        >
+                          View
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+
 
           {/* Popular Packs Section */}
           <div className="mb-8 md:mb-12 ml-4">
@@ -827,11 +831,11 @@ const ProductPage: React.FC = () => {
                               <h3 className="text-[16px] font-semibold text-gray-900 truncate">
                                 {pack.name}
                               </h3>
-                              <p className="text-[14px] text-gray-500 truncate">
+                              {/* <p className="text-[14px] text-gray-500 truncate">
                                 Basepack
-                              </p>
+                              </p> */}
                               <p className="text-pink-600 text-[16px] font-bold">
-                                ₹{pack.sellingPrice}/Day
+                                ₹{pack.sellingPrice}
                               </p>
                               <button
                                 onClick={(e) => {

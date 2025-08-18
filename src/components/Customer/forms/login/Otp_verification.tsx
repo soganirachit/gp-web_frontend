@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { authService } from '../../../../services/auth.service';
+import { addressService } from '../../../../services/address.service';
 import { useAuth } from '../../../../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import logo from "../../../../assets/All/logo.png";
@@ -92,10 +93,50 @@ const OTPVerification: React.FC = () => {
     }
   };
 
+  // const handleVerify = async () => {
+  //   const otpString = otp.join('');
+  //   if (otpString.length !== 6 || !phoneNumber) return;
+
+  //   try {
+  //     setIsSubmitting(true);
+  //     setError('');
+  //     const response = await authService.verifyOTP(phoneNumber, otpString);
+      
+  //     if (response.message === "Number verified successfully") {
+  //       toast.success('OTP verified successfully!');
+        
+  //       if (response.token) {
+  //         login(response.token, phoneNumber);
+  //       }
+        
+  //       if (response.userExists) {
+  //         if (response.userName) {
+  //           localStorage.setItem('userName', response.userName);
+  //         }
+
+
+  //         navigate('/location', { 
+  //           state: { 
+  //             returnUrl: '/' 
+  //           } 
+  //         });
+  //       } else {
+  //         navigate('/name-input');
+  //       }
+  //     }
+  //   } catch (err: any) {
+  //     setError(err.response?.data?.message || 'Invalid OTP');
+  //     setOtp(new Array(6).fill(""));
+  //     toast.error(err.response?.data?.message || 'Invalid OTP');
+  //   } finally {
+  //     setIsSubmitting(false);
+  //   }
+  // };
+
   const handleVerify = async () => {
     const otpString = otp.join('');
     if (otpString.length !== 6 || !phoneNumber) return;
-
+  
     try {
       setIsSubmitting(true);
       setError('');
@@ -112,11 +153,34 @@ const OTPVerification: React.FC = () => {
           if (response.userName) {
             localStorage.setItem('userName', response.userName);
           }
-          navigate('/location', { 
-            state: { 
-              returnUrl: '/' 
-            } 
-          });
+          
+          // Check if user already has addresses
+          try {
+            const addresses = await addressService.getAllAddresses();
+            if (addresses && addresses.length > 0) {
+              // User has addresses, go directly to home
+              navigate('/', { 
+                state: { 
+                  returnUrl: '/' 
+                } 
+              });
+            } else {
+              // User has no addresses, go to location page
+              navigate('/location', { 
+                state: { 
+                  returnUrl: '/' 
+                } 
+              });
+            }
+          } catch (error) {
+            // If there's an error checking addresses, assume user needs to set location
+            console.error('Error checking addresses:', error);
+            navigate('/location', { 
+              state: { 
+                returnUrl: '/' 
+              } 
+            });
+          }
         } else {
           navigate('/name-input');
         }
