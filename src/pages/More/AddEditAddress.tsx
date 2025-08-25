@@ -4,7 +4,7 @@ import { IoArrowBack } from 'react-icons/io5';
 import { MdLocationOn, MdMyLocation } from 'react-icons/md';
 import { addressService, Address } from '../../services/address.service';
 import { toast } from 'react-hot-toast';
-import { GoogleMap } from '@react-google-maps/api';
+import { GoogleMap, Autocomplete } from '@react-google-maps/api';
 import { useGoogleMaps } from '../../hooks/useGoogleMaps';
 
 const AddEditAddress: React.FC = () => {
@@ -14,6 +14,8 @@ const AddEditAddress: React.FC = () => {
   const existingAddress = location.state?.address as Address | undefined;
   const mapRef = useRef<google.maps.Map | null>(null);
   const { isLoaded, loadError } = useGoogleMaps();
+  const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [selectedPosition, setSelectedPosition] = useState<{lat: number, lng: number}>({
     lat: 20.5937,
@@ -252,6 +254,28 @@ const AddEditAddress: React.FC = () => {
     }
   };
 
+  const onLoadAutocomplete = useCallback((autocomplete: google.maps.places.Autocomplete) => {
+    setAutocomplete(autocomplete);
+  }, []);
+
+  const onPlaceChanged = () => {
+    if (autocomplete) {
+      const place = autocomplete.getPlace();
+      if (!place.geometry?.location) {
+        return;
+      }
+      const location = {
+        lat: place.geometry.location.lat(),
+        lng: place.geometry.location.lng()
+      };
+      setSelectedPosition(location);
+      if (mapRef.current) {
+        mapRef.current.panTo(location);
+        mapRef.current.setZoom(15);
+      }
+    }
+  };
+
   if (loadError) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-white">
@@ -289,10 +313,129 @@ const AddEditAddress: React.FC = () => {
                 <button onClick={() => navigate(-1)} className="hover:bg-gray-100 rounded-full p-2 transition-colors mr-2 md:mr-4">
                   <IoArrowBack className="text-xl md:text-2xl" />
                 </button>
-                Edit/Add Address
+                {isEdit ? 'Edit Address' : 'Add New Address'}
               </span>
             </h1>
             <p className="text-gray-600 mb-4 md:mb-6 ml-10 md:ml-9 text-sm md:text-base"></p>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative mb-4">
+          <div className="relative">
+            {isLoaded ? (
+              <Autocomplete
+                onLoad={(autocomplete) => {
+                  setAutocomplete(autocomplete);
+                }}
+                onPlaceChanged={() => {
+                  if (autocomplete) {
+                    const place = autocomplete.getPlace();
+                    if (!place.geometry?.location) {
+                      return;
+                    }
+                    const location = {
+                      lat: place.geometry.location.lat(),
+                      lng: place.geometry.location.lng()
+                    };
+                    setSelectedPosition(location);
+                    if (mapRef.current) {
+                      mapRef.current.panTo(location);
+                      mapRef.current.setZoom(15);
+                    }
+                    
+                    // Update form data with address components
+                    const addressComponents: any = {};
+                    place.address_components?.forEach(component => {
+                      const componentType = component.types[0];
+                      switch(componentType) {
+                        case 'street_number':
+                          addressComponents.houseNo = component.long_name;
+                          break;
+                        case 'route':
+                          addressComponents.streetName = component.long_name;
+                          break;
+                        case 'sublocality_level_1':
+                        case 'sublocality':
+                          addressComponents.area = component.long_name;
+                          break;
+                        case 'locality':
+                          addressComponents.city = component.long_name;
+                          break;
+                        case 'administrative_area_level_1':
+                          addressComponents.state = component.long_name;
+                          break;
+                        case 'postal_code':
+                          addressComponents.pincode = component.long_name;
+                          break;
+                        case 'administrative_area_level_2':
+                          addressComponents.district = component.long_name;
+                          break;
+                      }
+                    });
+                    
+                    setFormData(prev => ({
+                      ...prev,
+                      ...addressComponents
+                    }));
+                    
+                    setSearchQuery(place.formatted_address || '');
+                  }
+                }}
+                fields={['address_components', 'geometry', 'formatted_address']}
+              >
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search for a location..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full p-3 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </Autocomplete>
+            ) : (
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Loading map..."
+                  disabled
+                  className="w-full p-3 pl-10 pr-4 border border-gray-300 rounded-lg bg-gray-100"
+                />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
