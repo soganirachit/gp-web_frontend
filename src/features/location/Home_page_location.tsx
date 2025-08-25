@@ -483,45 +483,80 @@ const HomePageLocation: React.FC = () => {
         mapRef.current.setZoom(15);
       }
       
-      // Extract address components
-      const addressComponents: any = {
-        city: '',
-        fullAddress: place.formatted_address || '',
-        district: '',
-        state: '',
-        pincode: ''
-      };
+      // Initialize address components
+      let streetNumber = '';
+      let route = '';
+      let locality = '';
+      let sublocality = '';
+      let city = '';
+      let state = '';
+      let pincode = '';
+      let district = '';
       
+      // Extract address components
       if (place.address_components) {
         place.address_components.forEach(component => {
-          const componentType = component.types[0];
+          const types = component.types;
           
-          if (componentType === 'locality') {
-            addressComponents.city = component.long_name;
-          } else if (componentType === 'administrative_area_level_2') {
-            addressComponents.district = component.long_name;
-          } else if (componentType === 'administrative_area_level_1') {
-            addressComponents.state = component.long_name;
-          } else if (componentType === 'postal_code') {
-            addressComponents.pincode = component.long_name;
+          if (types.includes('street_number')) {
+            streetNumber = component.long_name;
+          }
+          if (types.includes('route')) {
+            route = component.long_name;
+          }
+          if (types.includes('sublocality_level_1') || types.includes('sublocality')) {
+            sublocality = component.long_name;
+          }
+          if (types.includes('locality')) {
+            city = component.long_name;
+            locality = component.long_name;
+          }
+          if (types.includes('administrative_area_level_1')) {
+            state = component.long_name;
+          }
+          if (types.includes('postal_code')) {
+            pincode = component.long_name;
+          }
+          if (types.includes('administrative_area_level_2')) {
+            district = component.long_name;
           }
         });
       }
       
-      setSelectedAddress(prev => ({
-        ...prev,
-        ...addressComponents
-      }));
+      // Construct address parts
+      const streetAddress = [streetNumber, route].filter(Boolean).join(' ');
+      const area = sublocality || locality || '';
       
+      // Update the address details
+      setAddressDetails({
+        houseNo: streetNumber || '',
+        apartment: route || '',
+        directions: place.name || area || ''
+      });
+      
+      // Update the selected address
+      setSelectedAddress({
+        city: city || '',
+        fullAddress: place.formatted_address || [streetAddress, area, city, state, pincode].filter(Boolean).join(', '),
+        district: district || '',
+        state: state || '',
+        pincode: pincode || ''
+      });
+      
+      // Update the search query
       setLocationSearchQuery(place.formatted_address || '');
       
       // Check if the location is in a serviced city
-      const city = addressComponents.city.toLowerCase();
-      const isServiced = SERVICED_CITIES.some(
-        servicedCity => servicedCity.toLowerCase() === city
-      );
+      const isServiced = city ? SERVICED_CITIES.some(
+        servicedCity => servicedCity.toLowerCase() === city.toLowerCase()
+      ) : false;
       
       setIsLocationServiced(isServiced);
+      
+      // Set a default location type if not set
+      if (!selectedLocationType) {
+        setSelectedLocationType('Home');
+      }
     }
   };
 
@@ -545,61 +580,9 @@ const HomePageLocation: React.FC = () => {
         <p className="text-gray-600 mb-6">
           Where should we deliver your flowers?
         </p>
-
-        {/* Map Container */}
-        <div className="w-full h-[300px] md:h-[400px] relative rounded-lg overflow-hidden mb-6 shadow-md">
-          {isLoaded && selectedPosition ? (
-            <GoogleMap
-              mapContainerStyle={{
-                width: "100%",
-                height: "100%",
-              }}
-              center={selectedPosition}
-              zoom={15}
-              onLoad={onLoad}
-              onUnmount={onUnmount}
-              onDragEnd={handleMapDrag}
-              options={{
-                zoomControl: false,
-                streetViewControl: false,
-                mapTypeControl: false,
-                fullscreenControl: false,
-              }}
-            >
-              {/* Marker */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-10">
-                <div className="flex flex-col items-center">
-                  <MdLocationOn className="text-5xl text-[#F15A22]" />
-                  <div className="w-3 h-3 -mt-2 bg-black/20 rounded-full shadow-lg"></div>
-                </div>
-              </div>
-
-              {/* Back Button */}
-              <button
-                onClick={() => navigate(-1)}
-                className="absolute top-4 left-4 bg-white rounded-full p-2 shadow-lg z-10 hover:bg-gray-50"
-              >
-                <MdArrowBack />
-              </button>
-
-              {/* Current Location Button */}
-              <button
-                onClick={getCurrentLocation}
-                className="absolute left-1/2 bottom-4 -translate-x-1/2 bg-white rounded-full px-4 py-2 shadow-lg z-10 hover:bg-gray-50 flex items-center gap-2 text-sm"
-              >
-                <MdMyLocation className="text-[#F15A22]" />
-                <span>Use current location</span>
-              </button>
-            </GoogleMap>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
-            </div>
-          )}
-        </div>
-
-        {/* Search Bar */}
-        <div className="relative mb-6">
+        
+{/* Search Bar */}
+<div className="relative mb-6">
           <div className="relative">
             {isLoaded ? (
               <Autocomplete
@@ -663,6 +646,60 @@ const HomePageLocation: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Map Container */}
+        <div className="w-full h-[300px] md:h-[400px] relative rounded-lg overflow-hidden mb-6 shadow-md">
+          {isLoaded && selectedPosition ? (
+            <GoogleMap
+              mapContainerStyle={{
+                width: "100%",
+                height: "100%",
+              }}
+              center={selectedPosition}
+              zoom={15}
+              onLoad={onLoad}
+              onUnmount={onUnmount}
+              onDragEnd={handleMapDrag}
+              options={{
+                zoomControl: false,
+                streetViewControl: false,
+                mapTypeControl: false,
+                fullscreenControl: false,
+              }}
+            >
+              {/* Marker */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-10">
+                <div className="flex flex-col items-center">
+                  <MdLocationOn className="text-5xl text-[#F15A22]" />
+                  <div className="w-3 h-3 -mt-2 bg-black/20 rounded-full shadow-lg"></div>
+                </div>
+              </div>
+
+              {/* Back Button */}
+              <button
+                onClick={() => navigate(-1)}
+                className="absolute top-4 left-4 bg-white rounded-full p-2 shadow-lg z-10 hover:bg-gray-50"
+              >
+                <MdArrowBack />
+              </button>
+
+              {/* Current Location Button */}
+              <button
+                onClick={getCurrentLocation}
+                className="absolute left-1/2 bottom-4 -translate-x-1/2 bg-white rounded-full px-4 py-2 shadow-lg z-10 hover:bg-gray-50 flex items-center gap-2 text-sm"
+              >
+                <MdMyLocation className="text-[#F15A22]" />
+                <span>Use current location</span>
+              </button>
+            </GoogleMap>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+            </div>
+          )}
+        </div>
+
+        
 
         {/* Address Details */}
         <div className="space-y-4 bg-white rounded-lg p-4 md:p-6 shadow-sm">
