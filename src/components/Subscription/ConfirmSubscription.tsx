@@ -670,6 +670,7 @@ const ConfirmSubscription: React.FC = () => {
       return;
     }
 
+    
     setIsProcessingPayment(true);
 
     try {
@@ -682,6 +683,7 @@ const ConfirmSubscription: React.FC = () => {
         deliveredBy: "",
         routeId: "",
         isStore: location.state.product.isStore,
+        deliveryTime: location.state.metaData.deliveryTime,
         paymentDetails: {
           razorpay_payment_id: paymentData.razorpay_payment_id,
           razorpay_order_id: paymentData.razorpay_order_id,
@@ -706,6 +708,7 @@ const ConfirmSubscription: React.FC = () => {
           amount,
           product: location.state.product,
           address: selectedAddress,
+          deliveryTime: location.state.metaData.deliveryTime,
           createdAt: new Date().toISOString()
         }));
       } else {

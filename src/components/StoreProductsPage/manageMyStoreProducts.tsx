@@ -18,20 +18,21 @@ import { orderService } from "@/services/order.service";
 interface order {
   id: string;
   orderId: string;
-  productId: string[];
+  status: "SCHEDULED" | "CANCELLED" | "PAUSED" | "COMPLETED" | "DELIVERED" | "REJECTED";
+  createdAt: string;
+  deliveryTime: string;
   product: {
     id: string;
     name: string;
     description: string;
+    sellingPrice: number;
+    productId: string;
     imagesUrl: string[];
+    category: string;
     isDaily: boolean;
     isStore: boolean;
-    productId: string;
-    sellingPrice: number;
   };
   quantity: number;
-  status: "SCHEDULED" | "CANCELLED" | "PAUSED" | "COMPLETED" | "DELIVERED" | "REJECTED";
-  createdAt: string;
 }
 
 const ManageMyStoreProducts: React.FC = () => {
@@ -182,10 +183,10 @@ const ManageMyStoreProducts: React.FC = () => {
   };
 
   const renderSubscriptionCard = (order: order) => {
-    const formattedDate = format(
-      new Date(order.createdAt),
-      "dd MMM yyyy, HH:mm"
-    );
+    const formattedDate = order.deliveryTime 
+      ? format(new Date(order.deliveryTime), "dd MMM yyyy, HH:mm")
+      : "No delivery time set";
+    
     const isScheduled = order.status === "SCHEDULED";
     const isCancelled = order.status === "CANCELLED";
 
@@ -484,6 +485,7 @@ const ManageMyStoreProducts: React.FC = () => {
               <h2 className="text-lg font-medium mb-3">
                 Active store products
               </h2>
+
               {orders
                 .filter((order) => order.status === "SCHEDULED")
                 .map(renderSubscriptionCard)}
@@ -514,7 +516,7 @@ const ManageMyStoreProducts: React.FC = () => {
                     <div>
                       <p className="font-medium">{delivery?.product.name}</p>
                       <p className="text-gray-600 text-sm mt-1">
-                        {format(new Date(delivery.createdAt), "MMMM d, yyyy")}
+                        {format(new Date(delivery.deliveryTime), "MMMM d, yyyy")}
                       </p>
                     </div>
 
