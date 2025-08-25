@@ -293,8 +293,12 @@ const ManageMySubscription: React.FC = () => {
     
     try {
       setIsUpdating(true);
+      
+      // Determine the subscription type based on number of days selected
+      const subscriptionType = editingDays.length === 7 ? "DAILY" : "CUSTOM";
+      
       await subscriptionService.updateSubscription(selectedSubscription.id, {
-        type: selectedSubscription.type,
+        type: subscriptionType,
         selectedDays: editingDays,
         status: selectedSubscription.status,
       });
@@ -302,7 +306,7 @@ const ManageMySubscription: React.FC = () => {
       // Refresh subscriptions
       await fetchSubscriptionDetails();
       setShowEditModal(false);
-      setValidationError(""); // Clear any previous errors
+      setValidationError("");
       toast.success("Subscription updated successfully!");
     } catch (error: any) {
       console.error("Error updating subscription:", error);
