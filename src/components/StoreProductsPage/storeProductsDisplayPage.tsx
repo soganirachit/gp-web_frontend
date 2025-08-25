@@ -15,6 +15,7 @@ import {
   storeProducts,
 } from "@/services/stroeProductDetails.service";
 import { Product, storeProductService } from "@/services/storeProduct.service";
+import DatePicker from "react-datepicker";
 
 interface BasePackContent {
   id: string;
@@ -63,6 +64,8 @@ const StorePage: React.FC = () => {
     subscriptionType: "Daily" as SubscriptionType,
     days: 7,
   });
+  
+  const [deliveryTime, setDeliveryTime] = useState<Date | null>(new Date(new Date().setHours(12, 0, 0, 0)));
 
   const [otherStroePacks, setOtherStorePacks] = useState<storeProducts[]>([]);
   const [, setExoticFlowers] = useState<Product[]>([]);
@@ -136,6 +139,12 @@ const StorePage: React.FC = () => {
       navigate("/login", { state: { returnUrl: `/store/${id}` } });
       return;
     }
+    
+    if (!deliveryTime) {
+      toast.error("Please select a delivery time");
+      return;
+    }
+    
     const { price, originalPrice, savings } = getPriceDisplay();
     const totalPrice = price * quantity;
     navigate("/address-selection", {
@@ -147,6 +156,7 @@ const StorePage: React.FC = () => {
           price,
           totalPrice,
           quantity,
+          deliveryTime: deliveryTime.toISOString(),
         },
       },
     });
@@ -351,6 +361,30 @@ const StorePage: React.FC = () => {
                     </button>
                   </div>
                 </div>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Preferred Delivery Time
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="w-full">
+                    <DatePicker
+                      selected={deliveryTime}
+                      onChange={(date: Date | null) => setDeliveryTime(date)}
+                      showTimeSelect
+                      timeFormat="h:mm aa"
+                      timeIntervals={30}
+                      dateFormat="MMMM d, yyyy h:mm aa"
+                      minDate={new Date()}
+                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      wrapperClassName="w-full"
+                      timeCaption="Time"
+                    />
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Select your preferred delivery date and time
+                </p>
               </div>
               <button
                 onClick={

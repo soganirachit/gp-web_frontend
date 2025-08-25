@@ -70,7 +70,10 @@ const ManageMySubscription: React.FC = () => {
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showSuccessToast] = useState(false);
+  const [editingDays, setEditingDays] = useState<string[]>([]);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
 
@@ -88,6 +91,8 @@ const ManageMySubscription: React.FC = () => {
 
   const [cancellationReason, setCancellationReason] = useState("");
   const [, setShowReasonError] = useState(false);
+
+  const [validationError, setValidationError] = useState<string>("");
 
   // Days of the week
   // const daysOfWeek = ['Mon', 'Tues', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'];
@@ -241,6 +246,76 @@ const ManageMySubscription: React.FC = () => {
     }
   };
 
+  // Helper function to normalize day names to full day names
+  const normalizeDayName = (day: string): string => {
+    const dayMap: { [key: string]: string } = {
+      'sunday': 'Sunday', 'sun': 'Sunday',
+      'monday': 'Monday', 'mon': 'Monday',
+      'tuesday': 'Tuesday', 'tue': 'Tuesday', 'tues': 'Tuesday',
+      'wednesday': 'Wednesday', 'wed': 'Wednesday',
+      'thursday': 'Thursday', 'thu': 'Thursday', 'thur': 'Thursday', 'thurs': 'Thursday',
+      'friday': 'Friday', 'fri': 'Friday',
+      'saturday': 'Saturday', 'sat': 'Saturday'
+    };
+    
+    return dayMap[day.toLowerCase()] || day;
+  };
+
+  // Open edit modal with current subscription days
+  const handleEditClick = (subscription: Subscription) => {
+    setSelectedSubscription(subscription);
+    
+    // Get the days from the subscription, handling both deliveryDays and selectedDays
+    const days = subscription.deliveryDays || subscription.selectedDays || [];
+    
+    // Normalize day names to full day names (e.g., 'mon' -> 'Monday')
+    const normalizedDays = days.map(day => {
+      // If day is already in full format, return as is
+      if (['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].includes(day)) {
+        return day;
+      }
+      return normalizeDayName(day);
+    });
+    
+    setEditingDays([...normalizedDays]);
+    setShowEditModal(true);
+  };
+
+  // Handle updating subscription days
+  const handleUpdateSubscription = async () => {
+    if (!selectedSubscription) return;
+    
+    // Validate minimum 3 days selection
+    if (editingDays.length < 3) {
+      setValidationError("Please select at least 3 days for your subscription");
+      return;
+    }
+    
+    try {
+      setIsUpdating(true);
+      
+      // Determine the subscription type based on number of days selected
+      const subscriptionType = editingDays.length === 7 ? "DAILY" : "CUSTOM";
+      
+      await subscriptionService.updateSubscription(selectedSubscription.id, {
+        type: subscriptionType,
+        selectedDays: editingDays,
+        status: selectedSubscription.status,
+      });
+      
+      // Refresh subscriptions
+      await fetchSubscriptionDetails();
+      setShowEditModal(false);
+      setValidationError("");
+      toast.success("Subscription updated successfully!");
+    } catch (error: any) {
+      console.error("Error updating subscription:", error);
+      toast.error(error.message || "Failed to update subscription");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const handlePause = async () => {
     if (!selectedSubscription || !customStartDate) return;
 
@@ -379,6 +454,14 @@ const ManageMySubscription: React.FC = () => {
                     <span className="px-2 py-0.5 bg-[#DCFCE7] text-[#166534] text-xs font-medium rounded-full">
                       Active
                     </span>
+                  )}
+                  {isActive && (
+                    <button 
+                      onClick={() => handleEditClick(subscription)}
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    >
+                      Edit
+                    </button>
                   )}
                 </div>
                 <p className="text-[#666666] text-sm">
@@ -1186,6 +1269,110 @@ const ManageMySubscription: React.FC = () => {
                 </div>
               </motion.div>
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Edit Subscription Modal */}
+        <AnimatePresence>
+          {showEditModal && selectedSubscription && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                className="bg-white rounded-2xl p-6 w-full max-w-md"
+              >
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold">Update Delivery Days</h2>
+                  <button 
+                    onClick={() => setShowEditModal(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                <div className="mb-6">
+                  <p className="text-sm text-gray-600 mb-2">
+                    Select at least 3 days you want to receive your subscription:
+                  </p>
+                  
+                  {validationError && (
+                    <p className="text-red-500 text-sm mb-3">{validationError}</p>
+                  )}
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => {
+                      const isSelected = editingDays.some(d => 
+                        d.toLowerCase() === day.toLowerCase() || 
+                        normalizeDayName(d) === day
+                      );
+                      
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => {
+                            setEditingDays(prev => {
+                              const normalizedPrev = prev.map(d => normalizeDayName(d));
+                              const normalizedDay = normalizeDayName(day);
+                              
+                              return normalizedPrev.includes(normalizedDay)
+                                ? normalizedPrev.filter(d => d !== normalizedDay)
+                                : [...normalizedPrev, normalizedDay];
+                            });
+                            // Clear validation error when user makes a selection
+                            if (validationError) setValidationError("");
+                          }}
+                          className={`py-2 px-3 rounded-lg text-sm font-medium ${
+                            isSelected
+                              ? 'bg-[#4CAF50] text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          {day}
+                          {isSelected && ' ✓'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {editingDays.length} days selected
+                  </p>
+                </div>
+                
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                    disabled={isUpdating}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUpdateSubscription}
+                    className={`px-4 py-2 text-sm font-medium text-white rounded-lg flex items-center gap-2 ${
+                      editingDays.length >= 3 
+                        ? 'bg-[#4CAF50] hover:bg-[#3e8e41]' 
+                        : 'bg-gray-300 cursor-not-allowed'
+                    }`}
+                    disabled={isUpdating || editingDays.length < 3}
+                  >
+                    {isUpdating ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Updating...
+                      </>
+                    ) : 'Update Subscription'}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
       </div>

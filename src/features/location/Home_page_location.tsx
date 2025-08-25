@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { GoogleMap } from "@react-google-maps/api";
+import { GoogleMap, Autocomplete } from "@react-google-maps/api";
 import { MdLocationOn, MdMyLocation, MdArrowBack } from "react-icons/md";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -42,6 +42,7 @@ const HomePageLocation: React.FC = () => {
   const location = useLocation();
   const returnUrl = location.state?.returnUrl || "/Allset";
   const [locationSearchQuery, setLocationSearchQuery] = useState("");
+  const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   // const [, setLocationPredictions] = useState<PlacePrediction[]>([]);
   const [selectedPosition, setSelectedPosition] = useState<{
     lat: number;
@@ -462,6 +463,103 @@ const HomePageLocation: React.FC = () => {
   // Apply the warning suppression
   setupRouterWarningSuppress();
 
+  const onPlaceChanged = () => {
+    if (autocomplete) {
+      const place = autocomplete.getPlace();
+      if (!place.geometry?.location) {
+        return;
+      }
+      
+      const location = {
+        lat: place.geometry.location.lat(),
+        lng: place.geometry.location.lng()
+      };
+      
+      setSelectedPosition(location);
+      
+      // Update the map view
+      if (mapRef.current) {
+        mapRef.current.panTo(location);
+        mapRef.current.setZoom(15);
+      }
+      
+      // Initialize address components
+      let streetNumber = '';
+      let route = '';
+      let locality = '';
+      let sublocality = '';
+      let city = '';
+      let state = '';
+      let pincode = '';
+      let district = '';
+      
+      // Extract address components
+      if (place.address_components) {
+        place.address_components.forEach(component => {
+          const types = component.types;
+          
+          if (types.includes('street_number')) {
+            streetNumber = component.long_name;
+          }
+          if (types.includes('route')) {
+            route = component.long_name;
+          }
+          if (types.includes('sublocality_level_1') || types.includes('sublocality')) {
+            sublocality = component.long_name;
+          }
+          if (types.includes('locality')) {
+            city = component.long_name;
+            locality = component.long_name;
+          }
+          if (types.includes('administrative_area_level_1')) {
+            state = component.long_name;
+          }
+          if (types.includes('postal_code')) {
+            pincode = component.long_name;
+          }
+          if (types.includes('administrative_area_level_2')) {
+            district = component.long_name;
+          }
+        });
+      }
+      
+      // Construct address parts
+      const streetAddress = [streetNumber, route].filter(Boolean).join(' ');
+      const area = sublocality || locality || '';
+      
+      // Update the address details
+      setAddressDetails({
+        houseNo: streetNumber || '',
+        apartment: route || '',
+        directions: place.name || area || ''
+      });
+      
+      // Update the selected address
+      setSelectedAddress({
+        city: city || '',
+        fullAddress: place.formatted_address || [streetAddress, area, city, state, pincode].filter(Boolean).join(', '),
+        district: district || '',
+        state: state || '',
+        pincode: pincode || ''
+      });
+      
+      // Update the search query
+      setLocationSearchQuery(place.formatted_address || '');
+      
+      // Check if the location is in a serviced city
+      const isServiced = city ? SERVICED_CITIES.some(
+        servicedCity => servicedCity.toLowerCase() === city.toLowerCase()
+      ) : false;
+      
+      setIsLocationServiced(isServiced);
+      
+      // Set a default location type if not set
+      if (!selectedLocationType) {
+        setSelectedLocationType('Home');
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen max-w-[800px] mx-auto flex flex-col bg-[#FFFBEB]">
       {/* Header */}
@@ -482,6 +580,72 @@ const HomePageLocation: React.FC = () => {
         <p className="text-gray-600 mb-6">
           Where should we deliver your flowers?
         </p>
+        
+{/* Search Bar */}
+<div className="relative mb-6">
+          <div className="relative">
+            {isLoaded ? (
+              <Autocomplete
+                onLoad={(autocomplete) => {
+                  setAutocomplete(autocomplete);
+                }}
+                onPlaceChanged={onPlaceChanged}
+                fields={['address_components', 'geometry', 'formatted_address']}
+              >
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search for a location..."
+                    value={locationSearchQuery}
+                    onChange={(e) => setLocationSearchQuery(e.target.value)}
+                    className="w-full p-3 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </Autocomplete>
+            ) : (
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Loading map..."
+                  disabled
+                  className="w-full p-3 pl-10 pr-4 border border-gray-300 rounded-lg bg-gray-100"
+                />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Map Container */}
         <div className="w-full h-[300px] md:h-[400px] relative rounded-lg overflow-hidden mb-6 shadow-md">
@@ -534,6 +698,8 @@ const HomePageLocation: React.FC = () => {
             </div>
           )}
         </div>
+
+        
 
         {/* Address Details */}
         <div className="space-y-4 bg-white rounded-lg p-4 md:p-6 shadow-sm">
