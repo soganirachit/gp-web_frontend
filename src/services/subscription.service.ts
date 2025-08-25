@@ -378,6 +378,43 @@ class SubscriptionService {
       };
     }
   }
+
+  /**
+   * Update subscription
+   */
+  async updateSubscription(
+    subscriptionId: string,
+    updates: {
+      type?: "DAILY" | "CUSTOM";
+      selectedDays?: string[];
+      endDate?: Date;
+      status?: "ACTIVE" | "PAUSED" | "CANCELLED" | "INACTIVE";
+    }
+  ): Promise<Subscription> {
+    try {
+      const headers = this.getHeaders();
+      const response = await fetch(`${SUBSCRIPTION_API_URL}/${subscriptionId}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          type: updates.type,
+          selectedDays: updates.selectedDays,
+          endDate: updates.endDate?.toISOString(),
+          status: updates.status,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update subscription");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error updating subscription:", error);
+      throw error;
+    }
+  }
 }
 
 export const subscriptionService = new SubscriptionService();
