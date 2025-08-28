@@ -536,7 +536,7 @@ const Wallet = () => {
                       </div> */}
                       <div>
                         <div className="font-medium md:text-lg">
-                          {transaction.type === "CREDIT" ? "Credit" : "Debit"}
+                          {transaction.type === "CREDIT" ? "Credit" : "Debit"}- {transaction.description}
                         </div>
 
                         {transaction.referenceId && (

@@ -458,7 +458,7 @@ const ManageMySubscription: React.FC = () => {
                   {isActive && (
                     <button 
                       onClick={() => handleEditClick(subscription)}
-                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      className="px-2 py-0.5 bg-[#DCFCE7] text-[#166534] text-xs font-medium rounded-full"
                     >
                       Edit
                     </button>
