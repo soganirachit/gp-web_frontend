@@ -1010,7 +1010,7 @@ const ManageMySubscription: React.FC = () => {
                       (day, index) => (
                         <button
                           key={day}
-                          className={`w-10 h-10 rounded-full flex items-center justify-center text-sm
+                          className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium
                           ${
                             index < 6
                               ? "bg-green-600 text-white"
@@ -1233,7 +1233,7 @@ const ManageMySubscription: React.FC = () => {
         <AnimatePresence>
           {showInsufficientBalanceModal && (
             <motion.div
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3"
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -1275,7 +1275,7 @@ const ManageMySubscription: React.FC = () => {
         {/* Edit Subscription Modal */}
         <AnimatePresence>
           {showEditModal && selectedSubscription && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1293,82 +1293,86 @@ const ManageMySubscription: React.FC = () => {
                 </div>
                 
                 <div className="mb-6">
-                  <p className="text-sm text-gray-600 mb-2">
+                  <p className="text-sm text-gray-600 mb-6 text-center">
                     Select at least 3 days you want to receive your subscription:
                   </p>
                   
                   {validationError && (
-                    <p className="text-red-500 text-sm mb-3">{validationError}</p>
+                    <p className="text-red-500 text-sm mb-6 text-center">{validationError}</p>
                   )}
                   
-                  <div className="grid grid-cols-2 gap-2">
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => {
+                  <div className="grid grid-cols-7 gap-2 mb-6">
+                    {['Sun', 'Mon', 'Tues', 'Wed', 'Thus', 'Fri', 'Sat'].map((day, index) => {
+                      const fullDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                      const fullDayName = fullDayNames[index];
                       const isSelected = editingDays.some(d => 
-                        d.toLowerCase() === day.toLowerCase() || 
-                        normalizeDayName(d) === day
+                        d.toLowerCase() === fullDayName.toLowerCase() || 
+                        normalizeDayName(d) === fullDayName
                       );
                       
                       return (
                         <button
-                          key={day}
+                          key={index}
                           type="button"
                           onClick={() => {
                             setEditingDays(prev => {
                               const normalizedPrev = prev.map(d => normalizeDayName(d));
-                              const normalizedDay = normalizeDayName(day);
+                              const normalizedDay = normalizeDayName(fullDayName);
                               
                               return normalizedPrev.includes(normalizedDay)
                                 ? normalizedPrev.filter(d => d !== normalizedDay)
                                 : [...normalizedPrev, normalizedDay];
                             });
-                            // Clear validation error when user makes a selection
                             if (validationError) setValidationError("");
                           }}
-                          className={`py-2 px-3 rounded-lg text-sm font-medium ${
+                          className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
                             isSelected
                               ? 'bg-[#4CAF50] text-white'
                               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           }`}
                         >
                           {day}
-                          {isSelected && ' ✓'}
                         </button>
                       );
                     })}
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {editingDays.length} days selected
-                  </p>
+                  
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-sm text-gray-600 text-center">
+                      {editingDays.length} days selected
+                    </p>
+                  </div>
                 </div>
                 
-                <div className="flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowEditModal(false)}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                    disabled={isUpdating}
-                  >
-                    Cancel
-                  </button>
+                <div className="space-y-3">
                   <button
                     type="button"
                     onClick={handleUpdateSubscription}
-                    className={`px-4 py-2 text-sm font-medium text-white rounded-lg flex items-center gap-2 ${
+                    disabled={isUpdating || editingDays.length < 3}
+                    className={`w-full py-3 text-sm font-medium text-white rounded-xl flex items-center justify-center gap-2 ${
                       editingDays.length >= 3 
                         ? 'bg-[#4CAF50] hover:bg-[#3e8e41]' 
                         : 'bg-gray-300 cursor-not-allowed'
                     }`}
-                    disabled={isUpdating || editingDays.length < 3}
                   >
                     {isUpdating ? (
                       <>
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                         Updating...
                       </>
                     ) : 'Update Subscription'}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="w-full py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50"
+                    disabled={isUpdating}
+                  >
+                    Cancel
                   </button>
                 </div>
               </motion.div>
