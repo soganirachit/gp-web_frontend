@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { IoWalletOutline, IoArrowBack } from "react-icons/io5";
 
@@ -48,6 +48,7 @@ const Wallet = () => {
   const [customAmount, setCustomAmount] = useState<string>("500");
   const [balance, setBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<TransactionType[]>([]);
+  const [transactionLogs, setTransactionLogs] = useState<any[]>([]);
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
   const [showCoupons, setShowCoupons] = useState(false);
   const [, setSelectedCoupon] = useState<CouponType | null>(null);
@@ -64,59 +65,22 @@ const Wallet = () => {
     retryWithBackoff,
   } = useNetworkRecovery();
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      toast.error("Please login to access your wallet");
-      navigate("/login", {
-        state: {
-          returnUrl: location.pathname,
-          ...location.state,
-        },
-      });
-      return;
-    }
-
-    // Fetch wallet balance if we have a token
-    fetchWalletBalance();
-
-    // Check for required amount from subscription
-    const state = location.state as {
-      requiredAmount?: number;
-      returnUrl?: string;
-      currentBalance?: number;
-    } | null;
-    if (state?.requiredAmount) {
-      setCustomAmount(state.requiredAmount.toString());
-      setReturnUrl(state.returnUrl || null);
-
-      // Show recharge required message with balance details
-      if (state.currentBalance !== undefined) {
-        toast(
-          () => (
-            <div>
-              <p>Current Balance: ₹{state.currentBalance}</p>
-              <p>Required Amount: ₹{state.requiredAmount}</p>
-              <p>Please add ₹{state.requiredAmount} to continue</p>
-            </div>
-          ),
-          {
-            icon: "💰",
-            duration: 5000,
-          }
-        );
-      }
-    }
-  }, [isLoggedIn, navigate, location.state, location.pathname]);
-
-  const fetchWalletBalance = async () => {
+  // Add useCallback to memoize fetchWalletBalance
+  const fetchWalletBalance = useCallback(async () => {
     try {
       setIsLoadingBalance(true);
-      const { balance, transactions: resTransactions = [] } =
-        (await walletService.getWalletBalance()) || {};
+      const response = await walletService.getWalletBalance();
+      
+      
+      const { balance = 0, transactions = [], transactionLogs = [] } = response || {};
+      
       setBalance(balance);
-      setTransactions(resTransactions);
+      setTransactions(transactions);
+      setTransactionLogs(transactionLogs);
+   
+      
     } catch (error: any) {
+      console.error('Error fetching wallet:', error);
       if (error.message.includes("Session expired")) {
         localStorage.removeItem("token");
         toast.error("Session expired. Please login again.");
@@ -132,7 +96,25 @@ const Wallet = () => {
     } finally {
       setIsLoadingBalance(false);
     }
-  };
+  }, [navigate, location.pathname, location.state]);
+
+  // Fetch wallet balance on component mount and when fetchWalletBalance changes
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast.error("Please login to access your wallet");
+      navigate("/login", {
+        state: {
+          returnUrl: location.pathname,
+          ...location.state,
+        },
+      });
+      return;
+    }
+
+    // Fetch wallet balance if we have a token
+    fetchWalletBalance();
+  }, [fetchWalletBalance, navigate, location.pathname, location.state]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -513,158 +495,143 @@ const Wallet = () => {
           </div>
         </div>
 
-        {/* Recent Transactions */}
+        {/* Combined Transactions & Payment History */}
         <div className="mx-4 md:mx-6 mt-8 mb-20">
           <h2 className="text-xl md:text-2xl font-medium mb-4">
-            Recent Transactions
+            Transaction History
           </h2>
-          {transactions.map((transaction: TransactionType, tdx) => {
-            return (
-              <div className="space-y-3 md:space-y-4" key={`trans+${tdx}`}>
-                <div className="bg-white p-4 md:p-5 rounded-lg flex items-center justify-between">
-                  <div className="flex items-center gap-3 md:gap-4">
-                    <div className="p-2 md:p-3 bg-[#FFF3E0] rounded-full">
-                      {transaction.type === "CREDIT" ? (
-                        <IoMdArrowDown className="text-[#4CAF50] md:text-xl" />
-                      ) : (
-                        <IoMdArrowUp className="text-[#FF5722] md:text-xl" />
-                      )}
-                    </div>
-                    <div>
-                      {/* <div className="font-medium md:text-lg">
-                        {transaction.description}
-                      </div> */}
-                      <div>
-                        <div className="font-medium md:text-lg">
-                          {transaction.type === "CREDIT" ? "Credit" : "Debit"}- {transaction.description}
-                        </div>
-
-                        {transaction.referenceId && (
-                          <div className="text-xs md:text-sm text-gray-400">
-                            Txn ID: {transaction.referenceId}
+          
+          {/* Show loading state */}
+          {isLoadingBalance ? (
+            <div className="text-center text-gray-600">Loading transactions...</div>
+          ) : transactions.length === 0 && (!transactionLogs || transactionLogs.length === 0) ? (
+            <div className="text-center text-gray-600">No transactions yet.</div>
+          ) : (
+            <div className="space-y-3 md:space-y-4">
+              {/* Map through all transactions */}
+              {[...transactions, ...(transactionLogs || [])]
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                .map((item, idx) => {
+                  const isTransaction = 'type' in item;
+                  const isCredit = isTransaction ? item.type === 'CREDIT' : item.status === 'captured';
+                  const isPending = !isTransaction && item.status === 'created';
+                  
+                  return (
+                    <div key={`txn-${idx}`} className="bg-white p-4 md:p-5 rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-start gap-3 md:gap-4">
+                          <div className={`p-2 md:p-3 rounded-full ${
+                            isPending ? 'bg-yellow-100' : isCredit ? 'bg-green-50' : 'bg-red-50'
+                          }`}>
+                            {isPending ? (
+                              <div className="w-5 h-5  border-yellow-500  "><IoMdArrowDown  className="text-green-500 md:text-xl" /></div>
+                            ) : isCredit ? (
+                              <IoMdArrowDown className="text-green-500 md:text-xl" />
+                            ) : (
+                              <IoMdArrowUp className="text-red-500 md:text-xl" />
+                            )}
                           </div>
-                        )}
-
-                      </div>
-
-                      <div className="text-sm md:text-base text-gray-500">
-                        {format(
-                          parseISO(transaction.createdAt),
-                          "dd MMM yyyy  h:mm a"
-                        )}
+                          <div>
+                            <div className="font-medium md:text-lg">
+                              {isTransaction 
+                                ? `${item.type === 'CREDIT' ? 'Credit' : 'Debit'} - ${item.description}`
+                                : 'Wallet Recharge'}
+                            </div>
+                            {isTransaction && item.referenceId && (
+                              <div className="text-xs md:text-sm text-gray-400">
+                                Txn ID: {item.referenceId}
+                              </div>
+                            )}
+                            {!isTransaction && item.razorpayOrderId && (
+                              <div className="text-xs md:text-sm text-gray-400">
+                                Order ID: {item.razorpayOrderId}
+                              </div>
+                            )}
+                            <div className="text-sm text-gray-500">
+                              {format(
+                                new Date(item.createdAt),
+                                "dd MMM yyyy • h:mm a"
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`font-medium md:text-lg ${
+                            isPending ? 'text-yellow-600' : 
+                            isCredit ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {isCredit ? '+' : '-'}{INR} {isTransaction ? item.amount : item.amount}
+                          </div>
+                          {!isTransaction && (
+                            <div className={`text-xs md:text-sm ${
+                              isPending ? 'text-yellow-600' : 
+                              item.status === 'captured' ? 'text-green-600' : 
+                              'text-gray-600'
+                            }`}>
+                              {item.status.charAt(0).toUpperCase() + item.status.slice(1).toLowerCase()}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div
-                    className={`${transaction.type === "CREDIT"
-                      ? "text-[#4CAF50]"
-                      : "text-[#FF5722]"
-                      } font-medium md:text-lg`}
-                  >
-                    {transaction.type === "CREDIT"
-                      ? `+${INR} ${transaction.amount}`
-                      : `-${INR} ${transaction.amount}`}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          {transactions.length === 0 && (
-            <div className="text-center text-gray-600">
-              No transactions yet.
+                  );
+                })}
             </div>
           )}
-          {/* <div className="space-y-3 md:space-y-4">
-            
-
-            <div className="bg-white p-4 md:p-5 rounded-lg flex items-center justify-between">
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className="p-2 md:p-3 bg-[#FFF3E0] rounded-full">
-                  <IoMdArrowUp className="text-[#FF5722] md:text-xl" />
-                </div>
-                <div>
-                  <div className="font-medium md:text-lg">
-                    Brahma Pack Subscription
-                  </div>
-                  <div className="text-sm md:text-base text-gray-500">
-                    9 May 2023 • 7:00 AM
-                  </div>
-                </div>
-              </div>
-              <div className="text-[#FF5722] font-medium md:text-lg">-₹299</div>
-            </div>
-
-            <div className="bg-white p-4 md:p-5 rounded-lg flex items-center justify-between">
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className="p-2 md:p-3 bg-[#E8F5E9] rounded-full">
-                  <IoMdArrowDown className="text-[#4CAF50] md:text-xl" />
-                </div>
-                <div>
-                  <div className="font-medium md:text-lg">
-                    Cashback Credited
-                  </div>
-                  <div className="text-sm md:text-base text-gray-500">
-                    5 May 2023 • 11:45 AM
-                  </div>
-                </div>
-              </div>
-              <div className="text-[#4CAF50] font-medium md:text-lg">+₹500</div>
-            </div>
-          </div> */}
         </div>
-      </div>
 
-      {/* Coupon Modal */}
-      <AnimatePresence>
-        {showCoupons && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-            onClick={() => setShowCoupons(false)}
-          >
+        {/* Coupon Modal */}
+        <AnimatePresence>
+          {showCoupons && (
             <motion.div
-              initial={{ scale: 0.95 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.95 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-xl p-6 md:p-8 m-4 w-full max-w-md"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+              onClick={() => setShowCoupons(false)}
             >
-              <h3 className="text-lg md:text-xl font-medium mb-4">
-                Available Coupons
-              </h3>
-              <div className="space-y-3 md:space-y-4">
-                {AVAILABLE_COUPONS.map((coupon) => (
-                  <motion.div
-                    key={coupon.code}
-                    whileHover={{ scale: 1.02 }}
-                    className="border rounded-lg p-4 md:p-5 cursor-pointer hover:border-green-500"
-                    onClick={() => handleCouponSelect(coupon)}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-medium text-green-600 md:text-lg">
-                          {coupon.code}
+              <motion.div
+                initial={{ scale: 0.95 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.95 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-xl p-6 md:p-8 m-4 w-full max-w-md"
+              >
+                <h3 className="text-lg md:text-xl font-medium mb-4">
+                  Available Coupons
+                </h3>
+                <div className="space-y-3 md:space-y-4">
+                  {AVAILABLE_COUPONS.map((coupon) => (
+                    <motion.div
+                      key={coupon.code}
+                      whileHover={{ scale: 1.02 }}
+                      className="border rounded-lg p-4 md:p-5 cursor-pointer hover:border-green-500"
+                      onClick={() => handleCouponSelect(coupon)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium text-green-600 md:text-lg">
+                            {coupon.code}
+                          </div>
+                          <div className="text-sm md:text-base text-gray-600">
+                            {coupon.description}
+                          </div>
                         </div>
-                        <div className="text-sm md:text-base text-gray-600">
-                          {coupon.description}
+                        <div className="text-lg md:text-xl font-bold text-green-600">
+                          ₹{coupon.discount}
                         </div>
                       </div>
-                      <div className="text-lg md:text-xl font-bold text-green-600">
-                        ₹{coupon.discount}
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
-      <div>
-        <BottomNav />
+        <div>
+          <BottomNav />
+        </div>
       </div>
     </div>
   );
