@@ -521,10 +521,10 @@ const Wallet = () => {
                       <div className="flex justify-between items-start">
                         <div className="flex items-start gap-3 md:gap-4">
                           <div className={`p-2 md:p-3 rounded-full ${
-                            isPending ? 'bg-yellow-100' : isCredit ? 'bg-green-50' : 'bg-red-50'
+                            isPending ? 'bg-red-50' : isCredit ? 'bg-green-50' : 'bg-red-50'
                           }`}>
                             {isPending ? (
-                              <div className="w-5 h-5  border-yellow-500  "><IoMdArrowDown  className="text-green-500 md:text-xl" /></div>
+                              <div className="w-5 h-5  border-red-600 "><IoMdArrowDown  className="text-red-500 md:text-xl" /></div>
                             ) : isCredit ? (
                               <IoMdArrowDown className="text-green-500 md:text-xl" />
                             ) : (
@@ -557,14 +557,14 @@ const Wallet = () => {
                         </div>
                         <div className="text-right">
                           <div className={`font-medium md:text-lg ${
-                            isPending ? 'text-yellow-600' : 
+                            isPending ? 'text-red-600' : 
                             isCredit ? 'text-green-600' : 'text-red-600'
                           }`}>
                             {isCredit ? '+' : '-'}{INR} {isTransaction ? item.amount : item.amount}
                           </div>
                           {!isTransaction && (
                             <div className={`text-xs md:text-sm ${
-                              isPending ? 'text-yellow-600' : 
+                              isPending ? 'text-red-600' : 
                               item.status === 'captured' ? 'text-green-600' : 
                               'text-gray-600'
                             }`}>
