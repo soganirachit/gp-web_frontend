@@ -33,6 +33,7 @@ class WalletService {
   async getWalletBalance(): Promise<{
     balance: number;
     transactions: TransactionType[];
+    transactionLogs?: any[];
   }> {
     try {
       const headers = this.getAuthHeaders();
@@ -40,6 +41,7 @@ class WalletService {
         return {
           balance: 0,
           transactions: [],
+          transactionLogs: [],
         };
       }
 
@@ -51,18 +53,21 @@ class WalletService {
       return {
         balance: 0,
         transactions: [],
+        transactionLogs: [],
       };
     } catch (error: any) {
       if (!localStorage.getItem("token")) {
         return {
           balance: 0,
           transactions: [],
+          transactionLogs: [],
         };
       }
       this.handleAuthError(error);
       return {
         balance: 0,
         transactions: [],
+        transactionLogs: [],
       };
     }
   }
