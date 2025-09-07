@@ -92,6 +92,11 @@ const ManageMySubscription: React.FC = () => {
   const [cancellationReason, setCancellationReason] = useState("");
   const [, setShowReasonError] = useState(false);
 
+  const [modifyData, setModifyData] = useState({
+    quantity: 1,
+    selectedDays: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
+  });
+
   const [validationError, setValidationError] = useState<string>("");
 
   // Days of the week
@@ -450,19 +455,19 @@ const ManageMySubscription: React.FC = () => {
                       Paused
                     </span>
                   )}
-                  {isActive && (
+                  {/* {isActive && (
                     <span className="px-2 py-0.5 bg-[#DCFCE7] text-[#166534] text-xs font-medium rounded-full">
                       Active
                     </span>
-                  )}
-                  {isActive && (
+                  )} */}
+                  {/* {isActive && (
                     <button 
                       onClick={() => handleEditClick(subscription)}
                       className="px-2 py-0.5 bg-[#DCFCE7] text-[#166534] text-xs font-medium rounded-full"
                     >
                       Edit
                     </button>
-                  )}
+                  )} */}
                 </div>
                 <p className="text-[#666666] text-sm">
                   {subscription.deliveryPreference === "DAILY"
@@ -472,6 +477,11 @@ const ManageMySubscription: React.FC = () => {
                       : "Custom • No specific days"}
                 </p>
               </div>
+              {isActive && (
+                    <span className="px-2 py-0.5 bg-[#DCFCE7] text-[#166534] text-xs font-medium rounded-full">
+                      Active
+                    </span>
+                  )}
             </div>
 
             {/* Next delivery section - only show for active subscriptions */}
@@ -566,19 +576,10 @@ const ManageMySubscription: React.FC = () => {
               ₹{formattedAmount}/pack
             </p>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 justify-center items-center">
               {isActive && (
                 <>
                   <button
-                    onClick={() => {
-                      setSelectedSubscription(subscription);
-                      setShowPauseModal(true);
-                    }}
-                    className="flex-1 py-1.5 rounded-full bg-[#FFF3CD] text-[#FF5722] text-sm font-medium"
-                  >
-                    Pause
-                  </button>
-                  {/* <button
                     onClick={() => {
                       setSelectedSubscription(subscription);
                       setShowDetailsModal(true);
@@ -624,7 +625,16 @@ const ManageMySubscription: React.FC = () => {
                       </svg>
                       Modify
                     </div>
-                  </button> */}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedSubscription(subscription);
+                      setShowPauseModal(true);
+                    }}
+                    className="flex-1 py-1.5 rounded-full bg-[#FFF3CD] text-[#FF5722] text-sm font-medium"
+                  >
+                    Pause
+                  </button>
                   <button
                     onClick={() => {
                       setSelectedSubscription(subscription);
@@ -813,7 +823,7 @@ const ManageMySubscription: React.FC = () => {
     <div className="min-h-screen bg-[#FFFBEB]">
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
-        <div className="p-4 md:p-6 flex items-center justify-between">
+        {/* <div className="p-4 md:p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
@@ -833,7 +843,7 @@ const ManageMySubscription: React.FC = () => {
               onClick={() => navigate("/account")}
             />
           </div>
-        </div>
+        </div> */}
 
         <div className="p-4">
           {/* Product Button */}
@@ -911,10 +921,10 @@ const ManageMySubscription: React.FC = () => {
                         {/* <span className="text-gray-500 text-sm">
                 {format(new Date(delivery.createdAt), "MMMM d, yyyy")}
               </span> */}
-                        <div className="mt-2">
+                        <div className="mt-0">
                           <button
-                            onClick={() => navigate("/support")}
-                            className="text-red-500 text-sm font-medium"
+                            onClick={() => navigate("/customer-support")}
+                            className="inline-flex items-center px-3 py-2 text-sm font-medium text-red-500 bg-red-50 border border-red-200 rounded-full hover:bg-red-100 hover:border-red-300 transition-colors duration-200"
                           >
                             Support
                           </button>
@@ -932,6 +942,337 @@ const ManageMySubscription: React.FC = () => {
         <div className="mb-10 md:mb-10">
           <BottomNavigation />
         </div>
+
+        
+
+{/* Details Modal - Updated to include the same functionality as edit modal */}
+<AnimatePresence> 
+  {showDetailsModal && selectedSubscription && (
+    <motion.div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="bg-white rounded-xl w-full max-w-md"
+        initial={{ scale: 0.95 }}
+        animate={{ scale: 1 }}
+        exit={{ scale: 0.95 }}
+      >
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-medium">Modify Subscription</h2>
+            <button
+              onClick={() => setShowDetailsModal(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Quantity Section - Same as ProductDisplaypage.tsx */}
+          {/* <div className="mb-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[15px] font-medium">Quantity</h3>
+              <div className="flex items-center gap-4">
+                <button
+                  className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 text-xl"
+                  onClick={() => setModifyData(prev => ({ 
+                    ...prev, 
+                    quantity: Math.max(1, prev.quantity - 1) 
+                  }))}
+                >
+                  −
+                </button>
+                <span className="text-lg font-medium w-4 text-center">
+                  {modifyData.quantity}
+                </span>
+                <button
+                  className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 text-xl"
+                  onClick={() => setModifyData(prev => ({ 
+                    ...prev, 
+                    quantity: prev.quantity + 1 
+                  }))}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div> */}
+
+          {/* Delivery Days Selection - Same as ProductDisplaypage.tsx with validation */}
+          <div className="mb-6">
+            <h4 className="text-[15px] font-medium mb-4">
+              Select delivery days
+            </h4>
+            
+            {validationError && (
+              <p className="text-red-500 text-sm mb-3">{validationError}</p>
+            )}
+            
+            <div className="flex gap-2 justify-between">
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day, index) => {
+                const dayKey = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"][index];
+                const isSelected = modifyData.selectedDays.includes(dayKey);
+                
+                return (
+                  <button
+                    key={day}
+                    onClick={() => {
+                      if (isSelected) {
+                        // Don't allow deselecting if only 3 days left
+                        if (modifyData.selectedDays.length > 3) {
+                          setModifyData(prev => ({
+                            ...prev,
+                            selectedDays: prev.selectedDays.filter(d => d !== dayKey)
+                          }));
+                          // Clear validation error when user makes a selection
+                          if (validationError) setValidationError("");
+                        }
+                      } else {
+                        setModifyData(prev => ({
+                          ...prev,
+                          selectedDays: [...prev.selectedDays, dayKey]
+                        }));
+                        // Clear validation error when user makes a selection
+                        if (validationError) setValidationError("");
+                      }
+                    }}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium transition-colors
+                      ${!isSelected
+                        ? "bg-white border border-gray-200 text-gray-700 hover:border-[#015D3A]"
+                        : "bg-[#015D3A] text-white"
+                      }`}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <p className="text-xs text-gray-500 mt-2">
+              {modifyData.selectedDays.length} days selected
+            </p>
+          </div>
+
+          {/* Subscribe Button - Same as ProductDisplaypage.tsx with API integration */}
+          <button
+            onClick={async () => {
+              // Use the same validation and API call logic as edit modal
+              if (modifyData.selectedDays.length < 3) {
+                setValidationError("Please select at least 3 days for your subscription");
+                return;
+              }
+              
+              try {
+                setIsUpdating(true);
+                setValidationError("");
+                
+                // Determine the subscription type based on number of days selected
+                const subscriptionType = modifyData.selectedDays.length === 7 ? "DAILY" : "CUSTOM";
+                
+                // Call the same API service that's used in the edit modal
+                await subscriptionService.updateSubscription(selectedSubscription!.id, {
+                  type: subscriptionType,
+                  selectedDays: modifyData.selectedDays,
+                  status: selectedSubscription!.status,
+                });
+                
+                // Refresh subscriptions
+                await fetchSubscriptionDetails();
+                setShowDetailsModal(false);
+                toast.success("Subscription updated successfully!");
+              } catch (error: any) {
+                console.error("Error updating subscription:", error);
+                setValidationError(error.message || "Failed to update subscription");
+              } finally {
+                setIsUpdating(false);
+              }
+            }}
+            disabled={modifyData.selectedDays.length < 3 || isUpdating}
+            className={`w-full py-3.5 rounded-lg text-[15px] font-medium mb-3
+              ${modifyData.selectedDays.length >= 3 
+                ? "bg-[#F15A22] text-white" 
+                : "bg-gray-200 text-gray-500 cursor-not-allowed"}`}
+          >
+            {isUpdating ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Updating...
+              </>
+            ) : (
+              modifyData.selectedDays.length >= 3
+                ? `Subscribe ${modifyData.selectedDays.length} days/wk for ₹${selectedSubscription?.amount || 0}/Pack`
+                : "Select at least 3 days to subscribe"
+            )}
+          </button>
+
+          {/* Subscribe Daily Link - Same as ProductDisplaypage.tsx */}
+          <button
+            onClick={() => {
+              setModifyData(prev => ({
+                ...prev,
+                selectedDays: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+              }));
+              // Clear validation error
+              if (validationError) setValidationError("");
+            }}
+            className="w-full text-[#015D3A] text-[15px] font-medium"
+          >
+            Subscribe Daily
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
+
+
+
+        {/* <AnimatePresence> 
+    {showDetailsModal && selectedSubscription && (
+      <motion.div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <motion.div
+          className="bg-white rounded-xl w-full max-w-md"
+          initial={{ scale: 0.95 }}
+          animate={{ scale: 1 }}
+          exit={{ scale: 0.95 }}
+        >
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-medium">Modify Subscription</h2>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div> */}
+
+            {/* Quantity Section - Same as ProductDisplaypage.tsx */}
+            {/* <div className="mb-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[15px] font-medium">Quantity</h3>
+                <div className="flex items-center gap-4">
+                  <button
+                    className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 text-xl"
+                    onClick={() => setModifyData(prev => ({ 
+                      ...prev, 
+                      quantity: Math.max(1, prev.quantity - 1) 
+                    }))}
+                  >
+                    −
+                  </button>
+                  <span className="text-lg font-medium w-4 text-center">
+                    {modifyData.quantity}
+                  </span>
+                  <button
+                    className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 text-xl"
+                    onClick={() => setModifyData(prev => ({ 
+                      ...prev, 
+                      quantity: prev.quantity + 1 
+                    }))}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div> */}
+
+            {/* Delivery Days Selection - Same as ProductDisplaypage.tsx */}
+            {/* <div className="mb-6">
+              <h4 className="text-[15px] font-medium mb-4">
+                Select delivery days
+              </h4>
+
+               {validationError && (
+                <p className="text-red-500 text-sm mb-3">{validationError}</p>
+              )}
+              
+              <div className="flex gap-2 justify-between">
+                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day, index) => {
+                  const dayKey = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"][index];
+                  const isSelected = modifyData.selectedDays.includes(dayKey);
+                  
+                  return (
+                    <button
+                      key={day}
+                      onClick={() => {
+                        if (isSelected) {
+                          // Don't allow deselecting if only 3 days left
+                          if (modifyData.selectedDays.length > 3) {
+                            setModifyData(prev => ({
+                              ...prev,
+                              selectedDays: prev.selectedDays.filter(d => d !== dayKey)
+                            }));
+                          }
+                        } else {
+                          setModifyData(prev => ({
+                            ...prev,
+                            selectedDays: [...prev.selectedDays, dayKey]
+                          }));
+                        }
+                      }}
+                      className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium transition-colors
+                        ${!isSelected
+                          ? "bg-white border border-gray-200 text-gray-700 hover:border-[#015D3A]"
+                          : "bg-[#015D3A] text-white"
+                        }`}
+                    >
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+            </div> */}
+
+            {/* Subscribe Button - Same as ProductDisplaypage.tsx */}
+            {/* <button
+              onClick={() => { */}
+                {/* // Handle subscription modification here
+                console.log("Modifying subscription:", modifyData);
+                // You can add API call here to update the subscription
+                setShowDetailsModal(false);
+                toast.success("Subscription modified successfully!");
+              }}
+              disabled={modifyData.selectedDays.length < 3}
+              className={`w-full py-3.5 rounded-lg text-[15px] font-medium mb-3
+                ${modifyData.selectedDays.length >= 3 
+                  ? "bg-[#F15A22] text-white" 
+                  : "bg-gray-200 text-gray-500 cursor-not-allowed"}`}
+            >
+              {modifyData.selectedDays.length >= 3
+                ? `Subscribe ${modifyData.selectedDays.length} days/wk for ₹${selectedSubscription?.amount || 0}/Pack`
+                : "Select at least 3 days to subscribe"}
+            </button> */}
+
+            {/* Subscribe Daily Link - Same as ProductDisplaypage.tsx */}
+            {/* <button
+              onClick={() => {
+                setModifyData(prev => ({
+                  ...prev,
+                  selectedDays: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+                }));
+              }}
+              className="w-full text-[#015D3A] text-[15px] font-medium"
+            >
+              Subscribe Daily
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    )}
+  </AnimatePresence> */}
+
 
         {/* Details Modal */}
         {/* <AnimatePresence>
@@ -957,9 +1298,9 @@ const ManageMySubscription: React.FC = () => {
                     >
                       ✕
                     </button>
-                  </div>
+                  </div> */}
 
-                  <div className="mb-6">
+                  {/* <div className="mb-6">
                     <label className="block text-gray-700 mb-2">Quantity</label>
                     <div className="flex items-center gap-4">
                       <button className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center text-xl">
@@ -970,10 +1311,10 @@ const ManageMySubscription: React.FC = () => {
                         +
                       </button>
                     </div>
-                  </div>
+                  </div> */}
 
                  
-                  <div className="mb-6">
+                  {/* <div className="mb-6">
                     <label className="block text-gray-700 mb-2">
                       Select Delivery Type
                     </label>
