@@ -20,6 +20,7 @@ const ProductPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const category = searchParams.get("category");
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (category === "pujaflowers") {
@@ -114,12 +115,12 @@ const ProductPage: React.FC = () => {
                   className="w-10 h-10 md:w-10 md:h-10"
                   onClick={() => navigate("/wallet")}
                 />
-                <img
+                {/* <img
                   src={profileImage}
                   alt="Profile"
                   className="w-6 h-6 md:w-8 md:h-8"
                   onClick={() => navigate("/account")}
-                />
+                /> */}
               </div>
             </div>
 
@@ -150,10 +151,10 @@ const ProductPage: React.FC = () => {
             </div>
 
             {/* Filter Section */}
-            <div className="px-4 pb-4 bg-[#FFFBEB] ">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Puja Flower Packs</h2>
-                <div className="relative">
+            {/* <div className="px-4 pb-4 bg-[#FFFBEB] ">
+              <div className="flex items-center justify-end"> */}
+                {/* <h2 className="text-xl font-semibold">Puja Flower Packs</h2> */}
+                {/* <div className="relative">
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
@@ -177,13 +178,81 @@ const ProductPage: React.FC = () => {
               </div>
             </div>
           </div>
+        </div> */}
+
+         {/* Filter Section - Improved for mobile */}
+         <div className="px-4 pb-4 bg-[#FFFBEB]">
+              <div className="flex items-center justify-end">
+                {/* <h2 className="text-xl font-semibold">Puja Flower Packs</h2> */}
+                
+                {/* Custom Sort Dropdown - Mobile Friendly */}
+                <div className="relative">
+                  <button
+                    onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                    className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-4 py-2 text-sm font-medium text-gray-600 hover:border-[#F15A22] focus:outline-none focus:ring-2 focus:ring-[#F15A22] focus:border-transparent transition-colors"
+                  >
+                    <span>Sort by {sortBy}</span>
+                    <svg
+                      className={`w-4 h-4 transition-transform ${isSortDropdownOpen ? 'rotate-180' : ''}`}
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                  </button>
+
+                  {/* Dropdown Menu - Mobile Optimized */}
+                  {isSortDropdownOpen && (
+                    <>
+                      {/* Backdrop to close dropdown */}
+                      <div 
+                        className="fixed inset-0 z-40"
+                        onClick={() => setIsSortDropdownOpen(false)}
+                      />
+                      
+                      {/* Dropdown Content */}
+                      <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                        {[
+                          { value: "Price", label: "Sort by Price" },
+                          { value: "Popularity", label: "Sort by Popularity"},
+                          { value: "New", label: "Sort by New"},
+                          { value: "Special", label: "Sort by Special"}
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => {
+                              setSortBy(option.value);
+                              setIsSortDropdownOpen(false);
+                            }}
+                            className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 ${
+                              sortBy === option.value 
+                                ? 'bg-[#F15A22] text-white' 
+                                : 'text-gray-700 hover:text-gray-900'
+                            }`}
+                          >
+                            
+                            <span className="text-sm font-medium">{option.label}</span>
+                            {sortBy === option.value && (
+                              <svg className="w-4 h-4 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Spacer to offset the fixed header */}
-        <div className="h-[300px]"></div>
+        <div className="h-[135px]"></div>
 
         {/* Content */}
-        <div className="px-4">
+        <div className="px-8 pb-20">
           {isLoading ? (
             <div className="flex justify-center items-center h-40">
               <Spinner size={400} />
@@ -217,9 +286,9 @@ const ProductPage: React.FC = () => {
                           <h3 className="text-[16px] font-semibold text-gray-900 truncate">
                             {item.name}
                           </h3>
-                          <p className="text-[14px] text-gray-500 truncate">
+                          {/* <p className="text-[14px] text-gray-500 truncate">
                             {"type" in item ? item.type : "Basepack"}
-                          </p>
+                          </p> */}
                           <p className="text-pink-600 text-[16px] font-bold">
                             ₹{getItemPrice(item)}
                           </p>
@@ -228,7 +297,7 @@ const ProductPage: React.FC = () => {
                               e.stopPropagation();
                               handleProductClick(item);
                             }}
-                            className="text-white bg-[#F97316] text-sm rounded-full mb-3 p-1 px-4 py-2 text-[10px]"
+                            className="text-white bg-[#F97316] text-sm rounded-full mb-3 p-1 px-4 py-2 text-[12px] font-sem"
                           >
                             Subscribe
                           </button>
@@ -261,9 +330,9 @@ const ProductPage: React.FC = () => {
                           <h3 className="text-[16px] font-semibold text-gray-900 truncate">
                             {item.name}
                           </h3>
-                          <p className="text-[14px] text-gray-500 truncate">
+                          {/* <p className="text-[14px] text-gray-500 truncate">
                             {"type" in item ? item.type : "Basepack"}
-                          </p>
+                          </p> */}
                           <p className="text-pink-600 text-[16px] font-bold">
                             ₹{getItemPrice(item)}
                           </p>

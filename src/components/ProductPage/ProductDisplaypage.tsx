@@ -515,7 +515,7 @@ const ProductPage: React.FC = () => {
     <div className="min-h-screen bg-[#FFFBEB]">
       <div className="max-w-[800px] mx-auto relative">
         {/* Header */}
-        <div className="p-4 md:p-6 flex items-center justify-between">
+        {/* <div className="p-4 md:p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
@@ -523,7 +523,7 @@ const ProductPage: React.FC = () => {
             >
               <IoArrowBack className="text-xl md:text-2xl" />
             </button>
-            <h1 className="text-xl md:text-2xl font-medium">Puja Pakcs</h1>
+            <h1 className="text-xl md:text-2xl font-medium">Puja Packs</h1>
           </div>
           <div className="flex items-center gap-4">
             <img
@@ -539,7 +539,7 @@ const ProductPage: React.FC = () => {
               onClick={() => navigate("/account")}
             />
           </div>
-        </div>
+        </div> */}
 
         {/* Main Content */}
         <div className="md:flex md:gap-6 md:flex-col">

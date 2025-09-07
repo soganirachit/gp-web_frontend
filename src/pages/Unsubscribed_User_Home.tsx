@@ -44,6 +44,10 @@ function Unsubscribed_User_Home() {
     navigate(`/product/${item.id}`);
   };
 
+  const handlePageClick = () => {
+    navigate('/home'); // Navigate to main home page
+  };
+
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -69,10 +73,10 @@ function Unsubscribed_User_Home() {
   };
 
   return (
-    <div className="bg-[#FFFBEB] min-h-screen">
+    <div className="bg-[#FFFBEB] min-h-screen cursor-pointer" onClick={handlePageClick}>
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 md:p-6">
+        {/* <div className="flex items-center justify-between p-4 md:p-6">
           <img src={logo} alt="Logo" className="h-16 md:h-20" />
           <div className="flex items-center gap-4 md:gap-6">
           <img 
@@ -88,7 +92,7 @@ function Unsubscribed_User_Home() {
               <img src={Profile} alt="Profile" className="w-full h-full" />
             </button>
           </div>
-        </div>
+        </div> */}
 
         {/* Slider Gallery */}
         <div className="px-4 md:px-6">

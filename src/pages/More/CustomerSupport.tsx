@@ -86,7 +86,7 @@ const CustomerSupport: React.FC = () => {
     <div className="bg-[#FFFBEB] min-h-screen">
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
-        <div className="p-4 md:p-6 flex items-center justify-between">
+        {/* <div className="p-4 md:p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
@@ -112,7 +112,7 @@ const CustomerSupport: React.FC = () => {
               onClick={() => navigate("/account")}
             />
           </div>
-        </div>
+        </div> */}
 
         {/* Raise a New Request */}
         <div className="bg-white rounded-lg shadow-sm p-6 mt-6 mx-4 md:mx-6">

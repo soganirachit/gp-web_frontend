@@ -265,7 +265,7 @@ const StorePage: React.FC = () => {
     <div className="min-h-screen bg-[#FFFBEB]">
       <div className="max-w-[800px] mx-auto relative">
         {/* Header */}
-        <div className="p-4 md:p-6 flex items-center justify-between">
+        {/* <div className="p-4 md:p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
@@ -289,7 +289,7 @@ const StorePage: React.FC = () => {
               onClick={() => navigate("/account")}
             />
           </div>
-        </div>
+        </div> */}
         {/* Main Content */}
         <div className="md:flex md:gap-6 md:flex-col">
           <div className="md:flex md:gap-6">

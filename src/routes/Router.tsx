@@ -73,8 +73,8 @@ const router = createBrowserRouter([
     children: [
       // ================== PUBLIC ROUTES ==================
       // Main Pages
-      { path: '/home', element: <Unsubscribed_User_Home /> },
-      { path: '/', element: <Main_Home_page /> },
+      { path: '/home', element: <Main_Home_page /> },
+      { path: '/', element: <Unsubscribed_User_Home /> },
       { path: '/NewUser', element: <Unsubscribed_User_Home /> },
       { path: '/Products', element: <Products /> },
       { path: '/product/:id', element: <ProductPage /> },

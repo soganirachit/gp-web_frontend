@@ -111,7 +111,7 @@ const Settings: React.FC = () => {
     <div className="min-h-screen bg-[#FFFBEB] flex flex-col items-center">
       <div className="w-full max-w-[800px] mx-auto">
         {/* Header */}
-        <div className="p-4 flex items-center justify-between">
+        {/* <div className="p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => navigate(-1)} className="hover:bg-gray-100 rounded-full p-2 transition-colors">
               <IoArrowBack className="text-xl" />
@@ -132,7 +132,7 @@ const Settings: React.FC = () => {
               onClick={() => navigate('/account')}
             />
           </div>
-        </div>
+        </div> */}
 
         {/* Content Container */}
         <div className="w-full px-4">

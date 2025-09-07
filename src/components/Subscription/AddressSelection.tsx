@@ -8,6 +8,11 @@ import { GoogleMap } from "@react-google-maps/api";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import WalletIcon from "../../assets/icon/Wallet.png";
 import ProfileIcon from "../../assets/icon/Profile.png";
+import ReactDOM from "react-dom/client";
+import { orderService } from "../../services/order.service";
+import { subscriptionService } from "../../services/subscription.service";
+import { motion } from "framer-motion";
+import { customerService } from "../../services/getcustomer.service";
 
 const AddressSelection: React.FC = () => {
   const navigate = useNavigate();
@@ -48,6 +53,9 @@ const AddressSelection: React.FC = () => {
     setAsDefault: false,
   });
   const isStoreProduct = location.state?.product?.isStore;
+  const [isConfirmed, setIsConfirmed] = useState(false);
+  const [confirmedSubscription, setConfirmedSubscription] = useState<any>(null);
+  const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -58,7 +66,22 @@ const AddressSelection: React.FC = () => {
       return;
     }
     loadAddresses();
+
+    const loadUserData = async () => {
+      try {
+        const customers = await customerService.getAllCustomers();
+        if (customers && customers.length > 0) {
+          setUserData(customers[0]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch customer data:", err);
+      }
+    };
+    
+    loadUserData();
   }, []);
+
+  
 
   const handleAuthError = (error: Error) => {
     const isAuthError =
@@ -271,37 +294,387 @@ const AddressSelection: React.FC = () => {
       return;
     }
 
+    // try {
+    //   // Get the current subscription data
+    //   const subscriptionData = localStorage.getItem("currentSubscription");
+    //   if (!subscriptionData && !isStoreProduct) {
+    //     toast.error("Subscription details not found. Please try again.");
+    //     navigate("/");
+    //     return;
+    //   }
+
+    //   const parsedData = JSON.parse(subscriptionData || "{}");
+
+    //   // Ensure basePackId is preserved
+    //   if (!parsedData.basePackId && location.state?.basePackId) {
+    //     parsedData.basePackId = location.state?.basePackId;
+    //     localStorage.setItem("currentSubscription", JSON.stringify(parsedData));
+    //   }
+
+    //   // Navigate to the return URL or default to confirm page
+    //   const returnUrl = location.state?.returnUrl || "/subscription/confirm";
+    //   navigate(returnUrl, {
+    //     state: {
+    //       basePackId: parsedData.basePackId,
+    //       subscriptionData: parsedData,
+    //       selectedAddress: selectedAddress,
+    //       product: location.state?.product,
+    //       metaData: location.state?.metaData,
+    //     },
+    //   });
+    // } catch (error) {
+    //   toast.error("An error occurred. Please try again.");
+    // }
+
     try {
-      // Get the current subscription data
+      // For store products, handle payment directly
+      if (isStoreProduct) {
+        // Set loading to true to show "Processing..." on button
+        setLoading(true);
+        
+        // Import the RazorpayPayment component dynamically
+        const { default: RazorpayPayment } = await import("../Payment/Rezorpay/RezorpayPayment");
+        
+        // Handle store product payment directly
+        const handleStoreProductPayment = async (paymentData: any) => {
+          if (!isStoreProduct || !selectedAddress) {
+            toast.error("Missing order details or address");
+            setLoading(false); // Reset loading state
+            return;
+          }
+
+          try {
+            const storeProductPayload = {
+              customerId: location.state.selectedAddress.customerId,
+              subscriptionId: "",
+              productId: location.state.product.id,
+              quantity: location.state.metaData.quantity,
+              addressId: location.state.selectedAddress.id,
+              deliveredBy: "",
+              routeId: "",
+              isStore: location.state.product.isStore,
+              paymentDetails: {
+                razorpay_payment_id: paymentData.razorpay_payment_id,
+                razorpay_order_id: paymentData.razorpay_order_id,
+                razorpay_signature: paymentData.razorpay_signature,
+              }
+            };
+
+            const { success, orderId, paymentId, amount } = await orderService.createStoreOrderWithPayment(storeProductPayload);
+            if (success) {
+              toast.success("Order created successfully!");
+              
+              // Store order details for reference
+              localStorage.setItem("lastStoreOrder", JSON.stringify({
+                orderId,
+                paymentId,
+                amount,
+                product: location.state.product,
+                address: selectedAddress,
+                createdAt: new Date().toISOString()
+              }));
+
+              // Navigate directly to thank you page
+              navigate("/subscription/confirm", {
+                state: {
+                  isConfirmed: true,
+                  isStoreProduct: true,
+                  selectedAddress: selectedAddress,
+                  product: location.state.product,
+                  metaData: location.state.metaData
+                }
+              });
+            } else {
+              throw new Error("Failed to create order");
+            }
+          } catch (error: any) {
+            console.error("Error creating order:", error);
+            toast.error(error.message || "Failed to create order. Please try again.");
+            setLoading(false); // Reset loading state on error
+          }
+        };
+
+        // Create a hidden div to render the payment component
+        const tempDiv = document.createElement('div');
+        tempDiv.style.position = 'absolute';
+        tempDiv.style.left = '-9999px';
+        tempDiv.style.top = '-9999px';
+        tempDiv.style.visibility = 'hidden';
+        document.body.appendChild(tempDiv);
+
+        // Render the payment component
+        const root = ReactDOM.createRoot(tempDiv);
+        root.render(
+          <RazorpayPayment
+            amount={location.state?.product?.sellingPrice * location.state?.metaData?.quantity || 0}
+            purpose="store_product_payment"
+            onSuccess={handleStoreProductPayment}
+            onError={(error) => {
+              toast.error(error.message || "Payment failed. Please try again.");
+              document.body.removeChild(tempDiv);
+              setLoading(false); // Reset loading state on error
+            }}
+          />
+        );
+
+        // Automatically trigger the payment after component renders
+        setTimeout(() => {
+          const paymentButton = tempDiv.querySelector('button');
+          if (paymentButton) {
+            paymentButton.click();
+          }
+        }, 200);
+
+        return;
+      }
+
+      // For subscriptions, confirm directly and show thank you page
       const subscriptionData = localStorage.getItem("currentSubscription");
-      if (!subscriptionData && !isStoreProduct) {
+      if (!subscriptionData) {
         toast.error("Subscription details not found. Please try again.");
         navigate("/");
         return;
       }
 
-      const parsedData = JSON.parse(subscriptionData || "{}");
-
-      // Ensure basePackId is preserved
-      if (!parsedData.basePackId && location.state?.basePackId) {
-        parsedData.basePackId = location.state?.basePackId;
-        localStorage.setItem("currentSubscription", JSON.stringify(parsedData));
+      const parsedData = JSON.parse(subscriptionData);
+      
+      // Validate required fields
+      if (!parsedData.basePackId) {
+        console.error("Missing basePackId");
+        toast.error("Missing base pack ID");
+        return;
       }
 
-      // Navigate to the return URL or default to confirm page
-      const returnUrl = location.state?.returnUrl || "/subscription/confirm";
-      navigate(returnUrl, {
-        state: {
+      if (!parsedData.type) {
+        console.error("Missing type");
+        toast.error("Missing subscription type");
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        const startDate = new Date(parsedData.startDate);
+
+        // Prepare initiate request data
+        const initiateData = {
+          basePackId: String(parsedData.basePackId),
+          type: parsedData.type.toUpperCase() as "DAILY" | "CUSTOM",
+          startDate: startDate,
+          days: parsedData.deliveryCount || 7,
+          ...(parsedData.type.toUpperCase() === "CUSTOM" && parsedData.selectedDays && {
+            selectedDays: parsedData.selectedDays
+          })
+        };
+
+        // First initiate the subscription
+        const initiateResponse = await subscriptionService.initiateSubscription(
+          initiateData
+        );
+
+        if (!initiateResponse.success) {
+          throw new Error(
+            initiateResponse.message || "Failed to initiate subscription"
+          );
+        }
+
+        // Format selected days based on subscription type
+        const selectedDays = parsedData.selectedDays ||
+          (parsedData.type.toUpperCase() === "DAILY"
+            ? ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+            : []);
+
+        // Validate custom subscription has delivery days
+        if (parsedData.type.toUpperCase() === "CUSTOM" && (!selectedDays || selectedDays.length === 0)) {
+          throw new Error("Please select at least one delivery day for custom subscription");
+        }
+
+        // Prepare confirm request data
+        const confirmData = {
           basePackId: parsedData.basePackId,
-          subscriptionData: parsedData,
-          selectedAddress: selectedAddress,
-          product: location.state?.product,
-          metaData: location.state?.metaData,
-        },
-      });
+          deliveryAddressId: selectedAddress.id,
+          type: parsedData.type.toUpperCase() as "DAILY" | "CUSTOM",
+          startDate: startDate,
+          selectedDays: selectedDays,
+        };
+
+        // Then confirm the subscription
+        const confirmResponse = await subscriptionService.confirmSubscription(
+          confirmData
+        );
+        
+        if (confirmResponse.success) {
+          const confirmedSubscriptionData = {
+            ...confirmResponse.subscription,
+            deliveryAddress: selectedAddress,
+            confirmedAt: new Date().toISOString(),
+            packDetails: parsedData.packDetails,
+            type: parsedData.type,
+            deliveryCount: parsedData.deliveryCount,
+            sellingPrice: parsedData.sellingPrice,
+          };
+          localStorage.setItem(
+            "lastConfirmedSubscription",
+            JSON.stringify(confirmedSubscriptionData)
+          );
+          
+          toast.success("Subscription confirmed successfully!");
+          
+          // Show thank you page directly instead of navigating
+          setIsConfirmed(true);
+          setConfirmedSubscription({
+            isStoreProduct: false,
+            subscriptionDetails: parsedData,
+            selectedAddress: selectedAddress
+          });
+        } else {
+          throw new Error(
+            confirmResponse.error || "Failed to confirm subscription"
+          );
+        }
+      } catch (error: any) {
+        console.error("Subscription error:", error);
+        // Enhanced error handling with more specific messages
+        const errorMessage =
+          error.message ||
+          "An error occurred while processing your subscription";
+        if (
+          errorMessage.includes("P2002") ||
+          errorMessage.includes("Unique constraint failed") ||
+          errorMessage.includes("deliveryAddressId")
+        ) {
+          toast.error(
+            "You already have an active subscription at this address"
+          );
+          navigate("/");
+        } else if (errorMessage.includes("Authentication required")) {
+          toast.error("Please login to continue");
+          navigate("/login", {
+            state: { returnUrl: "/subscription/confirm" },
+          });
+        } else if (errorMessage.includes("Insufficient wallet balance")) {
+          toast.error("Insufficient wallet balance");
+          navigate("/wallet", {
+            state: {
+              returnUrl: "/subscription/confirm",
+              requiredAmount: parsedData.amount,
+            },
+          });
+        } else {
+          console.error("Detailed error:", {
+            message: errorMessage,
+            parsedData,
+            selectedAddress,
+          });
+          toast.error(errorMessage);
+        }
+      } finally {
+        setLoading(false);
+      }
     } catch (error) {
       toast.error("An error occurred. Please try again.");
+      setLoading(false);
     }
+  };
+
+  // Success Checkmark Component (copied from ConfirmSubscription.tsx)
+  const SuccessCheckmark = () => (
+    <motion.div
+      className="relative w-16 h-16 mx-auto mb-4"
+      initial={{ scale: 0 }}
+      animate={{ scale: 1 }}
+      transition={{ duration: 0.5, type: "spring", bounce: 0.5 }}
+    >
+      <motion.div
+        className="absolute inset-0 bg-[#E6F7EE] opacity-20 rounded-full"
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1.2, opacity: 0.2 }}
+        transition={{
+          duration: 1.5,
+          repeat: Infinity,
+          repeatType: "reverse",
+        }}
+      />
+      <motion.div
+        className="absolute inset-2 bg-[#E6F7EE] rounded-full flex items-center justify-center"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3 }}
+      >
+        <motion.div
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{
+            delay: 0.5,
+            type: "spring",
+            stiffness: 200,
+            damping: 15,
+          }}
+        >
+          <FaCheck className="text-2xl text-green-600" />
+        </motion.div>
+      </motion.div>
+    </motion.div>
+  );
+
+  // MapView Component (copied from ConfirmSubscription.tsx)
+  const MapView = ({ address }: { address: any }) => {
+    if (!isLoaded) {
+      return (
+        <div className="w-full h-[250px] bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#F15A22]"></div>
+        </div>
+      );
+    }
+
+    if (loadError) {
+      return (
+        <div className="w-full h-[250px] bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+          <FaMapMarkerAlt className="text-gray-400 text-4xl" />
+        </div>
+      );
+    }
+
+    // Get coordinates from the address.coordinates field
+    let center = { lat: 20.5937, lng: 78.9629 }; // Default to India's center
+
+    if (address?.coordinates) {
+      const [lat, lng] = address.coordinates.split(",").map(Number);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        center = { lat, lng };
+      }
+    }
+
+    return (
+      <div className="w-full h-[250px] rounded-lg overflow-hidden relative">
+        <GoogleMap
+          mapContainerStyle={{
+            width: "100%",
+            height: "100%",
+          }}
+          center={center}
+          zoom={16}
+          options={{
+            zoomControl: false,
+            streetViewControl: false,
+            mapTypeControl: false,
+            fullscreenControl: false,
+            draggable: false,
+            scrollwheel: false,
+            disableDoubleClickZoom: true,
+            disableDefaultUI: true,
+            gestureHandling: "none",
+            clickableIcons: false,
+          }}
+        >
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
+            <MdLocationOn className="text-[#F15A22] text-4xl drop-shadow-lg" />
+          </div>
+        </GoogleMap>
+        {/* Overlay to prevent any map interactions */}
+        <div className="absolute inset-0 bg-transparent" />
+      </div>
+    );
   };
 
   // Map related functions
@@ -404,10 +777,200 @@ const AddressSelection: React.FC = () => {
     }
   };
 
+  // Check if we should show thank you page
+  if (isConfirmed) {
+    return (
+      <div className="min-h-screen bg-[#FFFBEB] flex justify-center items-center px-4">
+        <div className="bg-[#FFFBEB] w-full max-w-[800px] rounded-xl pb-24">
+          <div className="pt-8 pb-6 mt-[20px] text-center">
+            <SuccessCheckmark />
+            <motion.h1
+              className="text-2xl font-semibold mb-2"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
+            >
+              Thank you,{" "}
+              {userData
+                ? `${userData.firstName} ${userData.lastName}`
+                : "User"}
+              !
+            </motion.h1>
+            <motion.p
+              className="text-gray-600 text-sm leading-relaxed"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1 }}
+            >
+              {confirmedSubscription?.isStoreProduct
+                ? "Your order has been placed successfully! Payment completed. You will receive a confirmation shortly."
+                : "Your subscription has been confirmed. Get ready for fresh flowers every morning."}
+            </motion.p>
+          </div>
+
+          {/* Address Block */}
+          <motion.div
+            className="bg-white rounded-lg mx-4 p-4 mb-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.2 }}
+          >
+            <h2 className="text-[15px] font-medium mb-3">Delivering to</h2>
+            <div className="flex items-start gap-3">
+              <FaMapMarkerAlt className="text-gray-400 mt-1" />
+              <p className="text-gray-600 text-sm leading-relaxed break-words">
+                {[
+                  selectedAddress?.streetName,
+                  selectedAddress?.area,
+                  selectedAddress?.city,
+                  selectedAddress?.state,
+                  selectedAddress?.pincode,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+              </p>
+            </div>
+            <div className="mt-4 overflow-hidden rounded-lg">
+              <MapView address={selectedAddress} />
+            </div>
+          </motion.div>
+
+          {/* Info Block for Order / Subscription */}
+          <motion.div
+            className="bg-white rounded-lg mx-4 p-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.4 }}
+          >
+            <h2 className="text-[15px] font-medium mb-4">
+              {confirmedSubscription?.isStoreProduct ? "Your Order Details" : "Your Subscription"}
+            </h2>
+            <div className="space-y-4">
+              {confirmedSubscription?.isStoreProduct ? (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 text-sm">Product</span>
+                    <span className="text-gray-800 text-sm">
+                      {confirmedSubscription?.product?.name}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 text-sm">Quantity</span>
+                    <span className="text-gray-800 text-sm">
+                      {confirmedSubscription?.metaData?.quantity}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 text-sm">Price</span>
+                    <span className="text-gray-800 text-sm">
+                      ₹{confirmedSubscription?.product?.sellingPrice ?? "N/A"}/Pack
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 text-sm">Total Amount</span>
+                    <span className="text-gray-800 text-sm font-medium">
+                      ₹{(confirmedSubscription?.product?.sellingPrice ?? 0) * (confirmedSubscription?.metaData?.quantity ?? 1)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 text-sm">Order ID</span>
+                    <span className="text-gray-800 text-sm font-medium">
+                      {localStorage.getItem("lastStoreOrder") ? JSON.parse(localStorage.getItem("lastStoreOrder")!).orderId : "Processing..."}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 text-sm">Pack</span>
+                    <span className="text-gray-800 text-sm">
+                      {confirmedSubscription?.subscriptionDetails?.packDetails?.name}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 text-sm">Frequency</span>
+                    <span className="text-gray-800 text-sm">
+                      {confirmedSubscription?.subscriptionDetails?.type === "DAILY"
+                        ? "Daily • mon-sun"
+                        : "Custom Days"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 text-sm">First Delivery</span>
+                    <span className="text-gray-800 text-sm">
+                      {(() => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0); // normalize to midnight
+
+                        const daysMap: { [key: string]: number } = {
+                          SUNDAY: 0,
+                          MONDAY: 1,
+                          TUESDAY: 2,
+                          WEDNESDAY: 3,
+                          THURSDAY: 4,
+                          FRIDAY: 5,
+                          SATURDAY: 6,
+                        };
+
+                        let nextDate: Date | undefined;
+
+                        if (confirmedSubscription?.subscriptionDetails?.type === "DAILY") {
+                          // Start from tomorrow
+                          for (let i = 1; i <= 7; i++) {
+                            const date = new Date(today);
+                            date.setDate(date.getDate() + i);
+                            const day = date.getDay();
+                            if (day >= 1 && day <= 7) { // Mon-Sun
+                              nextDate = date;
+                              break;
+                            }
+                          }
+                        } else if (
+                          confirmedSubscription?.subscriptionDetails?.type === "CUSTOM" &&
+                          confirmedSubscription?.subscriptionDetails?.selectedDays &&
+                          Array.isArray(confirmedSubscription?.subscriptionDetails?.selectedDays)
+                        ) {
+                          // Normalize and filter valid days only
+                          const selectedDays = confirmedSubscription?.subscriptionDetails?.selectedDays
+                            .map((day: string) => day.toUpperCase())
+                            .filter((day: string) => day in daysMap)
+                            .map((day: string) => daysMap[day]);
+
+                          for (let i = 1; i <= 7; i++) {
+                            const date = new Date(today);
+                            date.setDate(date.getDate() + i);
+                            const day = date.getDay();
+                            if (selectedDays.includes(day)) {
+                              nextDate = date;
+                              break;
+                            }
+                          }
+                        }
+
+                        return nextDate
+                          ? nextDate.toLocaleDateString("en-US", {
+                            weekday: "short",
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })
+                          : "Calculating...";
+                      })()}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#FFFBEB]">
       {/* Header */}
-      <div className="bg-[#FFFBEB] sticky top-0 z-10 border-b">
+      {/* <div className="bg-[#FFFBEB] sticky top-0 z-10 border-b">
         <div className="max-w-[800px] mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -434,7 +997,7 @@ const AddressSelection: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Main Content */}
       <div className="max-w-[800px] mx-auto p-4">
@@ -635,7 +1198,7 @@ const AddressSelection: React.FC = () => {
               </div>
             )}
             
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 md:relative md:border-t-0 md:bg-transparent md:p-0">
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50 md:relative md:border-t-0 md:bg-transparent md:p-0 md:mt-6">
             <div className="max-w-[800px] mx-auto space-y-3">
             <button
               onClick={() => setShowAddForm(true)}
@@ -653,7 +1216,7 @@ const AddressSelection: React.FC = () => {
                   : 'bg-gray-300 cursor-not-allowed'
               }`}
             >
-              {loading ? 'Processing...' : 'Continue'}
+              {loading ? 'Processing...' : 'Continue & Pay'}
             </button>
             </div>
             </div>

@@ -634,9 +634,9 @@ const Home2: React.FC = () => {
       <div className="min-h-screen bg-[#FFFBEB] pb-20 lg:pb-0">
         <div className="max-w-[800px] mx-auto">
           {/* Header */}
-          <header className="p-4 md:p-6 bg-[#FFFBEB] z-50">
+          {/* <header className="p-4 md:p-6 bg-[#FFFBEB] z-50">
           
-            <div className="flex-1 space-y-1">
+            <div className="flex-1 space-y-1"> */}
               {/* Location clickable row */}
               {/*<motion.div
                 className="flex items-center gap-2 cursor-pointer"
@@ -650,7 +650,7 @@ const Home2: React.FC = () => {
               </motion.div> */}
 
               {/* Refresh Button and Address */}
-              <div className="flex items-center ">
+              {/* <div className="flex items-center ">
                 <button
                   onClick={() => validateDeliveryZone(true)}
                   disabled={isValidatingDeliveryZone}
@@ -666,7 +666,7 @@ const Home2: React.FC = () => {
               </div>
 
               {/* Delivery Zone Status */}
-              <div className="ml-6">
+              {/* <div className="ml-6">
                 {isValidatingDeliveryZone ? (
                   <div className="flex items-center gap-2 text-xs text-gray-600">
                     <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-[#015D3A]"></div>
@@ -689,7 +689,7 @@ const Home2: React.FC = () => {
                 )}
               </div>
             </div>
-          </header>
+          </header> */} 
 
           {/* Greeting Section */}
           <div className="px-4 md:px-6 mb-6">
@@ -705,7 +705,7 @@ const Home2: React.FC = () => {
           <div className="px-4 md:px-6 space-y-6">
             {/* Alert and Promo Banner Container */}
             <div className="space-y-6">
-              {/* Low Balance Alert */}
+              {/* Low Balance Alert
               {walletBalance < 100 && (
                 <div className="bg-orange-100 rounded-xl p-6 shadow-sm">
                   <div className="flex items-center space-x-4">
@@ -734,7 +734,7 @@ const Home2: React.FC = () => {
                     </motion.button>
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Promo Banner Card */}
               <div className="bg-white rounded-xl p-6 shadow-sm">
