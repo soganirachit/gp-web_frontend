@@ -73,7 +73,11 @@ class OrderService {
                 if (!localStorage.getItem("token")) {
                     throw new Error("Authentication token is not configured");
                 }
-                throw new Error(error.response?.data?.error || error.message || "Unknown error occurred");
+                const apiError = error.response?.data;
+                if (apiError?.details) {
+                    console.error("Store order payload rejected:", apiError.details);
+                }
+                throw new Error(apiError?.error || apiError?.message || error.message || "Unknown error occurred");
             }
         } catch (error: any) {
             throw new Error(error.message || "Unknown error occurred");

@@ -329,6 +329,35 @@ const AddressSelection: React.FC = () => {
     try {
       // For store products, handle payment directly
       if (isStoreProduct) {
+        // Ensure userData is loaded before proceeding
+        let currentUserData = userData;
+        if (!currentUserData?.id) {
+          try {
+            const customers = await customerService.getAllCustomers();
+            if (customers && customers.length > 0) {
+              currentUserData = customers[0];
+              setUserData(customers[0]);
+            } else {
+              toast.error("Customer information not available. Please refresh the page.");
+              return;
+            }
+          } catch (err) {
+            console.error("Failed to fetch customer data:", err);
+            toast.error("Failed to load customer information. Please refresh the page.");
+            return;
+          }
+        }
+
+        if (!location.state?.product || !location.state?.metaData) {
+          toast.error("Product information not available. Please try again.");
+          return;
+        }
+
+        // Store product and metaData in localStorage for after Razorpay redirect
+        localStorage.setItem("pendingStoreProduct", JSON.stringify(location.state.product));
+        localStorage.setItem("pendingStoreMetaData", JSON.stringify(location.state.metaData));
+        localStorage.setItem("selectedDeliveryAddress", JSON.stringify(selectedAddress));
+        
         // Set loading to true to show "Processing..." on button
         setLoading(true);
         
@@ -336,32 +365,141 @@ const AddressSelection: React.FC = () => {
         const { default: RazorpayPayment } = await import("../Payment/Rezorpay/RezorpayPayment");
         
         // Handle store product payment directly
+        // Use currentUserData (local variable) to avoid closure issues
         const handleStoreProductPayment = async (paymentData: any) => {
           if (!isStoreProduct || !selectedAddress) {
             toast.error("Missing order details or address");
-            setLoading(false); // Reset loading state
+            setLoading(false);
+            return;
+          }
+
+          // Get fresh userData if needed (in case of redirect or closure issue)
+          let customerData = currentUserData;
+          if (!customerData?.id && !customerData?.customerId) {
+            try {
+              const customers = await customerService.getAllCustomers();
+              console.log("Fetched customers:", customers);
+              if (customers && customers.length > 0) {
+                customerData = customers[0];
+                console.log("Using customer data:", customerData);
+              } else {
+                console.error("No customers returned from API");
+                toast.error("Customer information not available. Please refresh the page.");
+                setLoading(false);
+                return;
+              }
+            } catch (err) {
+              console.error("Failed to fetch customer data:", err);
+              toast.error("Failed to load customer information. Please refresh the page.");
+              setLoading(false);
+              return;
+            }
+          }
+
+          // Log customer data to debug
+          console.log("Customer data for order:", {
+            hasId: !!customerData?.id,
+            customerId: customerData?.id,
+            fullData: customerData
+          });
+
+          // Get product and metaData from localStorage (after redirect) or location.state
+          const storedProduct = localStorage.getItem("pendingStoreProduct");
+          const storedMetaData = localStorage.getItem("pendingStoreMetaData");
+          const storedAddress = localStorage.getItem("selectedDeliveryAddress");
+          
+          let productToUse = location.state?.product;
+          let metaDataToUse = location.state?.metaData;
+          let addressToUse = selectedAddress;
+
+          if (storedProduct && storedMetaData) {
+            try {
+              productToUse = JSON.parse(storedProduct);
+              metaDataToUse = JSON.parse(storedMetaData);
+            } catch (e) {
+              console.error("Error parsing stored product data:", e);
+            }
+          }
+
+          if (storedAddress) {
+            try {
+              addressToUse = JSON.parse(storedAddress);
+            } catch (e) {
+              console.error("Error parsing stored address:", e);
+            }
+          }
+
+          if (!productToUse || !metaDataToUse || !addressToUse) {
+            toast.error("Order information not available. Please try again.");
+            setLoading(false);
+            return;
+          }
+
+          const resolvedCustomerId = customerData?.id || customerData?.customerId;
+          const resolvedProductId = productToUse.id || productToUse.productId;
+          const resolvedQuantity = Number(metaDataToUse.quantity);
+          const resolvedDeliveryTime = metaDataToUse.deliveryTime || new Date().toISOString();
+
+          const missingFields = {
+            customerId: !resolvedCustomerId && !localStorage.getItem("token"),
+            productId: !resolvedProductId,
+            quantity: !resolvedQuantity || Number.isNaN(resolvedQuantity),
+            addressId: !addressToUse.id,
+            paymentDetailsMissing:
+              !paymentData?.razorpay_payment_id ||
+              !paymentData?.razorpay_order_id ||
+              !paymentData?.razorpay_signature,
+          };
+
+          if (
+            missingFields.customerId ||
+            missingFields.productId ||
+            missingFields.quantity ||
+            missingFields.addressId ||
+            missingFields.paymentDetailsMissing
+          ) {
+            console.error("Missing required order fields:", {
+              ...missingFields,
+              addressId: addressToUse.id,
+              productId: resolvedProductId,
+              quantity: resolvedQuantity,
+            });
+            toast.error("Order information incomplete. Please try again.");
+            setLoading(false);
             return;
           }
 
           try {
-            const storeProductPayload = {
-              customerId: location.state.selectedAddress.customerId,
+            // Build payload - include customerId explicitly and coerce numeric values
+            const storeProductPayload: any = {
+              customerId: resolvedCustomerId,
               subscriptionId: "",
-              productId: location.state.product.id,
-              quantity: location.state.metaData.quantity,
-              addressId: location.state.selectedAddress.id,
+              productId: resolvedProductId,
+              quantity: resolvedQuantity,
+              addressId: addressToUse.id,
               deliveredBy: "",
               routeId: "",
-              isStore: location.state.product.isStore,
+              isStore: productToUse.isStore ?? true,
+              deliveryTime: resolvedDeliveryTime,
               paymentDetails: {
                 razorpay_payment_id: paymentData.razorpay_payment_id,
                 razorpay_order_id: paymentData.razorpay_order_id,
                 razorpay_signature: paymentData.razorpay_signature,
+                paymentMethod: "razorpay",
               }
             };
 
+            console.log("Creating store order with payload:", {
+              ...storeProductPayload,
+              paymentDetails: { ...storeProductPayload.paymentDetails } // Log without sensitive data
+            });
+
             const { success, orderId, paymentId, amount } = await orderService.createStoreOrderWithPayment(storeProductPayload);
             if (success) {
+              // Clear pending store product data from localStorage
+              localStorage.removeItem("pendingStoreProduct");
+              localStorage.removeItem("pendingStoreMetaData");
+              
               toast.success("Order created successfully!");
               
               // Store order details for reference
@@ -369,8 +507,9 @@ const AddressSelection: React.FC = () => {
                 orderId,
                 paymentId,
                 amount,
-                product: location.state.product,
-                address: selectedAddress,
+                product: productToUse,
+                address: addressToUse,
+                deliveryTime: resolvedDeliveryTime,
                 createdAt: new Date().toISOString()
               }));
 
@@ -379,9 +518,9 @@ const AddressSelection: React.FC = () => {
                 state: {
                   isConfirmed: true,
                   isStoreProduct: true,
-                  selectedAddress: selectedAddress,
-                  product: location.state.product,
-                  metaData: location.state.metaData
+                  selectedAddress: addressToUse,
+                  product: productToUse,
+                  metaData: { ...metaDataToUse, quantity: resolvedQuantity, deliveryTime: resolvedDeliveryTime }
                 }
               });
             } else {

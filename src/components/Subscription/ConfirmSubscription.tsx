@@ -73,6 +73,8 @@ interface MapViewProps {
 }
 
 interface UserData {
+  id?: string;
+  customerId?: string;
   firstName: string;
   lastName: string;
   emailAddress: string;
@@ -394,6 +396,8 @@ const ConfirmSubscription: React.FC = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [storeProduct, setStoreProduct] = useState<any>(null);
+  const [storeMetaData, setStoreMetaData] = useState<any>(null);
 
   const [, setStatusModal] = useState<{
     isOpen: boolean;
@@ -404,7 +408,7 @@ const ConfirmSubscription: React.FC = () => {
     type: "loading",
     message: "",
   });
-  const isStoreProduct = location?.state?.product?.isStore;
+  const isStoreProduct = location?.state?.product?.isStore || storeProduct?.isStore;
 
   useEffect(() => {
     const loadData = async () => {
@@ -416,6 +420,29 @@ const ConfirmSubscription: React.FC = () => {
           }
         } catch (err) {
           console.error("Failed to fetch customer data:", err);
+        }
+
+        // For store products, load from localStorage or location.state
+        if (location?.state?.product?.isStore || localStorage.getItem("pendingStoreProduct")) {
+          const storedProduct = localStorage.getItem("pendingStoreProduct");
+          const storedMetaData = localStorage.getItem("pendingStoreMetaData");
+          
+          if (storedProduct && storedMetaData) {
+            try {
+              setStoreProduct(JSON.parse(storedProduct));
+              setStoreMetaData(JSON.parse(storedMetaData));
+            } catch (e) {
+              console.error("Error parsing stored product data:", e);
+            }
+          } else if (location?.state?.product) {
+            setStoreProduct(location.state.product);
+            setStoreMetaData(location.state.metaData);
+            // Store in localStorage for after Razorpay redirect
+            localStorage.setItem("pendingStoreProduct", JSON.stringify(location.state.product));
+            if (location.state.metaData) {
+              localStorage.setItem("pendingStoreMetaData", JSON.stringify(location.state.metaData));
+            }
+          }
         }
 
         // Get subscription details from multiple sources
@@ -484,7 +511,7 @@ const ConfirmSubscription: React.FC = () => {
           setSubscriptionDetails(normalizedDetails);
 
           // Check for address from location state first, then localStorage
-          let addressToUse = locationState?.selectedAddress;
+          let addressToUse = locationState?.selectedAddress || location?.state?.selectedAddress;
 
           if (!addressToUse && address) {
             try {
@@ -494,9 +521,16 @@ const ConfirmSubscription: React.FC = () => {
             }
           }
 
+          // For store products, also check if address is in location.state
+          if (!addressToUse && isStoreProduct && location?.state?.selectedAddress) {
+            addressToUse = location.state.selectedAddress;
+            // Store in localStorage for after Razorpay redirect
+            localStorage.setItem("selectedDeliveryAddress", JSON.stringify(addressToUse));
+          }
+
           // console.log('Selected address:', addressToUse);
 
-          if (!addressToUse) {
+          if (!addressToUse && !isStoreProduct) {
             navigate("/subscription/confirm", {
               state: {
                 selectedAddress: address,
@@ -507,7 +541,9 @@ const ConfirmSubscription: React.FC = () => {
             return;
           }
 
-          setSelectedAddress(addressToUse);
+          if (addressToUse) {
+            setSelectedAddress(addressToUse);
+          }
         } catch (error) {
           console.error("Error processing subscription details:", error);
           navigate("/");
@@ -665,29 +701,67 @@ const ConfirmSubscription: React.FC = () => {
   };
 
   const handleStoreProductPayment = async (paymentData: any) => {
-    if (!isStoreProduct || !selectedAddress) {
+    if (!isStoreProduct || !selectedAddress || !storeProduct || !storeMetaData) {
       toast.error("Missing order details or address");
       return;
     }
 
-    
+    const resolvedCustomerId = userData?.id || userData?.customerId;
+    if (!resolvedCustomerId) {
+      toast.error("Customer information not available. Please refresh the page.");
+      return;
+    }
+
+    const resolvedProductId = storeProduct.id || (storeProduct as any)?.productId;
+    const resolvedQuantity = Number(storeMetaData.quantity);
+    const resolvedDeliveryTime = storeMetaData.deliveryTime || new Date().toISOString();
+
+    const missingFields = {
+      customerId: !resolvedCustomerId && !localStorage.getItem("token"),
+      productId: !resolvedProductId,
+      quantity: !resolvedQuantity || Number.isNaN(resolvedQuantity),
+      addressId: !selectedAddress.id,
+      paymentDetailsMissing:
+        !paymentData?.razorpay_payment_id ||
+        !paymentData?.razorpay_order_id ||
+        !paymentData?.razorpay_signature,
+    };
+
+    if (
+      missingFields.customerId ||
+      missingFields.productId ||
+      missingFields.quantity ||
+      missingFields.addressId ||
+      missingFields.paymentDetailsMissing
+    ) {
+      console.error("Missing required order fields (store confirm):", {
+        ...missingFields,
+        addressId: selectedAddress.id,
+        productId: resolvedProductId,
+        quantity: resolvedQuantity,
+      });
+      toast.error("Order information incomplete. Please try again.");
+      return;
+    }
+
     setIsProcessingPayment(true);
 
     try {
       const storeProductPayload = {
-        customerId: location.state.selectedAddress.customerId,
+        customerId: resolvedCustomerId,
         subscriptionId: "",
-        productId: location.state.product.id,
-        quantity: location.state.metaData.quantity,
-        addressId: location.state.selectedAddress.id,
+        productId: resolvedProductId,
+        quantity: resolvedQuantity,
+        addressId: selectedAddress.id,
         deliveredBy: "",
         routeId: "",
-        isStore: location.state.product.isStore,
-        deliveryTime: location.state.metaData.deliveryTime,
+        isStore: storeProduct.isStore ?? true,
+        deliveryTime: resolvedDeliveryTime,
         paymentDetails: {
           razorpay_payment_id: paymentData.razorpay_payment_id,
           razorpay_order_id: paymentData.razorpay_order_id,
           razorpay_signature: paymentData.razorpay_signature,
+          paymentMethod: "razorpay",
         }
       };
 
@@ -701,14 +775,18 @@ const ConfirmSubscription: React.FC = () => {
         toast.success("Order created successfully!");
         setIsConfirmed(true);
 
+        // Clear pending store product data from localStorage
+        localStorage.removeItem("pendingStoreProduct");
+        localStorage.removeItem("pendingStoreMetaData");
+
         // Store order details for reference
         localStorage.setItem("lastStoreOrder", JSON.stringify({
           orderId,
           paymentId,
           amount,
-          product: location.state.product,
+          product: storeProduct,
           address: selectedAddress,
-          deliveryTime: location.state.metaData.deliveryTime,
+          deliveryTime: resolvedDeliveryTime,
           createdAt: new Date().toISOString()
         }));
       } else {
@@ -907,7 +985,7 @@ const ConfirmSubscription: React.FC = () => {
             {isStoreProduct ? (
               <>
                 <RazorpayPayment
-                  amount={location.state?.product?.sellingPrice * location.state?.metaData?.quantity || 0}
+                  amount={(storeProduct?.sellingPrice || 0) * (storeMetaData?.quantity || 1)}
                   purpose="store_product_payment"
                   onSuccess={handleStoreProductPayment}
                   onError={(error) => {
@@ -1019,27 +1097,27 @@ const ConfirmSubscription: React.FC = () => {
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600 text-sm">Product</span>
                       <span className="text-gray-800 text-sm">
-                        {location.state?.product?.name}
+                        {storeProduct?.name || "N/A"}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600 text-sm">Quantity</span>
                       <span className="text-gray-800 text-sm">
-                        {location.state?.metaData?.quantity}
+                        {storeMetaData?.quantity || "N/A"}
                       </span>
                     </div>
 
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600 text-sm">Price</span>
                       <span className="text-gray-800 text-sm">
-                        ₹{location?.state?.product?.sellingPrice ?? "N/A"}
+                        ₹{storeProduct?.sellingPrice ?? "N/A"}
                         /Pack
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600 text-sm">Total Amount</span>
                       <span className="text-gray-800 text-sm font-medium">
-                        ₹{(location?.state?.product?.sellingPrice ?? 0) * (location?.state?.metaData?.quantity ?? 1)}
+                        ₹{(storeProduct?.sellingPrice ?? 0) * (storeMetaData?.quantity ?? 1)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
