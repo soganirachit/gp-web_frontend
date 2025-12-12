@@ -125,7 +125,7 @@ const NameInput: React.FC = () => {
               type="text"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              placeholder="Enter your full name"
+              placeholder="Enter your first name"
               className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FF5722] transition-colors"
             />
           </div>
@@ -136,7 +136,7 @@ const NameInput: React.FC = () => {
               type="text"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              placeholder="Enter your email address"
+              placeholder="Enter your last name"
               className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FF5722] transition-colors"
             />
           </div>
@@ -147,7 +147,7 @@ const NameInput: React.FC = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Valid Input Only"
+              placeholder="Enter your email address"
               className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FF5722] transition-colors"
             />
           </div>

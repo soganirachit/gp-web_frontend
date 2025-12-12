@@ -61,7 +61,15 @@ const FixedHeader: React.FC = () => {
   // Function to get header content based on current route
   const getHeaderContent = () => {
     const path = location.pathname;
-    
+
+    // Auth pages
+    if (['/login', '/otp-verification', '/name-input', '/allset'].includes(path)) {
+      return (
+        <div className="flex items-center">
+          <img src={logo} alt="Logo" className="h-16 md:h-20" />
+        </div>
+      );
+    }
     
      // Home page 
      if (path === "/home") {
@@ -112,6 +120,22 @@ const FixedHeader: React.FC = () => {
           </button>
           <h1 className="text-xl md:text-2xl font-medium">
             Select Delivery Address
+          </h1>
+        </div>
+      );
+    }
+    
+    // Addresses page
+    if (path.includes("addresses")) {
+      return (
+        <div className="flex items-center gap-3">
+           <button onClick={() => navigate(-1)} 
+          className="hover:bg-gray-100 rounded-full p-2 transition-colors"
+          >
+            <IoArrowBack className="text-xl md:text-2xl" />
+          </button>
+          <h1 className="text-xl md:text-2xl font-medium">
+            Address Book
           </h1>
         </div>
       );
@@ -267,7 +291,11 @@ const FixedHeader: React.FC = () => {
 
   return (
     <div className="bg-[#FFFBEB] sticky top-0 z-10">
-      <div className="max-w-[800px] mx-auto px-4 py-3">
+      <div className={`max-w-[800px] mx-auto px-4 ${
+      ['/login', '/otp-verification', '/name-input', '/allset'].includes(location.pathname) 
+        ? 'py-2' 
+        : 'py-3'
+    }`}>
         <div className="flex items-center justify-between">
           {/* Left side - Dynamic content */}
           {getHeaderContent()}

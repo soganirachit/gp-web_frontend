@@ -553,7 +553,7 @@ const AddEditAddress: React.FC = () => {
         </div>
 
         {/* Confirm Button */}
-        <div className="mt-6 md:mb-9">
+        <div className="mt-6 mb-6 md:mb-9">
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || isValidatingLocation}

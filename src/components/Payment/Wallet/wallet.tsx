@@ -247,7 +247,7 @@ const Wallet = () => {
         )}
 
         {/* Header */}
-        <div className="p-4 md:p-6 flex items-center justify-between">
+        {/* <div className="p-4 md:p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
@@ -271,7 +271,7 @@ const Wallet = () => {
               onClick={() => navigate("/account")}
             />
           </div>
-        </div>
+        </div> */}
 
         {/* Balance Card */}
         <div className="mx-4 md:mx-6 bg-[#16A34A] text-white rounded-lg p-6 md:p-8 flex items-center gap-4">
@@ -513,22 +513,41 @@ const Wallet = () => {
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                 .map((item, idx) => {
                   const isTransaction = 'type' in item;
-                  const isCredit = isTransaction ? item.type === 'CREDIT' : item.status === 'captured';
-                  const isPending = !isTransaction && item.status === 'created';
+                  
+                  // Determine if it's a credit transaction
+                  let isCredit = false;
+                  if (isTransaction) {
+                    // For regular transactions, check the type
+                    isCredit = item.type === 'CREDIT';
+                  } else {
+                    // For transactionLogs, check status only
+                    const status = (item as any).status?.toLowerCase();
+                    isCredit = 
+                      status === 'wallet_recharged' ||
+                      status === 'captured' ||
+                      status === 'completed' ||
+                      status === 'paid';
+                  }
+                  
+                  const status = !isTransaction ? (item as any).status?.toLowerCase() : null;
+                  const isPending = !isTransaction && (status === 'created' || status === 'pending');
+                  
+                  // Get absolute amount value
+                  const amount = Math.abs(isTransaction ? item.amount : (item as any).amount);
                   
                   return (
                     <div key={`txn-${idx}`} className="bg-white p-4 md:p-5 rounded-lg">
                       <div className="flex justify-between items-start">
                         <div className="flex items-start gap-3 md:gap-4">
                           <div className={`p-2 md:p-3 rounded-full ${
-                            isPending ? 'bg-red-50' : isCredit ? 'bg-green-50' : 'bg-red-50'
+                            isPending ? 'bg-yellow-50' : isCredit ? 'bg-green-50' : 'bg-red-50'
                           }`}>
                             {isPending ? (
-                              <div className="w-5 h-5  border-red-600 "><IoMdArrowDown  className="text-red-500 md:text-xl" /></div>
+                              <IoWarningOutline className="text-yellow-500 md:text-xl" />
                             ) : isCredit ? (
-                              <IoMdArrowDown className="text-green-500 md:text-xl" />
+                              <IoMdArrowUp className="text-green-500 md:text-xl" />
                             ) : (
-                              <IoMdArrowUp className="text-red-500 md:text-xl" />
+                              <IoMdArrowDown className="text-red-500 md:text-xl" />
                             )}
                           </div>
                           <div>
@@ -542,9 +561,9 @@ const Wallet = () => {
                                 Txn ID: {item.referenceId}
                               </div>
                             )}
-                            {!isTransaction && item.razorpayOrderId && (
+                            {!isTransaction && (item as any).razorpayOrderId && (
                               <div className="text-xs md:text-sm text-gray-400">
-                                Order ID: {item.razorpayOrderId}
+                                Order ID: {(item as any).razorpayOrderId}
                               </div>
                             )}
                             <div className="text-sm text-gray-500">
@@ -557,18 +576,18 @@ const Wallet = () => {
                         </div>
                         <div className="text-right">
                           <div className={`font-medium md:text-lg ${
-                            isPending ? 'text-red-600' : 
+                            isPending ? 'text-yellow-600' : 
                             isCredit ? 'text-green-600' : 'text-red-600'
                           }`}>
-                            {isCredit ? '+' : '-'}{INR} {isTransaction ? item.amount : item.amount}
+                            {isPending ? '' : (isCredit ? '+' : '-')}{INR} {amount}
                           </div>
                           {!isTransaction && (
                             <div className={`text-xs md:text-sm ${
-                              isPending ? 'text-red-600' : 
-                              item.status === 'captured' ? 'text-green-600' : 
+                              isPending ? 'text-yellow-600' : 
+                              isCredit ? 'text-green-600' : 
                               'text-gray-600'
                             }`}>
-                              {item.status.charAt(0).toUpperCase() + item.status.slice(1).toLowerCase()}
+                              {((item as any).status?.charAt(0).toUpperCase() || '') + ((item as any).status?.slice(1).toLowerCase() || '')}
                             </div>
                           )}
                         </div>

@@ -108,7 +108,7 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB] flex flex-col items-center">
+    <div className="min-h-screen bg-[#FFFBEB]">
       <div className="w-full max-w-[800px] mx-auto">
         {/* Header */}
         {/* <div className="p-4 flex items-center justify-between">
@@ -194,7 +194,7 @@ const Settings: React.FC = () => {
           </div>
 
           {/* Logout Button */}
-          <div className="mt-6 mb-24">
+          <div className="mt-6 mb-20">
             <button
               onClick={handleLogout}
               className="flex items-center justify-center gap-2 w-full py-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
@@ -207,9 +207,7 @@ const Settings: React.FC = () => {
       </div>
 
       {/* Bottom Navigation */}
-      <div className="w-full">
-        <BottomNav />
-      </div>
+      <BottomNav />
     </div>
   );
 }

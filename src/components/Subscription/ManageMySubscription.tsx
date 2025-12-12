@@ -781,13 +781,6 @@ const ManageMySubscription: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#FFFBEB]">
         <div className="max-w-md mx-auto p-4">
-          <div className="flex items-center mb-6">
-            <button onClick={() => navigate(-1)} className="text-gray-600">
-              <FaArrowLeft className="text-xl" />
-            </button>
-            <h1 className="ml-4 text-xl font-semibold">My Subscription</h1>
-          </div>
-
           <div className="bg-white rounded-lg p-6 shadow-sm text-center">
             <svg
               className="w-16 h-16 text-gray-300 mx-auto mb-4"

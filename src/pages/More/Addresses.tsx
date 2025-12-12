@@ -176,31 +176,7 @@ const Addresses: React.FC = () => {
 
   return (
     <div className="min-h-screen  bg-[#FFFBEB]">
-        <div className="max-w-[800px] mx-auto">
-      {/* Header */}
-      <div className="p-4 md:p-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate(-1)} className="hover:bg-gray-100 rounded-full p-2 transition-colors">
-              <IoArrowBack className="text-xl md:text-2xl" />
-            </button>
-            <h1 className="text-xl md:text-2xl font-medium">Address Book</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <img 
-              src={WalletIcon} 
-              alt="Wallet" 
-              className="w-10 h-10 md:w-10 md:h-10" 
-              onClick={() => navigate('/wallet')}
-            />
-            <img 
-              src={ProfileIcon} 
-              alt="Profile" 
-              className="w-6 h-6 md:w-8 md:h-8" 
-              onClick={() => navigate('/account')}
-            />
-          </div>
-          </div>
-        </div>
+      
 
 
       {/* Main Content */}
