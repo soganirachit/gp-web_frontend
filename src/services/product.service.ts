@@ -4,18 +4,37 @@ import { getApiUrl } from "../config/api.config";
 const API_URL = `${getApiUrl()}/products`;
 
 export interface Product {
-  isActive: unknown;
   id: string;
+  productId?: string;
   name: string;
-  category: string;
+  sku?: string;
   description: string;
-  imagesUrl?: string;
   sellingPrice: number;
-  type: string;
-  allowedSubscriptionType: string;
+  imagesUrl?: string | string[];
   tags: string[];
-  weight?: number;
+  subcategories?: string[];
   isAvailable: boolean;
+  weight?: number | null;
+  margin?: number;
+  profit?: number;
+  costOfGoods?: number;
+  noOfSticks?: number;
+  contents?: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+    description?: string;
+  }>;
+  category: string;
+  type?: string;
+  allowedSubscriptionType?: string;
+  surcharge?: number;
+  isVisible?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  isActive?: boolean | unknown;
+  isStore?: boolean;
+  isDaily?: boolean;
 }
 
 export const productService = {
@@ -33,6 +52,30 @@ export const productService = {
       }
     } catch (error: unknown) {
       console.error("Error fetching products:", error);
+      if (error instanceof Error || error instanceof AxiosError) {
+        throw error;
+      }
+      throw new Error("An unknown error occurred");
+    }
+  },
+
+  async getProductById(id: string): Promise<Product> {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${API_URL}/${id}`, {
+        headers: token ? { Authorization: token } : {},
+      });
+      
+      // Handle different response formats
+      if (response.data && response.data.data) {
+        return response.data.data;
+      } else if (response.data) {
+        return response.data;
+      }
+      
+      throw new Error("Invalid response format");
+    } catch (error: unknown) {
+      console.error("Error fetching product:", error);
       if (error instanceof Error || error instanceof AxiosError) {
         throw error;
       }

@@ -1,30 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {  FaHome, FaBuilding, FaPen, FaTrash, FaMapMarkerAlt } from 'react-icons/fa';
-import { motion, AnimatePresence } from 'framer-motion';
-import { addressService, type Address } from '../../services/address.service';
-import WalletIcon from '../../assets/icon/Wallet.png';
-import ProfileIcon from '../../assets/icon/Profile.png';
-import BottomNav from '../../components/layout/BottomNav';
+import { FaPen, FaTrash } from 'react-icons/fa';
 import { IoArrowBack } from 'react-icons/io5';
-import { MdLocationOn } from 'react-icons/md';
-import { GoogleMap } from '@react-google-maps/api';
-import { useGoogleMaps } from '../../hooks/useGoogleMaps';
+import { BsCheckSquareFill } from 'react-icons/bs';
+import { addressService, type Address } from '../../services/address.service';
+import BottomNav from '../../components/layout/BottomNav';
 import Spinner from '../../components/common/Spinner';
+import { GoogleMap, useJsApiLoader } from '@react-google-maps/api';
+
+// Import SVG icons
+import homeIcon from '../../assets/svg/adressbook/home.svg';
+import workIcon from '../../assets/svg/adressbook/office.svg';
+import othersIcon from '../../assets/svg/adressbook/others.svg';
+import defaultIcon from '../../assets/svg/adressbook/default.svg';
 
 const Addresses: React.FC = () => {
   const navigate = useNavigate();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [addressToDelete, setAddressToDelete] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState(false);
-  const { isLoaded, loadError } = useGoogleMaps();
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadAddresses();
-  }, []);
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+  });
 
   const loadAddresses = async () => {
     try {
@@ -32,13 +33,39 @@ const Addresses: React.FC = () => {
       setError(null);
       const data = await addressService.getAllAddresses();
       setAddresses(data);
-    } catch (error: any) {
-      setError(error.message || 'Failed to load addresses');
-      if (error.message.includes('login')) {
-        navigate('/login', { state: { returnUrl: location.pathname } });
+    } catch (err: any) {
+      setError(err.message || 'Failed to load addresses');
+      if (err.message?.includes('login')) {
+        navigate('/login');
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAddresses();
+  }, [navigate]);
+
+  const handleEdit = (address: Address) => {
+    navigate('/addresses/edit', { state: { address } });
+  };
+
+  const handleDeleteClick = (id: string) => {
+    setDeleteId(id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteId) return;
+    try {
+      setActionInProgress(true);
+      await addressService.deleteAddress(deleteId);
+      setAddresses(addresses.filter(a => a.id !== deleteId));
+      setDeleteId(null);
+    } catch (error: any) {
+      // Error handling
+    } finally {
+      setActionInProgress(false);
     }
   };
 
@@ -47,7 +74,7 @@ const Addresses: React.FC = () => {
       setActionInProgress(true);
       setError(null);
       await addressService.setDefaultAddress(addressId);
-      await loadAddresses(); // Reload addresses to get updated state
+      await loadAddresses();
     } catch (error: any) {
       setError(error.message || 'Failed to set default address');
       if (error.message.includes('login')) {
@@ -58,248 +85,223 @@ const Addresses: React.FC = () => {
     }
   };
 
-  const handleDeleteClick = (addressId: string) => {
-    setAddressToDelete(addressId);
-    setShowDeleteModal(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (addressToDelete) {
-      try {
-        setActionInProgress(true);
-        setError(null);
-        await addressService.deleteAddress(addressToDelete);
-        setAddresses(addresses.filter(addr => addr.id !== addressToDelete));
-        setShowDeleteModal(false);
-      } catch (error: any) {
-        setError(error.message || 'Failed to delete address');
-        if (error.message.includes('login')) {
-          navigate('/login', { state: { returnUrl: location.pathname } });
-        }
-      } finally {
-        setActionInProgress(false);
-        setAddressToDelete(null);
-      }
-    }
-  };
-
-  const handleEdit = (address: Address) => {
-    navigate('/addresses/edit', { state: { address } });
-  };
-
   const AddressMap: React.FC<{ coordinates: string }> = ({ coordinates }) => {
     const [lat, lng] = coordinates.split(',').map(Number);
-    
-    if (!isLoaded) return (
-      <div className="w-32 h-32 bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#F15A22]"></div>
-      </div>
-    );
 
-    if (loadError) return (
-      <div className="w-32 h-32 bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center">
-        <FaMapMarkerAlt className="text-gray-400 text-4xl" />
-      </div>
-    );
+    if (!isLoaded) return <div className="w-full h-full bg-gray-200 animate-pulse rounded-lg" />;
 
     return (
-      <div className="w-32 h-32 bg-gray-100 rounded-xl overflow-hidden">
-        <GoogleMap
-          mapContainerStyle={{
-            width: '100%',
-            height: '100%'
-          }}
-          center={{ lat, lng }}
-          zoom={15}
-          options={{
-            disableDefaultUI: true,
-            zoomControl: false,
-            streetViewControl: false,
-            mapTypeControl: false,
-            fullscreenControl: false,
-            clickableIcons: false,
-            draggable: false
-          }}
-        >
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-            <MdLocationOn className="text-[#F15A22] text-3xl drop-shadow-lg" />
-          </div>
-        </GoogleMap>
-      </div>
+      <GoogleMap
+        mapContainerStyle={{ width: '100%', height: '100%', borderRadius: '0.5rem' }}
+        center={{ lat, lng }}
+        zoom={15}
+        options={{
+          disableDefaultUI: true,
+          draggable: false,
+          zoomControl: false,
+          scrollwheel: false,
+          disableDoubleClickZoom: true,
+        }}
+      />
     );
   };
 
-  const DeleteConfirmationModal = () => (
-    <AnimatePresence>
-      {showDeleteModal && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-opacity-50 backdrop-blur z-50 flex items-center justify-center px-4"
-        >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            className="bg-white rounded-2xl p-6 w-full max-w-sm"
-          >
-            <div className="text-center">
-              <FaTrash className="mx-auto text-[#F15A22] text-2xl mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Delete Address</h3>
-              <p className="text-gray-600 mb-6">Are you sure you want to delete this address? This action cannot be undone.</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowDeleteModal(false)}
-                  disabled={actionInProgress}
-                  className="flex-1 py-3 border-2 border-gray-300 text-gray-700 rounded-lg text-[15px] font-medium hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteConfirm}
-                  disabled={actionInProgress}
-                  className="flex-1 bg-[#F15A22] text-white py-3 rounded-lg text-[15px] font-medium hover:bg-[#F15A22]/90 disabled:opacity-50"
-                >
-                  {actionInProgress ? 'Deleting...' : 'Delete'}
-                </button>
-              </div>
-              {error && (
-                <p className="mt-4 text-sm text-red-500">{error}</p>
-              )}
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
+  // Helper to get icon based on type
+  const getTypeIcon = (type: string) => {
+    const t = type?.toLowerCase();
+    if (t === 'home') return homeIcon;
+    if (t === 'work' || t === 'office') return workIcon;
+    return othersIcon;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+        <Spinner size={400} />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen  bg-[#FFFBEB]">
-      
+    <div className="min-h-screen bg-[#FFFBEB] px-4">
+      <div className="max-w-[800px] mx-auto">
+        {/* Header */}
+        <div className="py-4 flex items-center mb-2">
+          <button
+            onClick={() => navigate(-1)}
+            className="hover:bg-gray-100 rounded-full p-2 transition-colors mr-3"
+          >
+            <IoArrowBack className="text-xl" />
+          </button>
+          <h1 className="text-2xl font-semibold text-gray-800">My Address</h1>
+        </div>
 
-
-      {/* Main Content */}
-      <div className="max-w-[800px] mx-auto p-4">
-        {loading ? (
-          <div className="flex justify-center items-center h-40">
-              <Spinner size={400} />
-          </div>
-        ) : error && !error.includes('login') ? (
-          <div className="text-center py-8">
-            <p className="text-red-500 mb-4">{error}</p>
-            <button
-              onClick={loadAddresses}
-              className="text-[#015D3A] font-medium hover:underline"
-            >
-              Try Again
-            </button>
-          </div>
-        ) : (
-          <>
-            {addresses.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-600 mb-4">No addresses found</p>
-                <button
-                  onClick={() => navigate('/addresses/add')}
-                  className="text-[#015D3A] font-medium hover:underline"
-                >
-                  Add your first address
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {addresses.map((address) => (
-                  <div
-                    key={address.id}
-                    className="bg-white rounded-xl p-4 shadow-sm"
+        {/* Main Content */}
+        <div>
+          {error && !error.includes('login') ? (
+            <div className="text-center py-8">
+              <p className="text-red-500 mb-4">{error}</p>
+              <button
+                onClick={loadAddresses}
+                className="text-[#015D3A] font-medium hover:underline"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : (
+            <>
+              {addresses.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600 mb-4">No addresses found</p>
+                  <button
+                    onClick={() => navigate('/addresses/add')}
+                    className="text-[#015D3A] font-medium hover:underline"
                   >
-                    <div className="flex items-start gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-3">
-                          <h3 className="text-xl font-medium text-gray-900">{address.type}</h3>
-                          {address.isDefault && (
-                            <span className="text-xs bg-[#ECFDF5] text-[#015D3A] px-2 py-1 rounded-full">
-                              Default
-                            </span>
-                          )}
-                          <div className="w-8 h-8 bg-[#ECFDF5] rounded-full flex items-center justify-center">
-                            {address.type === 'Home' ? (
-                              <FaHome className="text-[#015D3A] text-sm" />
-                            ) : (
-                              <FaBuilding className="text-[#015D3A] text-sm" />
-                            )}
+                    Add your first address
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4 mb-24">
+                  {addresses.map((address) => {
+                    const icon = getTypeIcon(address.type);
+                    const isGreenBg = ['home', 'others'].includes(address.type?.toLowerCase());
+                    const iconBgClass = isGreenBg ? 'bg-[#ECFDF5]' : 'bg-[#EEF2FF]';
+
+                    return (
+                      <div
+                        key={address.id}
+                        className="bg-white rounded-3xl p-5 shadow-sm"
+                      >
+                        <div className="flex justify-between items-start gap-3">
+
+                          {/* Left Details Section */}
+                          <div className="flex-1 min-w-0">
+                            {/* Header: Icon + Type + Default Badge */}
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className={`w-10 h-10 rounded-full ${iconBgClass} flex items-center justify-center flex-shrink-0`}>
+                                <img src={icon} alt={address.type} className="w-5 h-5" />
+                              </div>
+                              <h3 className="text-lg font-semibold text-gray-800 capitalize">
+                                {address.type || 'Others'}
+                              </h3>
+
+                              <span className="bg-[#E6F4EA] text-[#1E8E3E] text-xs px-2 py-1 rounded-2xl font-semibold">
+                                Default
+                              </span>
+
+                            </div>
+
+                            {/* Address Text */}
+                            <p className="text-gray-500 text-sm leading-relaxed mb-1 pr-2 break-words">
+                              {[
+                                address.houseNo,
+                                address.streetName,
+                                address.area,
+                                address.landmark,
+                                address.city,
+                                address.state
+                              ].filter(Boolean).join(', ')} - {address.pincode}
+                            </p>
+
+                            {/* Phone Text */}
+                            <p className="text-gray-800 font-base text-sm mb-4">
+                              +91 {address.associatedPhoneNumber}
+                            </p>
                           </div>
+
+                          {/* Right Map Section */}
+                          {address.coordinates && (
+                            <div className="w-28 h-28 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                              <AddressMap coordinates={address.coordinates} />
+                            </div>
+                          )}
                         </div>
-                        <p className="text-gray-600 text-[15px]">{address.houseNo}, {address.streetName}</p>
-                        <p className="text-gray-600 text-[15px]">{address.area}, {address.city}</p>
-                        <p className="text-gray-600 text-[15px]">{address.state} - {address.pincode}</p>
-                        <p className="text-gray-600 text-[15px] mt-2">+91 {address.associatedPhoneNumber}</p>
+
+                        {/* Action Buttons Row */}
+                        <div className="flex items-center gap-6 mt-2">
+                          <button
+                            onClick={() => handleEdit(address)}
+                            className="flex items-center gap-1.5 text-[#00A082] font-semibold text-sm hover:opacity-80 disabled:opacity-50"
+                            disabled={actionInProgress}
+                          >
+                            <FaPen className="text-xs" />
+                            Edit
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteClick(address.id)}
+                            className="flex items-center gap-1.5 text-[#FF3B30] font-semibold text-sm hover:opacity-80 disabled:opacity-50"
+                            disabled={actionInProgress}
+                          >
+                            <FaTrash className="text-xs" />
+                            Delete
+                          </button>
+
+                          {!address.isDefault && (
+                            <button
+                              onClick={() => handleSetDefault(address.id)}
+                              disabled={actionInProgress}
+                              className="flex items-center gap-1.5 text-[#3B82F6] font-semibold text-sm hover:opacity-80 disabled:opacity-50"
+                            >
+                              <img src={defaultIcon} alt="default" className="w-5 h-5" />
+                              Set as Default
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      {address.coordinates ? (
-                        <AddressMap coordinates={address.coordinates} />
-                      ) : (
-                        <div className="w-32 h-32 bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center">
-                          <FaMapMarkerAlt className="text-gray-400 text-4xl" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex gap-3 mt-4">
-                      <button
-                        onClick={() => handleEdit(address)}
-                        className="flex-1 flex items-center justify-center gap-2 py-3 border-2 border-[#015D3A] text-[#015D3A] rounded-full text-[15px] font-medium hover:bg-[#ECFDF5] disabled:opacity-50"
-                        disabled={actionInProgress}
-                      >
-                        <FaPen className="text-sm" />
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteClick(address.id)}
-                        className="flex-1 flex items-center justify-center gap-2 py-3 border-2 border-[#F15A22] text-[#F15A22] rounded-full text-[15px] font-medium hover:bg-red-50 disabled:opacity-50"
-                        disabled={actionInProgress}
-                      >
-                        <FaTrash className="text-sm" />
-                        Delete
-                      </button>
-                      {!address.isDefault && (
-                        <button
-                          onClick={() => handleSetDefault(address.id)}
-                          disabled={actionInProgress}
-                          className="flex-1 bg-[#F15A22] text-white py-3 px-5 rounded-full text-[15px] font-medium hover:bg-[#F15A22]/90 disabled:opacity-50"
-                        >
-                          {actionInProgress ? 'Setting...' : 'Set as Default'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
 
-            {/* Add New Address Button */}
-            <button
-              onClick={() => navigate('/addresses/add')}
-              disabled={actionInProgress}
-              className="mt-6 w-full flex items-center justify-center gap-2 text-[#015D3A] py-4 mb-[90px] border-[#015D3A] rounded-xl hover:bg-[#ECFDF5] disabled:opacity-50"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add New Address
-            </button>
-          </>
-        )}
-      </div>
+              {/* Add New Address Button */}
+              <button
+                onClick={() => navigate('/addresses/add')}
+                disabled={actionInProgress}
+                className="w-full flex items-center justify-center gap-2 bg-[#F9A11D] text-gray-900 py-3.5 rounded-[20px] text-base font-semibold hover:opacity-90 disabled:opacity-50 mb-8 shadow-sm"
+              >
+                <span className="text-xl font-light">+</span>
+                Add New Address
+              </button>
+            </>
+          )}
+        </div>
 
-      {/* Bottom Navigation */}
+        {/* Bottom Navigation */}
         <div>
           <BottomNav />
         </div>
 
-      {/* Delete Confirmation Modal */}
-      <DeleteConfirmationModal />
+        {/* Delete Confirmation Modal */}
+        {deleteId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm px-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+              <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">
+                Confirm Delete
+              </h3>
+              <p className="text-gray-500 text-center mb-6">
+                Are you sure you want to delete this address?
+              </p>
+              <div className="space-y-3">
+                <button
+                  onClick={handleDeleteConfirm}
+                  className="w-full py-3.5 bg-red-50 text-red-600 font-semibold rounded-xl hover:bg-red-100 transition-colors"
+                >
+                  Delete Address
+                </button>
+                <button
+                  onClick={() => setDeleteId(null)}
+                  className="w-full py-3.5 bg-gray-50 text-gray-700 font-semibold rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-export default Addresses; 
+export default Addresses;

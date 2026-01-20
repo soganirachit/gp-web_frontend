@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { FaMapMarkerAlt, FaCheck } from "react-icons/fa";
+import { FaMapMarkerAlt, FaCheck, FaClock, FaBox, FaRupeeSign } from "react-icons/fa";
+import ordercnfSvg from "../../assets/svg/dp_daily svg/ordercnf.svg";
+import flowerCnfSvg from "../../assets/svg/dp_daily svg/flower_cnf.svg";
+import paycnfSvg from "../../assets/svg/dp_daily svg/paycnf.svg";
+import clockSvg from "../../assets/svg/dp_daily svg/clock.svg";
+import savingsCnfSvg from "../../assets/svg/dp_daily svg/savings_cnf.svg";
+import allsetLogo from "../../assets/All/allset_logo.png";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 import { GoogleMap } from "@react-google-maps/api";
@@ -287,40 +293,27 @@ interface UserData {
 
 const SuccessCheckmark = () => (
   <motion.div
-    className="relative w-16 h-16 mx-auto mb-4"
-    initial={{ scale: 0 }}
-    animate={{ scale: 1 }}
-    transition={{ duration: 0.5, type: "spring", bounce: 0.5 }}
+    className="relative w-20 h-20 mx-auto mb-4"
+    initial={{ scale: 0, opacity: 0 }}
+    animate={{ scale: 1, opacity: 1 }}
+    transition={{ 
+      type: "spring",
+      stiffness: 260,
+      damping: 20,
+      delay: 0.2 
+    }}
   >
-    <motion.div
-      className="absolute inset-0 bg-[#E6F7EE] opacity-20 rounded-full"
-      initial={{ scale: 0.8, opacity: 0 }}
-      animate={{ scale: 1.2, opacity: 0.2 }}
-      transition={{
-        duration: 1.5,
-        repeat: Infinity,
-        repeatType: "reverse",
+    <img
+      src={allsetLogo}
+      alt="Success"
+      className="w-20 h-20 object-contain select-none"
+      style={{
+        imageRendering: 'auto',
+        WebkitBackfaceVisibility: 'hidden',
+        backfaceVisibility: 'hidden',
+        transform: 'translateZ(0) scale(1)',
       }}
     />
-    <motion.div
-      className="absolute inset-2 bg-[#E6F7EE] rounded-full flex items-center justify-center"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: 0.3 }}
-    >
-      <motion.div
-        initial={{ scale: 0, rotate: -180 }}
-        animate={{ scale: 1, rotate: 0 }}
-        transition={{
-          delay: 0.5,
-          type: "spring",
-          stiffness: 200,
-          damping: 15,
-        }}
-      >
-        <FaCheck className="text-2xl text-green-600" />
-      </motion.div>
-    </motion.div>
   </motion.div>
 );
 
@@ -398,6 +391,8 @@ const ConfirmSubscription: React.FC = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [storeProduct, setStoreProduct] = useState<any>(null);
   const [storeMetaData, setStoreMetaData] = useState<any>(null);
+  const [confirmedSubscriptionData, setConfirmedSubscriptionData] = useState<any>(null);
+  const [confirmedProductData, setConfirmedProductData] = useState<any>(null);
 
   const [, setStatusModal] = useState<{
     isOpen: boolean;
@@ -443,6 +438,25 @@ const ConfirmSubscription: React.FC = () => {
               localStorage.setItem("pendingStoreMetaData", JSON.stringify(location.state.metaData));
             }
           }
+        }
+
+        // Check if coming from confirmed subscription (from AddressSelection)
+        if (location?.state?.isConfirmed && !location?.state?.isStoreProduct) {
+          // Subscription was confirmed in AddressSelection, show thank you page
+          setIsConfirmed(true);
+          if (location.state.subscription) {
+            setConfirmedSubscriptionData(location.state.subscription);
+          }
+          if (location.state.product) {
+            setConfirmedProductData(location.state.product);
+          }
+          if (location.state.selectedAddress) {
+            setSelectedAddress(location.state.selectedAddress);
+          }
+          if (location.state.subscriptionDetails) {
+            setSubscriptionDetails(location.state.subscriptionDetails);
+          }
+          return; // Don't load other data, just show thank you page
         }
 
         // Get subscription details from multiple sources
@@ -632,6 +646,14 @@ const ConfirmSubscription: React.FC = () => {
           confirmData
         );
         if (confirmResponse.success) {
+          // Store the backend response data
+          setConfirmedSubscriptionData(confirmResponse.subscription);
+          // Handle product from response (it may be in the response object directly)
+          const responseWithProduct = confirmResponse as any;
+          if (responseWithProduct.product) {
+            setConfirmedProductData(responseWithProduct.product);
+          }
+          
           const confirmedSubscription = {
             ...confirmResponse.subscription,
             deliveryAddress: selectedAddress,
@@ -640,6 +662,7 @@ const ConfirmSubscription: React.FC = () => {
             type: subscriptionDetails.type,
             deliveryCount: subscriptionDetails.deliveryCount,
             sellingPrice: subscriptionDetails.sellingPrice,
+            product: responseWithProduct.product,
           };
           localStorage.setItem(
             "lastConfirmedSubscription",
@@ -1025,198 +1048,217 @@ const ConfirmSubscription: React.FC = () => {
         )}
 
         {/* Show thank you + details if confirmed */}
-        {isConfirmed && (
+        {isConfirmed && !isStoreProduct && (
           <>
-            <div className="pt-8 pb-6 mt-[90px] text-center">
+            <div className="pt-8 pb-4 text-center">
               <SuccessCheckmark />
               <motion.h1
-                className="text-2xl font-semibold mb-2"
+                className="text-3xl font-bold text-gray-900 mb-2"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8 }}
+                transition={{ delay: 0.5 }}
               >
-                Thank you,{" "}
-                {userData
-                  ? `${userData.firstName} ${userData.lastName}`
-                  : "User"}
-                !
+                Thank you
               </motion.h1>
               <motion.p
-                className="text-gray-600 text-sm leading-relaxed"
+                className="text-gray-900 text-base"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1 }}
+                transition={{ delay: 0.7 }}
               >
-                {isStoreProduct
-                  ? "Your order has been placed successfully! Payment completed. You will receive a confirmation shortly."
-                  : "Your subscription has been confirmed. Get ready for fresh flowers every morning."}
+                Your daily flower subscription is confirmed.
               </motion.p>
             </div>
 
-            {/* Address Block */}
+            {/* Subscription Details Card */}
             <motion.div
-              className="bg-white rounded-lg mx-4 p-4 mb-4"
+              className="bg-white rounded-xl mx-4 p-4 mb-4 shadow-sm"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.2 }}
+              transition={{ delay: 0.9 }}
             >
-              <h2 className="text-[15px] font-medium mb-3">Delivering to</h2>
-              <div className="flex items-start gap-3">
-                <FaMapMarkerAlt className="text-gray-400 mt-1" />
-                <p className="text-gray-600 text-sm leading-relaxed break-words">
-                  {[
-                    selectedAddress?.street,
-                    selectedAddress?.area,
-                    selectedAddress?.city,
-                    selectedAddress?.state,
-                    selectedAddress?.pincode,
-                  ]
-                    .filter(Boolean)
-                    .join(", ")}
+              {/* Address Section */}
+              <div className="mb-4">
+                <div className="flex items-start gap-3 mb-3">
+                  <FaMapMarkerAlt className="text-gray-600 mt-1 flex-shrink-0 text-lg" />
+                  <p className="text-gray-900 text-sm leading-relaxed">
+                    {confirmedSubscriptionData?.address 
+                      ? `${confirmedSubscriptionData.address.houseNo || ''} ${confirmedSubscriptionData.address.streetName || ''}, ${confirmedSubscriptionData.address.area || ''}, ${confirmedSubscriptionData.address.city || ''}, ${confirmedSubscriptionData.address.state || ''} - ${confirmedSubscriptionData.address.pincode || ''}`.replace(/^[\s,]+|[\s,]+$/g, '')
+                      : selectedAddress
+                      ? `${selectedAddress?.street || ''}, ${selectedAddress?.area || ''}, ${selectedAddress?.city || ''}, ${selectedAddress?.state || ''} - ${selectedAddress?.pincode || ''}`.replace(/^[\s,]+|[\s,]+$/g, '')
+                      : 'Address not available'}
+                  </p>
+                </div>
+                <div className="mt-3 overflow-hidden -mx-4">
+                  <MapView address={selectedAddress || (confirmedSubscriptionData?.address ? {
+                    id: confirmedSubscriptionData.address.id,
+                    street: confirmedSubscriptionData.address.streetName || '',
+                    area: confirmedSubscriptionData.address.area || '',
+                    city: confirmedSubscriptionData.address.city || '',
+                    state: confirmedSubscriptionData.address.state || '',
+                    pincode: confirmedSubscriptionData.address.pincode || '',
+                    coordinates: confirmedSubscriptionData.address.coordinates
+                  } : null)} />
+                </div>
+              </div>
+
+              {/* Delivery Time */}
+              <div className="flex items-start gap-3 mb-4">
+              <img src={clockSvg} alt="Clock" className="w-6 h-6 opacity-80" />
+                <p className="text-gray-900 text-sm">
+                  Tomorrow - 7:00 AM
                 </p>
-
               </div>
-              <div className="mt-4 overflow-hidden rounded-lg">
-                <MapView address={selectedAddress} />
+
+              {/* Selected Days */}
+              <div className="mb-4">
+                <div className="flex gap-1.5 w-full">
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
+                    // Map display names to API format (3-letter abbreviations)
+                    const dayToApiFormat: { [key: string]: string } = {
+                      'Mon': 'MON',
+                      'Tue': 'TUE',
+                      'Wed': 'WED',
+                      'Thu': 'THU',
+                      'Fri': 'FRI',
+                      'Sat': 'SAT',
+                      'Sun': 'SUN'
+                    };
+                    
+                    // Also map to full names for backward compatibility
+                    const dayToFullName: { [key: string]: string } = {
+                      'Mon': 'MONDAY',
+                      'Tue': 'TUESDAY',
+                      'Wed': 'WEDNESDAY',
+                      'Thu': 'THURSDAY',
+                      'Fri': 'FRIDAY',
+                      'Sat': 'SATURDAY',
+                      'Sun': 'SUNDAY'
+                    };
+                    
+                    const dayAbbrev = dayToApiFormat[day]; // "MON", "TUE", etc.
+                    const dayFull = dayToFullName[day]; // "MONDAY", "TUESDAY", etc.
+                    
+                    // Check if day is in deliveryDays array from API response
+                    // Handle both confirmedSubscriptionData and subscription from location.state
+                    const subscriptionData = confirmedSubscriptionData || location?.state?.subscription;
+                    const deliveryDays = subscriptionData?.deliveryDays || [];
+                    const deliveryPreference = subscriptionData?.deliveryPreference;
+                    
+                    // Day is selected if:
+                    // 1. deliveryPreference is 'DAILY' (all days selected), OR
+                    // 2. The day is in the deliveryDays array (check both 3-letter abbrev and full name)
+                    let isSelected = false;
+                    if (deliveryPreference === 'DAILY') {
+                      isSelected = true;
+                    } else if (Array.isArray(deliveryDays) && deliveryDays.length > 0) {
+                      // Check if the day is in the array (handle both "MON" and "MONDAY" formats)
+                      isSelected = deliveryDays.some((d: string) => {
+                        if (typeof d !== 'string') return false;
+                        const normalized = d.toUpperCase().trim();
+                        // Check against both 3-letter abbreviation and full name
+                        return normalized === dayAbbrev || normalized === dayFull;
+                      });
+                    }
+                    
+                    return (
+                      <button
+                        key={day}
+                        className={`flex-1 py-2 rounded-2xl text-sm font-semibold transition-colors ${
+                          isSelected
+                            ? 'bg-[rgb(250,162,34)] text-black'
+                            : 'bg-gray-100 text-gray-700 border-2 border-gray-300'
+                        }`}
+                        disabled
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Product Details */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <img src={ordercnfSvg} alt="Box" className="w-6 h-6 opacity-80" />
+                  <span className="text-gray-900 text-sm font-medium">
+                    {confirmedProductData?.name || confirmedSubscriptionData?.product?.name || subscriptionDetails?.packDetails?.name || 'Pack'} x {confirmedSubscriptionData?.quantity || 1}
+                  </span>
+                </div>
+                <span className="text-gray-900 text-sm font-medium">
+                  ₹{confirmedProductData?.sellingPrice || confirmedSubscriptionData?.product?.sellingPrice || subscriptionDetails?.sellingPrice || 0}/Pack
+                </span>
+              </div>
+
+              {/* Total Amount */}
+              <div className="flex items-center justify-between border-t pt-4">
+                <div className="flex items-center gap-3">
+                  <img src={paycnfSvg} alt="Payment" className="w-6 h-6 opacity-80" />
+                  <span className="text-gray-900 text-sm font-medium">Total Amount</span>
+                </div>
+                <span className="text-gray-900 text-lg font-medium">
+                  ₹{(confirmedProductData?.sellingPrice || confirmedSubscriptionData?.product?.sellingPrice || subscriptionDetails?.sellingPrice || 0) * (confirmedSubscriptionData?.quantity || 1)}
+                </span>
               </div>
             </motion.div>
 
-            {/* Info Block for Order / Subscription */}
+            {/* Savings Banner */}
             <motion.div
-              className="bg-white rounded-lg mx-4 p-4"
+              className="bg-[rgb(250,162,34)] bg-opacity-20 rounded-xl mx-4 p-4 mb-4 flex items-center justify-center relative overflow-hidden min-h-[80px]"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.4 }}
+              transition={{ delay: 1.1 }}
             >
-              <h2 className="text-[15px] font-medium mb-4">
-                {isStoreProduct ? "Your Order Details" : "Your Subscription"}
-              </h2>
-              <div className="space-y-4">
-                {isStoreProduct ? (
-                  <>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">Product</span>
-                      <span className="text-gray-800 text-sm">
-                        {storeProduct?.name || "N/A"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">Quantity</span>
-                      <span className="text-gray-800 text-sm">
-                        {storeMetaData?.quantity || "N/A"}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">Price</span>
-                      <span className="text-gray-800 text-sm">
-                        ₹{storeProduct?.sellingPrice ?? "N/A"}
-                        /Pack
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">Total Amount</span>
-                      <span className="text-gray-800 text-sm font-medium">
-                        ₹{(storeProduct?.sellingPrice ?? 0) * (storeMetaData?.quantity ?? 1)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">Order ID</span>
-                      <span className="text-gray-800 text-sm font-medium">
-                        {localStorage.getItem("lastStoreOrder") ? JSON.parse(localStorage.getItem("lastStoreOrder")!).orderId : "Processing..."}
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">Pack</span>
-                      <span className="text-gray-800 text-sm">
-                        {subscriptionDetails?.packDetails?.name}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">Frequency</span>
-                      <span className="text-gray-800 text-sm">
-                        {subscriptionDetails?.type === "DAILY"
-                          ? "Daily • mon-sun"
-                          : "Custom Days"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">
-                        First Delivery
-                      </span>
-                      <span className="text-gray-800 text-sm">
-                        {(() => {
-                          const today = new Date();
-                          today.setHours(0, 0, 0, 0); // normalize to midnight
-
-                          const daysMap = {
-                            SUNDAY: 0,
-                            MONDAY: 1,
-                            TUESDAY: 2,
-                            WEDNESDAY: 3,
-                            THURSDAY: 4,
-                            FRIDAY: 5,
-                            SATURDAY: 6,
-                          };
-
-                          type DayName = keyof typeof daysMap;
-
-                          let nextDate: Date | undefined;
-
-                          if (subscriptionDetails?.type === "DAILY") {
-                            // Start from tomorrow
-                            for (let i = 1; i <= 7; i++) {
-                              const date = new Date(today);
-                              date.setDate(date.getDate() + i);
-                              const day = date.getDay();
-                              if (day >= 1 && day <= 7) { // Mon-Sun
-                                nextDate = date;
-                                break;
-                              }
-                            }
-                          } else if (
-                            subscriptionDetails?.type === "CUSTOM" &&
-                            "days" in subscriptionDetails &&
-                            Array.isArray(subscriptionDetails.days)
-                          ) {
-                            // Normalize and filter valid days only
-                            const selectedDays = subscriptionDetails.days
-                              .map((day) => day.toUpperCase())
-                              .filter((day): day is DayName => day in daysMap)
-                              .map((day) => daysMap[day]);
-
-                            for (let i = 1; i <= 7; i++) {
-                              const date = new Date(today);
-                              date.setDate(date.getDate() + i);
-                              const day = date.getDay();
-                              if (selectedDays.includes(day)) {
-                                nextDate = date;
-                                break;
-                              }
-                            }
-                          }
-
-                          return nextDate
-                            ? nextDate.toLocaleDateString("en-US", {
-                              weekday: "short",
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            })
-                            : "Calculating...";
-                        })()}
-                      </span>
-                    </div>
-                  </>
-                )}
+              {/* Left flower decoration */}
+              <img 
+                src={flowerCnfSvg} 
+                alt="Flower" 
+                className="absolute left-0 top-1/2 -translate-y-1/2 w-12 h-12 sm:w-16 sm:h-16 opacity-70"
+              />
+              
+              {/* Center text with 50 graphic */}
+              <div className="flex items-center gap-1.5 sm:gap-2 relative z-10 px-4">
+                <span className="text-gray-900 text-sm sm:text-base md:text-lg font-medium">You're saving</span>
+                <img src={savingsCnfSvg} alt="50" className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16" />
+                <span className="text-gray-900 text-sm sm:text-base md:text-lg font-medium">this month!</span>
               </div>
+              
+              {/* Right flower decoration */}
+              <img 
+                src={flowerCnfSvg} 
+                alt="Flower" 
+                className="absolute right-0 top-1/2 -translate-y-1/2 w-12 h-12 sm:w-16 sm:h-16 opacity-70 rotate-180"
+              />
             </motion.div>
+
+            {/* View My Subscription Button */}
+            <motion.div
+              className="px-4 mb-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.3 }}
+            >
+              <button
+                onClick={() => navigate('/manage-my-subscription')}
+                className="w-full bg-[rgb(250,162,34)] text-grey-900 py-3.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+              >
+                View My Subscription
+              </button>
+            </motion.div>
+
+            {/* Customer Care Info */}
+            <motion.p
+              className="text-center text-gray-600 text-xs mb-24"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.5 }}
+            >
+              Our customer care is available 24/7
+            </motion.p>
 
             {/* Bottom Navigation */}
-            <div className="mb-10 md:mb-10">
+            <div className="fixed bottom-0 left-0 right-0">
               <BottomNavigation />
             </div>
           </>

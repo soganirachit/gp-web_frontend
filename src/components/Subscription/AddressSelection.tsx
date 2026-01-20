@@ -2,17 +2,17 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { FaArrowLeft, FaMapMarkerAlt, FaCheck } from "react-icons/fa";
 import { MdLocationOn, MdMyLocation } from "react-icons/md";
+import { IoArrowBack } from "react-icons/io5";
+import { BsThreeDotsVertical } from "react-icons/bs";
 import { toast } from "react-hot-toast";
 import { addressService, Address } from "../../services/address.service";
 import { GoogleMap } from "@react-google-maps/api";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
-import WalletIcon from "../../assets/icon/Wallet.png";
-import ProfileIcon from "../../assets/icon/Profile.png";
 import ReactDOM from "react-dom/client";
 import { orderService } from "../../services/order.service";
 import { subscriptionService } from "../../services/subscription.service";
-import { motion } from "framer-motion";
 import { customerService } from "../../services/getcustomer.service";
+import { FaPen } from "react-icons/fa";
 
 const AddressSelection: React.FC = () => {
   const navigate = useNavigate();
@@ -26,11 +26,11 @@ const AddressSelection: React.FC = () => {
     isValid: boolean;
     message?: string;
   } | null>(null);
-  
+
   // Map related states
   const mapRef = useRef<google.maps.Map | null>(null);
   const { isLoaded, loadError } = useGoogleMaps();
-  const [selectedPosition, setSelectedPosition] = useState<{lat: number, lng: number}>({
+  const [selectedPosition, setSelectedPosition] = useState<{ lat: number, lng: number }>({
     lat: 20.5937,
     lng: 78.9629
   });
@@ -38,7 +38,7 @@ const AddressSelection: React.FC = () => {
     isValid: boolean;
     message?: string;
   } | null>(null);
-  
+
   const [formData, setFormData] = useState({
     houseNo: "",
     streetName: "",
@@ -52,9 +52,8 @@ const AddressSelection: React.FC = () => {
     coordinates: "",
     setAsDefault: false,
   });
+  const [expandedMenuId, setExpandedMenuId] = useState<string | null>(null);
   const isStoreProduct = location.state?.product?.isStore;
-  const [isConfirmed, setIsConfirmed] = useState(false);
-  const [confirmedSubscription, setConfirmedSubscription] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
@@ -77,11 +76,11 @@ const AddressSelection: React.FC = () => {
         console.error("Failed to fetch customer data:", err);
       }
     };
-    
+
     loadUserData();
   }, []);
 
-  
+
 
   const handleAuthError = (error: Error) => {
     const isAuthError =
@@ -128,34 +127,34 @@ const AddressSelection: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate location before saving
     if (!formData.coordinates) {
       toast.error('Please select a location on the map');
       return;
     }
-    
+
     // First validate coordinates format
     if (!addressService.validateCoordinatesFormat(formData.coordinates)) {
       toast.error('Invalid coordinates format');
       setLocationValidation({ isValid: false, message: 'Invalid coordinates format' });
       return;
     }
-    
+
     // Then validate delivery area
     try {
       setIsValidatingAddress(true);
       const validation = await addressService.validateAddressInDeliveryArea(formData.coordinates);
       setLocationValidation(validation);
-      
+
       if (!validation.isValid) {
         toast.error(validation.message || 'Address is outside delivery area');
         return;
       }
-      
+
       // If validation passes, proceed with saving
       setLoading(true);
-      
+
       // Create address data with only the fields that match the AddressInput interface
       const addressData = {
         houseNo: formData.houseNo,
@@ -169,12 +168,12 @@ const AddressSelection: React.FC = () => {
         coordinates: formData.coordinates,
         setAsDefault: formData.setAsDefault
       };
-      
+
       const newAddress = await addressService.createAddress(addressData);
-      
+
       toast.success("Address added successfully");
       setShowAddForm(false);
-      
+
       // Reset form
       setFormData({
         houseNo: "",
@@ -189,7 +188,7 @@ const AddressSelection: React.FC = () => {
         coordinates: "",
         setAsDefault: false,
       });
-      
+
       await loadAddresses();
       setSelectedAddress(newAddress);
       localStorage.setItem(
@@ -220,22 +219,22 @@ const AddressSelection: React.FC = () => {
 
     try {
       setIsValidatingAddress(true);
-      
+
       // First validate coordinates format
       if (!addressService.validateCoordinatesFormat(address.coordinates)) {
         toast.error('Invalid coordinates format');
         setAddressValidation({ isValid: false, message: 'Invalid coordinates format' });
         return false;
       }
-      
+
       const validation = await addressService.validateAddressInDeliveryArea(address.coordinates);
       setAddressValidation(validation);
-      
+
       if (!validation.isValid) {
         toast.error(validation.message || 'Address is outside delivery area');
         return false;
       }
-      
+
       toast.success('Address is within delivery area!');
       return true;
     } catch (error) {
@@ -357,13 +356,13 @@ const AddressSelection: React.FC = () => {
         localStorage.setItem("pendingStoreProduct", JSON.stringify(location.state.product));
         localStorage.setItem("pendingStoreMetaData", JSON.stringify(location.state.metaData));
         localStorage.setItem("selectedDeliveryAddress", JSON.stringify(selectedAddress));
-        
+
         // Set loading to true to show "Processing..." on button
         setLoading(true);
-        
+
         // Import the RazorpayPayment component dynamically
         const { default: RazorpayPayment } = await import("../Payment/Rezorpay/RezorpayPayment");
-        
+
         // Handle store product payment directly
         // Use currentUserData (local variable) to avoid closure issues
         const handleStoreProductPayment = async (paymentData: any) => {
@@ -407,7 +406,7 @@ const AddressSelection: React.FC = () => {
           const storedProduct = localStorage.getItem("pendingStoreProduct");
           const storedMetaData = localStorage.getItem("pendingStoreMetaData");
           const storedAddress = localStorage.getItem("selectedDeliveryAddress");
-          
+
           let productToUse = location.state?.product;
           let metaDataToUse = location.state?.metaData;
           let addressToUse = selectedAddress;
@@ -499,9 +498,9 @@ const AddressSelection: React.FC = () => {
               // Clear pending store product data from localStorage
               localStorage.removeItem("pendingStoreProduct");
               localStorage.removeItem("pendingStoreMetaData");
-              
+
               toast.success("Order created successfully!");
-              
+
               // Store order details for reference
               localStorage.setItem("lastStoreOrder", JSON.stringify({
                 orderId,
@@ -576,7 +575,7 @@ const AddressSelection: React.FC = () => {
       }
 
       const parsedData = JSON.parse(subscriptionData);
-      
+
       // Validate required fields
       if (!parsedData.basePackId) {
         console.error("Missing basePackId");
@@ -641,7 +640,7 @@ const AddressSelection: React.FC = () => {
         const confirmResponse = await subscriptionService.confirmSubscription(
           confirmData
         );
-        
+
         if (confirmResponse.success) {
           const confirmedSubscriptionData = {
             ...confirmResponse.subscription,
@@ -651,20 +650,25 @@ const AddressSelection: React.FC = () => {
             type: parsedData.type,
             deliveryCount: parsedData.deliveryCount,
             sellingPrice: parsedData.sellingPrice,
+            product: (confirmResponse as any).product,
           };
           localStorage.setItem(
             "lastConfirmedSubscription",
             JSON.stringify(confirmedSubscriptionData)
           );
-          
+
           toast.success("Subscription confirmed successfully!");
-          
-          // Show thank you page directly instead of navigating
-          setIsConfirmed(true);
-          setConfirmedSubscription({
-            isStoreProduct: false,
-            subscriptionDetails: parsedData,
-            selectedAddress: selectedAddress
+
+          // Navigate to ConfirmSubscription.tsx to show thank you page
+          navigate("/subscription/confirm", {
+            state: {
+              isConfirmed: true,
+              isStoreProduct: false,
+              selectedAddress: selectedAddress,
+              subscription: confirmResponse.subscription,
+              product: (confirmResponse as any).product,
+              subscriptionDetails: parsedData,
+            }
           });
         } else {
           throw new Error(
@@ -716,106 +720,6 @@ const AddressSelection: React.FC = () => {
     }
   };
 
-  // Success Checkmark Component (copied from ConfirmSubscription.tsx)
-  const SuccessCheckmark = () => (
-    <motion.div
-      className="relative w-16 h-16 mx-auto mb-4"
-      initial={{ scale: 0 }}
-      animate={{ scale: 1 }}
-      transition={{ duration: 0.5, type: "spring", bounce: 0.5 }}
-    >
-      <motion.div
-        className="absolute inset-0 bg-[#E6F7EE] opacity-20 rounded-full"
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1.2, opacity: 0.2 }}
-        transition={{
-          duration: 1.5,
-          repeat: Infinity,
-          repeatType: "reverse",
-        }}
-      />
-      <motion.div
-        className="absolute inset-2 bg-[#E6F7EE] rounded-full flex items-center justify-center"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-      >
-        <motion.div
-          initial={{ scale: 0, rotate: -180 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{
-            delay: 0.5,
-            type: "spring",
-            stiffness: 200,
-            damping: 15,
-          }}
-        >
-          <FaCheck className="text-2xl text-green-600" />
-        </motion.div>
-      </motion.div>
-    </motion.div>
-  );
-
-  // MapView Component (copied from ConfirmSubscription.tsx)
-  const MapView = ({ address }: { address: any }) => {
-    if (!isLoaded) {
-      return (
-        <div className="w-full h-[250px] bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#F15A22]"></div>
-        </div>
-      );
-    }
-
-    if (loadError) {
-      return (
-        <div className="w-full h-[250px] bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-          <FaMapMarkerAlt className="text-gray-400 text-4xl" />
-        </div>
-      );
-    }
-
-    // Get coordinates from the address.coordinates field
-    let center = { lat: 20.5937, lng: 78.9629 }; // Default to India's center
-
-    if (address?.coordinates) {
-      const [lat, lng] = address.coordinates.split(",").map(Number);
-      if (!isNaN(lat) && !isNaN(lng)) {
-        center = { lat, lng };
-      }
-    }
-
-    return (
-      <div className="w-full h-[250px] rounded-lg overflow-hidden relative">
-        <GoogleMap
-          mapContainerStyle={{
-            width: "100%",
-            height: "100%",
-          }}
-          center={center}
-          zoom={16}
-          options={{
-            zoomControl: false,
-            streetViewControl: false,
-            mapTypeControl: false,
-            fullscreenControl: false,
-            draggable: false,
-            scrollwheel: false,
-            disableDoubleClickZoom: true,
-            disableDefaultUI: true,
-            gestureHandling: "none",
-            clickableIcons: false,
-          }}
-        >
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
-            <MdLocationOn className="text-[#F15A22] text-4xl drop-shadow-lg" />
-          </div>
-        </GoogleMap>
-        {/* Overlay to prevent any map interactions */}
-        <div className="absolute inset-0 bg-transparent" />
-      </div>
-    );
-  };
-
   // Map related functions
   const onLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
@@ -834,17 +738,17 @@ const AddressSelection: React.FC = () => {
           if (mapRef.current) {
             mapRef.current.panTo({ lat: latitude, lng: longitude });
           }
-          
+
           try {
             const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
             const response = await fetch(
               `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`
             );
             const data = await response.json();
-            
+
             if (data.results && data.results.length > 0) {
               const formattedAddress: any = {};
-              
+
               data.results.forEach((result: any) => {
                 if (result.address_components) {
                   result.address_components.forEach((component: any) => {
@@ -874,13 +778,13 @@ const AddressSelection: React.FC = () => {
                   });
                 }
               });
-              
+
               setFormData(prev => ({
                 ...prev,
                 ...formattedAddress,
                 coordinates: `${latitude},${longitude}`
               }));
-              
+
               toast.success('Location detected successfully');
             }
           } catch (error) {
@@ -916,195 +820,6 @@ const AddressSelection: React.FC = () => {
     }
   };
 
-  // Check if we should show thank you page
-  if (isConfirmed) {
-    return (
-      <div className="min-h-screen bg-[#FFFBEB] flex justify-center items-center px-4">
-        <div className="bg-[#FFFBEB] w-full max-w-[800px] rounded-xl pb-24">
-          <div className="pt-8 pb-6 mt-[20px] text-center">
-            <SuccessCheckmark />
-            <motion.h1
-              className="text-2xl font-semibold mb-2"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
-            >
-              Thank you,{" "}
-              {userData
-                ? `${userData.firstName} ${userData.lastName}`
-                : "User"}
-              !
-            </motion.h1>
-            <motion.p
-              className="text-gray-600 text-sm leading-relaxed"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1 }}
-            >
-              {confirmedSubscription?.isStoreProduct
-                ? "Your order has been placed successfully! Payment completed. You will receive a confirmation shortly."
-                : "Your subscription has been confirmed. Get ready for fresh flowers every morning."}
-            </motion.p>
-          </div>
-
-          {/* Address Block */}
-          <motion.div
-            className="bg-white rounded-lg mx-4 p-4 mb-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.2 }}
-          >
-            <h2 className="text-[15px] font-medium mb-3">Delivering to</h2>
-            <div className="flex items-start gap-3">
-              <FaMapMarkerAlt className="text-gray-400 mt-1" />
-              <p className="text-gray-600 text-sm leading-relaxed break-words">
-                {[
-                  selectedAddress?.streetName,
-                  selectedAddress?.area,
-                  selectedAddress?.city,
-                  selectedAddress?.state,
-                  selectedAddress?.pincode,
-                ]
-                  .filter(Boolean)
-                  .join(", ")}
-              </p>
-            </div>
-            <div className="mt-4 overflow-hidden rounded-lg">
-              <MapView address={selectedAddress} />
-            </div>
-          </motion.div>
-
-          {/* Info Block for Order / Subscription */}
-          <motion.div
-            className="bg-white rounded-lg mx-4 p-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.4 }}
-          >
-            <h2 className="text-[15px] font-medium mb-4">
-              {confirmedSubscription?.isStoreProduct ? "Your Order Details" : "Your Subscription"}
-            </h2>
-            <div className="space-y-4">
-              {confirmedSubscription?.isStoreProduct ? (
-                <>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 text-sm">Product</span>
-                    <span className="text-gray-800 text-sm">
-                      {confirmedSubscription?.product?.name}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 text-sm">Quantity</span>
-                    <span className="text-gray-800 text-sm">
-                      {confirmedSubscription?.metaData?.quantity}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 text-sm">Price</span>
-                    <span className="text-gray-800 text-sm">
-                      ₹{confirmedSubscription?.product?.sellingPrice ?? "N/A"}/Pack
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 text-sm">Total Amount</span>
-                    <span className="text-gray-800 text-sm font-medium">
-                      ₹{(confirmedSubscription?.product?.sellingPrice ?? 0) * (confirmedSubscription?.metaData?.quantity ?? 1)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 text-sm">Order ID</span>
-                    <span className="text-gray-800 text-sm font-medium">
-                      {localStorage.getItem("lastStoreOrder") ? JSON.parse(localStorage.getItem("lastStoreOrder")!).orderId : "Processing..."}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 text-sm">Pack</span>
-                    <span className="text-gray-800 text-sm">
-                      {confirmedSubscription?.subscriptionDetails?.packDetails?.name}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 text-sm">Frequency</span>
-                    <span className="text-gray-800 text-sm">
-                      {confirmedSubscription?.subscriptionDetails?.type === "DAILY"
-                        ? "Daily • mon-sun"
-                        : "Custom Days"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 text-sm">First Delivery</span>
-                    <span className="text-gray-800 text-sm">
-                      {(() => {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0); // normalize to midnight
-
-                        const daysMap: { [key: string]: number } = {
-                          SUNDAY: 0,
-                          MONDAY: 1,
-                          TUESDAY: 2,
-                          WEDNESDAY: 3,
-                          THURSDAY: 4,
-                          FRIDAY: 5,
-                          SATURDAY: 6,
-                        };
-
-                        let nextDate: Date | undefined;
-
-                        if (confirmedSubscription?.subscriptionDetails?.type === "DAILY") {
-                          // Start from tomorrow
-                          for (let i = 1; i <= 7; i++) {
-                            const date = new Date(today);
-                            date.setDate(date.getDate() + i);
-                            const day = date.getDay();
-                            if (day >= 1 && day <= 7) { // Mon-Sun
-                              nextDate = date;
-                              break;
-                            }
-                          }
-                        } else if (
-                          confirmedSubscription?.subscriptionDetails?.type === "CUSTOM" &&
-                          confirmedSubscription?.subscriptionDetails?.selectedDays &&
-                          Array.isArray(confirmedSubscription?.subscriptionDetails?.selectedDays)
-                        ) {
-                          // Normalize and filter valid days only
-                          const selectedDays = confirmedSubscription?.subscriptionDetails?.selectedDays
-                            .map((day: string) => day.toUpperCase())
-                            .filter((day: string) => day in daysMap)
-                            .map((day: string) => daysMap[day]);
-
-                          for (let i = 1; i <= 7; i++) {
-                            const date = new Date(today);
-                            date.setDate(date.getDate() + i);
-                            const day = date.getDay();
-                            if (selectedDays.includes(day)) {
-                              nextDate = date;
-                              break;
-                            }
-                          }
-                        }
-
-                        return nextDate
-                          ? nextDate.toLocaleDateString("en-US", {
-                            weekday: "short",
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })
-                          : "Calculating...";
-                      })()}
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
-          </motion.div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#FFFBEB]">
@@ -1183,15 +898,13 @@ const AddressSelection: React.FC = () => {
 
             {/* Location Validation Status */}
             {locationValidation && (
-              <div className={`p-3 rounded-lg text-sm ${
-                locationValidation.isValid 
-                  ? 'bg-green-50 text-green-700 border border-green-200' 
-                  : 'bg-red-50 text-red-700 border border-red-200'
-              }`}>
+              <div className={`p-3 rounded-lg text-sm ${locationValidation.isValid
+                ? 'bg-green-50 text-green-700 border border-green-200'
+                : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${
-                    locationValidation.isValid ? 'bg-green-500' : 'bg-red-500'
-                  }`}></div>
+                  <div className={`w-2 h-2 rounded-full ${locationValidation.isValid ? 'bg-green-500' : 'bg-red-500'
+                    }`}></div>
                   <span>{locationValidation.message}</span>
                 </div>
               </div>
@@ -1245,7 +958,7 @@ const AddressSelection: React.FC = () => {
                     value={formData.associatedPhoneNumber}
                     onChange={handleInputChange}
                     className="flex-1 p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm ml-2"
-                    
+
                   />
                 </div>
               </div>
@@ -1274,90 +987,127 @@ const AddressSelection: React.FC = () => {
             </div>
           </form>
         ) : (
-          <div className="space-y-4">
-            {/* Existing address list and continue button */}
-          <div className="space-y-4 mb-6">
-                       {addresses.map((address) => (
-                         <div
-                           key={address.id}
-                           className={`bg-white rounded-xl p-4 cursor-pointer transition-all hover:shadow-md ${selectedAddress?.id === address.id
-                             ? "border-2 border-[#015D3A] bg-[#ECFDF5]"
-                             : "border border-gray-200"
-                             }`}
-                           onClick={() => handleAddressSelect(address)}
-                         >
-                           <div className="flex items-start">
-                             <div className="w-10 h-10 bg-[#ECFDF5] rounded-lg flex items-center justify-center mt-1">
-                               <FaMapMarkerAlt className="text-xl text-[#015D3A]" />
-                             </div>
-                             <div className="ml-3 flex-1">
-                               <div className="flex items-center justify-between mb-2">
-                                 <h4 className="text-[15px] font-medium text-gray-900">
-                                   {address.houseNo}, {address.streetName}
-                                 </h4>
-                                 {address.isDefault && (
-                                   <span className="text-xs bg-[#ECFDF5] text-[#015D3A] px-2 py-1 rounded-full">
-                                     Default
-                                   </span>
-                                 )}
-                               </div>
-                               <p className="text-sm text-gray-600">
-                                 {address.area}, {address.city}, {address.state} -{" "}
-                                 {address.pincode}
-                               </p>
-                               {address.societyName && (
-                                 <p className="text-sm text-gray-600">
-                                   {address.societyName}
-                                 </p>
-                               )}
-                             </div>
-                             {selectedAddress?.id === address.id && (
-                               <FaCheck className="text-[#015D3A] text-xl" />
-                             )}
-                           </div>
-                         </div>
-                       ))}
+          <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="py-4 flex items-center mb-2">
+              <button
+                onClick={() => navigate(-1)}
+                className="hover:bg-gray-100 rounded-full p-2 transition-colors mr-3"
+              >
+                <IoArrowBack className="text-xl" />
+              </button>
+              <h1 className="text-2xl font-semibold text-gray-800">Confirm delivery address</h1>
+            </div>
 
+            {/* Address List */}
+            <div className="space-y-4 mb-24">
+              {addresses.map((address) => (
+                <div
+                  key={address.id}
+                  onClick={() => handleAddressSelect(address)}
+                  className={`rounded-2xl p-5 cursor-pointer transition-all relative shadow-sm ${selectedAddress?.id === address.id
+                    ? "bg-[#E6F4EA] border border-[#E6F4EA]"
+                    : "bg-white border border-transparent"
+                    }`}
+                >
+                  {/* Row 1: Type - Default - Menu */}
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-lg font-semibold text-gray-800 capitalize">
+                        {address.type || 'Home'}
+                      </h3>
+                      {/* {address.isDefault && ( */}
+                      <span className="bg-[#C6F6D5] text-[#22543D] text-xs px-2 py-0.5 rounded-2xl font-semibold">
+                        Default
+                      </span>
+                      {/* // )} */}
+                    </div>
+                    {/* Menu action */}
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedMenuId(expandedMenuId === address.id ? null : address.id);
+                        }}
+                        className="text-gray-400 p-1 hover:bg-black/5 rounded-full"
+                      >
+                        <BsThreeDotsVertical />
+                      </button>
 
+                      {expandedMenuId === address.id && (
+                        <div className="absolute right-0 top-8 bg-white shadow-lg rounded-lg py-1 z-10 border min-w-[120px]">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate('/addresses/edit', { state: { address } });
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 bg-white flex items-center gap-2"
+                          >
+                            <FaPen className="text-xs" />
+                            <span>Edit</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-                     </div>
+                  {/* Row 2: Full Address */}
+                  <p className="text-gray-600 text-sm leading-relaxed mb-3 pr-4">
+                    {[
+                      address.houseNo,
+                      address.streetName,
+                      address.area,
+                      address.landmark
+                    ].filter(Boolean).join(', ')}
+                    {address.pincode && ` - ${address.pincode}`}
+                  </p>
 
-                     {addressValidation && (
-              <div className={`mb-4 p-3 rounded-lg text-sm ${
-                addressValidation.isValid 
-                  ? 'bg-green-50 text-green-700 border border-green-200' 
-                  : 'bg-red-50 text-red-700 border border-red-200'
-              }`}>
+                  {/* Row 3: Location - City - Phone */}
+                  <div className="flex items-center text-gray-500 text-sm gap-2">
+                    <FaMapMarkerAlt className="text-gray-900" />
+                    <span className="font-medium text-gray-700">{address.city}</span>
+                    <span className="ml-3 font-medium text-gray-800">+91 {address.associatedPhoneNumber}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Validation Message */}
+            {addressValidation && (
+              <div className={`mb-4 p-3 rounded-lg text-sm ${addressValidation.isValid
+                ? 'bg-green-50 text-green-700 border border-green-200'
+                : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${
-                    addressValidation.isValid ? 'bg-green-500' : 'bg-red-500'
-                  }`}></div>
+                  <div className={`w-2 h-2 rounded-full ${addressValidation.isValid ? 'bg-green-500' : 'bg-red-500'
+                    }`}></div>
                   <span>{addressValidation.message}</span>
                 </div>
               </div>
             )}
-            
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50 md:relative md:border-t-0 md:bg-transparent md:p-0 md:mt-6">
-            <div className="max-w-[800px] mx-auto space-y-3">
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="w-full bg-white border-2 border-[#015D3A] text-[#015D3A] py-3.5 rounded-lg text-[15px] font-medium hover:bg-[#ECFDF5]"
-            >
-               Add New Address
-            </button>
 
-            <button
-              onClick={handleContinue}
-              disabled={!selectedAddress || loading}
-              className={`w-full bg-[#F15A22] text-white py-3.5 rounded-lg text-[15px] font-medium hover:bg-[#F15A22]/90 disabled:opacity-50 ${
-                selectedAddress && !loading
-                  ? 'bg-[#015D3A] hover:bg-[#014931]'
-                  : 'bg-gray-300 cursor-not-allowed'
-              }`}
-            >
-              {loading ? 'Processing...' : 'Continue & Pay'}
-            </button>
-            </div>
+            {/* Bottom Buttons */}
+            <div className="mt-auto pt-4 md:relative md:bg-transparent md:p-0">
+              <div className="max-w-[800px] mx-auto space-y-3">
+                <button
+                  onClick={() => navigate('/addresses/add')}
+                  className="w-full flex items-center justify-center gap-2 bg-[#F9A11D] text-gray-900 py-4 rounded-xl text-base font-semibold hover:opacity-90 shadow-sm"
+                >
+                  <span className="text-2xl font-semibold">+</span>
+                  Add New Address
+                </button>
+
+                <button
+                  onClick={handleContinue}
+                  disabled={!selectedAddress || loading}
+                  className={`w-full py-4 rounded-xl text-base font-semibold text-gray-900 shadow-sm ${selectedAddress && !loading
+                    ? 'bg-[#F9A11D] hover:opacity-90'
+                    : 'bg-gray-300 cursor-not-allowed'
+                    }`}
+                >
+                  {loading ? 'Processing...' : 'Continue & Pay'}
+                </button>
+              </div>
             </div>
           </div>
         )}

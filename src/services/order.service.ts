@@ -119,10 +119,10 @@ class OrderService {
             )
             // return response.data.data
              {
-                const orders = response.data.data.filter(
-                (order: any) => order.product?.isStore === true
-            );;
-                return orders;                
+            //     const orders = response.data.data.filter(
+            //     (order: any) => order.product?.isStore === true
+            // );;
+                return response.data.data;                
                 
             }
             return [];

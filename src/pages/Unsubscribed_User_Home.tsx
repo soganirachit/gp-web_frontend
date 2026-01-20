@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import {  FaStar, FaArrowLeft,FaArrowRight } from 'react-icons/fa';
+import { FaStar, FaArrowLeft, FaArrowRight } from 'react-icons/fa';
 import Slider from 'react-slick';
-import 'slick-carousel/slick/slick.css'; 
+import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 import logo from '../assets/All/logo.png'
 import Banner1 from '../assets/Banner/Banner1.png'
@@ -72,6 +72,14 @@ function Unsubscribed_User_Home() {
     slidesToScroll: 1
   };
 
+  if (isLoadingProducts) {
+    return (
+      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+        <Spinner size={400} />
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[#FFFBEB] min-h-screen cursor-pointer" onClick={handlePageClick}>
       <div className="max-w-[800px] mx-auto">
@@ -132,13 +140,13 @@ function Unsubscribed_User_Home() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl md:text-3xl font-semibold">We're Loved!</h2>
             <div className="flex items-center gap-4">
-              <button 
+              <button
                 onClick={() => sliderRef?.current?.slickPrev()}
                 className="bg-[#F3F4F6] text-black rounded-full h-8 w-8 md:h-10 md:w-10 flex items-center justify-center hover:bg-gray-200 transition-colors active:bg-gray-300"
               >
                 <FaArrowLeft className="text-sm md:text-base" />
               </button>
-              <button 
+              <button
                 onClick={() => sliderRef?.current?.slickNext()}
                 className="bg-[#F3F4F6] text-black rounded-full h-8 w-8 md:h-10 md:w-10 flex items-center justify-center hover:bg-gray-200 transition-colors active:bg-gray-300"
               >
@@ -147,8 +155,8 @@ function Unsubscribed_User_Home() {
             </div>
           </div>
 
-          <Slider ref={sliderRef} {...sliderSettings} dots={false} arrows={false} 
-            slidesToShow={window.innerWidth >= 768 ? 2 : 1.2} 
+          <Slider ref={sliderRef} {...sliderSettings} dots={false} arrows={false}
+            slidesToShow={window.innerWidth >= 768 ? 2 : 1.2}
             infinite={false}
             responsive={[
               {
@@ -288,11 +296,7 @@ function Unsubscribed_User_Home() {
                 View All
               </button>
             </div>
-            {isLoadingProducts ? (
-              <div className="flex justify-center items-center h-40">
-                <Spinner size={400} />
-              </div>
-            ) : products.filter(item => item.type === 'FLOWERS').length === 0 ? (
+            {products.filter(item => item.type === 'FLOWERS').length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 No flowers available at the moment
               </div>
@@ -308,8 +312,8 @@ function Unsubscribed_User_Home() {
                     >
                       <div className="p-3">
                         <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
-                          <img 
-                            src={item.imageUrl || 'https://via.placeholder.com/160'} 
+                          <img
+                            src={item.imageUrl || 'https://via.placeholder.com/160'}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
@@ -343,11 +347,7 @@ function Unsubscribed_User_Home() {
                 View All
               </button>
             </div>
-            {isLoadingProducts ? (
-              <div className="flex justify-center items-center h-40">
-                <Spinner size={400} />
-              </div>
-            ) : products.filter(item => item.type === 'LEAVES').length === 0 ? (
+            {products.filter(item => item.type === 'LEAVES').length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 No leaves available at the moment
               </div>
@@ -363,8 +363,8 @@ function Unsubscribed_User_Home() {
                     >
                       <div className="p-3">
                         <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
-                          <img 
-                            src={item.imageUrl || 'https://via.placeholder.com/160'} 
+                          <img
+                            src={item.imageUrl || 'https://via.placeholder.com/160'}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
@@ -407,10 +407,10 @@ function Unsubscribed_User_Home() {
       </div>
 
       {/* Navigation Bar - Hide on desktop */}
-     <div className='fixed overflow:hidden md:hidden'>
-        <BottomNav  />
-     </div>
-    
+      <div className='fixed overflow:hidden md:hidden'>
+        <BottomNav />
+      </div>
+
     </div>
   );
 }

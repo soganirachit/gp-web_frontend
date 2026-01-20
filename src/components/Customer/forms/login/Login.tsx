@@ -2,110 +2,133 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { authService } from "../../../../services/auth.service";
-import logo from "../../../../assets/All/logo.png";
+import login_logo from "../../../../assets/All/login_logo.png";
 
 const Login = () => {
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
+    const [phoneNumber, setPhoneNumber] = useState("");
+    const [error, setError] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (phoneNumber.length < 10) {
-      setError("Please enter a valid phone number.");
-      return;
-    }
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (phoneNumber.length < 10) {
+            setError("Please enter a valid phone number.");
+            return;
+        }
 
-    try {
-      setIsLoading(true);
-      setError("");
-      await authService.sendOTP(phoneNumber);
-      navigate("/otp-verification", { state: { phoneNumber } });
-    } catch (err: any) {
-      setError(
-        err?.error || err?.response?.data?.message || "Failed to send OTP"
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        try {
+            setIsLoading(true);
+            setError("");
+            await authService.sendOTP(phoneNumber);
+            navigate("/otp-verification", { state: { phoneNumber } });
+        } catch (err: any) {
+            setError(
+                err?.error || err?.response?.data?.message || "Failed to send OTP"
+            );
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-  return (
-    <div className="min-h-screen w-screen flex items-center justify-center bg-gradient-to-b from-[#FFF1F2] to-[#FFFBEB] fixed inset-0">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="w-full max-w-[800px] mx-auto flex flex-col items-center"
-      >
-        <div className="w-full max-w-md px-6">
-          <img src={logo} alt="Genda Phool" className="h-32 mx-auto mb-20" />
+    return (
+        <div className="min-h-screen w-screen bg-white fixed inset-0 flex flex-col items-center justify-center px-3 sm:px-4 py-4 sm:py-6 md:py-8 overflow-y-auto">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+                className="w-full max-w-md relative z-10 flex flex-col"
+            >
+                {/* Top Section - Orange Graphic with Badge */}
+                <div className="relative mb-4 sm:mb-6 md:mb-8 flex flex-col items-center">
+                    {/* OTP Graphic */}
+                    <div className="relative w-full max-w-[280px] sm:max-w-xs h-48 sm:h-56 md:h-64 flex items-center justify-center mb-4 sm:mb-6">
+                        <img
+                            src={login_logo}
+                            alt="OTP Graphic"
+                            className="w-full h-full object-contain"
+                        />
+                    </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="w-full bg-white p-8 rounded-2xl shadow-sm"
-          >
-            <div className="mb-8">
-              <h1 className="text-2xl font-semibold mb-2">
-                Login with WhatsApp
-              </h1>
-              <p className="text-gray-600">Enter Phone Number</p>
-            </div>
+                    {/* Carousel Indicators */}
+                    <div className="flex gap-1.5 sm:gap-2 mt-2 sm:mt-4">
+                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#FAA222]"></div>
+                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#FAA222]/30"></div>
+                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#FAA222]/30"></div>
+                    </div>
 
-            {error && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-red-500 text-sm mb-6 text-center"
-              >
-                {error}
-              </motion.div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="relative">
-                <div className="flex items-center border border-gray-300 rounded-xl overflow-hidden bg-white">
-                  <span className="pl-4 pr-2 text-gray-500">+91</span>
-                  <input
-                    type="tel"
-                    required
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="w-full py-3.5 px-2 text-gray-900 focus:outline-none"
-                    placeholder="Enter your WhatsApp number"
-                    pattern="[0-9]*"
-                    maxLength={10}
-                  />
                 </div>
-              </div>
 
-              <motion.button
-                type="submit"
-                disabled={isLoading}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full py-3.5 px-4 bg-[#FF5722] text-white rounded-full font-medium hover:bg-[#F4511E] transition-colors duration-200"
-              >
-                {isLoading ? (
-                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
-                ) : (
-                  "Send OTP on WhatsApp"
-                )}
-              </motion.button>
-            </form>
+                {/* Form Section */}
+                <div className="px-4 sm:px-6 md:px-8 pb-4 sm:pb-6 md:pb-8">
+                    <div className="mb-6 sm:mb-8 text-center">
+                        <h1 className="text-2xl sm:text-3xl font-semibold text-gray-800 mb-1.5 sm:mb-2">
+                            Get Started
+                        </h1>
+                        <p className="text-sm sm:text-base text-gray-600 font-normal px-2">
+                            Enter your WhatsApp number to continue
+                        </p>
+                    </div>
 
-            <p className="text-sm text-center text-gray-500 mt-6">
-              By continuing, you agree to our Terms of Service and Privacy
-              Policy
-            </p>
-          </motion.div>
+                    {error && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="text-red-500 text-xs sm:text-sm mb-4 sm:mb-6 text-center"
+                        >
+                            {error}
+                        </motion.div>
+                    )}
+
+                    <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">
+                        <div>
+                            <label className="block text-gray-700 mb-1.5 sm:mb-2 text-sm sm:text-base font-medium">
+                                Phone Number
+                            </label>
+                            <div className="flex items-center border border-gray-300 rounded-lg sm:rounded-xl overflow-hidden bg-white">
+                                <span className="pl-3 sm:pl-4 pr-1.5 sm:pr-2 text-gray-700 text-sm sm:text-base font-medium">+91</span>
+                                <input
+                                    type="tel"
+                                    required
+                                    value={phoneNumber}
+                                    onChange={(e) => setPhoneNumber(e.target.value)}
+                                    className="w-full py-3 sm:py-3.5 px-2 text-gray-900 text-sm sm:text-base focus:outline-none"
+                                    placeholder="Enter your WhatsApp number"
+                                    pattern="[0-9]*"
+                                    maxLength={10}
+                                />
+                            </div>
+                        </div>
+
+                        <motion.button
+                            type="submit"
+                            disabled={isLoading}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="w-full py-3 sm:py-3.5 md:py-4 px-4 bg-[#FAA222] text-black rounded-lg sm:rounded-xl font-semibold hover:bg-[#E8911F] transition-colors duration-200 text-base sm:text-lg"
+                        >
+                            {isLoading ? (
+                                <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
+                            ) : (
+                                "Get OTP"
+                            )}
+                        </motion.button>
+                    </form>
+
+                    <p className="text-xs sm:text-sm text-center text-gray-500 mt-4 sm:mt-6 px-2">
+                        By continuing, you agree to our{" "}
+                        <a href="#" className="text-gray-700 underline">
+                            Terms of Service
+                        </a>{" "}
+                        and{" "}
+                        <a href="#" className="text-gray-700 underline">
+                            Privacy Policy
+                        </a>
+                    </p>
+                </div>
+            </motion.div>
         </div>
-      </motion.div>
-    </div>
-  );
+    );
 };
 
 export default Login;

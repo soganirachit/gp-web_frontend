@@ -1,95 +1,96 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FaPause } from 'react-icons/fa';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import BottomNavigation from '../../layout/BottomNav';
+import pauseSvg from '../../../assets/svg/cancelpage/pause.svg';
+import vectorBadge from '../../../assets/All/Vector (1).png';
+import { format } from 'date-fns';
 
 const PausedSubscriptionLanding: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get resume date from navigation state
+  const resumeDateFromState = location.state?.resumeDate;
+
+  // Format the date
+  let formattedDate = '{Date}';
+  if (resumeDateFromState) {
+    formattedDate = format(new Date(resumeDateFromState), 'dd MMM, yyyy');
+  }
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB] flex flex-col">
-      <div className="max-w-[800px] w-full mx-auto flex-1 flex flex-col items-center justify-center px-4">
-        <div className="w-full max-w-md text-center">
-          {/* Pause Icon Circle with Enhanced Animation */}
-          <motion.div 
-            className="w-20 h-20 bg-[#FFF3CD] rounded-full flex items-center justify-center mx-auto mb-6"
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ 
-              scale: [0, 1.2, 1],
-              rotate: [-180, 0],
-              boxShadow: [
-                "0px 0px 0px rgba(255,87,34,0)",
-                "0px 0px 20px rgba(255,87,34,0.3)",
-                "0px 0px 0px rgba(255,87,34,0)"
-              ]
-            }}
-            transition={{
-              duration: 1,
-              times: [0, 0.6, 1],
-              ease: "easeOut"
-            }}
-          >
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ 
-                opacity: 1,
-                scale: [1, 1.2, 1],
-              }}
-              transition={{ 
-                delay: 0.3,
-                duration: 0.5,
-                repeat: Infinity,
-                repeatDelay: 2
-              }}
-            >
-              <FaPause className="text-[#FF5722] text-2xl" />
-            </motion.div>
-          </motion.div>
+    <div className="min-h-screen bg-[#FFFBEB] flex flex-col pb-20 font-sans">
+      <div className="max-w-[500px] w-full mx-auto flex-1 flex flex-col items-center justify-center px-4">
 
-          {/* Text Content with Animation */}
-          <motion.h1 
-            className="text-2xl font-semibold text-gray-900 mb-2"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
+        {/* Toggle Icon */}
+        <motion.div
+          className="relative w-24 h-24 mx-auto mb-6"
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+        >
+          <img
+            src={vectorBadge}
+            alt="Badge"
+            className="w-full h-full object-contain"
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            {/* Verify if pauseSvg is black bars. If not, we might need to style it or filter it. 
+                Assuming it is correct for now based on user context. */}
+            <img src={pauseSvg} alt="Pause" className="w-8 h-8" />
+          </div>
+        </motion.div>
+
+        {/* Text Content */}
+        <motion.div
+          className="text-center mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <h1 className="text-2xl font-bold text-gray-900 mb-3 font-serif">
             Subscription Paused
-          </motion.h1>
-          <motion.p 
-            className="text-gray-600 mb-8"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-          >
-            Your subscription has been paused. You can resume it anytime.
-          </motion.p>
+          </h1>
+          <p className="text-[#666666] text-sm leading-relaxed px-6">
+            Your deliveries will resume from <span className="font-medium">{formattedDate}</span>.
+            <br />
+            You can resume it anytime!
+          </p>
+        </motion.div>
 
-          {/* Buttons with Enhanced Animation */}
-          <motion.div 
-            className="space-y-3"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
+        {/* View Subscription Button */}
+        <motion.div
+          className="w-full max-w-xs mb-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <button
+            onClick={() => navigate('/manage-my-subscription')}
+            className="w-full bg-[#FAA222] text-gray-900 py-4 rounded-[20px] font-semibold text-sm hover:bg-[#E8911F] transition-colors shadow-sm"
           >
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/manage-my-subscription')}
-              className="w-full bg-[#FF5722] text-white py-3.5 rounded-full font-medium hover:bg-[#F4511E] transition-colors"
-            >
-              View Subscription
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/')}
-              className="w-full border border-gray-300 text-gray-700 py-3.5 rounded-full font-medium hover:bg-gray-50 transition-colors"
-            >
-              Back to Home
-            </motion.button>
-          </motion.div>
-        </div>
+            View Subscription
+          </button>
+        </motion.div>
+
+        {/* Explore Other Packs Link */}
+        <motion.div
+          className="w-full text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <button
+            onClick={() => navigate('/Products')}
+            className="text-gray-800 text-sm font-medium hover:text-gray-600 transition-colors"
+          >
+            Explore Other Packs
+          </button>
+        </motion.div>
       </div>
+
+      <BottomNavigation />
     </div>
   );
 };

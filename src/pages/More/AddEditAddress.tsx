@@ -7,6 +7,8 @@ import { toast } from 'react-hot-toast';
 import { GoogleMap, Autocomplete } from '@react-google-maps/api';
 import { useGoogleMaps } from '../../hooks/useGoogleMaps';
 
+import { customerService } from '../../services/getcustomer.service';
+
 const AddEditAddress: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,27 +19,27 @@ const AddEditAddress: React.FC = () => {
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [selectedPosition, setSelectedPosition] = useState<{lat: number, lng: number}>({
+  const [selectedPosition, setSelectedPosition] = useState<{ lat: number, lng: number }>({
     lat: 20.5937,
     lng: 78.9629
   });
 
   const [formData, setFormData] = useState({
-    houseNo: '',
-    streetName: '',
+    completeAddress: '',
+    floor: '',
     landmark: '',
-    area: '',
-    city: '',
-    state: '',
-    pincode: '',
-    phoneNumber: '',
     type: 'Home' as 'Home' | 'Work' | 'Others',
-    district:''
   });
+
+  const [deliveryAddress, setDeliveryAddress] = useState('');
 
   const [selectedType, setSelectedType] = useState<'Home' | 'Work' | 'Others'>('Home');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isValidatingLocation, setIsValidatingLocation] = useState(false);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [pincode, setPincode] = useState('');
+
   const [locationValidation, setLocationValidation] = useState<{
     isValid: boolean;
     message?: string;
@@ -45,21 +47,56 @@ const AddEditAddress: React.FC = () => {
 
   useEffect(() => {
     if (isEdit && existingAddress) {
+      const fullAddress = [
+        existingAddress.houseNo,
+        existingAddress.streetName,
+        existingAddress.area
+      ].filter(Boolean).join(', ');
+
       setFormData({
-        houseNo: existingAddress.houseNo || 'unknown',
-        streetName: existingAddress.streetName || 'unknown',
-        landmark: existingAddress.landmark || 'unknown',
-        area: existingAddress.area || 'unknown',
-        city: existingAddress.city || 'jaipur',
-        state: existingAddress.state || '',
-        pincode: existingAddress.pincode || '302021',
-        phoneNumber: existingAddress.associatedPhoneNumber || '',
+        completeAddress: fullAddress || '',
+        floor: '',
+        landmark: existingAddress.area || '',
         type: existingAddress.type || 'Home',
-        district: existingAddress.district || 'Unknown'
       });
       setSelectedType(existingAddress.type || 'Home');
+      setDeliveryAddress(fullAddress || '');
+      setPincode(existingAddress.pincode || '');
+      // If editing, use the name/phone from the address record if available
+      if (existingAddress.name) {
+        setName(existingAddress.name);
+      }
+      if (existingAddress.associatedPhoneNumber) {
+        setPhone(existingAddress.associatedPhoneNumber);
+      }
+    } else {
+      getCurrentLocation();
     }
-    getCurrentLocation();
+
+    // Fetch user details for default name/phone
+    const fetchUserDetails = async () => {
+      // Don't overwrite if editing (values already set from existing address)
+      if (isEdit && existingAddress) return;
+
+      try {
+        const customers = await customerService.getAllCustomers();
+        if (customers.length > 0) {
+          const user = customers[0];
+          // Set name if available
+          if (user.firstName || user.lastName) {
+            setName(`${user.firstName} ${user.lastName}`.trim());
+          }
+          // Set phone if available
+          if (user.phoneNumber) {
+            setPhone(user.phoneNumber);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch user details:', error);
+      }
+    };
+
+    fetchUserDetails();
   }, [isEdit, existingAddress]);
 
   const onLoad = useCallback((map: google.maps.Map) => {
@@ -71,19 +108,22 @@ const AddEditAddress: React.FC = () => {
   }, []);
 
   const validateForm = () => {
-    const requiredFields = ['houseNo', 'streetName'];
-    const emptyFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
-    
-    if (emptyFields.length > 0) {
-      toast.error(`Please fill in all required fields`);
+    if (!name.trim()) {
+      toast.error('Please enter your full name');
       return false;
     }
-
-    if (formData.phoneNumber && !/^\d{10}$/.test(formData.phoneNumber)) {
-      toast.error('Please enter a valid 10-digit phone number');
+    if (!phone.trim()) {
+      toast.error('Please enter your phone number');
       return false;
     }
-
+    if (!formData.completeAddress.trim()) {
+      toast.error('Please enter a complete address');
+      return false;
+    }
+    if (!pincode.trim()) {
+      toast.error('Please enter a zip code');
+      return false;
+    }
     return true;
   };
 
@@ -91,22 +131,22 @@ const AddEditAddress: React.FC = () => {
     try {
       setIsValidatingLocation(true);
       const coordinates = `${selectedPosition.lat},${selectedPosition.lng}`;
-      
+
       // First validate coordinates format
       if (!addressService.validateCoordinatesFormat(coordinates)) {
         toast.error('Invalid coordinates format');
         setLocationValidation({ isValid: false, message: 'Invalid coordinates format' });
         return false;
       }
-      
+
       const validation = await addressService.validateAddressInDeliveryArea(coordinates);
       setLocationValidation(validation);
-      
+
       if (!validation.isValid) {
         toast.error(validation.message || 'Address is outside delivery area');
         return false;
       }
-      
+
       toast.success('Address is within delivery area!');
       return true;
     } catch (error) {
@@ -130,26 +170,36 @@ const AddEditAddress: React.FC = () => {
 
     try {
       setIsSubmitting(true);
+
+      // Parse completeAddress to extract components
+      const addressParts = formData.completeAddress.split(',').map(s => s.trim());
+      const houseNo = addressParts[0] || 'unknown';
+      const streetName = addressParts.slice(1).join(', ') || 'unknown';
+
       const addressData = {
-        associatedPhoneNumber:formData.phoneNumber,
-        city:formData.city || 'unknown',
+        name: name, // Include name in payload
+        associatedPhoneNumber: phone, // Use the state variable
+        city: 'unknown',
         coordinates: `${selectedPosition.lat},${selectedPosition.lng}`,
-        district:formData.district || 'unknown',
-        houseNo:formData.houseNo || 'unknown',
-        area:formData.landmark || 'unknown',
-        state:formData.state || 'Unknown',
-        pincode:formData.pincode || '302021',
-        streetName:formData.streetName || 'unknown',
+        district: 'unknown',
+        houseNo: houseNo,
+        area: formData.landmark || 'unknown',
+        state: 'Unknown',
+        pincode: pincode, // Use the state variable
+        streetName: streetName,
+        setAsDefault: false // explicitly initialize as false
       };
 
       if (isEdit && existingAddress?.id) {
-        await addressService.updateAddress(existingAddress.id, addressData);
+        // Exclude setAsDefault for update if it causes issues, or the backend doesn't support it on update
+        const { setAsDefault, ...updateData } = addressData;
+        await addressService.updateAddress(existingAddress.id, updateData);
         toast.success('Address updated successfully');
       } else {
         await addressService.createAddress(addressData);
         toast.success('Address added successfully');
       }
-      navigate('/addresses');
+      navigate(-1);
     } catch (error) {
       console.error('Failed to save address:', error);
       toast.error(isEdit ? 'Failed to update address' : 'Failed to add address');
@@ -167,61 +217,64 @@ const AddEditAddress: React.FC = () => {
           if (mapRef.current) {
             mapRef.current.panTo({ lat: latitude, lng: longitude });
           }
-          
+
           try {
-             const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+            const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
             const response = await fetch(
               `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`
             );
             const data = await response.json();
-            
-            if (data.results && data.results.length > 0) {
-              const formattedAddress: any = {};
-              
-              // Loop through all results to find address components
-              data.results.forEach((result: any) => {
-                if (result.address_components) {
-                  result.address_components.forEach((component: any) => {
-                    // Check all types for each component
-                    component.types.forEach((type: string) => {
-                      if (type === 'street_number' && !formattedAddress.houseNo) {
-                        formattedAddress.houseNo = component.long_name;
-                      }
-                      if (type === 'route' && !formattedAddress.streetName) {
-                        formattedAddress.streetName = component.long_name;
-                      }
-                      if (type === 'sublocality_level_1' && !formattedAddress.area) {
-                        formattedAddress.area = component.long_name;
-                      }
-                      if (type === 'locality' && !formattedAddress.city) {
-                        formattedAddress.city = component.long_name;
-                      }
-                      if (type === 'administrative_area_level_1' && !formattedAddress.state) {
-                        formattedAddress.state = component.long_name;
-                      }
-                      if (type === 'postal_code' && !formattedAddress.pincode) {
-                        formattedAddress.pincode = component.long_name;
-                      }
-                      if (type === 'administrative_area_level_2' && !formattedAddress.district) {
-                        formattedAddress.district = component.long_name;
-                      }
-                    });
-                  });
-                }
-              });
 
-              // Also try to get formatted address from the first result
+            if (data.results && data.results.length > 0) {
+              // Get formatted address from the first result
               if (data.results[0].formatted_address) {
                 const fullAddress = data.results[0].formatted_address;
-                console.log('Full formatted address:', fullAddress);
-              }
+                setDeliveryAddress(fullAddress);
 
-              console.log('Extracted address components:', formattedAddress);
-              
-              setFormData(prev => ({
-                ...prev,
-                ...formattedAddress
-              }));
+                // Extract components for completeAddress field
+                const addressComponents: any = {};
+                data.results.forEach((result: any) => {
+                  if (result.address_components) {
+                    result.address_components.forEach((component: any) => {
+                      component.types.forEach((type: string) => {
+                        if (type === 'street_number' && !addressComponents.houseNo) {
+                          addressComponents.houseNo = component.long_name;
+                        }
+                        if (type === 'route' && !addressComponents.streetName) {
+                          addressComponents.streetName = component.long_name;
+                        }
+                        if (type === 'sublocality_level_1' && !addressComponents.area) {
+                          addressComponents.area = component.long_name;
+                        }
+                      });
+                    });
+                  }
+                });
+
+                // Build complete address string
+                const completeAddr = [
+                  addressComponents.houseNo,
+                  addressComponents.streetName,
+                  addressComponents.area
+                ].filter(Boolean).join(', ');
+
+                if (completeAddr) {
+                  setFormData(prev => ({
+                    ...prev,
+                    completeAddress: completeAddr
+                  }));
+                  // Fix: use 'place' variable which is available in this scope?
+                  // Actually 'place' variable is defined in the closure above in autocomplete logic?
+                  // Wait, looking at the code structure...
+                  // This is inside getCurrentLocation which calls Geocoding API.
+                  // It returns 'data' which has results. It is NOT using 'place' object from Google Places API directly here.
+                  // It uses 'data.results[0]'.
+
+                  const result = data.results[0];
+                  const pin = result.address_components?.find((c: any) => c.types.includes('postal_code'))?.long_name;
+                  if (pin) setPincode(pin);
+                }
+              }
               toast.success('Location detected successfully');
             }
           } catch (error) {
@@ -282,7 +335,7 @@ const AddEditAddress: React.FC = () => {
         <div className="text-red-500 text-xl mb-4">
           Unable to load map
         </div>
-        <button 
+        <button
           onClick={() => window.location.reload()}
           className="bg-orange-500 text-white px-4 py-2 rounded-lg"
         >
@@ -306,23 +359,23 @@ const AddEditAddress: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#FFFBEB] px-4">
       <div className="max-w-[800px] mx-auto">
-        <div className="py-4 md:p-6 flex items-center">
-          <div>
-            <h1 className="text-xl md:text-2xl font-semibold mb-2">
-              <span className="flex items-center">
-                <button onClick={() => navigate(-1)} className="hover:bg-gray-100 rounded-full p-2 transition-colors mr-2 md:mr-4">
-                  <IoArrowBack className="text-xl md:text-2xl" />
-                </button>
-                {isEdit ? 'Edit Address' : 'Add New Address'}
-              </span>
-            </h1>
-            <p className="text-gray-600 mb-4 md:mb-6 ml-10 md:ml-9 text-sm md:text-base"></p>
-          </div>
+        {/* Header */}
+        <div className="py-4 flex items-center">
+          <button
+            onClick={() => navigate(-1)}
+            className="hover:bg-gray-100 rounded-full p-2 transition-colors mr-3"
+          >
+            <IoArrowBack className="text-xl" />
+          </button>
+          <h1 className="text-xl font-semibold">
+            Enter Address Details
+          </h1>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative mb-4">
-          <div className="relative">
+        {/* Map Section */}
+        <div className="w-full h-[300px] relative rounded-lg overflow-hidden mb-4 bg-[#F5F5DC]">
+          {/* Search Bar inside Map */}
+          <div className="absolute top-3 left-3 right-3 z-30">
             {isLoaded ? (
               <Autocomplete
                 onLoad={(autocomplete) => {
@@ -343,43 +396,45 @@ const AddEditAddress: React.FC = () => {
                       mapRef.current.panTo(location);
                       mapRef.current.setZoom(15);
                     }
-                    
-                    // Update form data with address components
+
+                    // Update delivery address and form data
+                    const formattedAddress = place.formatted_address || '';
+                    setDeliveryAddress(formattedAddress);
+                    setSearchQuery(formattedAddress);
+
+                    // Extract address components for completeAddress field
                     const addressComponents: any = {};
                     place.address_components?.forEach(component => {
-                      const componentType = component.types[0];
-                      switch(componentType) {
-                        case 'street_number':
+                      component.types.forEach((type: string) => {
+                        if (type === 'street_number' && !addressComponents.houseNo) {
                           addressComponents.houseNo = component.long_name;
-                          break;
-                        case 'route':
+                        }
+                        if (type === 'route' && !addressComponents.streetName) {
                           addressComponents.streetName = component.long_name;
-                          break;
-                        case 'sublocality_level_1':
-                        case 'sublocality':
+                        }
+                        if ((type === 'sublocality_level_1' || type === 'sublocality') && !addressComponents.area) {
                           addressComponents.area = component.long_name;
-                          break;
-                        case 'locality':
-                          addressComponents.city = component.long_name;
-                          break;
-                        case 'administrative_area_level_1':
-                          addressComponents.state = component.long_name;
-                          break;
-                        case 'postal_code':
-                          addressComponents.pincode = component.long_name;
-                          break;
-                        case 'administrative_area_level_2':
-                          addressComponents.district = component.long_name;
-                          break;
-                      }
+                        }
+                      });
                     });
-                    
-                    setFormData(prev => ({
-                      ...prev,
-                      ...addressComponents
-                    }));
-                    
-                    setSearchQuery(place.formatted_address || '');
+
+                    // Build complete address string
+                    const completeAddr = [
+                      addressComponents.houseNo,
+                      addressComponents.streetName,
+                      addressComponents.area
+                    ].filter(Boolean).join(', ');
+
+                    if (completeAddr) {
+                      setFormData(prev => ({
+                        ...prev,
+                        completeAddress: completeAddr
+                      }));
+
+                      // Set pincode from autocomplete
+                      const pin = place.address_components?.find(c => c.types.includes('postal_code'))?.long_name;
+                      if (pin) setPincode(pin);
+                    }
                   }
                 }}
                 fields={['address_components', 'geometry', 'formatted_address']}
@@ -387,12 +442,12 @@ const AddEditAddress: React.FC = () => {
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Search for a location..."
+                    placeholder="Search anything...."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full p-3 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    className="w-full p-3 pl-4 pr-10 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-md"
                   />
-                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       className="h-5 w-5"
@@ -416,31 +471,11 @@ const AddEditAddress: React.FC = () => {
                   type="text"
                   placeholder="Loading map..."
                   disabled
-                  className="w-full p-3 pl-10 pr-4 border border-gray-300 rounded-lg bg-gray-100"
+                  className="w-full p-3 pl-4 pr-10 border border-gray-300 rounded-lg bg-gray-100"
                 />
-                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                </div>
               </div>
             )}
           </div>
-        </div>
-
-        {/* Map Section */}
-        <div className="w-full h-[200px] md:h-[300px] relative rounded-lg overflow-hidden mb-4 md:mb-6">
           <GoogleMap
             mapContainerStyle={{
               width: '100%',
@@ -459,112 +494,172 @@ const AddEditAddress: React.FC = () => {
               disableDefaultUI: true
             }}
           />
+          {/* Fixed Marker - Black */}
+          <div className="absolute left-1/2 top-[40%] -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
+            <MdLocationOn className="text-black text-5xl drop-shadow-lg" />
+          </div>
+          {/* Locate Me Button - At the bottom */}
           <button
             onClick={getCurrentLocation}
-            className="absolute bottom-2 md:bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm flex items-center gap-1 md:gap-2 shadow-sm hover:bg-gray-50"
+            className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm flex items-center gap-2 shadow-sm hover:bg-gray-50 z-20"
           >
-            <MdMyLocation className="text-orange-500 h-3 w-3 md:h-4 md:w-4" />
-            <span>Use current location</span>
+            <MdMyLocation className="h-4 w-4" />
+            <span>Locate Me</span>
           </button>
-          {/* Fixed Marker */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
-            <MdLocationOn className="text-orange-500 text-4xl md:text-5xl drop-shadow-lg animate-bounce" />
-          </div>
+          {/* Paper airplane icon button (top right) */}
+          <button
+            onClick={getCurrentLocation}
+            className="absolute top-3 right-3 bg-white rounded-full p-2 shadow-md hover:bg-gray-50 z-10"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5 text-gray-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+              />
+            </svg>
+          </button>
         </div>
 
-        {/* Location Validation Status */}
-        {locationValidation && (
-          <div className={`mb-4 p-3 rounded-lg text-sm ${
-            locationValidation.isValid 
-              ? 'bg-green-50 text-green-700 border border-green-200' 
-              : 'bg-red-50 text-red-700 border border-red-200'
-          }`}>
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${
-                locationValidation.isValid ? 'bg-green-500' : 'bg-red-500'
-              }`}></div>
-              <span>{locationValidation.message}</span>
-            </div>
+        {/* Delivering to Section */}
+        {deliveryAddress && (
+          <div className="mb-4">
+            <p className="text-gray-600 text-sm mb-1">Delivering to</p>
+            <p className="text-gray-800 font-medium">{deliveryAddress}</p>
           </div>
         )}
 
-        {/* Complete Address Section */}
-        <div className="space-y-4 md:space-y-6">
+        {/* Form Fields - Updated Layout */}
+        <div className="space-y-4">
+
+          {/* Full Name */}
           <div>
-            <h3 className="text-gray-700 mb-1 md:mb-2 text-sm md:text-base">Complete Address</h3>
+            <label className="block text-gray-700 mb-2 text-sm font-bold">
+              Full Name*
+            </label>
             <input
               type="text"
-              placeholder="House/Flat no"
-              value={formData.houseNo}
-              onChange={(e) => setFormData({ ...formData, houseNo: e.target.value })}
-              className="w-full p-2 md:p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm md:text-base"
+              placeholder="e.g. John Doe"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-[#FFFBF7]"
             />
           </div>
 
-          <input
-            type="text"
-            placeholder="Street Name, Area"
-            value={formData.streetName}
-            onChange={(e) => setFormData({ ...formData, streetName: e.target.value })}
-            className="w-full p-2 md:p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm md:text-base"
-          />
-
+          {/* Phone Number */}
           <div>
-            <h3 className="text-gray-700 mb-1 md:mb-2 text-sm md:text-base">Directions/Landmark</h3>
+            <label className="block text-gray-700 mb-2 text-sm font-bold">
+              Phone Number*
+            </label>
+            <input
+              type="tel"
+              placeholder="00000 00000"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-[#FFFBF7]"
+            />
+          </div>
+
+          {/* Complete Address */}
+          <div>
+            <label className="block text-gray-700 mb-2 text-sm font-bold">
+              Complete Address *
+            </label>
+            <textarea
+              placeholder="House/Flat No., Building Name, Area, City, State"
+              value={formData.completeAddress}
+              onChange={(e) => setFormData({ ...formData, completeAddress: e.target.value })}
+              rows={3}
+              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-[#FFFBF7]"
+            />
+          </div>
+
+          {/* Zip Code */}
+          <div>
+            <label className="block text-gray-700 mb-2 text-sm font-bold">
+              Zip Code*
+            </label>
             <input
               type="text"
-              placeholder="Nearby landmark for easy location"
+              placeholder="302021"
+              value={pincode}
+              onChange={(e) => setPincode(e.target.value)}
+              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-[#FFFBF7]"
+            />
+          </div>
+
+
+          {/* Floor (Optional) */}
+          <div>
+            <label className="block text-gray-700 mb-2 text-sm font-bold">
+              Floor (Optional)
+            </label>
+            <input
+              type="text"
+              placeholder="e.g., 2nd Floor"
+              value={formData.floor}
+              onChange={(e) => setFormData({ ...formData, floor: e.target.value })}
+              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-[#FFFBF7]"
+            />
+          </div>
+
+          {/* Nearby Landmark (Optional) */}
+          <div>
+            <label className="block text-gray-700 mb-2 text-sm font-bold">
+              Nearby Landmark (Optional)
+            </label>
+            <input
+              type="text"
+              placeholder="e.g., Near City Mall"
               value={formData.landmark}
               onChange={(e) => setFormData({ ...formData, landmark: e.target.value })}
-              className="w-full p-2 md:p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm md:text-base"
+              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-[#FFFBF7]"
             />
           </div>
 
           <div>
-            <h3 className="text-gray-700 mb-1 md:mb-2 text-sm md:text-base">Receiver's Phone (Optional)</h3>
-            <div className="flex">
-              <span className="bg-white border border-gray-200 rounded-lg px-3 py-2 md:py-3 text-gray-500 text-sm md:text-base">+91</span>
-              <input
-                type="tel"
-                placeholder="Enter your WhatsApp number"
-                value={formData.phoneNumber}
-                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                className="flex-1 p-2 md:p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 ml-2 text-sm md:text-base"
-              />
+            <label className="block text-gray-700 mb-3 text-sm font-bold">
+              Tag this location Type
+            </label>
+            <div className="flex gap-3 w-2/3">
+              {['Home', 'Work', 'Others'].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => {
+                    setSelectedType(type as 'Home' | 'Work' | 'Others');
+                    setFormData(prev => ({ ...prev, type: type as 'Home' | 'Work' | 'Others' }));
+                  }}
+                  className={`flex-1 py-2.5 px-2 rounded-2xl border-2 transition-colors text-sm font-semibold whitespace-nowrap ${selectedType === type
+                    ? 'border-[#FAA222] bg-[#FAA222] text-gray-800'
+                    : 'border-gray-200 bg-[#F3F4F6] text-gray-500'
+                    }`}
+                >
+                  {type}
+                </button>
+              ))}
             </div>
-          </div>
-
-          {/* Address Type Selection */}
-          <div className="flex gap-3">
-            {['Home', 'Work', 'Others'].map((type) => (
-              <button
-                key={type}
-                onClick={() => setSelectedType(type as 'Home' | 'Work' | 'Others')}
-                className={`flex-1 py-2 px-4 rounded-full border transition-colors ${
-                  selectedType === type
-                    ? 'border-orange-500 text-orange-500'
-                    : 'border-gray-300 text-gray-600'
-                }`}
-              >
-                {type}
-              </button>
-            ))}
           </div>
         </div>
 
         {/* Confirm Button */}
-        <div className="mt-6 mb-6 md:mb-9">
+        <div className="mt-6 mb-24">
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || isValidatingLocation}
-            className={`w-full py-4 rounded-full font-medium transition-colors ${
-              isSubmitting || isValidatingLocation
-                ? 'bg-gray-400 text-white cursor-not-allowed'
-                : 'bg-orange-500 hover:bg-orange-600 text-white'
-            }`}
+            className={`w-full py-4 rounded-[20px] font-medium transition-colors ${isSubmitting || isValidatingLocation
+              ? 'bg-gray-400 text-grey-700 cursor-not-allowed'
+              : 'bg-[#FAA222] hover:bg-[#DD7600] text-grey-500'
+              }`}
           >
-            {isValidatingLocation ? 'Validating Location...' : 
-             isSubmitting ? 'Saving Address...' : 'Confirm Location'}
+            {isValidatingLocation ? 'Validating Location...' :
+              isSubmitting ? 'Saving Address...' : 'Cofirm Location And Proceed'}
           </button>
         </div>
       </div>

@@ -1,25 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
+import {
   FaChevronRight,
-  FaInstagram,
-  FaFacebookF,
-  FaWhatsapp,
 } from 'react-icons/fa';
-import { 
-  IoPersonOutline, 
+import {
   IoLocationOutline,
-  IoCopyOutline,
-  IoNotificationsOutline,
-  IoHelpCircleOutline,
-  IoMailOutline,
   IoLogOutOutline,
-  IoArrowBack
+  IoCreateOutline,
 } from 'react-icons/io5';
-import walletImage from '../../assets/icon/Wallet.png'
-import profileImage from '../../assets/icon/Profile.png'
 import BottomNav from '../../components/layout/BottomNav';
 import { customerService } from '@/services/getcustomer.service';
+
+// Import SVG icons
+import subscriptionIcon from '../../assets/icon/subscription.svg';
+import ordersIcon from '../../assets/icon/orders.png';
+import pujaIcon from '../../assets/icon/puja.svg';
+import exoticIcon from '../../assets/icon/exotic.svg';
+import referIcon from '../../assets/icon/refer.svg';
+import supportIcon from '../../assets/icon/support.svg';
+import walletIcon from '../../assets/wallet.svg';
+import faqIcon from '../../assets/icon/Faq.svg';
+import vectorBg from '../../assets/All/Vector (1).png';
+import BlackProfile from '../../assets/svg/Blackprofile.svg';
+import facebookIcon from '../../assets/icon/social/facebook.svg';
+import instagramIcon from '../../assets/icon/social/insta.svg';
+import whatsappIcon from '../../assets/icon/social/whatsapp.svg';
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
@@ -27,8 +32,9 @@ const Settings: React.FC = () => {
   const [userPhone, setUserPhone] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [hasEmail, setHasEmail] = useState(true);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
 
-  // Add loading and error state if needed
   const [, setLoading] = useState(false);
   const [, setError] = useState<string | null>(null);
 
@@ -36,7 +42,7 @@ const Settings: React.FC = () => {
     setLoading(true);
     customerService.getAllCustomers()
       .then((customers) => {
-        const user = customers[0]; 
+        const user = customers[0];
         if (user) {
           setUserName(`${user.firstName} ${user.lastName}`);
           setUserPhone(user.phoneNumber.toString());
@@ -53,100 +59,151 @@ const Settings: React.FC = () => {
 
   const menuItems = [
     {
-      icon: <IoPersonOutline className="text-xl text-gray-500" />,
-      title: 'Edit Profile',
-      path: '/profile'
+      icon: subscriptionIcon,
+      title: 'Manage Subscription',
+      path: '/manage-my-subscription',
+      isSvg: true
+    },
+    {
+      icon: ordersIcon,
+      title: 'Orders',
+      path: '/orders',
+      isSvg: false
+    },
+    {
+      icon: pujaIcon,
+      title: 'Puja Flower',
+      path: '/Products?category=puja',
+      isSvg: true
+    },
+    {
+      icon: exoticIcon,
+      title: 'Exotic Flower',
+      path: '/Products?category=exotic',
+      isSvg: true
     },
     {
       icon: <IoLocationOutline className="text-xl text-gray-500" />,
       title: 'Address Book',
-      path: '/addresses'
+      path: '/addresses',
+      isSvg: false,
+      isComponent: true
     },
     {
-      icon: <IoCopyOutline className="text-xl text-gray-500" />,
+      icon: referIcon,
       title: 'Refer Us',
-      path: '/refer'
+      path: '/refer',
+      isSvg: true
     },
     {
-      icon: <IoNotificationsOutline className="text-xl text-gray-500" />,
-      title: 'Manage Subscriptions',
-      path: '/manage-my-subscription'
+      icon: supportIcon,
+      title: 'Request & Support',
+      path: '/customer-support',
+      isSvg: true
     },
     {
-      icon: <IoHelpCircleOutline className="text-xl text-gray-500" />,
-      title: 'Help & Support',
-      path: '/customer-support'
+      icon: walletIcon,
+      title: 'Wallet',
+      path: '/wallet',
+      isSvg: true
+    },
+    {
+      icon: faqIcon,
+      title: 'FAQs',
+      path: '/faq',
+      isSvg: true
     }
   ];
 
   const socialLinks = [
     {
-      icon: <FaInstagram />,
-      title: 'Instagram',
+      icon: facebookIcon,
       url: '#'
     },
     {
-      icon: <FaFacebookF />,
-      title: 'Facebook',
+      icon: instagramIcon,
       url: '#'
     },
     {
-      icon: <FaWhatsapp />,
-      title: 'Whatsapp',
-      url: '#'
-    },
-    {
-      icon: <IoMailOutline />,
-      title: 'E-mail',
+      icon: whatsappIcon,
       url: '#'
     }
   ];
 
-  const handleLogout = () => {
+  const handleLogoutClick = () => {
+    setShowLogoutDialog(true);
+  };
+
+  const handleLogoutConfirm = () => {
     localStorage.clear();
     navigate('/login');
+  };
+
+  const handleLogoutCancel = () => {
+    setShowLogoutDialog(false);
+  };
+
+  const handleDeleteAccountClick = () => {
+    setShowDeleteAccountDialog(true);
+  };
+
+  const handleDeleteAccountConfirm = () => {
+    // Add delete account functionality here
+    console.log('Delete account confirmed');
+    // localStorage.clear();
+    // navigate('/login');
+    setShowDeleteAccountDialog(false);
+  };
+
+  const handleDeleteAccountCancel = () => {
+    setShowDeleteAccountDialog(false);
+  };
+
+  const handleMenuClick = (path: string) => {
+    if (path.includes('?')) {
+      const [route, query] = path.split('?');
+      navigate(`${route}?${query}`);
+    } else {
+      navigate(path);
+    }
+  };
+
+  const formatPhoneNumber = (phone: string) => {
+    if (!phone || phone.length < 10) return phone;
+    return `+91 ${phone}`;
   };
 
   return (
     <div className="min-h-screen bg-[#FFFBEB]">
       <div className="w-full max-w-[800px] mx-auto">
-        {/* Header */}
-        {/* <div className="p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate(-1)} className="hover:bg-gray-100 rounded-full p-2 transition-colors">
-              <IoArrowBack className="text-xl" />
-            </button>
-            <h1 className="text-xl font-medium">Account & Settings</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <img 
-              src={walletImage} 
-              alt="Wallet" 
-              className="w-10 h-10" 
-              onClick={() => navigate('/wallet')}
-            />
-            <img 
-              src={profileImage} 
-              alt="Profile" 
-              className="w-6 h-6" 
-              onClick={() => navigate('/account')}
-            />
-          </div>
-        </div> */}
-
         {/* Content Container */}
         <div className="w-full px-4">
           {/* User Profile Card */}
-          <div className="bg-white mt-4 p-4 rounded-xl shadow-sm">
+          <div className="bg-white mt-4 p-4 rounded-xl shadow-sm relative">
+            <button
+              onClick={() => navigate('/Profile')}
+              className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              <IoCreateOutline className="text-xl" />
+            </button>
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center">
-                <IoPersonOutline className="text-2xl text-[#FF5722]" />
+              <div className="relative w-20 h-20 flex-shrink-0 flex items-center justify-center">
+                <img
+                  src={vectorBg}
+                  alt="Profile background"
+                  className="absolute inset-0 w-full h-full object-contain"
+                />
+                <img
+                  src={BlackProfile}
+                  alt="Account"
+                  className="relative z-10 w-7 h-7 object-contain"
+                />
               </div>
-              <div>
-                <h2 className="text-lg font-medium text-gray-900">{userName} </h2>
-                <p className="text-gray-500 text-[15px]">{userPhone}</p>
-                <p className={`text-[15px] ${hasEmail ? 'text-gray-500' : 'text-blue-600'}`}>
-                  {userEmail}
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-semibold text-gray-900 truncate">{userName || 'User Name'}</h2>
+                <p className="text-gray-500 text-[15px] mt-0.5">{formatPhoneNumber(userPhone)}</p>
+                <p className={`text-[15px] mt-0.5 ${hasEmail ? 'text-gray-500' : 'text-blue-600'}`}>
+                  {userEmail || 'No email'}
                 </p>
               </div>
             </div>
@@ -157,13 +214,16 @@ const Settings: React.FC = () => {
             {menuItems.map((item, index) => (
               <div
                 key={item.title}
-                onClick={() => navigate(item.path)}
-                className={`flex items-center justify-between p-4 ${
-                  index !== menuItems.length - 1 ? 'border-b border-gray-100' : ''
-                } cursor-pointer hover:bg-gray-50 transition-colors`}
+                onClick={() => handleMenuClick(item.path)}
+                className={`flex items-center justify-between p-4 ${index !== menuItems.length - 1 ? 'border-b border-gray-100' : ''
+                  } cursor-pointer hover:bg-gray-50 transition-colors`}
               >
                 <div className="flex items-center gap-4">
-                  {item.icon}
+                  {item.isComponent ? (
+                    item.icon
+                  ) : (
+                    <img src={item.icon as string} alt={item.title} className="w-5 h-5 object-contain" />
+                  )}
                   <span className="text-[15px] text-gray-700 font-normal">{item.title}</span>
                 </div>
                 <FaChevronRight className="text-gray-400 text-sm" />
@@ -172,42 +232,113 @@ const Settings: React.FC = () => {
           </div>
 
           {/* Social Connect Section */}
-          <div className="mt-6 bg-white p-4 rounded-xl shadow-sm">
-            <h3 className="text-[17px] font-medium text-gray-900 mb-2">Connect With Us</h3>
+          <div className="mt-6">
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Connect With Us</h3>
             <p className="text-[15px] text-gray-500 mb-4">
-              Follow us on social media for daily flower inspiration, puja tips, and exclusive offers.
+              Follow us on social media for daily flowers inspiration, puja tips, & exclusive offers.
             </p>
-            <div className="bg-white rounded-xl">
-              <div className="grid grid-cols-2 gap-3">
-                {socialLinks.map((link) => (
-                  <button
-                    key={link.title}
-                    onClick={() => window.open(link.url, '_blank')}
-                    className="flex items-center justify-center gap-2 p-3 border border-gray-200 rounded-full hover:bg-gray-50 transition-colors"
-                  >
-                    <span className="text-[#1B4B33] text-base">{link.icon}</span>
-                    <span className="text-[15px] text-gray-700">{link.title}</span>
-                  </button>
-                ))}
-              </div>
+            <div className="flex items-center justify-center gap-6">
+              {socialLinks.map((link, index) => (
+                <button
+                  key={index}
+                  onClick={() => window.open(link.url, '_blank')}
+                  className="transition-opacity hover:opacity-80"
+                >
+                  <img src={link.icon} alt="" className="w-6 h-6" />
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Logout Button */}
-          <div className="mt-6 mb-20">
+          <div className="mt-6 mb-4">
             <button
-              onClick={handleLogout}
-              className="flex items-center justify-center gap-2 w-full py-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+              onClick={handleLogoutClick}
+              className="flex items-center justify-center gap-2 w-full py-3.5 bg-[#FAA222] text-gray-700 rounded-xl font-semibold hover:bg-[#E8911F] transition-colors"
             >
               <IoLogOutOutline className="text-xl" />
               <span className="text-[15px]">Logout</span>
             </button>
+          </div>
+
+          {/* Delete Account Link */}
+          <div className="mb-4 text-center">
+            <button
+              onClick={handleDeleteAccountClick}
+              className="text-red-500 text-[15px] hover:text-red-700 transition-colors underline"
+            >
+              Delete Account
+            </button>
+          </div>
+
+          {/* Legal Disclaimer */}
+          <div className="mb-20 text-center">
+            <p className="text-xs text-gray-400">
+              By continuing, you agree to our{' '}
+              <a href="#" className="text-gray-500 underline">
+                Terms of Service
+              </a>{' '}
+              and{' '}
+              <a href="#" className="text-gray-500 underline">
+                Privacy Policy
+              </a>
+            </p>
           </div>
         </div>
       </div>
 
       {/* Bottom Navigation */}
       <BottomNav />
+
+      {/* Logout Confirmation Dialog */}
+      {showLogoutDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 mx-4 max-w-sm w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6 text-center">
+              Are you Sure?
+            </h3>
+            <div className="space-y-3">
+              <button
+                onClick={handleLogoutConfirm}
+                className="w-full py-3 text-gray-700 font-medium text-base rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Log Out
+              </button>
+              <button
+                onClick={handleLogoutCancel}
+                className="w-full py-3 text-red-500 font-medium text-base rounded-lg hover:bg-red-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Confirmation Dialog */}
+      {showDeleteAccountDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 mx-4 max-w-sm w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6 text-center">
+              Are you Sure?
+            </h3>
+            <div className="space-y-3">
+              <button
+                onClick={handleDeleteAccountConfirm}
+                className="w-full py-3 text-gray-700 font-medium text-base rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Delete
+              </button>
+              <button
+                onClick={handleDeleteAccountCancel}
+                className="w-full py-3 text-red-500 font-medium text-base rounded-lg hover:bg-red-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

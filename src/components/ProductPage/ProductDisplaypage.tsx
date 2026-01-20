@@ -15,6 +15,8 @@ import logo from "../../assets/All/logo.png";
 import Spinner from "../common/Spinner";
 import { IoArrowBack } from "react-icons/io5";
 import BottomNav from "../layout/BottomNav";
+import cautionIcon from "../../assets/svg/dp_daily svg/caution.svg";
+import deliveryTruckIcon from "../../assets/svg/dp_daily svg/delivery_truck.svg";
 
 // Add interface for content items
 // interface ContentItem {
@@ -164,11 +166,15 @@ const ProductPage: React.FC = () => {
 
   // State management
   const [selectedType, setSelectedType] = useState<SubscriptionType>("DAILY");
+  const [deliveryFrequency, setDeliveryFrequency] = useState<"Daily" | "Mon-Sat" | "Customize">("Daily");
   const [startDate] = useState<Date>(new Date());
   // const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [basePack, setBasePack] = useState<ExtendedBasePack | null>(null);
+  const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"Description" | "Product Info" | "More">("Description");
+  const [combineProducts, setCombineProducts] = useState<Product[]>([]);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
     useState(false);
@@ -197,6 +203,7 @@ const ProductPage: React.FC = () => {
   // Add new state for custom days
   const [showDeliveryDays, setShowDeliveryDays] = useState(false);
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [combineQuantities, setCombineQuantities] = useState<{ [key: string]: number }>({});
   const weekDays = [
     { day: "Mon", enabled: true },
     { day: "Tue", enabled: true },
@@ -207,8 +214,8 @@ const ProductPage: React.FC = () => {
     { day: "Sun", enabled: true },
   ];
 
-  // Fetch base pack data
-  const fetchBasePack = async () => {
+  // Fetch product or base pack data
+  const fetchProductData = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -228,11 +235,16 @@ const ProductPage: React.FC = () => {
         return;
       }
 
+      // Try to fetch as Product first
+      try {
+        const productData = await productService.getProductById(id);
+        setProduct(productData);
+      } catch (productError) {
+        // If product fetch fails, try base pack
+        try {
       const data = await basePackService.getProductById(id);
-      // Transform the data to match ExtendedBasePack interface
       const extendedData: ExtendedBasePack = {
         ...data,
-        // Calculate MRP as 20% more than selling price if not provided
         mrpPerPackDaily: Math.ceil(data.sellingPrice * 1.2),
         mrpPerPackAlternate: Math.ceil(data.sellingPrice * 1.2),
         description: data.description || "",
@@ -242,6 +254,17 @@ const ProductPage: React.FC = () => {
         surcharge: 0,
       };
       setBasePack(extendedData);
+        } catch (basePackError) {
+          setError("Failed to fetch product details");
+        }
+      }
+
+      // Fetch combine products (other flower packs)
+      const allProducts = await productService.getAllProducts();
+      const otherProducts = allProducts
+        .filter((p) => p.id !== id && p.isAvailable && p.isActive)
+        .slice(0, 5);
+      setCombineProducts(otherProducts);
 
       // Fetch other base packs
       const allPacks = await basePackService.getAllBasePacks();
@@ -256,7 +279,7 @@ const ProductPage: React.FC = () => {
           },
         });
       } else {
-        setError("Failed to fetch base pack details");
+        setError("Failed to fetch product details");
       }
     } finally {
       setLoading(false);
@@ -282,9 +305,9 @@ const ProductPage: React.FC = () => {
     }
   }, [id]);
 
-  // Fetch base pack data on mount
+  // Fetch product data on mount
   useEffect(() => {
-    fetchBasePack();
+    fetchProductData();
   }, [id, navigate]);
 
   // Format date for display
@@ -298,22 +321,83 @@ const ProductPage: React.FC = () => {
 
   // Add function to calculate price display
   const getPriceDisplay = () => {
-    if (!basePack) return { price: 0, originalPrice: 0, savings: 0 };
+    const currentProduct = product || basePack;
+    if (!currentProduct) return { price: 0, originalPrice: 0, savings: 0 };
 
     let price = 0;
+    // Calculate original price as 20% more than selling price (static calculation)
     let originalPrice = 0;
 
-    if (selectedType === "DAILY") {
-      price = basePack.sellingPrice;
-      originalPrice = basePack.sellingPrice + (basePack.surcharge ?? 0);
-    } else if (selectedType === "CUSTOM") {
-      price = selectedDays.length * basePack.sellingPrice;
-      originalPrice = selectedDays.length * (basePack.sellingPrice + (basePack.surcharge ?? 0));
-    }
+    const basePrice = currentProduct.sellingPrice;
+    
+    // Calculate static original price (20% markup)
+    const staticOriginalPrice = Math.ceil(basePrice * 1.2);
+
+    // Always show price per pack, not total
+    price = basePrice;
+    originalPrice = staticOriginalPrice;
 
     const savings = originalPrice - price;
 
     return { price, originalPrice, savings };
+  };
+
+  // Get product image
+  const getProductImage = () => {
+    const currentProduct = product || basePack;
+    if (!currentProduct) return "";
+    
+    if (product?.imagesUrl) {
+      if (Array.isArray(product.imagesUrl)) {
+        return product.imagesUrl[0] || "";
+      }
+      return product.imagesUrl;
+    }
+    return (basePack as any)?.imagesUrl || "";
+  };
+
+  // Get product name
+  const getProductName = () => {
+    return product?.name || basePack?.name || "";
+  };
+
+  // Get product description
+  const getProductDescription = () => {
+    return product?.description || basePack?.description || "";
+  };
+
+  // Get product contents
+  const getProductContents = () => {
+    return product?.contents || basePack?.contents || [];
+  };
+
+  // Get includes list - fetch from backend or use static fallback
+  const getIncludesList = (): string[] => {
+    const contents = getProductContents();
+    
+    // If we have contents from backend, extract names
+    if (contents && contents.length > 0) {
+      return contents.map(item => item.name);
+    }
+    
+    // Static fallback list (matches screenshot)
+    return ["Bel Leaves", "Lotus", "Marigold", "White Lotus"];
+  };
+
+  // Get product weight
+  const getProductWeight = () => {
+    if (product?.weight) {
+      return `${product.weight} gms`;
+    }
+    return "120 gms"; // Default
+  };
+
+  // Handle combine product quantity
+  const handleCombineQuantity = (productId: string, delta: number) => {
+    setCombineQuantities((prev) => ({
+      ...prev,
+      [productId]: Math.max(0, (prev[productId] || 0) + delta),
+    }));
   };
 
 
@@ -333,7 +417,8 @@ const ProductPage: React.FC = () => {
         return;
       }
 
-      if (!basePack || !id) {
+      const currentProduct = product || basePack;
+      if (!currentProduct || !id) {
         toast.error("Product information not available");
         return;
       }
@@ -342,11 +427,7 @@ const ProductPage: React.FC = () => {
 
       // Set minimum days and calculate price
       const minDays = selectedType === "CUSTOM" ? selectedDays.length : 7;
-      const pricePerPack =
-        selectedType === "DAILY"
-          ? basePack.sellingPricePerPackDaily
-          : basePack.sellingPricePerPackAlternate;
-
+      const pricePerPack = currentProduct.sellingPrice;
       const totalPrice = pricePerPack * minDays * quantity;
 
 
@@ -371,17 +452,22 @@ const ProductPage: React.FC = () => {
       }
 
       // If we have sufficient balance, prepare subscription details
+      const productImage = product 
+        ? (Array.isArray(product.imagesUrl) ? product.imagesUrl[0] : product.imagesUrl)
+        : (basePack as any)?.imagesUrl;
+      
       const subscriptionDetails = {
         basePackId: id,
+        productId: product?.id || id,
         type: selectedType, // This will be either "DAILY" or "CUSTOM"
         startDate: startDate.toISOString(),
         amount: pricePerPack,
         quantity: quantity,
         packDetails: {
-          name: basePack.name,
-          description: basePack.description,
-          imageUrl: basePack.imagesUrl,
-          contents: basePack.contents,
+          name: currentProduct.name,
+          description: currentProduct.description,
+          imageUrl: productImage,
+          contents: getProductContents(),
         },
         deliveryCount: minDays,
         pricePerPack: pricePerPack,
@@ -457,6 +543,11 @@ const ProductPage: React.FC = () => {
 
   // Add handler for day selection
   const handleDaySelection = (day: string) => {
+    // Only allow day selection changes in Customize mode
+    if (deliveryFrequency === "Mon-Sat") {
+      return; // Prevent any changes in Mon-Sat mode
+    }
+    
     if (selectedDays.includes(day)) {
       setSelectedDays(selectedDays.filter((d) => d !== day));
     } else {
@@ -465,8 +556,8 @@ const ProductPage: React.FC = () => {
   };
 
   // Add function to handle product click
-  const handleProductClick = (product: GarlandProduct | BasePack) => {
-    navigate(`/product/${product.id}`);
+  const handleProductClick = (item: GarlandProduct | BasePack | Product) => {
+    navigate(`/product/${item.id}`);
   };
 
   // Update the fetchGarlandProducts function
@@ -495,11 +586,11 @@ const ProductPage: React.FC = () => {
     );
   }
 
-  if (error || !basePack) {
+  if (error || (!basePack && !product)) {
     return (
       <div className="flex flex-col items-center justify-center container h-screen">
         <div className="text-red-500 mb-4">
-          {error || "Base pack not found"}
+          {error || "Product not found"}
         </div>
         <button
           onClick={() => navigate("/")}
@@ -511,359 +602,340 @@ const ProductPage: React.FC = () => {
     );
   }
 
+  const currentProduct = product || basePack;
+  const categoryName = product?.category === "PUJA" ? "Puja Pack" : product?.category === "EXOTIC" ? "Exotic Pack" : "Puja Pack";
+
   return (
-    <div className="min-h-screen bg-[#FFFBEB]">
+    <div className="min-h-screen bg-[#FFFBEB] pb-24">
       <div className="max-w-[800px] mx-auto relative">
         {/* Header */}
-        {/* <div className="p-4 md:p-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="sticky top-0 bg-[#FFFBEB] z-10 px-4 py-4 flex items-center gap-3 border-b border-gray-200">
             <button
               onClick={() => navigate(-1)}
               className="hover:bg-gray-100 rounded-full p-2 transition-colors"
             >
-              <IoArrowBack className="text-xl md:text-2xl" />
+            <IoArrowBack className="text-xl" />
             </button>
-            <h1 className="text-xl md:text-2xl font-medium">Puja Packs</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">{categoryName}</h1>
           </div>
-          <div className="flex items-center gap-4">
-            <img
-              src={WalletImage}
-              alt="Wallet"
-              className="w-10 h-10 md:w-10 md:h-10"
-              onClick={() => navigate("/wallet")}
-            />
-            <img
-              src={ProfileImage}
-              alt="Profile"
-              className="w-6 h-6 md:w-8 md:h-8"
-              onClick={() => navigate("/account")}
-            />
-          </div>
-        </div> */}
 
         {/* Main Content */}
-        <div className="md:flex md:gap-6 md:flex-col">
-          {/* Product Image and Basic Info */}
-          <div className="md:flex md:gap-6">
-            {/* Left Column - Image */}
-            <div className="md:w-1/2">
-              <div className="aspect-square w-full">
+        <div className="px-4">
+          {/* Product Image */}
+          <div className="mt-4">
+            <div className="aspect-square w-full rounded-xl overflow-hidden">
                 <img
-                  src={basePack?.imagesUrl}
-                  alt={basePack?.name}
+                src={getProductImage()}
+                alt={getProductName()}
                   className="w-full h-full object-cover"
                 />
               </div>
             </div>
 
-            {/* Right Column - Basic Info */}
-            <div className="md:w-1/2 md:pr-4">
-              <div className="px-4 py-4">
-                <div className="flex justify-between items-start">
-                  <h1 className="text-xl font-semibold text-gray-900">
-                    {basePack?.name}
+          {/* Product Info - Name, Price, Weight */}
+          <div className="mt-4">
+            <div className="flex justify-between items-start gap-3">
+              <h1 className="text-3xl font-semibold text-gray-900 flex-1">
+                {getProductName()}
                   </h1>
-                  <span className="text-sm text-gray-600">120 gms</span>
-                </div>
-
-                {/* Includes Section */}
-                <div className="mt-3">
-                  <p className="text-sm text-gray-700 mb-2">Includes</p>
-                  <div className="flex flex-wrap gap-2">
-                    {basePack?.contents?.map((item, index) => (
-                      <span
-                        key={index}
-                        className={`text-sm px-3 py-1 rounded-full ${index % 4 === 0
-                            ? "bg-[#FFF7E6] text-[#664D03]"
-                            : index % 4 === 1
-                              ? "bg-[#FFF1F2] text-[#881337]"
-                              : index % 4 === 2
-                                ? "bg-[#FFF7ED] text-[#9A3412]"
-                                : "bg-[#ECFDF5] text-[#065F46]"
-                          }`}
-                      >
-                        {item.name}
+              <span className="text-base font-medium text-gray-900 bg-[rgb(250,162,34)] px-5 py-2 rounded-2xl whitespace-nowrap">
+                {getProductWeight()}
                       </span>
-                    ))}
-                  </div>
                 </div>
 
                 {/* Price Section */}
-                <div className="mt-4 flex items-center gap-3">
-                  <span className="text-xl font-bold text-[#015D3A]">
+            <div className="mt-3 flex items-center gap-3">
+              <span className="text-2xl font-bold text-gray-900">
                     ₹{getPriceDisplay().price}/Pack
                   </span>
-                  <span className="text-gray-500 line-through">
+              {getPriceDisplay().originalPrice > getPriceDisplay().price && (
+                <span className="text-2xl font-bold text-gray-500 line-through">
                     ₹{getPriceDisplay().originalPrice}
                   </span>
-                  <span className="text-[#015D3A] text-sm">
-                    Save ₹{getPriceDisplay().savings}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Description Section */}
-          <div className="px-4 mt-6">
-            <div className="bg-white rounded-xl p-4 shadow-sm">
-              <h3 className="text-[15px] font-medium mb-4">Details</h3>
-              <div className="text-sm text-gray-600 space-y-2">
-                {basePack?.description && <p>{basePack.description}</p>}
-                {basePack?.contents?.map((item, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <span>•</span>
-                    <span>
-                      {item.name} - {item.description}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          {/* Quantity and Delivery Selection */}
-          <div className="px-4 mt-6">
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              {/* Quantity Section */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[15px] font-medium">Quantity</h3>
-                  <div className="flex items-center gap-4">
-                    <button
-                      className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 text-xl"
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    >
-                      −
-                    </button>
-                    <span className="text-lg font-medium w-4 text-center">
-                      {quantity}
-                    </span>
-                    <button
-                      className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 text-xl"
-                      onClick={() => setQuantity(quantity + 1)}
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {showDeliveryDays ? (
-                <>
-                  {/* Delivery Days Selection */}
-                  <div className="mb-6">
-                    <h4 className="text-[15px] font-medium mb-4">
-                      Select delivery days
-                    </h4>
-                    <div className="flex gap-2 justify-between">
-                      {weekDays.map((day) => (
-                        <button
-                          key={day.day}
-                          onClick={() => day.enabled && handleDaySelection(day.day)}
-                          className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium transition-colors
-                            ${!day.enabled
-                              ? "bg-gray-100 text-gray-400"
-                              : selectedDays.includes(day.day)
-                                ? "bg-[#015D3A] text-white"
-                                : "bg-white border border-gray-200 text-gray-700 hover:border-[#015D3A]"
-                            }`}
-                          disabled={!day.enabled}
-                        >
-                          {day.day}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Subscribe Button */}
-                  <button
-  onClick={() => {
-    setSelectedType("CUSTOM");
-    handleSubscribe();
-  }}
-  className={`w-full py-3.5 rounded-lg text-[15px] font-medium mb-3
-    ${selectedDays.length >= 3 
-      ? "bg-[#F15A22] text-white" 
-      : "bg-gray-200 text-gray-500 cursor-not-allowed"}`}
-  disabled={selectedDays.length < 3} // ✅ Require minimum 3 days
->
-  {selectedDays.length >= 3
-    ? `Subscribe ${selectedDays.length} days/wk for ₹${getPriceDisplay().price}/Pack`
-    : "Select at least 3 days to subscribe"}
-</button>
-
-
-                  {/* Toggle Days Button */}
-                  <button
-                    onClick={() => {
-                      setSelectedType("DAILY");
-                      setShowDeliveryDays(false);
-                    }}
-                    className="w-full text-[#015D3A] text-[15px] font-medium"
-                  >
-                    Subscribe Daily
-                  </button>
-                </>
-              ) : (
-                <>
-                  {/* Subscribe Button */}
-                  <button
-                    onClick={() => {
-                      setSelectedType("DAILY");
-                      handleSubscribe();
-                    }}
-                    className="w-full bg-[#F15A22] text-white py-3.5 rounded-full text-[15px] font-medium mb-3"
-                  >
-                    Subscribe Daily for ₹{getPriceDisplay().price}/Pack
-                  </button>
-
-                  {/* Toggle Days Button */}
-                  <button
-                    onClick={() => {
-                      setSelectedType("CUSTOM");
-                      setShowDeliveryDays(true);
-                    }}
-                    className="w-full text-[#015D3A] text-[15px] font-medium"
-                  >
-                    Customise Days
-                  </button>
-                </>
               )}
             </div>
           </div>
-          {/* Garlands Section */}
-          <div className="mb-8 md:mb-12 ml-4">
-            <div className="flex justify-between items-center mb-4 md:mb-6">
-              <h2 className="text-xl md:text-2xl font-semibold text-gray-800 ml-4 mt-4">
-                Garlands
-              </h2>
+
+          {/* Includes Section */}
+          <div className="mt-4">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">Includes</h3>
+            <div className="flex gap-1.5 sm:gap-2 flex-wrap">
+              {getIncludesList().map((item, index) => (
+                <span
+                  key={index}
+                  className="flex-1 min-w-[calc(50%-0.375rem)] sm:min-w-0 text-xs sm:text-sm font-medium text-gray-900 bg-white border border-[rgb(250,162,34)] px-2 sm:px-4 py-1.5 sm:py-2 rounded-2xl text-center"
+                >
+                  {item}
+                    </span>
+                ))}
+              </div>
             </div>
-            <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-              {products
-                .filter((item) => item.type === "GARLAND")
-                .map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex-shrink-0 w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => handleProductClick(item)}
-                  >
-                    <div className="p-3">
-                      <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
+
+              {/* Quantity Section */}
+          <div className="mt-6 pl-4 pr-12 ">
+                <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Quantity</h3>
+                  <div className="flex items-center gap-4">
+                    <button
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 hover:bg-[rgb(250,162,34)] hover:text-white transition-colors"
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    >
+                  <span className="text-xl leading-none">−</span>
+                    </button>
+                <span className="text-lg font-medium w-8 text-center">
+                      {quantity}
+                    </span>
+                    <button
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 hover:bg-[rgb(250,162,34)] hover:text-white transition-colors"
+                      onClick={() => setQuantity(quantity + 1)}
+                    >
+                  <span className="text-xl leading-none">+</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+          {/* Combine with Section */}
+          {combineProducts.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-3 sm:mb-4">Combine with</h3>
+              <div className="flex overflow-x-auto gap-3 sm:gap-4 pb-2 no-scrollbar">
+                {combineProducts.map((item) => {
+                  const itemImage = Array.isArray(item.imagesUrl) ? item.imagesUrl[0] : item.imagesUrl;
+                  const itemQty = combineQuantities[item.id] || 0;
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex-shrink-0 w-[150px] sm:w-[180px] bg-white rounded-xl shadow-md overflow-hidden"
+                    >
+                      <div className="h-32 sm:h-40 w-full">
                         <img
-                          src={
-                            item.imagesUrl || "https://via.placeholder.com/160"
-                          }
+                          src={itemImage || "https://via.placeholder.com/160"}
                           alt={item.name}
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      <div className="pt-3 pb-2 px-1 space-y-2">
-                        <h3 className="text-[16px] font-semibold text-gray-900 truncate">
+                      <div className="p-2.5 sm:p-4">
+                        <h4 className="text-sm sm:text-base font-semibold text-gray-900 truncate mb-1.5 sm:mb-2">
                           {item.name}
-                        </h3>
-                        <p className="text-[14px] text-gray-500 truncate">
-                          {item.description}
-                        </p>
-                        <p className="text-pink-600 text-[16px] font-bold">
-                          ₹{item.sellingPrice}
-                        </p>
+                    </h4>
+                        <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-4">
+                          <span className="text-xs sm:text-sm text-gray-500 line-through">
+                            ₹{Math.ceil(item.sellingPrice * 1.2)}
+                          </span>
+                          <span className="text-sm sm:text-base font-semibold text-gray-900">
+                            ₹{item.sellingPrice}
+                          </span>
+                        </div>
+                        {itemQty > 0 ? (
+                          <div className="flex items-center justify-center gap-2 sm:gap-3">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleProductClick(item);
-                          }}
-                          className="text-green-600 text-[16px] mb-3 font-medium block hover:text-green-700"
-                        >
-                          View
+                              onClick={() => handleCombineQuantity(item.id, -1)}
+                              className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white border-2 border-gray-700 text-gray-600 flex items-center justify-center hover:bg-[rgb(250,162,34)] hover:border-[rgb(250,162,34)] hover:text-white transition-colors shadow-sm"
+                            >
+                              <span className="text-base sm:text-lg leading-none font-medium">−</span>
                         </button>
+                            <span className="text-sm sm:text-base font-semibold text-gray-900 min-w-[20px] sm:min-w-[24px] text-center">{itemQty}</span>
+                            <button
+                              onClick={() => handleCombineQuantity(item.id, 1)}
+                              className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white border-2 border-gray-700 text-gray-600 flex items-center justify-center hover:bg-[rgb(250,162,34)] hover:border-[rgb(250,162,34)] hover:text-white transition-colors shadow-sm"
+                            >
+                              <span className="text-base sm:text-lg leading-none font-medium">+</span>
+                            </button>
+                    </div>
+                        ) : (
+                  <button
+                            onClick={() => handleCombineQuantity(item.id, 1)}
+                            className="w-full bg-[rgb(250,162,34)] text-gray-900 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm"
+                          >
+                            + Add
+</button>
+                        )}
                       </div>
                     </div>
-                  </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Select Delivery Days Section */}
+          <div className="mt-6">
+            <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm">
+              <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-3 sm:mb-4">Select Delivery Days</h3>
+              
+              {/* Delivery Frequency Tabs */}
+              <div className="flex gap-1.5 sm:gap-2 mb-3 sm:mb-4 w-full sm:w-[70%]">
+                  <button
+                    onClick={() => {
+                    setDeliveryFrequency("Daily");
+                      setSelectedType("DAILY");
+                    setSelectedDays([]);
+                    }}
+                  className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-semibold transition-colors ${
+                    deliveryFrequency === "Daily"
+                      ? "bg-[rgb(250,162,34)] text-gray-900"
+                      : "bg-white border-2 border-gray-400 text-gray-900"
+                  }`}
+                >
+                  Daily
+                  </button>
+                  <button
+                    onClick={() => {
+                    setDeliveryFrequency("Mon-Sat");
+                    setSelectedType("CUSTOM");
+                    setSelectedDays(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
+                    }}
+                  className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-semibold transition-colors ${
+                    deliveryFrequency === "Mon-Sat"
+                      ? "bg-[rgb(250,162,34)] text-gray-900"
+                      : "bg-white border-2 border-gray-400 text-gray-900"
+                  }`}
+                >
+                  Mon-Sat
+                  </button>
+                  <button
+                    onClick={() => {
+                    setDeliveryFrequency("Customize");
+                      setSelectedType("CUSTOM");
+                    // Pre-select all days when switching to Customize mode
+                    setSelectedDays(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+                    }}
+                  className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-semibold transition-colors ${
+                    deliveryFrequency === "Customize"
+                      ? "bg-[rgb(250,162,34)] text-gray-900"
+                      : "bg-white border-2 border-gray-400 text-gray-900"
+                  }`}
+                  >
+                  Customize
+                  </button>
+            </div>
+
+              {/* Individual Day Selectors */}
+              {(deliveryFrequency === "Customize" || deliveryFrequency === "Mon-Sat") && (
+                <div className="mb-3 sm:mb-4">
+                  <div className="flex gap-0.5 sm:gap-1 justify-between">
+                    {weekDays.map((day) => (
+                        <button
+                        key={day.day}
+                        onClick={() => {
+                          if (deliveryFrequency === "Customize" && day.enabled) {
+                            handleDaySelection(day.day);
+                          }
+                          }}
+                        className={`w-14 sm:w-20 h-8 sm:h-10 rounded-2xl flex items-center justify-center text-xs sm:text-sm font-semibold transition-colors ${
+                          !day.enabled
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            : selectedDays.includes(day.day)
+                            ? "bg-[rgb(250,162,34)] text-gray-900"
+                            : "bg-white border-2 border-gray-400 text-gray-900"
+                        }`}
+                        disabled={!day.enabled || deliveryFrequency === "Mon-Sat"}
+                      >
+                        {day.day}
+                        </button>
                 ))}
             </div>
           </div>
+              )}
 
-
-
-          {/* Popular Packs Section */}
-          <div className="mb-8 md:mb-12 ml-4">
-            <div className="flex justify-between items-center mb-4 md:mb-6 ">
-              <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mt-4 ml-4">
-                Combo Puja Packs
-              </h2>
+              {/* Warning Message */}
+              {deliveryFrequency === "Customize" && selectedDays.length > 0 && selectedDays.length < 3 && (
+                <div className="mb-3 sm:mb-4 bg-pink-100 rounded-2xl p-2.5 sm:p-3 flex items-start gap-1.5 sm:gap-2">
+                  <img src={cautionIcon} alt="Warning" className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs sm:text-sm font-bold text-gray-700">
+                    Please select at least 3 days for a 1-week subscription
+                  </p>
             </div>
-            <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-              {otherBasePacks.map((pack) => (
-                <div
-                  key={pack.id}
-                  className="flex-shrink-0 w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => handleProductClick(pack)}
-                >
-                  <div className="p-3">
-                    <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
-                      <img
-                        src={
-                          pack.imagesUrl || "https://via.placeholder.com/160"
-                        }
-                        alt={pack.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                      {otherBasePacks.map((pack) => (
-                        <div
-                          key={pack.id}
-                          className="flex-shrink-0 w-[160px] md:w-[180px] h-[280px] md:h-[300px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => handleProductClick(pack)}
-                        >
-                          <div className="p-3">
-                            <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
-                              <img
-                                src={
-                                  pack.imagesUrl ||
-                                  "https://via.placeholder.com/160"
-                                }
-                                alt={pack.name}
-                                className="w-full h-full object-cover"
-                              />
+              )}
+
+              {/* Subscribe Button */}
+              <button
+                onClick={() => {
+                  if (deliveryFrequency === "Daily") {
+                    setSelectedType("DAILY");
+                  } else {
+                    setSelectedType("CUSTOM");
+                  }
+                  handleSubscribe();
+                }}
+                disabled={deliveryFrequency === "Customize" && selectedDays.length < 3}
+                className={`w-full py-3 sm:py-3.5 rounded-2xl text-sm sm:text-[15px] font-semibold ${
+                  deliveryFrequency === "Customize" && selectedDays.length < 3
+                    ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                    : "bg-[rgb(250,162,34)] text-black hover:opacity-90"
+                }`}
+              >
+                {deliveryFrequency === "Daily"
+                  ? `Subscribe for ₹${getPriceDisplay().price}/Pack`
+                  : deliveryFrequency === "Mon-Sat"
+                  ? `Subscribe for ₹${getPriceDisplay().price}/Pack`
+                  : selectedDays.length >= 3
+                  ? `Subscribe for ₹${getPriceDisplay().price}/Pack`
+                  : "Select at least 3 days to subscribe"}
+              </button>
                             </div>
-                            <div className="pt-3 pb-2 px-1 space-y-2">
-                              <h3 className="text-[16px] font-semibold text-gray-900 truncate">
-                                {pack.name}
-                              </h3>
-                              {/* <p className="text-[14px] text-gray-500 truncate">
-                                Basepack
-                              </p> */}
-                              <p className="text-pink-600 text-[16px] font-bold">
-                                ₹{pack.sellingPrice}
-                              </p>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleProductClick(pack);
-                                }}
-                                className="text-green-600 text-[16px] mb-3 font-medium block hover:text-green-700"
-                              >
-                                View
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
+          </div>
+
+          {/* Delivery Information Banner */}
+          <div className="mt-6">
+            <div className="bg-[rgb(250,162,34)] bg-opacity-20 rounded-lg p-4 flex items-center gap-3">
+              <img src={deliveryTruckIcon} alt="Delivery" className="w-20 h-20 flex-shrink-0" />
+              <p className="text-base font-bold text-gray-800 flex-1">
+                Orders placed before 8 PM will be delivered next day. Sunday deliveries available on request.
+              </p>
             </div>
           </div>
 
-          {/* Logo */}
-          <div className="mt-[290px] mb-9 md:mb-9 flex justify-center">
-            <img
-              src={logo}
-              alt=""
-              className="text-[#231F20] opacity-50 md:h-24 md:mb-9"
-            />
+          {/* Description Section with Tabs */}
+          <div className="mt-6">
+            <div className="bg-white rounded-xl shadow-sm">
+              {/* Tabs */}
+              <div className="flex border-b border-gray-200">
+                {(["Description", "Product Info", "More"] as const).map((tab) => (
+                              <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex-1 py-4 text-sm font-medium transition-colors ${
+                      activeTab === tab
+                        ? "text-gray-900 border-b-2 border-gray-900"
+                        : "text-gray-500"
+                    }`}
+                  >
+                    {tab}
+                              </button>
+                ))}
+                            </div>
+
+              {/* Tab Content */}
+              <div className="p-4">
+                {activeTab === "Description" && (
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      {getProductDescription() || "No description available."}
+                    </p>
+                    {getProductContents().map((item, index) => (
+                      <div key={index} className="flex items-start gap-2">
+                        <span className="text-gray-600">•</span>
+                        <span className="text-sm text-gray-600">
+                          {item.name} {item.description && `- ${item.description}`}
+                        </span>
+                        </div>
+                      ))}
+                    </div>
+                )}
+                {activeTab === "Product Info" && (
+                  <div className="text-sm text-gray-600">
+                    <p>Product information coming soon.</p>
+                  </div>
+                )}
+                {activeTab === "More" && (
+                  <div className="text-sm text-gray-600">
+                    <p>Additional information coming soon.</p>
+                </div>
+                )}
+            </div>
+          </div>
           </div>
         </div>
 

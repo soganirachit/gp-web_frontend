@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider,  } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import ProtectedRoute from './ProtectedRoute';
 
@@ -8,13 +8,15 @@ import { StoreProvider } from '../context/StoreContext';
 // ================== PUBLIC ROUTES COMPONENTS ==================
 // Main Pages
 import Unsubscribed_User_Home from '../pages/Unsubscribed_User_Home';
-import Main_Home_page from '../pages/Main_homepage';
+import Gp_daily_Homepage from '../pages/GpDaily_Homepage';
+import HomePage from '../pages/home_page';
 import Products from '../components/ProductPage/page';
 import ProductPage from '../components/ProductPage/ProductDisplaypage';
 import Search from '../components/ProductPage/SearchPage';
+import ExploreMore from '../components/ProductPage/ExploreMore';
 
 // Auth Components
-
+import Startup from '../components/Customer/forms/login/Startup';
 import Login from '../components/Customer/forms/login/Login';
 import OTPVerification from '../components/Customer/forms/login/Otp_verification';
 
@@ -43,7 +45,7 @@ import EditAddress from '../pages/More/AddEditAddress';
 
 // Features
 import Location from '../features/location/Home_page_location';
-import OrderManagement from '../features/orders/components/OrderManagement';
+import OrderManagement from '../components/Order/MyOrders';
 
 // Subscription Components
 import ManageMySubscription from '../components/Subscription/ManageMySubscription';
@@ -51,14 +53,19 @@ import AddressSelection from '../components/Subscription/AddressSelection';
 import ConfirmSubscription from '../components/Subscription/ConfirmSubscription';
 import ModifySubscription from '../components/Subscription/Page/Modify_subscription';
 import PausedSubscriptionLanding from '../components/Subscription/Page/Paused_susbcription_Landing';
+import PauseSubscription from '../components/Subscription/Page/PauseSubscription';
 import CancelSubscriptionLanding from '../components/Subscription/Page/Cancel_subscription_Landingpage';
+import CancelSubscriptionReason from '../components/Subscription/Page/CancelSubscriptionReason';
+import CancelSubscriptionSuccess from '../components/Subscription/Page/CancelSubscriptionSuccess';
 
 // Payment Components
 import Wallet from '../components/Payment/Wallet/wallet';
+import PaymentSuccessful from '../components/Payment/payment_successful';
 
 // Other Components
 import Refer from '../pages/Refer/Refer';
 import CustomerSupport from '../pages/More/CustomerSupport';
+import FAQ from '../pages/More/FAQ';
 import StoreProductsPages from '@/components/StoreProductsPage/page';
 import StorePage from '@/components/StoreProductsPage/storeProductsDisplayPage';
 import ManageMyStoreProducts from '@/components/StoreProductsPage/manageMyStoreProducts';
@@ -72,20 +79,24 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       // ================== PUBLIC ROUTES ==================
+      // Startup/Splash Screen - shown first
+      { path: '/', element: <Startup /> },
+      { path: '/startup', element: <Startup /> },
       // Main Pages
-      { path: '/home', element: <Main_Home_page /> },
-      { path: '/', element: <Unsubscribed_User_Home /> },
+
+      { path: '/gp-daily', element: <Gp_daily_Homepage /> },
       { path: '/NewUser', element: <Unsubscribed_User_Home /> },
       { path: '/Products', element: <Products /> },
       { path: '/product/:id', element: <ProductPage /> },
       { path: '/store/:id', element: <StorePage /> },
       { path: '/search', element: <Search /> },
       { path: '/store', element: <StoreProductsPages /> },
-    
+      { path: '/explore-more', element: <ExploreMore /> },
+
 
       // Auth Routes
-
       { path: '/login', element: <Login /> },
+      { path: '/otp-verification', element: <OTPVerification /> },
       { path: '/otp-Verification', element: <OTPVerification /> },
       { path: '/Name-input', element: <NameInput /> },
       { path: '/Allset', element: <Allset /> },
@@ -115,22 +126,33 @@ const router = createBrowserRouter([
       { path: '/orders', element: <ProtectedRoute><OrderManagement /></ProtectedRoute> },
 
       // Subscription Routes
-       { path: '/manage-my-storeProducts', element: <ProtectedRoute><ManageMyStoreProducts /></ProtectedRoute> },
+      { path: '/manage-my-storeProducts', element: <ProtectedRoute><ManageMyStoreProducts /></ProtectedRoute> },
       { path: '/manage-my-subscription', element: <ProtectedRoute><ManageMySubscription /></ProtectedRoute> },
       { path: '/manage-subscription', element: <ProtectedRoute><ManageMySubscription /></ProtectedRoute> },
       { path: '/address-selection', element: <ProtectedRoute><AddressSelection /></ProtectedRoute> },
       { path: '/subscription/confirm', element: <ProtectedRoute><ConfirmSubscription /></ProtectedRoute> },
       { path: '/modify-Subscription', element: <ProtectedRoute><ModifySubscription /></ProtectedRoute> },
-      { path: '/Pause-Subscription', element: <ProtectedRoute><PausedSubscriptionLanding /></ProtectedRoute> },
+      { path: '/pause-subscription', element: <ProtectedRoute><PauseSubscription /></ProtectedRoute> },
+      { path: '/subscription-paused', element: <ProtectedRoute><PausedSubscriptionLanding /></ProtectedRoute> },
       { path: '/Cancel-Subscription', element: <ProtectedRoute><CancelSubscriptionLanding /></ProtectedRoute> },
+      { path: '/cancel-subscription', element: <ProtectedRoute><CancelSubscriptionLanding /></ProtectedRoute> },
+      { path: '/cancel-subscription-reason', element: <ProtectedRoute><CancelSubscriptionReason /></ProtectedRoute> },
+      { path: '/cancel-subscription-success', element: <ProtectedRoute><CancelSubscriptionSuccess /></ProtectedRoute> },
 
       // Payment Routes 
       { path: '/wallet', element: <ProtectedRoute><Wallet /></ProtectedRoute> },
+      { path: '/payment-success', element: <ProtectedRoute><PaymentSuccessful /></ProtectedRoute> },
 
       // Other Protected Routes
       { path: '/refer', element: <ProtectedRoute><Refer /></ProtectedRoute> },
       { path: '/customer-support', element: <ProtectedRoute><CustomerSupport /></ProtectedRoute> },
+      { path: '/faq', element: <ProtectedRoute><FAQ /></ProtectedRoute> },
     ],
+  },
+  // Standalone home page route without Layout wrapper
+  {
+    path: '/home',
+    element: <HomePage />,
   },
 ]);
 

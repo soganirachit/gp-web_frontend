@@ -5,7 +5,9 @@ import { authService } from '../../../../services/auth.service';
 import { addressService } from '../../../../services/address.service';
 import { useAuth } from '../../../../context/AuthContext';
 import { toast } from 'react-hot-toast';
-import logo from "../../../../assets/All/logo.png";
+import { FaWhatsapp } from 'react-icons/fa';
+import { MdEdit } from 'react-icons/md';
+import otpLogo from '../../../../assets/All/otp_logo.png';
 
 interface LocationState {
   phoneNumber: string;
@@ -36,7 +38,7 @@ const OTPVerification: React.FC = () => {
 
   const handleChange = (element: HTMLInputElement, index: number) => {
     if (isSubmitting) return;
-    
+
     const value = element.value;
     if (!/^\d*$/.test(value)) return;
 
@@ -44,7 +46,7 @@ const OTPVerification: React.FC = () => {
       const otpArray = value.slice(0, 6).split('').map(char => char.toString());
       const newOtp = [...otpArray, ...new Array(6 - otpArray.length).fill("")];
       setOtp(newOtp);
-      
+
       if (otpArray.length === 6) {
         setTimeout(() => handleVerify(), 100);
       }
@@ -54,12 +56,12 @@ const OTPVerification: React.FC = () => {
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
-    
+
     if (value && index === 5) {
       handleVerify();
       return;
     }
-    
+
     if (value && element.nextSibling) {
       (element.nextSibling as HTMLInputElement).focus();
     }
@@ -84,7 +86,7 @@ const OTPVerification: React.FC = () => {
       handleVerify();
       return;
     }
-    
+
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
       const prevInput = e.currentTarget.previousSibling;
       if (prevInput) {
@@ -93,92 +95,52 @@ const OTPVerification: React.FC = () => {
     }
   };
 
-  // const handleVerify = async () => {
-  //   const otpString = otp.join('');
-  //   if (otpString.length !== 6 || !phoneNumber) return;
-
-  //   try {
-  //     setIsSubmitting(true);
-  //     setError('');
-  //     const response = await authService.verifyOTP(phoneNumber, otpString);
-      
-  //     if (response.message === "Number verified successfully") {
-  //       toast.success('OTP verified successfully!');
-        
-  //       if (response.token) {
-  //         login(response.token, phoneNumber);
-  //       }
-        
-  //       if (response.userExists) {
-  //         if (response.userName) {
-  //           localStorage.setItem('userName', response.userName);
-  //         }
-
-
-  //         navigate('/location', { 
-  //           state: { 
-  //             returnUrl: '/' 
-  //           } 
-  //         });
-  //       } else {
-  //         navigate('/name-input');
-  //       }
-  //     }
-  //   } catch (err: any) {
-  //     setError(err.response?.data?.message || 'Invalid OTP');
-  //     setOtp(new Array(6).fill(""));
-  //     toast.error(err.response?.data?.message || 'Invalid OTP');
-  //   } finally {
-  //     setIsSubmitting(false);
-  //   }
-  // };
-
   const handleVerify = async () => {
     const otpString = otp.join('');
     if (otpString.length !== 6 || !phoneNumber) return;
-  
+
     try {
       setIsSubmitting(true);
       setError('');
       const response = await authService.verifyOTP(phoneNumber, otpString);
-      
+
       if (response.message === "Number verified successfully") {
         toast.success('OTP verified successfully!');
-        
+
         if (response.token) {
           login(response.token, phoneNumber);
         }
-        
+
         if (response.userExists) {
           if (response.userName) {
             localStorage.setItem('userName', response.userName);
           }
-          
+
           // Check if user already has addresses
           try {
             const addresses = await addressService.getAllAddresses();
             if (addresses && addresses.length > 0) {
               // User has addresses, go directly to home
-              navigate('/', { 
-                state: { 
-                  returnUrl: '/' 
-                } 
+              navigate('/', {
+                state: {
+                  returnUrl: '/'
+                }
               });
             } else {
               // User has no addresses, go to location page
-              navigate('/location', { 
-                state: { 
-                  returnUrl: '/' 
-                } 
+              navigate('/location', {
+                state: {
+                  returnUrl: '/'
+                }
               });
             }
           } catch (error) {
             // If there's an error checking addresses, assume user needs to set location
             console.error('Error checking addresses:', error);
-            navigate('/location', { 
-              state: { 
-                returnUrl: '/' 
-              } 
+            navigate('/location', {
+              state: {
+                returnUrl: '/'
+              }
             });
           }
         } else {
@@ -196,7 +158,7 @@ const OTPVerification: React.FC = () => {
 
   const handleResendOTP = async () => {
     if (countdown > 0 || !phoneNumber) return;
-    
+
     try {
       await authService.sendOTP(phoneNumber);
       setCountdown(29);
@@ -211,42 +173,75 @@ const OTPVerification: React.FC = () => {
     return `+91 ${phone.slice(0, -4)}XXXX`;
   };
 
+  const handleEditNumber = () => {
+    navigate('/login');
+  };
+
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-b from-[#FFF1F2] to-[#FFFBEB] px-4 sm:px-6 lg:px-8">
-      <motion.div 
+    <div className="min-h-screen w-screen bg-white fixed inset-0 flex flex-col items-center justify-center px-3 sm:px-4 py-4 sm:py-6 md:py-8 overflow-y-auto">
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="w-full max-w-md"
+        className="w-full max-w-md relative z-10 flex flex-col"
       >
-        <div className="flex flex-col items-center">
-          <img 
-            src={logo}
-            alt="Genda Phool"
-            className="h-20 sm:h-24 md:h-28 lg:h-32 mb-8 sm:mb-12 md:mb-16 lg:mb-20"
-          />
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="w-full bg-white p-6 sm:p-8 rounded-2xl shadow-sm"
-          >
-            <div className="text-center mb-6 sm:mb-8">
-              <h1 className="text-xl sm:text-2xl font-semibold mb-2">Verify WhatsApp OTP</h1>
-              <p className="text-sm sm:text-base text-gray-600">Enter 6-digit OTP sent to {formatPhoneNumber(phoneNumber || '')}</p>
+        {/* Top Section - Orange Graphic */}
+        <div className="relative mb-4 sm:mb-6 md:mb-8 flex flex-col items-center">
+          {/* OTP Graphic */}
+          <div className="relative w-full max-w-[280px] sm:max-w-xs h-48 sm:h-56 md:h-64 flex items-center justify-center mb-4 sm:mb-6">
+            <img
+              src={otpLogo}
+              alt="OTP Graphic"
+              className="w-full h-full object-contain"
+            />
+          </div>
+
+          {/* Carousel Indicators */}
+          <div className="flex gap-1.5 sm:gap-2 mt-2 sm:mt-4">
+            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#FAA222]"></div>
+            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#FAA222]/30"></div>
+            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#FAA222]/30"></div>
+          </div>
+        </div>
+
+        {/* Form Section */}
+        <div className="px-4 sm:px-6 md:px-8 pb-4 sm:pb-6 md:pb-8">
+          <div className="mb-6 sm:mb-8 text-center">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-2">
+              Verify your code
+            </h1>
+            <p className="text-sm sm:text-base text-gray-600 font-normal px-2 mb-1 sm:mb-1.5">
+              Enter 6-digit code sent to {formatPhoneNumber(phoneNumber || '')}
+            </p>
+
+            {/* WhatsApp Notification */}
+            <div className="flex items-center justify-center gap-2 mb-2 sm:mb-2.5">
+              <FaWhatsapp className="text-green-500 text-sm sm:text-base" />
+              <p className="text-xs sm:text-sm text-gray-500">Code sent to WhatsApp</p>
             </div>
 
-            {error && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-red-500 text-xs sm:text-sm text-center mb-4 sm:mb-6"
-              >
-                {error}
-              </motion.div>
-            )}
+            {/* Edit Number Link */}
+            <button
+              onClick={handleEditNumber}
+              className="flex items-center justify-center gap-1 text-xs sm:text-sm text-gray-500 underline hover:text-gray-700 transition-colors mx-auto"
+            >
+              <MdEdit className="text-xs sm:text-sm" />
+              <span>Edit number</span>
+            </button>
+          </div>
 
-            <div className="flex gap-2 sm:gap-4 justify-center mb-6 sm:mb-8">
+          {error && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-red-500 text-xs sm:text-sm mb-4 sm:mb-6 text-center"
+            >
+              {error}
+            </motion.div>
+          )}
+
+          <form onSubmit={(e) => { e.preventDefault(); handleVerify(); }} className="space-y-4 sm:space-y-5 md:space-y-6">
+            <div className="flex gap-2 sm:gap-3 justify-center">
               {otp.map((data, index) => (
                 <input
                   key={index}
@@ -256,46 +251,43 @@ const OTPVerification: React.FC = () => {
                   onChange={(e) => handleChange(e.target, index)}
                   onKeyDown={(e) => handleKeyDown(e, index)}
                   onPaste={(e) => handlePaste(e)}
-                  className="w-8 h-10 sm:w-10 sm:h-12 md:w-12 md:h-14 border border-gray-300 rounded-lg text-center text-lg sm:text-xl font-semibold focus:border-[#FF5722] focus:outline-none transition-all duration-200 bg-white"
+                  className="w-10 h-12 sm:w-12 sm:h-14 md:w-14 md:h-16 border-2 border-[#FAA222] rounded-lg sm:rounded-xl text-center text-lg sm:text-xl md:text-2xl font-semibold focus:border-[#E8911F] focus:outline-none focus:ring-2 focus:ring-[#FAA222]/20 transition-all duration-200 bg-white"
                   disabled={isSubmitting}
                 />
               ))}
             </div>
 
             <motion.button
+              type="submit"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={handleVerify}
               disabled={isSubmitting || otp.join('').length !== 6}
-              className="w-full py-3 sm:py-3.5 px-4 bg-[#FF5722] text-white rounded-full font-medium hover:bg-[#F4511E] transition-colors duration-200 mb-4 sm:mb-6"
+              className="w-full py-3 sm:py-3.5 md:py-4 px-4 bg-[#FAA222] text-black rounded-lg sm:rounded-xl font-semibold hover:bg-[#E8911F] transition-colors duration-200 text-base sm:text-lg"
             >
               {isSubmitting ? (
                 <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
               ) : (
-                'Verify & Continue'
+                'Continue'
               )}
             </motion.button>
+          </form>
 
-            <div className="text-center">
-              <p className="text-xs sm:text-sm text-gray-600">
-                Didn't receive OTP?{' '}
-                <motion.button 
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleResendOTP}
-                  disabled={countdown > 0}
-                  className={countdown > 0 ? 'text-gray-400' : 'text-[#FF5722] font-medium'}
-                >
-                  Resend
-                </motion.button>
-                {countdown > 0 && (
-                  <span className="text-gray-400 ml-1">
-                    in {`00:${countdown < 10 ? `0${countdown}` : countdown}`}
-                  </span>
-                )}
-              </p>
-            </div>
-          </motion.div>
+          <div className="text-center mt-4 sm:mt-6">
+            <button
+              onClick={handleResendOTP}
+              disabled={countdown > 0}
+              className={`text-xs sm:text-sm ${countdown > 0
+                ? 'text-gray-400 cursor-not-allowed'
+                : 'text-gray-600 hover:text-[#FAA222] transition-colors'
+                }`}
+            >
+              {countdown > 0 ? (
+                `Didn't get it? Resend code (${countdown}s)`
+              ) : (
+                "Didn't get it? Resend code"
+              )}
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>

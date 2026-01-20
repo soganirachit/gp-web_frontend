@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { IoWalletOutline, IoArrowBack } from "react-icons/io5";
+import { IoWalletOutline, IoArrowBack, IoTimeOutline, IoRefresh } from "react-icons/io5";
 
 import { motion, AnimatePresence } from "framer-motion";
 import { walletService } from "../../../services/wallet.service";
@@ -16,6 +16,10 @@ import BottomNav from "../../layout/BottomNav";
 import { TransactionType } from "@/interfaces";
 import { format, parseISO } from "date-fns";
 import { INR } from "@/components/constants";
+import lowbalanceIcon from "../../../assets/svg/lowbalance.svg";
+import depositIcon from "../../../assets/svg/deposit.svg";
+import enableIcon from "../../../assets/svg/enable.svg";
+import Spinner from "../../common/Spinner";
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
 const MIN_AMOUNT = 1;
@@ -70,15 +74,15 @@ const Wallet = () => {
     try {
       setIsLoadingBalance(true);
       const response = await walletService.getWalletBalance();
-      
-      
+
+
       const { balance = 0, transactions = [], transactionLogs = [] } = response || {};
-      
+
       setBalance(balance);
       setTransactions(transactions);
       setTransactionLogs(transactionLogs);
-   
-      
+
+
     } catch (error: any) {
       console.error('Error fetching wallet:', error);
       if (error.message.includes("Session expired")) {
@@ -229,6 +233,14 @@ const Wallet = () => {
     }
   }, []);
 
+  if (isLoadingBalance) {
+    return (
+      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+        <Spinner size={400} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#FFFBEB]">
       <div className="max-w-[800px] mx-auto">
@@ -247,206 +259,204 @@ const Wallet = () => {
         )}
 
         {/* Header */}
-        {/* <div className="p-4 md:p-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(-1)}
-              className="hover:bg-gray-100 rounded-full p-2 transition-colors"
-            >
-              <IoArrowBack className="text-xl md:text-2xl" />
-            </button>
-            <h1 className="text-xl md:text-2xl font-medium">Wallet</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <img
-              src={walletImage}
-              alt="Wallet"
-              className="w-10 h-10 md:w-10 md:h-10"
-              onClick={() => navigate("/wallet")}
-            />
-            <img
-              src={profileImage}
-              alt="Profile"
-              className="w-6 h-6 md:w-8 md:h-8"
-              onClick={() => navigate("/account")}
-            />
-          </div>
-        </div> */}
+        <div className="p-4 flex items-center gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="text-gray-700 hover:bg-gray-100 rounded-full p-2 transition-colors"
+          >
+            <IoArrowBack className="text-xl" />
+          </button>
+          <h1 className="text-2xl font-semibold text-gray-800">My Wallet</h1>
+        </div>
 
         {/* Balance Card */}
-        <div className="mx-4 md:mx-6 bg-[#16A34A] text-white rounded-lg p-6 md:p-8 flex items-center gap-4">
-          <div className="p-2 md:p-3 bg-white/20 rounded-lg">
-            <IoWalletOutline className="text-2xl md:text-3xl" />
+        <div className="mx-4 md:mx-6 bg-[#27A155] text-white rounded-[32px] p-6 md:p-8 shadow-sm relative overflow-hidden">
+
+          <div className="flex justify-between items-start mb-6">
+            <span className="text-sm md:text-base font-bold tracking-wider opacity-90 uppercase self-center">Available Balance</span>
+            <button className="flex items-center gap-2 px-4 py-2 bg-transparent rounded-2xl text-sm font-semibold border-2 border-white hover:bg-white/10 transition-colors">
+              <img src={depositIcon} alt="History" className="w-5 h-5" />
+              Deposit History
+            </button>
           </div>
-          <div>
-            <div className="text-3xl md:text-4xl font-semibold">
-              ₹{isLoadingBalance ? "..." : balance}
-            </div>
-            <div className="text-sm md:text-base opacity-80">
-              Available Balance
-            </div>
+
+          <div className="text-6xl md:text-7xl font-bold mb-6">
+            {isLoadingBalance ? (
+              <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+            ) : (
+              `₹${balance?.toLocaleString()}`
+            )}
+          </div>
+
+          <div className="w-full h-[1px] bg-white/40 mb-4"></div>
+
+          <div className="text-base md:text-lg font-normal opacity-90">
+            Last deposit ₹1,000
           </div>
         </div>
 
         {/* Low Balance Alert */}
-        {balance < 100 && (
-          <div className="mx-4 md:mx-6 mt-4 bg-[#FFFFFF] p-4 md:p-5 rounded-lg flex items-start gap-3">
-            <IoWarningOutline className="text-[#FF5722] text-xl md:text-2xl flex-shrink-0 mt-1" />
-            <div className="text-sm md:text-base">
-              <div className="text-[#FF5722] font-medium">
-                Low Balance Alert
+        {!isLoadingBalance && balance < 100000 && (
+          <div className="bg-[#FE5053] rounded-2xl p-6 text-white mx-4 md:mx-6 md:p-6 flex items-center mt-4 h-20 ">
+            <div className="flex items-start gap-3 m-3">
+              <img src={lowbalanceIcon} alt="Low Balance" className="w-6 h-6" />
+              <div className="flex-1">
+                <h3 className="font-bold text-md mb-1">Low Balance</h3>
+                <p className="text-sm text-white/90">
+                  Your wallet balance is low. Recharge Now!                </p>
               </div>
-              <div className="text-gray-600">
-                Your wallet balance is below ₹100. Your subscription will stop
-                after 3 deliveries
-              </div>
+
+
             </div>
           </div>
         )}
 
         {/* Add Money Section */}
         <div className="mx-4 md:mx-6 mt-6">
-          <h2 className="text-xl md:text-2xl font-medium mb-4">Add Money</h2>
-          <div className="bg-white rounded-lg p-4 md:p-6">
-            <div className="mb-4">
-              <label className="block text-gray-600 mb-2 md:text-lg">
-                Enter Amount
-              </label>
-              <input
-                type="text"
-                value={customAmount}
-                onChange={handleAmountChange}
-                className={`w-full p-3 md:p-4 border rounded-lg text-lg md:text-xl ${customAmount && parseInt(customAmount) < MIN_AMOUNT
-                  ? "border-red-300 bg-red-50"
-                  : "border-gray-200"
-                  }`}
-                placeholder="1000"
-              />
-              {customAmount && parseInt(customAmount) < MIN_AMOUNT && (
-                <p className="text-red-500 text-sm mt-1">
-                  Minimum amount is ₹{MIN_AMOUNT}
-                </p>
-              )}
-              {customAmount && parseInt(customAmount) > MAX_AMOUNT && (
-                <p className="text-red-500 text-sm mt-1">
-                  Maximum amount is ₹{MAX_AMOUNT.toLocaleString()}
-                </p>
-              )}
-            </div>
+          <h2 className="text-2xl md:text-2xl font-semibold mb-4">Add Money To Wallet</h2>
 
-            {/* Quick Amount Buttons */}
-            <div className="grid grid-cols-4 gap-3 md:gap-4 mb-6">
-              {QUICK_AMOUNTS.map((amount) => (
-                <button
-                  key={amount}
-                  onClick={() => handleQuickAmount(amount)}
-                  className={`py-2 md:py-3 rounded-lg border ${customAmount === amount.toString()
-                    ? "border-[#FF5722] text-[#FF5722]"
-                    : "border-gray-200 text-gray-600"
-                    } md:text-lg`}
-                >
-                  ₹{amount}
-                </button>
-              ))}
-            </div>
+          {/* Quick Amount Buttons */}
+          <div className="grid grid-cols-4 gap-3 md:gap-4 mb-6">
+            {QUICK_AMOUNTS.map((amount) => (
+              <button
+                key={amount}
+                onClick={() => handleQuickAmount(amount)}
+                className={`py-2 md:py-3 rounded-2xl border-2 font-medium ${customAmount === amount.toString()
+                  ? "border-[#FAA222] text-black bg-[#FAA222]"
+                  : "border-gray-200 text-gray-600 bg-white "
+                  } md:text-lg`}
+              >
+                ₹{amount}
+              </button>
+            ))}
+          </div>
 
-            {/* Proceed Button */}
-            <RazorpayPayment
-              amount={parseInt(customAmount)}
-              onSuccess={async (data) => {
-                const amount = parseInt(customAmount);
-                const validationError = validateAmount(amount);
 
-                if (validationError) {
-                  toast.error(validationError);
-                  return;
-                }
 
-                setIsProcessingPayment(true);
-
-                // Store payment as pending in case of network failure
-                const pendingPaymentId = storePendingPayment({
-                  razorpay_payment_id: data.razorpay_payment_id,
-                  razorpay_order_id: data.razorpay_order_id,
-                  razorpay_signature: data.razorpay_signature,
-                  amount: amount,
-                });
-
-                try {
-                  // Call the add-to-payment endpoint to verify and update wallet
-                  // await walletService.verifyPayment({
-                  //   razorpay_payment_id: data.razorpay_payment_id,
-                  //   razorpay_order_id: data.razorpay_order_id,
-                  //   razorpay_signature: data.razorpay_signature,
-                  //   amount: amount,
-                  // });
-
-                  // Payment verified successfully, remove from pending
-                  removePendingPayment(pendingPaymentId);
-
-                  toast.success(
-                    "Payment successful! Your wallet has been updated."
-                  );
-                  await fetchWalletBalance();
-                  if (returnUrl) {
-                    navigate(returnUrl);
-                  }
-                } catch (error: any) {
-                  console.error("Payment verification failed:", error);
-
-                  // Better error handling based on error type
-                  let errorMessage = "Payment verification failed.";
-                  let shouldKeepPending = false;
-
-                  if (error.response?.status === 402) {
-                    errorMessage = "Payment failed. Please try again.";
-                    removePendingPayment(pendingPaymentId); // Don't keep failed payments
-                  } else if (error.response?.status >= 500) {
-                    errorMessage =
-                      "Server error. We'll retry when connection is restored.";
-                    shouldKeepPending = true;
-                  } else if (
-                    !navigator.onLine ||
-                    error.code === "NETWORK_ERROR"
-                  ) {
-                    errorMessage =
-                      "Network error. Payment will be verified when connection is restored.";
-                    shouldKeepPending = true;
-                  } else if (error.message?.includes("timeout")) {
-                    errorMessage =
-                      "Payment verification timed out. We'll retry automatically.";
-                    shouldKeepPending = true;
-                  } else {
-                    errorMessage =
-                      "Payment verification failed. Please contact support.";
-                    shouldKeepPending = true; // Keep for manual verification
-                  }
-
-                  if (!shouldKeepPending) {
-                    removePendingPayment(pendingPaymentId);
-                  }
-
-                  toast.error(errorMessage);
-                } finally {
-                  setIsProcessingPayment(false);
-                }
-              }}
-              onError={(error) => {
-                toast.error(
-                  error.message || "Payment failed. Please try again."
-                );
-              }}
-              className="w-full py-3.5 md:py-4 bg-[#FF5722] text-white rounded-full font-medium md:text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
-              buttonText={
-                isProcessingPayment ? "Processing..." : "Proceed to Pay"
-              }
-              disabled={
-                isProcessingPayment ||
-                !customAmount ||
-                parseInt(customAmount) < MIN_AMOUNT
-              }
+          <div className="mb-4">
+            <label className="block text-gray-900 font-medium mb-2 md:text-lg">
+              Enter Amount
+            </label>
+            <input
+              type="text"
+              value={customAmount}
+              onChange={handleAmountChange}
+              className={`w-full p-3 md:p-4 border-2 rounded-2xl text-lg md:text-xl ${customAmount && parseInt(customAmount) < MIN_AMOUNT
+                ? "border-red-300 bg-red-50"
+                : "border-gray-400"
+                }`}
+              placeholder="Enter Amount"
             />
-            {/* <button
+            {customAmount && parseInt(customAmount) < MIN_AMOUNT && (
+              <p className="text-red-500 text-sm mt-1">
+                Minimum amount is ₹{MIN_AMOUNT}
+              </p>
+            )}
+            {customAmount && parseInt(customAmount) > MAX_AMOUNT && (
+              <p className="text-red-500 text-sm mt-1">
+                Maximum amount is ₹{MAX_AMOUNT.toLocaleString()}
+              </p>
+            )}
+          </div>
+
+
+          {/* Proceed Button */}
+          <RazorpayPayment
+            amount={parseInt(customAmount)}
+            onSuccess={async (data) => {
+              const amount = parseInt(customAmount);
+              const validationError = validateAmount(amount);
+
+              if (validationError) {
+                toast.error(validationError);
+                return;
+              }
+
+              setIsProcessingPayment(true);
+
+              // Store payment as pending in case of network failure
+              const pendingPaymentId = storePendingPayment({
+                razorpay_payment_id: data.razorpay_payment_id,
+                razorpay_order_id: data.razorpay_order_id,
+                razorpay_signature: data.razorpay_signature,
+                amount: amount,
+              });
+
+              try {
+                // Call the add-to-payment endpoint to verify and update wallet
+                // await walletService.verifyPayment({
+                //   razorpay_payment_id: data.razorpay_payment_id,
+                //   razorpay_order_id: data.razorpay_order_id,
+                //   razorpay_signature: data.razorpay_signature,
+                //   amount: amount,
+                // });
+
+                // Payment verified successfully, remove from pending
+                removePendingPayment(pendingPaymentId);
+
+                toast.success(
+                  "Payment successful! Your wallet has been updated."
+                );
+                await fetchWalletBalance();
+                if (returnUrl) {
+                  navigate(returnUrl);
+                }
+              } catch (error: any) {
+                console.error("Payment verification failed:", error);
+
+                // Better error handling based on error type
+                let errorMessage = "Payment verification failed.";
+                let shouldKeepPending = false;
+
+                if (error.response?.status === 402) {
+                  errorMessage = "Payment failed. Please try again.";
+                  removePendingPayment(pendingPaymentId); // Don't keep failed payments
+                } else if (error.response?.status >= 500) {
+                  errorMessage =
+                    "Server error. We'll retry when connection is restored.";
+                  shouldKeepPending = true;
+                } else if (
+                  !navigator.onLine ||
+                  error.code === "NETWORK_ERROR"
+                ) {
+                  errorMessage =
+                    "Network error. Payment will be verified when connection is restored.";
+                  shouldKeepPending = true;
+                } else if (error.message?.includes("timeout")) {
+                  errorMessage =
+                    "Payment verification timed out. We'll retry automatically.";
+                  shouldKeepPending = true;
+                } else {
+                  errorMessage =
+                    "Payment verification failed. Please contact support.";
+                  shouldKeepPending = true; // Keep for manual verification
+                }
+
+                if (!shouldKeepPending) {
+                  removePendingPayment(pendingPaymentId);
+                }
+
+                toast.error(errorMessage);
+              } finally {
+                setIsProcessingPayment(false);
+              }
+            }}
+            onError={(error) => {
+              toast.error(
+                error.message || "Payment failed. Please try again."
+              );
+            }}
+            className="w-full py-3.5 md:py-4 bg-[#FAA222] text-black rounded-2xl font-medium md:text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
+            buttonText={
+              isProcessingPayment ? "Processing..." : `Proceed to Pay ₹${customAmount}`
+            }
+            disabled={
+              isProcessingPayment ||
+              !customAmount ||
+              parseInt(customAmount) < MIN_AMOUNT
+            }
+          />
+          {/* <button
               className="w-full py-3.5 md:py-4 bg-[#FF5722] text-white rounded-full font-medium md:text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
               disabled={
                 isProcessingPayment ||
@@ -492,15 +502,37 @@ const Wallet = () => {
             >
               {isProcessingPayment ? "Processing..." : "Proceed to Pay"}
             </button> */}
-          </div>
         </div>
+
+        {/* Enable Auto-Pay Section */}
+        <div className="mx-4 md:mx-6 mt-6 bg-white rounded-2xl p-4 flex items-center justify-between border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className=" mb-8 w-12 h-12 rounded-full bg-green-50 flex items-center justify-center shrink-0">
+              <img src={enableIcon} alt="Auto Pay" className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-medium text-gray-800 text-md md:text-lg leading-tight">
+                Enable Auto-Pay for<br className="block md:hidden" /> Subscription Payments
+              </h3>
+              <p className="text-[15px] md:text-sm text-gray-500 mt-1 leading-tight">
+                Your subscription payments will auto-deduct from wallet.
+              </p>
+            </div>
+          </div>
+          <button className=" mb-8 px-5 py-2 bg-[#FAA222] text-black font-semibold rounded-2xl text-sm md:text-md shadow-sm hover:bg-[#E5931F] transition-colors">
+            Disable
+          </button>
+        </div>
+
+
+
 
         {/* Combined Transactions & Payment History */}
         <div className="mx-4 md:mx-6 mt-8 mb-20">
           <h2 className="text-xl md:text-2xl font-medium mb-4">
-            Transaction History
+            Recent Transactions
           </h2>
-          
+
           {/* Show loading state */}
           {isLoadingBalance ? (
             <div className="text-center text-gray-600">Loading transactions...</div>
@@ -513,7 +545,7 @@ const Wallet = () => {
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                 .map((item, idx) => {
                   const isTransaction = 'type' in item;
-                  
+
                   // Determine if it's a credit transaction
                   let isCredit = false;
                   if (isTransaction) {
@@ -522,45 +554,44 @@ const Wallet = () => {
                   } else {
                     // For transactionLogs, check status only
                     const status = (item as any).status?.toLowerCase();
-                    isCredit = 
+                    isCredit =
                       status === 'wallet_recharged' ||
                       status === 'captured' ||
                       status === 'completed' ||
                       status === 'paid';
                   }
-                  
+
                   const status = !isTransaction ? (item as any).status?.toLowerCase() : null;
                   const isPending = !isTransaction && (status === 'created' || status === 'pending');
-                  
+
                   // Get absolute amount value
                   const amount = Math.abs(isTransaction ? item.amount : (item as any).amount);
-                  
+
                   return (
-                    <div key={`txn-${idx}`} className="bg-white p-4 md:p-5 rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-start gap-3 md:gap-4">
-                          <div className={`p-2 md:p-3 rounded-full ${
-                            isPending ? 'bg-yellow-50' : isCredit ? 'bg-green-50' : 'bg-red-50'
-                          }`}>
+                    <div key={`txn-${idx}`} className="bg-white p-4 md:p-5 rounded-2xl border-2 border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3 md:gap-4">
+                          <div className={`p-2 md:p-3 rounded-full ${isPending ? 'bg-yellow-50' : isCredit ? 'bg-green-50' : 'bg-red-50'
+                            }`}>
                             {isPending ? (
                               <IoWarningOutline className="text-yellow-500 md:text-xl" />
                             ) : isCredit ? (
-                              <IoMdArrowUp className="text-green-500 md:text-xl" />
+                              <IoMdArrowUp className="text-green-500 md:text-xl -rotate-[135deg]" />
                             ) : (
-                              <IoMdArrowDown className="text-red-500 md:text-xl" />
+                              <IoMdArrowDown className="text-red-500 md:text-xl -rotate-[135deg]" />
                             )}
                           </div>
                           <div>
                             <div className="font-medium md:text-lg">
-                              {isTransaction 
+                              {isTransaction
                                 ? `${item.type === 'CREDIT' ? 'Credit' : 'Debit'} - ${item.description}`
                                 : 'Wallet Recharge'}
                             </div>
-                            {isTransaction && item.referenceId && (
+                            {/* {isTransaction && item.referenceId && (
                               <div className="text-xs md:text-sm text-gray-400">
                                 Txn ID: {item.referenceId}
                               </div>
-                            )}
+                            )} */}
                             {!isTransaction && (item as any).razorpayOrderId && (
                               <div className="text-xs md:text-sm text-gray-400">
                                 Order ID: {(item as any).razorpayOrderId}
@@ -574,19 +605,17 @@ const Wallet = () => {
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className={`font-medium md:text-lg ${
-                            isPending ? 'text-yellow-600' : 
+                        <div className="text-right shrink-0 whitespace-nowrap">
+                          <div className={`font-semibold md:text-xl ${isPending ? 'text-yellow-600' :
                             isCredit ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {isPending ? '' : (isCredit ? '+' : '-')}{INR} {amount}
+                            }`}>
+                            {isPending ? '' : (isCredit ? '+' : '')}{INR} {amount}
                           </div>
                           {!isTransaction && (
-                            <div className={`text-xs md:text-sm ${
-                              isPending ? 'text-yellow-600' : 
-                              isCredit ? 'text-green-600' : 
-                              'text-gray-600'
-                            }`}>
+                            <div className={`text-xs md:text-sm ${isPending ? 'text-yellow-600' :
+                              isCredit ? 'text-green-600' :
+                                'text-gray-600'
+                              }`}>
                               {((item as any).status?.charAt(0).toUpperCase() || '') + ((item as any).status?.slice(1).toLowerCase() || '')}
                             </div>
                           )}

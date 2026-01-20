@@ -1,64 +1,60 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { IoCheckmark} from 'react-icons/io5';
-import logo from '../../../../assets/All/logo.png';
+import allsetLogo from '../../../../assets/All/allset_logo.png';
 
 function Allset() {
   const navigate = useNavigate();
 
+  useEffect(() => {
+    // Auto-navigate to home after 2 seconds
+    const timer = setTimeout(() => {
+      navigate('/home');
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [navigate]);
+
   return (
-    <div className="min-h-screen w-screen flex items-center justify-center bg-[#FFFBEB] px-4">
+    <div className="min-h-screen w-screen flex items-center justify-center bg-white px-4">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
+        className="w-full max-w-md text-center"
       >
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">
-          Perfect! You're All Set
-        </h1>
-        
-        <p className="text-gray-600 mb-8">
-          Let's start your spiritual journey with fresh flowers
-        </p>
-
-        <div className="bg-white rounded-2xl p-8 text-center shadow-lg">
-          <motion.div 
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
+        {/* Orange Badge with Checkmark */}
+        <div className="flex justify-center mb-6 sm:mb-8">
+          <motion.img
+            src={allsetLogo}
+            alt="Success"
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
             transition={{ 
               type: "spring",
               stiffness: 260,
               damping: 20,
               delay: 0.2 
             }}
-            className="w-16 h-16 bg-[#E8F5E9] rounded-full flex items-center justify-center mx-auto mb-6"
-          >
-            <IoCheckmark className="text-4xl text-green-500" />
-          </motion.div>
-
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">
-            Profile Created Successfully
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Your account has been created and you're ready to explore our subscription packs!
-          </p>
-
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => navigate('/Products')}
-            className="w-full py-3.5 bg-[#FF5722] text-white rounded-full font-medium hover:bg-[#F4511E] transition-colors"
-          >
-            Browse Subscription Packs
-          </motion.button>
+            className="w-32 h-32 sm:w-40 sm:h-40 object-contain select-none"
+            style={{
+              imageRendering: 'auto',
+              WebkitBackfaceVisibility: 'hidden',
+              backfaceVisibility: 'hidden',
+              transform: 'translateZ(0) scale(1)',
+            }}
+          />
         </div>
 
-        <img 
-          src={logo} 
-          alt="Genda Phool" 
-          className="h-12 mx-auto mt-[220px] opacity-50"
-        />
+        {/* Heading */}
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-3">
+          Profile Created Successfully
+        </h1>
+
+        {/* Description */}
+        <p className="text-sm sm:text-base text-gray-600 px-4">
+          Your account has been created and you're ready to explore our subscription packs!
+        </p>
       </motion.div>
     </div>
   );

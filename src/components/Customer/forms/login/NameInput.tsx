@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { authService } from "../../../../services/auth.service";
 import { toast } from "react-hot-toast";
+import { FaStar, FaRedo, FaHeadset, FaTag } from "react-icons/fa";
 
 const NameInput: React.FC = () => {
   const navigate = useNavigate();
@@ -103,57 +104,79 @@ const NameInput: React.FC = () => {
     }
   };
 
+  const features = [
+    {
+      icon: FaStar,
+      text: "Flexible subscription plans",
+    },
+    {
+      icon: FaRedo,
+      text: "Fresh flowers delivered daily",
+    },
+    {
+      icon: FaHeadset,
+      text: "24/7 customer support",
+    },
+    {
+      icon: FaTag,
+      text: "Special discounts & offers",
+    },
+  ];
+
   return (
-    <div className="min-h-screen w-screen flex items-center justify-center bg-[#FFFBEB] px-4">
+    <div className="min-h-screen w-screen flex flex-col items-center justify-center bg-white px-4 py-8">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         className="w-full max-w-md"
       >
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">
-            Welcome to Genda Phool
-          </h1>
-          <p className="text-gray-600">Let's get to know you better</p>
-        </div>
-
-        <div className="bg-white rounded-2xl p-6 space-y-6">
-          <div>
-            <label className="block text-gray-700 mb-2">First Name</label>
-            <input
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              placeholder="Enter your first name"
-              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FF5722] transition-colors"
-            />
+        <div className="bg-white rounded-2xl p-6 mb-6">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">
+              Welcome to Genda Phool
+            </h1>
+            <p className="text-gray-600">Let's get to know you better</p>
           </div>
 
-          <div>
-            <label className="block text-gray-700 mb-2">Last Name</label>
-            <input
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              placeholder="Enter your last name"
-              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FF5722] transition-colors"
-            />
-          </div>
+          <div className="space-y-6">
+            <div>
+              <label className="block text-gray-700 mb-2 font-semibold">First Name</label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="Enter your first name"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FAA222] transition-colors"
+              />
+            </div>
 
-          <div>
-            <label className="block text-gray-700 mb-2">E-mail</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email address"
-              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FF5722] transition-colors"
-            />
-          </div>
+            <div>
+              <label className="block text-gray-700 mb-2 font-semibold">Last Name</label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Enter your last name"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FAA222] transition-colors"
+              />
+            </div>
 
-          <div>
-            <label className="block text-gray-700 mb-3">Gender</label>
+            <div>
+              <label className="block text-gray-700 mb-2 font-semibold">
+                Email Address<span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your.email@gmail.com"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FAA222] transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-gray-700 mb-3 font-semibold">Gender</label>
             <div className="flex gap-8">
               {[
                 { value: "male", label: "Male" },
@@ -171,10 +194,10 @@ const NameInput: React.FC = () => {
                       onChange={() =>
                         setGender(option.value as "male" | "female" | "other")
                       }
-                      className="appearance-none w-5 h-5 border-2 border-gray-300 rounded-full checked:border-[#FF5722] transition-colors"
+                      className="appearance-none w-5 h-5 border-2 border-gray-300 rounded-full checked:border-[#FAA222] transition-colors"
                     />
                     {gender === option.value && (
-                      <div className="absolute w-3 h-3 bg-[#FF5722] rounded-full" />
+                      <div className="absolute w-3 h-3 bg-[#FAA222] rounded-full" />
                     )}
                   </div>
                   <span className="text-gray-700">{option.label}</span>
@@ -183,44 +206,65 @@ const NameInput: React.FC = () => {
             </div>
           </div>
 
-          {gender === "other" && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <label className="block text-gray-700 mb-2">Specify Gender</label>
-              <input
-                type="text"
-                value={customGender}
-                onChange={(e) => setCustomGender(e.target.value)}
-                placeholder="Enter your gender"
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FF5722] transition-colors"
+            {gender === "other" && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <label className="block text-gray-700 mb-2 font-semibold">Specify Gender</label>
+                <input
+                  type="text"
+                  value={customGender}
+                  onChange={(e) => setCustomGender(e.target.value)}
+                  placeholder="Enter your gender"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FAA222] transition-colors"
+                />
+              </motion.div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl p-6">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="w-full py-3.5 bg-[#FAA222] text-white rounded-xl font-medium hover:bg-[#E8911F] transition-colors"
+          >
+            {isSubmitting ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="w-5 h-5 border-2 border-white border-t-transparent rounded-full mx-auto"
               />
-            </motion.div>
+            ) : (
+              "Continue"
+            )}
+          </motion.button>
+
+          {error && (
+            <p className="mt-4 text-sm text-red-500 text-center">{error}</p>
           )}
         </div>
 
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          className="w-full py-3.5 bg-[#FF5722] text-white rounded-full font-medium hover:bg-[#F4511E] transition-colors mt-6"
-        >
-          {isSubmitting ? (
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              className="w-5 h-5 border-2 border-white border-t-transparent rounded-full mx-auto"
-            />
-          ) : (
-            "Continue"
-          )}
-        </motion.button>
-
-        {error && (
-          <p className="mt-4 text-sm text-red-500 text-center">{error}</p>
-        )}
+        {/* Features Section */}
+        <div className="grid grid-cols-2 gap-6 mt-8">
+          {features.map((feature, index) => {
+            const Icon = feature.icon;
+            return (
+              <div
+                key={index}
+                className="flex flex-col items-center text-center"
+              >
+                <Icon className="text-gray-800 text-2xl mb-2" />
+                <p className="text-sm text-gray-700 leading-tight">
+                  {feature.text}
+                </p>
+              </div>
+            );
+          })}
+        </div>
       </motion.div>
     </div>
   );

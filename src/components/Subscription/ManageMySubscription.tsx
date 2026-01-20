@@ -13,6 +13,9 @@ import Low_Balance from "../../assets/icon/LowBalance.png";
 import { IoArrowBack } from "react-icons/io5";
 import Spinner from "../../components/common/Spinner";
 import { format } from "date-fns";
+import orangeCover from "../../assets/svg/dp_daily svg/orange_cover.svg";
+import redBox from "../../assets/svg/dp_daily svg/redbox.svg";
+import greenBox from "../../assets/svg/dp_daily svg/greenbox.svg";
 interface Subscription {
   id: string;
   customerId: string;
@@ -67,13 +70,14 @@ const ManageMySubscription: React.FC = () => {
   const navigate = useNavigate();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showPauseModal, setShowPauseModal] = useState(false);
-  const [showCancelModal, setShowCancelModal] = useState(false);
+
+  // const [showCancelModal, setShowCancelModal] = useState(false); // Removed modal state
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSuccessToast] = useState(false);
   const [editingDays, setEditingDays] = useState<string[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [activeTab, setActiveTab] = useState<'subscriptions' | 'history'>('subscriptions');
 
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
 
@@ -89,8 +93,8 @@ const ManageMySubscription: React.FC = () => {
     days: 7,
   });
 
-  const [cancellationReason, setCancellationReason] = useState("");
-  const [, setShowReasonError] = useState(false);
+  // const [cancellationReason, setCancellationReason] = useState("");
+  // const [, setShowReasonError] = useState(false);
 
   const [modifyData, setModifyData] = useState({
     quantity: 1,
@@ -132,29 +136,29 @@ const ManageMySubscription: React.FC = () => {
       // For daily delivery (Mon-Sat), find next weekday
       let nextDeliveryDate = new Date(today);
       nextDeliveryDate.setDate(today.getDate() + 1);
-      
+
       // If tomorrow is Sunday, skip to Monday
       if (nextDeliveryDate.getDay() === 0) {
         nextDeliveryDate.setDate(nextDeliveryDate.getDate() + 1);
       }
-      
+
       return nextDeliveryDate;
-    } 
-    
+    }
+
     // For CUSTOM delivery preference or type
     if (subscription.deliveryPreference === "CUSTOM" || subscription.type === "CUSTOM") {
       let subscribedDays: number[] = [];
-      
+
       // Try to get delivery days from multiple possible sources
       const deliveryDays = subscription.deliveryDays || subscription.selectedDays || [];
-      
+
       if (deliveryDays.length > 0) {
         subscribedDays = deliveryDays.map(day => {
           const dayKey = day.toLowerCase().trim();
           return dayMap[dayKey] !== undefined ? dayMap[dayKey] : -1;
         }).filter(day => day !== -1);
       }
-      
+
       // If no custom days found, default to Mon-Sun for custom subscriptions
       if (subscribedDays.length === 0) {
         subscribedDays = [1, 2, 3, 4, 5, 6, 7]; // Mon-Sun
@@ -162,7 +166,7 @@ const ManageMySubscription: React.FC = () => {
 
       // Find the next delivery day
       let daysToAdd = 1;
-      
+
       // Look for the next subscribed day within the next 7 days
       while (daysToAdd <= 7) {
         const nextDay = (currentDay + daysToAdd) % 7;
@@ -178,19 +182,19 @@ const ManageMySubscription: React.FC = () => {
     // Fallback: if no specific preference, default to tomorrow (skip Sunday)
     let nextDeliveryDate = new Date(today);
     nextDeliveryDate.setDate(today.getDate() + 1);
-    
+
     // If tomorrow is Sunday, skip to Monday
     if (nextDeliveryDate.getDay() === 0) {
       nextDeliveryDate.setDate(nextDeliveryDate.getDate() + 1);
     }
-    
+
     return nextDeliveryDate;
   };
 
   // Helper function to format next delivery display
   const getNextDeliveryDisplay = (subscription: Subscription) => {
     const nextDate = calculateNextDeliveryDate(subscription);
-    
+
     if (!nextDate) {
       // Only show "No upcoming delivery" for paused/inactive subscriptions
       if (subscription.status === "PAUSED" || subscription.status === "INACTIVE") {
@@ -262,17 +266,17 @@ const ManageMySubscription: React.FC = () => {
       'friday': 'Friday', 'fri': 'Friday',
       'saturday': 'Saturday', 'sat': 'Saturday'
     };
-    
+
     return dayMap[day.toLowerCase()] || day;
   };
 
   // Open edit modal with current subscription days
   const handleEditClick = (subscription: Subscription) => {
     setSelectedSubscription(subscription);
-    
+
     // Get the days from the subscription, handling both deliveryDays and selectedDays
     const days = subscription.deliveryDays || subscription.selectedDays || [];
-    
+
     // Normalize day names to full day names (e.g., 'mon' -> 'Monday')
     const normalizedDays = days.map(day => {
       // If day is already in full format, return as is
@@ -281,7 +285,7 @@ const ManageMySubscription: React.FC = () => {
       }
       return normalizeDayName(day);
     });
-    
+
     setEditingDays([...normalizedDays]);
     setShowEditModal(true);
   };
@@ -289,25 +293,25 @@ const ManageMySubscription: React.FC = () => {
   // Handle updating subscription days
   const handleUpdateSubscription = async () => {
     if (!selectedSubscription) return;
-    
+
     // Validate minimum 3 days selection
     if (editingDays.length < 3) {
       setValidationError("Please select at least 3 days for your subscription");
       return;
     }
-    
+
     try {
       setIsUpdating(true);
-      
+
       // Determine the subscription type based on number of days selected
       const subscriptionType = editingDays.length === 7 ? "DAILY" : "CUSTOM";
-      
+
       await subscriptionService.updateSubscription(selectedSubscription.id, {
         type: subscriptionType,
         selectedDays: editingDays,
         status: selectedSubscription.status,
       });
-      
+
       // Refresh subscriptions
       await fetchSubscriptionDetails();
       setShowEditModal(false);
@@ -321,48 +325,7 @@ const ManageMySubscription: React.FC = () => {
     }
   };
 
-  const handlePause = async () => {
-    if (!selectedSubscription || !customStartDate) return;
 
-    try {
-      setIsLoading(true);
-
-      // Calculate pause duration in days
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const resumeDate = new Date(customStartDate);
-      resumeDate.setHours(0, 0, 0, 0);
-
-      // Calculate the difference in days
-      const diffTime = resumeDate.getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      if (diffDays < 1) {
-        alert("Resume date must be at least 1 day from today");
-        return;
-      }
-
-      // Call the API to pause the subscription
-      const response = await subscriptionService.pauseSubscription(
-        selectedSubscription.id,
-        diffDays
-      );
-
-      if (response.success) {
-        setShowPauseModal(false);
-        // Navigate to the paused subscription landing page
-        navigate("/Pause-Subscription");
-      } else {
-        alert(response.error || "Failed to pause subscription");
-      }
-    } catch (error) {
-      console.error("Error pausing subscription:", error);
-      alert("An error occurred while pausing your subscription");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleResume = async (subscriptionId: string) => {
     try {
@@ -378,25 +341,25 @@ const ManageMySubscription: React.FC = () => {
     }
   };
 
-  const handleCancel = async () => {
-    if (!cancellationReason.trim()) {
-      setShowReasonError(true);
-      return;
-    }
-    try {
-      // Pass cancellation reason in the correct format
-      await subscriptionService.cancelSubscription(
-        selectedSubscription!.id,
-        cancellationReason
-      );
-      setShowCancelModal(false);
-      setCancellationReason("");
-      // Navigate to cancel landing page instead of fetching subscriptions
-      navigate("/cancel-subscription");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to cancel subscription");
-    }
-  };
+  // const handleCancel = async () => {
+  //   if (!cancellationReason.trim()) {
+  //     setShowReasonError(true);
+  //     return;
+  //   }
+  //   try {
+  //     // Pass cancellation reason in the correct format
+  //     await subscriptionService.cancelSubscription(
+  //       selectedSubscription!.id,
+  //       cancellationReason
+  //     );
+  //     setShowCancelModal(false);
+  //     setCancellationReason("");
+  //     // Navigate to cancel landing page instead of fetching subscriptions
+  //     navigate("/cancel-subscription");
+  //   } catch (error: any) {
+  //     toast.error(error.message || "Failed to cancel subscription");
+  //   }
+  // };
 
   const handleRechargeWallet = () => {
     setShowInsufficientBalanceModal(false);
@@ -473,15 +436,26 @@ const ManageMySubscription: React.FC = () => {
                   {subscription.deliveryPreference === "DAILY"
                     ? "Daily • mon-sun"
                     : subscription.deliveryPreference === "CUSTOM" && subscription.deliveryDays?.length
-                      ? `Custom • ${subscription.deliveryDays.map(day => day.toLowerCase()).join(", ")}`
+                      ? `Custom • ${subscription.deliveryDays.map(day => {
+                        const dayMap: { [key: string]: string } = {
+                          'sunday': 'Sun', 'sun': 'Sun',
+                          'monday': 'Mon', 'mon': 'Mon',
+                          'tuesday': 'Tue', 'tue': 'Tue',
+                          'wednesday': 'Wed', 'wed': 'Wed',
+                          'thursday': 'Thu', 'thu': 'Thu',
+                          'friday': 'Fri', 'fri': 'Fri',
+                          'saturday': 'Sat', 'sat': 'Sat'
+                        };
+                        return dayMap[day.toLowerCase()] || day;
+                      }).join(", ")}`
                       : "Custom • No specific days"}
                 </p>
               </div>
               {isActive && (
-                    <span className="px-2 py-0.5 bg-[#DCFCE7] text-[#166534] text-xs font-medium rounded-full">
-                      Active
-                    </span>
-                  )}
+                <span className="px-2 py-0.5 bg-[#DCFCE7] text-[#166534] text-xs font-medium rounded-full">
+                  Active
+                </span>
+              )}
             </div>
 
             {/* Next delivery section - only show for active subscriptions */}
@@ -582,7 +556,8 @@ const ManageMySubscription: React.FC = () => {
                   <button
                     onClick={() => {
                       setSelectedSubscription(subscription);
-                      setShowDetailsModal(true);
+                      // Navigate to modify page instead of showing modal
+                      navigate('/modify-Subscription', { state: { subscription } });
                     }}
                     className="flex-1 py-1.5 rounded-full border border-[#006D3B] text-[#006D3B] text-sm font-medium"
                   >
@@ -629,7 +604,7 @@ const ManageMySubscription: React.FC = () => {
                   <button
                     onClick={() => {
                       setSelectedSubscription(subscription);
-                      setShowPauseModal(true);
+                      navigate('/pause-subscription', { state: { subscription } });
                     }}
                     className="flex-1 py-1.5 rounded-full bg-[#FFF3CD] text-[#FF5722] text-sm font-medium"
                   >
@@ -638,7 +613,8 @@ const ManageMySubscription: React.FC = () => {
                   <button
                     onClick={() => {
                       setSelectedSubscription(subscription);
-                      setShowCancelModal(true);
+                      // Navigate to landing page directly
+                      navigate('/cancel-subscription', { state: { subscription } });
                     }}
                     className="flex-1 py-1.5 rounded-full border border-red-500 text-red-500 text-sm font-medium"
                   >
@@ -730,7 +706,8 @@ const ManageMySubscription: React.FC = () => {
                   <button
                     onClick={() => {
                       setSelectedSubscription(subscription);
-                      setShowCancelModal(true);
+                      // Navigate to landing page directly
+                      navigate('/cancel-subscription', { state: { subscription } });
                     }}
                     className="flex-1 py-1.5 rounded-full border border-red-500 text-red-500 text-sm font-medium"
                   >
@@ -816,119 +793,141 @@ const ManageMySubscription: React.FC = () => {
     <div className="min-h-screen bg-[#FFFBEB]">
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
-        {/* <div className="p-4 md:p-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="p-4 md:p-6 sticky top-0 bg-[#FFFBEB] z-10">
+          <div className="flex items-center gap-3 mb-6">
             <button
               onClick={() => navigate(-1)}
-              className="hover:bg-gray-100 rounded-full p-2 transition-colors"
+              className="hover:bg-gray-100 rounded-full p-2 transition-colors -ml-2"
             >
               <IoArrowBack className="text-xl md:text-2xl" />
             </button>
-            <h1 className="text-xl md:text-2xl font-medium">
-              Manage Subscription
+            <h1 className="text-lg md:text-2xl font-bold font-serif text-gray-800">
+              Your Flower Subscriptions
             </h1>
           </div>
-          <div className="flex items-center gap-4">
-            <img
-              src={profileImage}
-              alt="Profile"
-              className="w-6 h-6 md:w-8 md:h-8"
-              onClick={() => navigate("/account")}
-            />
-          </div>
-        </div> */}
 
-        <div className="p-4">
-          {/* Product Button */}
-          <div className="mb-6">
-            <button
-              onClick={() => navigate("/products?category=pujaflowers")}
-              className="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition-colors"
-            >
-              Browse Other Products
-            </button>
-          </div>
+          {/* Toggle Switch */}
+          <div className="bg-white rounded-2xl p-2 mb-6 border border-gray-200 shadow-sm">
+            <div className="relative flex gap-2">
+              {/* Sliding Orange Background */}
+              <div
+                className={`absolute top-0 bottom-0 transition-all duration-300 ease-in-out ${activeTab === 'subscriptions' ? "left-0" : "left-1/2"
+                  }`}
+                style={{
+                  width: "50%",
+                }}
+              >
+                <img
+                  src={orangeCover}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  style={{ borderRadius: "0.75rem" }}
+                />
+              </div>
 
-          {/* Active Subscriptions */}
-          {subscriptions.some((sub) => sub.status === "ACTIVE") && (
+              <button
+                onClick={() => setActiveTab('subscriptions')}
+                className={`relative z-10 flex-1 py-3 rounded-xl text-sm font-semibold transition-colors duration-300 ${activeTab === 'subscriptions' ? 'text-gray-900' : 'text-gray-500'
+                  }`}
+              >
+                Subscriptions
+              </button>
+              <button
+                onClick={() => setActiveTab('history')}
+                className={`relative z-10 flex-1 py-3 rounded-xl text-sm font-semibold transition-colors duration-300 ${activeTab === 'history' ? 'text-gray-900' : 'text-gray-500'
+                  }`}
+              >
+                Delivery History
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-4">
+          {activeTab === 'subscriptions' && (
             <>
-              <h2 className="text-lg font-medium mb-3">Active Subscriptions</h2>
-              {subscriptions
-                .filter((sub) => sub.status === "ACTIVE")
-                .map(renderSubscriptionCard)}
+              {/* Active Subscriptions */}
+              {subscriptions.some((sub) => sub.status === "ACTIVE") && (
+                <div className="mb-6">
+                  {subscriptions
+                    .filter((sub) => sub.status === "ACTIVE")
+                    .map(renderSubscriptionCard)}
+                </div>
+              )}
+
+              {/* Paused Subscriptions */}
+              {subscriptions.some(
+                (sub) => sub.status === "PAUSED" || sub.status === "INACTIVE"
+              ) && (
+                  <div>
+                    <h2 className="text-lg font-bold font-serif mb-3 text-gray-800">
+                      Paused Subscriptions
+                    </h2>
+                    {subscriptions
+                      .filter(
+                        (sub) => sub.status === "PAUSED" || sub.status === "INACTIVE"
+                      )
+                      .map(renderSubscriptionCard)}
+                  </div>
+                )}
+
+              {!subscriptions.some((sub) => sub.status === "ACTIVE" || sub.status === "PAUSED" || sub.status === "INACTIVE") && (
+                <div className="text-center py-10">
+                  <p className="text-gray-500">No active or paused subscriptions found.</p>
+                </div>
+              )}
             </>
           )}
 
-          {/* Paused Subscriptions */}
-          {subscriptions.some(
-            (sub) => sub.status === "PAUSED" || sub.status === "INACTIVE"
-          ) && (
-              <>
-                <h2 className="text-lg font-medium mt-6 mb-3">
-                  Paused Subscriptions
-                </h2>
-                {subscriptions
-                  .filter(
-                    (sub) => sub.status === "PAUSED" || sub.status === "INACTIVE"
-                  )
-                  .map(renderSubscriptionCard)}
-              </>
-            )}
-
-          {/* Delivery History - Only show completed or cancelled subscriptions */}
-          {subscriptions.some(
-            (sub) => sub.status === "CANCELLED"
-          ) && (
-            <div className="mt-8">
-              <h2 className="text-lg font-medium mb-4">Delivery History</h2>
-              <div className="space-y-4">
-                {subscriptions
-                  .filter((delivery: any) => delivery.status === "CANCELLED")
+          {activeTab === 'history' && (
+            <div className="space-y-4">
+              {subscriptions.some((sub) => sub.status === "CANCELLED") ? (
+                subscriptions
+                  .filter((delivery: any) => ["CANCELLED", "ACTIVE", "PAUSED", "INACTIVE", "DELIVERED", "Undelivered"].includes(delivery.status))
                   .map((delivery: any, index) => (
                     <div
                       key={index}
-                      className="bg-white rounded-xl p-4 grid grid-cols-3 items-center"
+                      className="bg-white rounded-2xl p-4 flex items-center justify-between shadow-sm"
                     >
-                      {/* Column 1: Product Name and Date (Date below Name) */}
-                      <div>
-                        {/* Product Name styled with font-medium */}
-                        <p className="font-medium">{delivery.productDetails.name}</p>
-                        {/* Date styled with text-sm */}
-                        <p className="text-sm text-gray-600 mt-1">
-                          {format(new Date(delivery.startDate), "MMMM d, yyyy")}
-                        </p>
-                      </div>
-
-                      {/* Column 2: Status */}
-                      <div className="text-center">
-                        <span
-                          className={`text-sm font-medium ${delivery.status === "ACTIVE" ? "text-green-600" : "text-red-600"
-                            }`}
-                        >
-                          {delivery.status}
-                        </span>
-                      </div>
-
-                      {/* Column 3: Created Date and Support Button */}
-                      <div className="text-right">
-                        {/* <span className="text-gray-500 text-sm">
-                {format(new Date(delivery.createdAt), "MMMM d, yyyy")}
-              </span> */}
-                        <div className="mt-0">
-                          <button
-                            onClick={() => navigate("/customer-support")}
-                            className="inline-flex items-center px-3 py-2 text-sm font-medium text-red-500 bg-red-50 border border-red-200 rounded-full hover:bg-red-100 hover:border-red-300 transition-colors duration-200"
-                          >
-                            Support
-                          </button>
+                      <div className="flex items-center gap-3">
+                        <div className="w-6 h-6 flex-shrink-0">
+                          <img
+                            src={redBox}
+                            alt="Cancelled"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <div>
+                          <p className="font-medium text-[#1A1A1A] text-sm">
+                            {delivery.productDetails.name}
+                          </p>
+                          <p className="text-xs text-[#9CA3AF]">
+                            {format(new Date(delivery.startDate), "MMMM d, yyyy")}
+                          </p>
                         </div>
                       </div>
+
+                      <div className="flex items-center gap-4 md:gap-8">
+                        <span className="px-3 py-1 bg-[#FEE2E2] text-[#EF4444] text-[10px] font-medium rounded-full">
+                          Cancelled
+                        </span>
+
+                        <button
+                          onClick={() => navigate("/customer-support")}
+                          className="text-xs text-[#9CA3AF] underline decoration-1 underline-offset-2 hover:text-gray-900 font-medium"
+                        >
+                          Support
+                        </button>
+                      </div>
                     </div>
-                  ))}
-              </div>
+                  ))
+              ) : (
+                <div className="text-center py-10 bg-white rounded-2xl shadow-sm">
+                  <p className="text-gray-500">No delivery history found.</p>
+                </div>
+              )}
             </div>
           )}
-
         </div>
 
         {/* Bottom Navigation */}
@@ -936,36 +935,36 @@ const ManageMySubscription: React.FC = () => {
           <BottomNavigation />
         </div>
 
-        
 
-{/* Details Modal - Updated to include the same functionality as edit modal */}
-<AnimatePresence> 
-  {showDetailsModal && selectedSubscription && (
-    <motion.div
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
-      <motion.div
-        className="bg-white rounded-xl w-full max-w-md"
-        initial={{ scale: 0.95 }}
-        animate={{ scale: 1 }}
-        exit={{ scale: 0.95 }}
-      >
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-medium">Modify Subscription</h2>
-            <button
-              onClick={() => setShowDetailsModal(false)}
-              className="text-gray-400 hover:text-gray-600"
+
+        {/* Details Modal - Updated to include the same functionality as edit modal */}
+        {/* <AnimatePresence>
+          {showDetailsModal && selectedSubscription && (
+            <motion.div
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
             >
-              ✕
-            </button>
-          </div>
+              <motion.div
+                className="bg-white rounded-xl w-full max-w-md"
+                initial={{ scale: 0.95 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.95 }}
+              >
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-medium">Modify Subscription</h2>
+                    <button
+                      onClick={() => setShowDetailsModal(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      ✕
+                    </button>
+                  </div> */}
 
-          {/* Quantity Section - Same as ProductDisplaypage.tsx */}
-          {/* <div className="mb-6">
+        {/* Quantity Section - Same as ProductDisplaypage.tsx */}
+        {/* <div className="mb-6">
             <div className="flex items-center justify-between">
               <h3 className="text-[15px] font-medium">Quantity</h3>
               <div className="flex items-center gap-4">
@@ -994,135 +993,8 @@ const ManageMySubscription: React.FC = () => {
             </div>
           </div> */}
 
-          {/* Delivery Days Selection - Same as ProductDisplaypage.tsx with validation */}
-          <div className="mb-6">
-            <h4 className="text-[15px] font-medium mb-4">
-              Select delivery days
-            </h4>
-            
-            {validationError && (
-              <p className="text-red-500 text-sm mb-3">{validationError}</p>
-            )}
-            
-            <div className="flex gap-2 justify-between">
-              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day, index) => {
-                const dayKey = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"][index];
-                const isSelected = modifyData.selectedDays.includes(dayKey);
-                
-                return (
-                  <button
-                    key={day}
-                    onClick={() => {
-                      if (isSelected) {
-                        // Don't allow deselecting if only 3 days left
-                        if (modifyData.selectedDays.length > 3) {
-                          setModifyData(prev => ({
-                            ...prev,
-                            selectedDays: prev.selectedDays.filter(d => d !== dayKey)
-                          }));
-                          // Clear validation error when user makes a selection
-                          if (validationError) setValidationError("");
-                        }
-                      } else {
-                        setModifyData(prev => ({
-                          ...prev,
-                          selectedDays: [...prev.selectedDays, dayKey]
-                        }));
-                        // Clear validation error when user makes a selection
-                        if (validationError) setValidationError("");
-                      }
-                    }}
-                    className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium transition-colors
-                      ${!isSelected
-                        ? "bg-white border border-gray-200 text-gray-700 hover:border-[#015D3A]"
-                        : "bg-[#015D3A] text-white"
-                      }`}
-                  >
-                    {day}
-                  </button>
-                );
-              })}
-            </div>
-            
-            <p className="text-xs text-gray-500 mt-2">
-              {modifyData.selectedDays.length} days selected
-            </p>
-          </div>
+        {/* Delivery Days Selection - Same as ProductDisplaypage.tsx with validation */}
 
-          {/* Subscribe Button - Same as ProductDisplaypage.tsx with API integration */}
-          <button
-            onClick={async () => {
-              // Use the same validation and API call logic as edit modal
-              if (modifyData.selectedDays.length < 3) {
-                setValidationError("Please select at least 3 days for your subscription");
-                return;
-              }
-              
-              try {
-                setIsUpdating(true);
-                setValidationError("");
-                
-                // Determine the subscription type based on number of days selected
-                const subscriptionType = modifyData.selectedDays.length === 7 ? "DAILY" : "CUSTOM";
-                
-                // Call the same API service that's used in the edit modal
-                await subscriptionService.updateSubscription(selectedSubscription!.id, {
-                  type: subscriptionType,
-                  selectedDays: modifyData.selectedDays,
-                  status: selectedSubscription!.status,
-                });
-                
-                // Refresh subscriptions
-                await fetchSubscriptionDetails();
-                setShowDetailsModal(false);
-                toast.success("Subscription updated successfully!");
-              } catch (error: any) {
-                console.error("Error updating subscription:", error);
-                setValidationError(error.message || "Failed to update subscription");
-              } finally {
-                setIsUpdating(false);
-              }
-            }}
-            disabled={modifyData.selectedDays.length < 3 || isUpdating}
-            className={`w-full py-3.5 rounded-lg text-[15px] font-medium mb-3
-              ${modifyData.selectedDays.length >= 3 
-                ? "bg-[#F15A22] text-white" 
-                : "bg-gray-200 text-gray-500 cursor-not-allowed"}`}
-          >
-            {isUpdating ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Updating...
-              </>
-            ) : (
-              modifyData.selectedDays.length >= 3
-                ? `Subscribe ${modifyData.selectedDays.length} days/wk for ₹${selectedSubscription?.amount || 0}/Pack`
-                : "Select at least 3 days to subscribe"
-            )}
-          </button>
-
-          {/* Subscribe Daily Link - Same as ProductDisplaypage.tsx */}
-          <button
-            onClick={() => {
-              setModifyData(prev => ({
-                ...prev,
-                selectedDays: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
-              }));
-              // Clear validation error
-              if (validationError) setValidationError("");
-            }}
-            className="w-full text-[#015D3A] text-[15px] font-medium"
-          >
-            Subscribe Daily
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
 
 
 
@@ -1151,8 +1023,8 @@ const ManageMySubscription: React.FC = () => {
               </button>
             </div> */}
 
-            {/* Quantity Section - Same as ProductDisplaypage.tsx */}
-            {/* <div className="mb-6">
+        {/* Quantity Section - Same as ProductDisplaypage.tsx */}
+        {/* <div className="mb-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-[15px] font-medium">Quantity</h3>
                 <div className="flex items-center gap-4">
@@ -1181,8 +1053,8 @@ const ManageMySubscription: React.FC = () => {
               </div>
             </div> */}
 
-            {/* Delivery Days Selection - Same as ProductDisplaypage.tsx */}
-            {/* <div className="mb-6">
+        {/* Delivery Days Selection - Same as ProductDisplaypage.tsx */}
+        {/* <div className="mb-6">
               <h4 className="text-[15px] font-medium mb-4">
                 Select delivery days
               </h4>
@@ -1228,10 +1100,10 @@ const ManageMySubscription: React.FC = () => {
               </div>
             </div> */}
 
-            {/* Subscribe Button - Same as ProductDisplaypage.tsx */}
-            {/* <button
+        {/* Subscribe Button - Same as ProductDisplaypage.tsx */}
+        {/* <button
               onClick={() => { */}
-                {/* // Handle subscription modification here
+        {/* // Handle subscription modification here
                 console.log("Modifying subscription:", modifyData);
                 // You can add API call here to update the subscription
                 setShowDetailsModal(false);
@@ -1248,8 +1120,8 @@ const ManageMySubscription: React.FC = () => {
                 : "Select at least 3 days to subscribe"}
             </button> */}
 
-            {/* Subscribe Daily Link - Same as ProductDisplaypage.tsx */}
-            {/* <button
+        {/* Subscribe Daily Link - Same as ProductDisplaypage.tsx */}
+        {/* <button
               onClick={() => {
                 setModifyData(prev => ({
                   ...prev,
@@ -1293,7 +1165,7 @@ const ManageMySubscription: React.FC = () => {
                     </button>
                   </div> */}
 
-                  {/* <div className="mb-6">
+        {/* <div className="mb-6">
                     <label className="block text-gray-700 mb-2">Quantity</label>
                     <div className="flex items-center gap-4">
                       <button className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center text-xl">
@@ -1306,8 +1178,8 @@ const ManageMySubscription: React.FC = () => {
                     </div>
                   </div> */}
 
-                 
-                  {/* <div className="mb-6">
+
+        {/* <div className="mb-6">
                     <label className="block text-gray-700 mb-2">
                       Select Delivery Type
                     </label>
@@ -1375,173 +1247,12 @@ const ManageMySubscription: React.FC = () => {
           )}
         </AnimatePresence> */}
 
-        {/* Pause Modal */}
-        <AnimatePresence>
-          {showPauseModal && selectedSubscription && (
-            <motion.div
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <motion.div
-                className="bg-white rounded-xl w-full max-w-md"
-                initial={{ scale: 0.95 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0.95 }}
-              >
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-medium">Pause Subscription</h2>
-                    <button
-                      onClick={() => setShowPauseModal(false)}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      ✕
-                    </button>
-                  </div>
 
-                  <div className="mb-6">
-                    <label className="block text-gray-700 mb-2">
-                      Resume delivery from
-                    </label>
-                    <DatePicker
-                      selected={customStartDate}
-                      onChange={(date) => setCustomStartDate(date)}
-                      minDate={new Date()}
-                      placeholderText="mm/dd/yyyy"
-                      className="w-full p-3 border border-gray-300 rounded-lg"
-                    />
-                  </div>
 
-                  <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                    <h3 className="font-medium mb-3">
-                      What happens when you pause?
-                    </h3>
-                    <ul className="space-y-2 text-sm text-gray-600">
-                      <li>• Your subscription will be paused immediately</li>
-                      <li>
-                        • No deliveries will be made until the resume date
-                      </li>
-                      <li>• You won't be charged during the pause period</li>
-                      <li>
-                        • Your subscription will automatically resume on the
-                        selected date
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setShowPauseModal(false)}
-                      className="flex-1 py-3 rounded-xl border-2 border-gray-300 font-medium"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handlePause}
-                      className="flex-1 py-3 rounded-xl bg-[#FF5722] text-white font-medium"
-                      disabled={!customStartDate}
-                    >
-                      Confirm
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Cancel Modal */}
-        <AnimatePresence>
-          {showCancelModal && selectedSubscription && (
-            <motion.div
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <motion.div
-                className="bg-white rounded-3xl w-full max-w-md p-6"
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-              >
-                <div className="mb-6">
-                  {/* Warning Section */}
-                  <div className="bg-[#FFF3CD] rounded-2xl p-4 mb-6">
-                    <div className="flex gap-3">
-                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center flex-shrink-0">
-                        <img src={Low_Balance} alt="" className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-medium text-gray-900 mb-1">
-                          Cancel Subscription?
-                        </h2>
-                        <p className="text-gray-600 text-sm">
-                          Your subscription will be cancelled immediately and
-                          you won't receive any further deliveries.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Help us improve section */}
-                  <div className="mb-6">
-                    <h3 className="text-xl font-medium text-gray-900 mb-3">
-                      Help us improve
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                      Why are you cancelling?
-                    </p>
-
-                    <div className="space-y-3">
-                      {[
-                        "Too expensive",
-                        "Quality issues",
-                        "Delivery timing issues",
-                        "Moving to a different location",
-                        "Taking a break",
-                        "Other",
-                      ].map((reason) => (
-                        <button
-                          key={reason}
-                          onClick={() => setCancellationReason(reason)}
-                          className={`w-full p-4 rounded-2xl text-left transition-all ${cancellationReason === reason
-                              ? "bg-[#FFF3CD] border-[#FF5722] border text-[#FF5722]"
-                              : "bg-white border border-gray-200 text-gray-700 hover:border-gray-300"
-                            }`}
-                        >
-                          {reason}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleCancel}
-                      className="flex-1 py-3.5 rounded-full border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                      disabled={!cancellationReason}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => setShowCancelModal(false)}
-                      className="flex-1 py-3.5 rounded-full bg-[#FF5722] text-white font-medium hover:bg-[#F4511E] transition-colors"
-                    >
-                      Keep Subscription
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Cancel Modal Removed */}
 
         {/* Success Toast */}
-        <AnimatePresence>
+        {/* <AnimatePresence>
           {showSuccessToast && selectedSubscription && (
             <motion.div
               className="fixed top-4 left-4 right-4 bg-white rounded-xl p-4 shadow-lg max-w-sm mx-auto"
@@ -1561,7 +1272,7 @@ const ManageMySubscription: React.FC = () => {
               </p>
             </motion.div>
           )}
-        </AnimatePresence>
+        </AnimatePresence> */}
 
         {/* Insufficient Balance Modal */}
         <AnimatePresence>
@@ -1607,10 +1318,10 @@ const ManageMySubscription: React.FC = () => {
         </AnimatePresence>
 
         {/* Edit Subscription Modal */}
-        <AnimatePresence>
+        {/* <AnimatePresence>
           {showEditModal && selectedSubscription && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
@@ -1618,32 +1329,32 @@ const ManageMySubscription: React.FC = () => {
               >
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold">Update Delivery Days</h2>
-                  <button 
+                  <button
                     onClick={() => setShowEditModal(false)}
                     className="text-gray-500 hover:text-gray-700"
                   >
                     ✕
                   </button>
                 </div>
-                
+
                 <div className="mb-6">
                   <p className="text-sm text-gray-600 mb-6 text-center">
                     Select at least 3 days you want to receive your subscription:
                   </p>
-                  
+
                   {validationError && (
                     <p className="text-red-500 text-sm mb-6 text-center">{validationError}</p>
                   )}
-                  
+
                   <div className="grid grid-cols-7 gap-2 mb-6">
                     {['Sun', 'Mon', 'Tues', 'Wed', 'Thus', 'Fri', 'Sat'].map((day, index) => {
                       const fullDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                       const fullDayName = fullDayNames[index];
-                      const isSelected = editingDays.some(d => 
-                        d.toLowerCase() === fullDayName.toLowerCase() || 
+                      const isSelected = editingDays.some(d =>
+                        d.toLowerCase() === fullDayName.toLowerCase() ||
                         normalizeDayName(d) === fullDayName
                       );
-                      
+
                       return (
                         <button
                           key={index}
@@ -1652,42 +1363,40 @@ const ManageMySubscription: React.FC = () => {
                             setEditingDays(prev => {
                               const normalizedPrev = prev.map(d => normalizeDayName(d));
                               const normalizedDay = normalizeDayName(fullDayName);
-                              
+
                               return normalizedPrev.includes(normalizedDay)
                                 ? normalizedPrev.filter(d => d !== normalizedDay)
                                 : [...normalizedPrev, normalizedDay];
                             });
                             if (validationError) setValidationError("");
                           }}
-                          className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                            isSelected
-                              ? 'bg-[#4CAF50] text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
+                          className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${isSelected
+                            ? 'bg-[#4CAF50] text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
                         >
                           {day}
                         </button>
                       );
                     })}
                   </div>
-                  
+
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <p className="text-sm text-gray-600 text-center">
                       {editingDays.length} days selected
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="space-y-3">
                   <button
                     type="button"
                     onClick={handleUpdateSubscription}
                     disabled={isUpdating || editingDays.length < 3}
-                    className={`w-full py-3 text-sm font-medium text-white rounded-xl flex items-center justify-center gap-2 ${
-                      editingDays.length >= 3 
-                        ? 'bg-[#4CAF50] hover:bg-[#3e8e41]' 
-                        : 'bg-gray-300 cursor-not-allowed'
-                    }`}
+                    className={`w-full py-3 text-sm font-medium text-white rounded-xl flex items-center justify-center gap-2 ${editingDays.length >= 3
+                      ? 'bg-[#4CAF50] hover:bg-[#3e8e41]'
+                      : 'bg-gray-300 cursor-not-allowed'
+                      }`}
                   >
                     {isUpdating ? (
                       <>
@@ -1699,7 +1408,7 @@ const ManageMySubscription: React.FC = () => {
                       </>
                     ) : 'Update Subscription'}
                   </button>
-                  
+
                   <button
                     type="button"
                     onClick={() => setShowEditModal(false)}
@@ -1712,7 +1421,7 @@ const ManageMySubscription: React.FC = () => {
               </motion.div>
             </div>
           )}
-        </AnimatePresence>
+        </AnimatePresence>*/}
       </div>
     </div>
   );

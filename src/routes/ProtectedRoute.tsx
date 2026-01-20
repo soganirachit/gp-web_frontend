@@ -10,8 +10,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const location = useLocation();
 
   if (!isLoggedIn) {
-    // Redirect to login page but save the attempted location
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Redirect to startup page first, then it will redirect to login
+    return <Navigate to="/startup" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

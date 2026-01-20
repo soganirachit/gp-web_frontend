@@ -5,6 +5,7 @@ import { headerService } from "./headers.service";
 export interface Address {
   id: string;
   userId: string;
+  name?: string; // Added name field
   houseNo: string;
   streetName: string;
   landmark?: string;
@@ -23,6 +24,7 @@ export interface Address {
 }
 
 export interface AddressInput {
+  name?: string; // Added name field
   houseNo: string;
   streetName: string;
   area: string;
@@ -126,11 +128,11 @@ class AddressService {
     }
   }
 
- 
+
   async validateAddressInDeliveryArea(coordinates: string): Promise<{ isValid: boolean; message?: string }> {
     try {
       const [lat, lng] = coordinates.split(',').map(Number);
-      
+
       if (isNaN(lat) || isNaN(lng)) {
         return { isValid: false, message: 'Invalid coordinates format' };
       }
@@ -148,7 +150,7 @@ class AddressService {
       );
 
       const { isDeliverable, message } = response.data;
-      
+
       return {
         isValid: isDeliverable,
         message: message || (isDeliverable ? 'Address is within delivery area' : 'Address is outside delivery area')
