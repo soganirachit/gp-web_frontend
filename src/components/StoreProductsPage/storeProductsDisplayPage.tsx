@@ -80,7 +80,7 @@ const StorePage: React.FC = () => {
       }
       const token = localStorage.getItem("token");
       if (!token) {
-        navigate("/login", { state: { returnUrl: `/store/${id}` } });
+        navigate("/login", { state: { returnUrl: `/gp-store/${id}` } });
         return;
       }
       const data = await storeProductGet.getProductById(id);
@@ -234,12 +234,12 @@ const StorePage: React.FC = () => {
   };
 
   const handleProductClick = (product: Product | storeProducts) => {
-    navigate(`/store/${product.id}`);
+    navigate(`/gp-store/${product.id}`);
   };
 
   if (loading || isCheckingBalance) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );

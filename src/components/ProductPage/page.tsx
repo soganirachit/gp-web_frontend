@@ -12,13 +12,13 @@ import Spinner from "../common/Spinner";
 import SearchIcon from "../../assets/icon/Search.png";
 import ProfileIcon from "../../assets/icon/Profile.png";
 import walletImage from "../../assets/icon/Wallet.png";
-import scooterIcon from "../../assets/svg/dp_daily svg/scooter.svg";
+import scooterIcon from "../../assets/svg/gp_daily svg/scooter.svg";
 import pujaIcon from "../../assets/icon/puja.svg";
 import exoticIcon from "../../assets/icon/exotic.svg";
-import sortIcon from "../../assets/svg/dp_daily svg/sort.svg";
-import filterIcon from "../../assets/svg/dp_daily svg/filter.svg";
-import orangeCover from "../../assets/svg/dp_daily svg/orange_cover.svg";
-import locationhomeIcon from "../../assets/svg/dp_daily svg/locationhome.svg";
+import sortIcon from "../../assets/svg/gp_daily svg/sort.svg";
+import filterIcon from "../../assets/svg/gp_daily svg/filter.svg";
+import orangeCover from "../../assets/svg/gp_daily svg/orange_cover.svg";
+import locationhomeIcon from "../../assets/svg/gp_daily svg/locationhome.svg";
 
 const ProductPage: React.FC = () => {
   const navigate = useNavigate();

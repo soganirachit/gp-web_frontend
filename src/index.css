@@ -7,6 +7,11 @@
   body {
     @apply bg-[#FFFBEB];
   }
+  
+  /* IBM Plex Serif font family */
+  .font-ibm-plex-serif {
+    font-family: 'IBM Plex Serif', serif;
+  }
 }
 
 /* Custom components */

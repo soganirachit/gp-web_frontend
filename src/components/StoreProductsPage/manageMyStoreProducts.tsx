@@ -14,6 +14,7 @@ import { IoArrowBack } from "react-icons/io5";
 import Spinner from "../../components/common/Spinner";
 import { format } from "date-fns";
 import { orderService } from "@/services/order.service";
+import { useFeatureTheme } from "../../context/FeatureThemeContext";
 
 interface order {
   id: string;
@@ -37,6 +38,8 @@ interface order {
 
 const ManageMyStoreProducts: React.FC = () => {
   const navigate = useNavigate();
+  const { feature } = useFeatureTheme();
+  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const [isLoading, setIsLoading] = useState(true);
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -158,7 +161,7 @@ const ManageMyStoreProducts: React.FC = () => {
       if (response.success) {
         setShowCancelModal(false);
         // setCancellationReason("");
-        navigate("/store");
+        navigate(basePath);
       } else {
         toast.error(response.error || "Failed to cancel order");
       }
@@ -169,11 +172,11 @@ const ManageMyStoreProducts: React.FC = () => {
 
   const handleRechargeWallet = () => {
     setShowInsufficientBalanceModal(false);
-    navigate("/wallet", {
+    navigate(`${basePath}/wallet`, {
       state: {
         requiredAmount: balanceDetails.shortageAmount,
         currentBalance: balanceDetails.currentBalance,
-        returnUrl: `/product/${selectedOrder?.id}`,
+        returnUrl: `${basePath}/product/${selectedOrder?.id}`,
         // subscriptionType: selectedOrder?.type,
         minimumDays: 7,
         // maximumDays: selectedOrder?.type === "DAILY" ? 30 : 14,
@@ -425,7 +428,7 @@ const ManageMyStoreProducts: React.FC = () => {
               You don't have any Store Products.
             </p>
             <button
-              onClick={() => navigate("/store")}
+              onClick={() => navigate(basePath)}
               className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium"
             >
               Browse store Products
@@ -457,13 +460,13 @@ const ManageMyStoreProducts: React.FC = () => {
               src={walletImage}
               alt="Wallet"
               className="w-10 h-10 md:w-10 md:h-10"
-              onClick={() => navigate("/wallet")}
+              onClick={() => navigate(`${basePath}/wallet`)}
             />
             <img
               src={profileImage}
               alt="Profile"
               className="w-6 h-6 md:w-8 md:h-8"
-              onClick={() => navigate("/account")}
+              onClick={() => navigate(`${basePath}/account`)}
             />
           </div>
         </div>
@@ -472,7 +475,7 @@ const ManageMyStoreProducts: React.FC = () => {
           {/* Product Button */}
           <div className="mb-6">
             <button
-              onClick={() => navigate("/store")}
+              onClick={() => navigate(basePath)}
               className="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition-colors"
             >
               Browse Other Products
@@ -539,7 +542,7 @@ const ManageMyStoreProducts: React.FC = () => {
                     {/* Column 3: Support Button */}
                     <div className="text-right">
                       <button
-                        onClick={() => navigate("/customer-support")}
+                        onClick={() => navigate(`${basePath}/customer-support`)}
                         className="text-red-500 text-sm font-medium"
                       >
                         Support

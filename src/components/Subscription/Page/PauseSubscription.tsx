@@ -21,7 +21,7 @@ const PauseSubscription: React.FC = () => {
     // Redirect if no subscription data
     React.useEffect(() => {
         if (!subscription) {
-            navigate('/manage-my-subscription');
+            navigate('/gp-daily/manage-my-subscription');
         }
     }, [subscription, navigate]);
 
@@ -51,7 +51,7 @@ const PauseSubscription: React.FC = () => {
             const response = await subscriptionService.pauseSubscription(subscription.id, diffDays);
 
             if (response.success) {
-                navigate('/subscription-paused', {
+                navigate('/gp-daily/subscription-paused', {
                     state: {
                         resumeDate: selectedDate.toISOString()
                     }

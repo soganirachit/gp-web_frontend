@@ -13,9 +13,9 @@ import Low_Balance from "../../assets/icon/LowBalance.png";
 import { IoArrowBack } from "react-icons/io5";
 import Spinner from "../../components/common/Spinner";
 import { format } from "date-fns";
-import orangeCover from "../../assets/svg/dp_daily svg/orange_cover.svg";
-import redBox from "../../assets/svg/dp_daily svg/redbox.svg";
-import greenBox from "../../assets/svg/dp_daily svg/greenbox.svg";
+import orangeCover from "../../assets/svg/gp_daily svg/orange_cover.svg";
+import redBox from "../../assets/svg/gp_daily svg/redbox.svg";
+import greenBox from "../../assets/svg/gp_daily svg/greenbox.svg";
 interface Subscription {
   id: string;
   customerId: string;
@@ -363,7 +363,7 @@ const ManageMySubscription: React.FC = () => {
 
   const handleRechargeWallet = () => {
     setShowInsufficientBalanceModal(false);
-    navigate("/wallet", {
+    navigate("/gp-daily/wallet", {
       state: {
         requiredAmount: balanceDetails.shortageAmount,
         currentBalance: balanceDetails.currentBalance,
@@ -557,7 +557,7 @@ const ManageMySubscription: React.FC = () => {
                     onClick={() => {
                       setSelectedSubscription(subscription);
                       // Navigate to modify page instead of showing modal
-                      navigate('/modify-Subscription', { state: { subscription } });
+                      navigate('/gp-daily/modify-Subscription', { state: { subscription } });
                     }}
                     className="flex-1 py-1.5 rounded-full border border-[#006D3B] text-[#006D3B] text-sm font-medium"
                   >
@@ -604,7 +604,7 @@ const ManageMySubscription: React.FC = () => {
                   <button
                     onClick={() => {
                       setSelectedSubscription(subscription);
-                      navigate('/pause-subscription', { state: { subscription } });
+                      navigate('/gp-daily/pause-subscription', { state: { subscription } });
                     }}
                     className="flex-1 py-1.5 rounded-full bg-[#FFF3CD] text-[#FF5722] text-sm font-medium"
                   >
@@ -614,7 +614,7 @@ const ManageMySubscription: React.FC = () => {
                     onClick={() => {
                       setSelectedSubscription(subscription);
                       // Navigate to landing page directly
-                      navigate('/cancel-subscription', { state: { subscription } });
+                      navigate('/gp-daily/cancel-subscription', { state: { subscription } });
                     }}
                     className="flex-1 py-1.5 rounded-full border border-red-500 text-red-500 text-sm font-medium"
                   >
@@ -707,7 +707,7 @@ const ManageMySubscription: React.FC = () => {
                     onClick={() => {
                       setSelectedSubscription(subscription);
                       // Navigate to landing page directly
-                      navigate('/cancel-subscription', { state: { subscription } });
+                      navigate('/gp-daily/cancel-subscription', { state: { subscription } });
                     }}
                     className="flex-1 py-1.5 rounded-full border border-red-500 text-red-500 text-sm font-medium"
                   >
@@ -748,7 +748,7 @@ const ManageMySubscription: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
@@ -778,7 +778,7 @@ const ManageMySubscription: React.FC = () => {
               started.
             </p>
             <button
-              onClick={() => navigate("/products?category=pujaflowers")}
+              onClick={() => navigate("/gp-daily/products?category=pujaflowers")}
               className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium"
             >
               Browse Subscribe Packs

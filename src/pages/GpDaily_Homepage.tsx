@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { FaChevronRight } from "react-icons/fa";
 import { MdKeyboardArrowDown } from "react-icons/md";
 import { motion } from "framer-motion";
@@ -24,16 +24,17 @@ import Spinner from "../components/common/Spinner";
 import ProfileIcon from "../assets/icon/Profile.png";
 import SearchIcon from "../assets/icon/Search.png";
 import smallgendaIcon from "../assets/svg/smallgenda.svg";
-import scooterIcon from "../assets/svg/dp_daily svg/scooter.svg";
-import clockIcon from "../assets/svg/dp_daily svg/clock.svg";
-import flowerIcon from "../assets/svg/dp_daily svg/flower.svg";
-import bannerPng from "../assets/svg/dp_daily svg/banner.png";
-import topBannerSvg from "../assets/svg/dp_daily svg/top _banner.svg";
-import bottomBannerSvg from "../assets/svg/dp_daily svg/bottom_banner.svg";
-import locationhomeIcon from "../assets/svg/dp_daily svg/locationhome.svg";
-import profilehomeIcon from "../assets/svg/dp_daily svg/profilehome.svg";
-import profilelogoIcon from "../assets/svg/dp_daily svg/profilelogo.svg";
-import alertIcon from "../assets/svg/lowbalance.svg";
+import scooterIcon from "../assets/svg/gp_daily svg/scooter.svg";
+import clockIcon from "../assets/svg/gp_daily svg/clock.svg";
+import flowerIcon from "../assets/svg/gp_daily svg/flower.svg";
+import bannerPng from "../assets/svg/gp_daily svg/banner.png";
+import topBannerSvg from "../assets/svg/gp_daily svg/top _banner.svg";
+import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
+import locationhomeIcon from "../assets/svg/gp_daily svg/locationhome.svg";
+import profilehomeIcon from "../assets/svg/gp_daily svg/profilehome.svg";
+import profilelogoIcon from "../assets/svg/gp_daily svg/profilelogo.svg";
+import alertIcon from "../assets/svg/gp_daily svg/lowbalance.svg";
+import { useFeatureTheme } from "../context/FeatureThemeContext";
 
 interface DayInfo {
   date: string;
@@ -44,6 +45,9 @@ interface DayInfo {
 
 const Home2: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { feature } = useFeatureTheme();
+  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const [, setDays] = useState<DayInfo[]>([]);
   const [deliveryLocation, setDeliveryLocation] = useState<string>("");
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
@@ -174,7 +178,7 @@ const Home2: React.FC = () => {
 
       const token = localStorage.getItem("token");
       if (!token) {
-        navigate("/login", { state: { returnUrl: location.pathname } });
+        navigate(`${basePath}/login`, { state: { returnUrl: location.pathname } });
         return;
       }
 
@@ -186,7 +190,7 @@ const Home2: React.FC = () => {
         error.message === "Authentication required" ||
         error.message.includes("Session expired")
       ) {
-        navigate("/login", { state: { returnUrl: location.pathname } });
+        navigate(`${basePath}/login`, { state: { returnUrl: location.pathname } });
       } else {
         setError(error.message || "Failed to load base packs");
       }
@@ -396,11 +400,11 @@ const Home2: React.FC = () => {
   }, [selectedSubscription]);
 
   const handleProductClick = (product: ProductType | BasePack) => {
-    navigate(`/product/${product.id}`);
+    navigate(`/gp-daily/product/${product.id}`);
   };
 
   const handleLocationClick = () => {
-    navigate('/location', { state: { returnUrl: '/gp-daily' } });
+    navigate(`${basePath}/location`, { state: { returnUrl: basePath } });
   };
 
   // Helper function to get image URL (handles both string and array)
@@ -478,7 +482,7 @@ const Home2: React.FC = () => {
                     src={profilehomeIcon}
                     alt="Profile"
                     className=" absolute inset-0 w-12 h-12 object-contain cursor-pointer self-center justify-self-center"
-                    onClick={() => navigate("/Account")}
+                    onClick={() => navigate(`${basePath}/account`)}
                   />
                   <img
                     src={profilelogoIcon}
@@ -532,7 +536,7 @@ const Home2: React.FC = () => {
                     </div>
                   </div>
                   <button
-                    onClick={() => navigate("/wallet")}
+                    onClick={() => navigate(`${basePath}/wallet`)}
                     className="w-full py-2.5 border-2 border-white rounded-xl text-white font-medium text-sm hover:bg-white/10 transition-colors"
                   >
                     Recharge Now
@@ -554,7 +558,7 @@ const Home2: React.FC = () => {
                     />
                   </div>
                   <button
-                    onClick={() => navigate("/manage-my-subscription")}
+                    onClick={() => navigate(`${basePath}/manage-my-subscription`)}
                     className="text-[#FAA222] text-sm font-medium underline"
                   >
                     Manage
@@ -666,7 +670,7 @@ const Home2: React.FC = () => {
             {/* View All Category Button */}
             <div className="flex justify-center pt-4">
               <button
-                onClick={() => navigate("/Products")}
+                onClick={() => navigate(`${basePath}/Products`)}
                 className="w-full max-w-md bg-[#FAA222] text-gray-700 py-3 rounded-lg font-medium text-sm hover:bg-[#DD7600] transition-colors"
               >
                 View All Category

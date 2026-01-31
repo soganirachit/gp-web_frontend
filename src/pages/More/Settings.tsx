@@ -20,14 +20,15 @@ import referIcon from '../../assets/icon/refer.svg';
 import supportIcon from '../../assets/icon/support.svg';
 import walletIcon from '../../assets/wallet.svg';
 import faqIcon from '../../assets/icon/Faq.svg';
-import vectorBg from '../../assets/All/Vector (1).png';
-import BlackProfile from '../../assets/svg/Blackprofile.svg';
 import facebookIcon from '../../assets/icon/social/facebook.svg';
 import instagramIcon from '../../assets/icon/social/insta.svg';
 import whatsappIcon from '../../assets/icon/social/whatsapp.svg';
+import { useFeatureTheme } from '../../context/FeatureThemeContext';
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
+  const { theme, feature } = useFeatureTheme();
+  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -57,63 +58,108 @@ const Settings: React.FC = () => {
       });
   }, []);
 
-  const menuItems = [
-    {
-      icon: subscriptionIcon,
-      title: 'Manage Subscription',
-      path: '/manage-my-subscription',
-      isSvg: true
-    },
+  // GP Store menu items (6 options only)
+  const gpStoreMenuItems = [
     {
       icon: ordersIcon,
       title: 'Orders',
-      path: '/orders',
+      path: `${basePath}/orders`,
       isSvg: false
     },
     {
       icon: pujaIcon,
-      title: 'Puja Flower',
-      path: '/Products?category=puja',
-      isSvg: true
-    },
-    {
-      icon: exoticIcon,
-      title: 'Exotic Flower',
-      path: '/Products?category=exotic',
+      title: 'Products',
+      path: `${basePath}/products`,
       isSvg: true
     },
     {
       icon: <IoLocationOutline className="text-xl text-gray-500" />,
       title: 'Address Book',
-      path: '/addresses',
+      path: `${basePath}/addresses`,
       isSvg: false,
       isComponent: true
     },
     {
       icon: referIcon,
       title: 'Refer Us',
-      path: '/refer',
+      path: `${basePath}/refer`,
       isSvg: true
     },
     {
       icon: supportIcon,
       title: 'Request & Support',
-      path: '/customer-support',
-      isSvg: true
-    },
-    {
-      icon: walletIcon,
-      title: 'Wallet',
-      path: '/wallet',
+      path: `${basePath}/customer-support`,
       isSvg: true
     },
     {
       icon: faqIcon,
       title: 'FAQs',
-      path: '/faq',
+      path: `${basePath}/faq`,
       isSvg: true
     }
   ];
+
+  // GP Daily menu items (all original options)
+  const gpDailyMenuItems = [
+    {
+      icon: subscriptionIcon,
+      title: 'Manage Subscription',
+      path: `${basePath}/manage-my-subscription`,
+      isSvg: true
+    },
+    {
+      icon: ordersIcon,
+      title: 'Orders',
+      path: `${basePath}/orders`,
+      isSvg: false
+    },
+    {
+      icon: pujaIcon,
+      title: 'Puja Flower',
+      path: `${basePath}/Products?category=puja`,
+      isSvg: true
+    },
+    {
+      icon: exoticIcon,
+      title: 'Exotic Flower',
+      path: `${basePath}/Products?category=exotic`,
+      isSvg: true
+    },
+    {
+      icon: <IoLocationOutline className="text-xl text-gray-500" />,
+      title: 'Address Book',
+      path: `${basePath}/addresses`,
+      isSvg: false,
+      isComponent: true
+    },
+    {
+      icon: referIcon,
+      title: 'Refer Us',
+      path: `${basePath}/refer`,
+      isSvg: true
+    },
+    {
+      icon: supportIcon,
+      title: 'Request & Support',
+      path: `${basePath}/customer-support`,
+      isSvg: true
+    },
+    {
+      icon: walletIcon,
+      title: 'Wallet',
+      path: `${basePath}/wallet`,
+      isSvg: true
+    },
+    {
+      icon: faqIcon,
+      title: 'FAQs',
+      path: `${basePath}/faq`,
+      isSvg: true
+    }
+  ];
+
+  // Select menu items based on feature
+  const menuItems = feature === 'gpStore' ? gpStoreMenuItems : gpDailyMenuItems;
 
   const socialLinks = [
     {
@@ -136,7 +182,7 @@ const Settings: React.FC = () => {
 
   const handleLogoutConfirm = () => {
     localStorage.clear();
-    navigate('/login');
+    navigate(`${basePath}/login`);
   };
 
   const handleLogoutCancel = () => {
@@ -181,7 +227,7 @@ const Settings: React.FC = () => {
           {/* User Profile Card */}
           <div className="bg-white mt-4 p-4 rounded-xl shadow-sm relative">
             <button
-              onClick={() => navigate('/Profile')}
+              onClick={() => navigate(`${basePath}/profile`)}
               className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 transition-colors"
             >
               <IoCreateOutline className="text-xl" />
@@ -189,12 +235,12 @@ const Settings: React.FC = () => {
             <div className="flex items-center gap-4">
               <div className="relative w-20 h-20 flex-shrink-0 flex items-center justify-center">
                 <img
-                  src={vectorBg}
+                  src={theme.assets.profileBackground}
                   alt="Profile background"
                   className="absolute inset-0 w-full h-full object-contain"
                 />
                 <img
-                  src={BlackProfile}
+                  src={theme.assets.profileLogo}
                   alt="Account"
                   className="relative z-10 w-7 h-7 object-contain"
                 />
@@ -254,7 +300,11 @@ const Settings: React.FC = () => {
           <div className="mt-6 mb-4">
             <button
               onClick={handleLogoutClick}
-              className="flex items-center justify-center gap-2 w-full py-3.5 bg-[#FAA222] text-gray-700 rounded-xl font-semibold hover:bg-[#E8911F] transition-colors"
+              className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-semibold transition-colors"
+              style={{ 
+                backgroundColor: theme.colors.primary,
+                color: feature === 'gpStore' ? 'white' : 'black'
+              }}
             >
               <IoLogOutOutline className="text-xl" />
               <span className="text-[15px]">Logout</span>

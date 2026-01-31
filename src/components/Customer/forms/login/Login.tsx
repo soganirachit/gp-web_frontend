@@ -2,13 +2,15 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { authService } from "../../../../services/auth.service";
-import login_logo from "../../../../assets/All/login_logo.png";
+import { useFeatureTheme } from "../../../../context/FeatureThemeContext";
 
 const Login = () => {
     const [phoneNumber, setPhoneNumber] = useState("");
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
+    const { theme, feature } = useFeatureTheme();
+    const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -21,7 +23,8 @@ const Login = () => {
             setIsLoading(true);
             setError("");
             await authService.sendOTP(phoneNumber);
-            navigate("/otp-verification", { state: { phoneNumber } });
+            const otpPath = `${basePath}/otp-verification`;
+            navigate(otpPath, { state: { phoneNumber } });
         } catch (err: any) {
             setError(
                 err?.error || err?.response?.data?.message || "Failed to send OTP"
@@ -32,7 +35,7 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen w-screen bg-white fixed inset-0 flex flex-col items-center justify-center px-3 sm:px-4 py-4 sm:py-6 md:py-8 overflow-y-auto">
+        <div className={`min-h-screen w-screen fixed inset-0 flex flex-col items-center justify-center px-3 sm:px-4 py-4 sm:py-6 md:py-8 overflow-y-auto ${theme.classes.authPageBackground}`}>
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -44,17 +47,17 @@ const Login = () => {
                     {/* OTP Graphic */}
                     <div className="relative w-full max-w-[280px] sm:max-w-xs h-48 sm:h-56 md:h-64 flex items-center justify-center mb-4 sm:mb-6">
                         <img
-                            src={login_logo}
-                            alt="OTP Graphic"
+                            src={theme.assets.loginHero}
+                            alt="Login Graphic"
                             className="w-full h-full object-contain"
                         />
                     </div>
 
                     {/* Carousel Indicators */}
                     <div className="flex gap-1.5 sm:gap-2 mt-2 sm:mt-4">
-                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#FAA222]"></div>
-                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#FAA222]/30"></div>
-                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#FAA222]/30"></div>
+                        <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${theme.classes.authIndicatorActive}`}></div>
+                        <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${theme.classes.authIndicatorInactive}`}></div>
+                        <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${theme.classes.authIndicatorInactive}`}></div>
                     </div>
 
                 </div>
@@ -105,7 +108,7 @@ const Login = () => {
                             disabled={isLoading}
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
-                            className="w-full py-3 sm:py-3.5 md:py-4 px-4 bg-[#FAA222] text-black rounded-lg sm:rounded-xl font-semibold hover:bg-[#E8911F] transition-colors duration-200 text-base sm:text-lg"
+                            className={`w-full py-3 sm:py-3.5 md:py-4 px-4 rounded-lg sm:rounded-xl font-semibold transition-colors duration-200 text-base sm:text-lg ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
                         >
                             {isLoading ? (
                                 <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />

@@ -4,8 +4,7 @@ import { FaCamera } from 'react-icons/fa';
 import { IoArrowBack } from 'react-icons/io5';
 import { customerService } from '@/services/getcustomer.service';
 import { editCustomerService } from '@/services/editcustomer.service';
-import vectorBg from '../../../../assets/All/Vector (1).png';
-import accountIconProfile from '../../../../assets/icon/Account.png';
+import { useFeatureTheme } from '../../../../context/FeatureThemeContext';
 
 interface UserDetails {
   name: string;
@@ -16,6 +15,8 @@ interface UserDetails {
 const Profile: React.FC = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { theme, feature } = useFeatureTheme();
+  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
 
   // User details state
   const [userDetails, setUserDetails] = useState<UserDetails>({
@@ -62,7 +63,7 @@ const Profile: React.FC = () => {
         phoneNumber: Number(userDetails.phone),
       });
       // Optionally show a success message or navigate
-      navigate('/Account');
+      navigate(`${basePath}/account`);
     } catch (err: any) {
       setError('Failed to update profile.');
     } finally {
@@ -91,12 +92,12 @@ const Profile: React.FC = () => {
           <div className="relative">
             <div className="relative w-24 h-24 flex items-center justify-center">
               <img
-                src={vectorBg}
+                src={theme.assets.profileBackground}
                 alt="Profile background"
                 className="absolute inset-0 w-full h-full object-contain"
               />
               <img
-                src={accountIconProfile}
+                src={theme.assets.profileLogo}
                 alt="Account"
                 className="relative z-10 w-12 h-12 object-contain"
               />
@@ -157,7 +158,8 @@ const Profile: React.FC = () => {
           {error && <div className="text-red-500 mb-4 text-center">{error}</div>}
           <button 
             onClick={handleSaveChanges}
-            className="w-full bg-[#FAA222] text-white py-3.5 rounded-xl font-semibold text-base hover:bg-[#E8911F] transition-colors"
+            className="w-full text-white py-3.5 rounded-xl font-semibold text-base transition-colors"
+            style={{ backgroundColor: theme.colors.primary }}
             disabled={loading}
           >
             {loading ? 'Saving...' : 'Save Changes'}

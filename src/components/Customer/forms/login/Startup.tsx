@@ -2,29 +2,50 @@ import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../../../context/AuthContext';
-import logo from '../../../../assets/All/logo.png';
-import vectorBg from '../../../../assets/All/Vector (1).png';
+import { getFeatureFromPath } from '../../../../config/features';
+import { useFeatureTheme } from '../../../../context/FeatureThemeContext';
 
 const Startup: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoggedIn } = useAuth();
+  const { theme } = useFeatureTheme();
   const from = (location.state as { from?: Location })?.from;
 
   useEffect(() => {
+    // Detect feature from referrer or default to gp-daily
+    const referrer = document.referrer;
+    const currentPath = location.pathname;
+    
+    // Try to detect feature from referrer URL or current path
+    let feature = getFeatureFromPath(currentPath);
+    if (referrer) {
+      try {
+        const referrerPath = new URL(referrer).pathname;
+        const referrerFeature = getFeatureFromPath(referrerPath);
+        if (referrerFeature) {
+          feature = referrerFeature;
+        }
+      } catch (e) {
+        // If referrer parsing fails, use current path feature
+      }
+    }
+    
+    const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+
     // If user is already logged in, redirect immediately without showing splash
     if (isLoggedIn) {
       navigate('/home', { replace: true });
       return;
     }
 
-    // Auto-navigate to login after 2.5 seconds for non-logged-in users
+    // Auto-navigate to feature-prefixed login after 2.5 seconds for non-logged-in users
     const timer = setTimeout(() => {
-      navigate('/login', { state: from ? { from } : undefined });
+      navigate(`${basePath}/login`, { state: from ? { from } : undefined });
     }, 2500);
 
     return () => clearTimeout(timer);
-  }, [navigate, from, isLoggedIn]);
+  }, [navigate, from, isLoggedIn, location.pathname]);
 
   return (
     <div className="min-h-screen w-screen bg-white fixed inset-0 flex items-center justify-center">
@@ -40,16 +61,20 @@ const Startup: React.FC = () => {
           transition={{ delay: 0.2, duration: 0.6 }}
           className="relative w-full max-w-[280px] sm:max-w-xs h-48 sm:h-56 md:h-64 flex items-center justify-center"
         >
-          {/* Orange Vector Background */}
+          {/* Theme-based Startup Banner Background */}
           <img
-            src={vectorBg}
-            alt="Background"
+            src={theme.assets.startupBanner}
+            alt="Startup Background"
             className="absolute inset-0 w-full h-full object-contain"
           />
-          {/* Logo on top */}
-          <div className="relative z-10 w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 flex items-center justify-center p-4 sm:p-6 md:p-8">
+          {/* Logo on top - use startupLogo with conditional sizing */}
+          <div className={`relative z-10 flex items-center justify-center p-4 sm:p-6 md:p-8 ${
+            theme.feature === 'gpStore' 
+              ? 'w-32 h-32 sm:w-36 sm:h-36 md:w-40 md:h-40' 
+              : 'w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64'
+          }`}>
             <img
-              src={logo}
+              src={theme.assets.startupLogo}
               alt="Genda Phool Logo"
               className="w-full h-full object-contain"
             />

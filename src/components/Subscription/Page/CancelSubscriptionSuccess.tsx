@@ -93,7 +93,7 @@ const CancelSubscriptionSuccess: React.FC = () => {
                     </h3>
 
                     <button
-                        onClick={() => navigate('/Products')}
+                        onClick={() => navigate('/gp-daily/Products')}
                         className="w-full h-[50px] bg-[#FAA222] text-gray-900 py-4 rounded-[20px] font-semibold shadow-sm hover:bg-[#E8911F] flex items-center justify-center gap-3 transition-transform active:scale-95"
                     >
                         <img src={blackFlowerIcon} alt="" className="w-8 h-8 opacity-80" />

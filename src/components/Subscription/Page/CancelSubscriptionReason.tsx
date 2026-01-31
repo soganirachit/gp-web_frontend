@@ -34,7 +34,7 @@ const CancelSubscriptionReason: React.FC = () => {
 
             await subscriptionService.cancelSubscription(subscription.id, fullReason);
 
-            navigate('/cancel-subscription-success', {
+            navigate('/gp-daily/cancel-subscription-success', {
                 state: {
                     subscription,
                     cancellationDate: new Date().toISOString()
@@ -133,7 +133,7 @@ const CancelSubscriptionReason: React.FC = () => {
                         {isCancelling ? "Cancelling..." : "Cancel Subscription"}
                     </button>
                     <button
-                        onClick={() => navigate('/manage-my-subscription')}
+                        onClick={() => navigate('/gp-daily/manage-my-subscription')}
                         disabled={isCancelling}
                         className="flex-1 py-4 rounded-[18px] bg-[#FAA222] text-gray-900 font-semibold text-sm hover:bg-[#E8911F] transition-colors shadow-sm disabled:opacity-70"
                     >

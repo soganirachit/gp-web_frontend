@@ -67,7 +67,7 @@ const PausedSubscriptionLanding: React.FC = () => {
           transition={{ delay: 0.4 }}
         >
           <button
-            onClick={() => navigate('/manage-my-subscription')}
+            onClick={() => navigate('/gp-daily/manage-my-subscription')}
             className="w-full bg-[#FAA222] text-gray-900 py-4 rounded-[20px] font-semibold text-sm hover:bg-[#E8911F] transition-colors shadow-sm"
           >
             View Subscription
@@ -82,7 +82,7 @@ const PausedSubscriptionLanding: React.FC = () => {
           transition={{ delay: 0.5 }}
         >
           <button
-            onClick={() => navigate('/Products')}
+            onClick={() => navigate('/gp-daily/Products')}
             className="text-gray-800 text-sm font-medium hover:text-gray-600 transition-colors"
           >
             Explore Other Packs

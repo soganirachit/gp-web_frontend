@@ -1,20 +1,28 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { IoArrowBack } from "react-icons/io5";
 import { productService } from "../../services/product.service";
 import type { Product } from "../../services/product.service";
 import { basePackService, BasePack } from "../../services/basepack.service";
+import { storeProductService, Product as StoreProduct } from "../../services/storeProduct.service";
+import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import ProductCard from "../common/ProductCard";
 import BottomNavigation from "../layout/BottomNav";
 import Spinner from "../common/Spinner";
 
 const ExploreMore: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const category = searchParams.get("category") || "";
   const section = searchParams.get("section") || "";
   
+  const { feature, basePath } = useFeatureTheme();
+  const activeFeature = feature;
+  const activeBasePath = basePath;
+  
   const [products, setProducts] = useState<Product[]>([]);
+  const [storeProducts, setStoreProducts] = useState<StoreProduct[]>([]);
   const [basePacks, setBasePacks] = useState<BasePack[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,8 +37,12 @@ const ExploreMore: React.FC = () => {
     return imagesUrl;
   };
 
-  const handleProductClick = (product: Product | BasePack) => {
-    navigate(`/product/${product.id}`, { state: { product } });
+  const handleProductClick = (product: Product | BasePack | StoreProduct) => {
+    if (activeFeature === "gpStore") {
+      navigate(`/gp-store/product/${product.id}`, { state: { product } });
+    } else {
+      navigate(`/gp-daily/product/${product.id}`, { state: { product } });
+    }
   };
 
   // Fetch data
@@ -40,14 +52,20 @@ const ExploreMore: React.FC = () => {
         setIsLoading(true);
         setError(null);
         
-        const [productsResult, basePacksResult] = await Promise.all([
-          productService.getAllProducts(),
-          basePackService.getAllBasePacks().catch(() => [])
-        ]);
+        if (activeFeature === "gpStore") {
+          const storeProductsResult = await storeProductService.getAllStoreProducts();
+          const activeStoreProducts = storeProductsResult.filter((item: StoreProduct) => item.isAvailable);
+          setStoreProducts(activeStoreProducts);
+        } else {
+          const [productsResult, basePacksResult] = await Promise.all([
+            productService.getAllProducts(),
+            basePackService.getAllBasePacks().catch(() => [])
+          ]);
 
-        const activeProducts = productsResult.filter((item: Product) => item.isActive);
-        setProducts(activeProducts);
-        setBasePacks(basePacksResult);
+          const activeProducts = productsResult.filter((item: Product) => item.isActive);
+          setProducts(activeProducts);
+          setBasePacks(basePacksResult);
+        }
       } catch (error) {
         console.error("Error fetching data:", error);
         setError("Failed to load products");
@@ -57,10 +75,28 @@ const ExploreMore: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [activeFeature]);
 
   // Filter products based on category and section
-  const getFilteredProducts = (): (Product | BasePack)[] => {
+  const getFilteredProducts = (): (Product | BasePack | StoreProduct)[] => {
+    if (activeFeature === "gpStore") {
+      // For GP Store, filter store products
+      const categoryUpper = category.toUpperCase();
+      const sectionUpper = section.toUpperCase();
+      
+      if (categoryUpper === "BEST" || sectionUpper === "BEST") {
+        return storeProducts.slice(0, 10); // Return first 10 for "Best"
+      }
+      
+      if (categoryUpper === "PREMIUM" || sectionUpper === "PREMIUM PACKS") {
+        return storeProducts.slice(3, 13); // Return products after first 3 for "Premium Packs"
+      }
+      
+      // Default: return all store products
+      return storeProducts;
+    }
+    
+    // GP Daily filtering logic
     if (section === "Puja Packs") {
       return basePacks;
     }
@@ -139,14 +175,14 @@ const ExploreMore: React.FC = () => {
             >
               <IoArrowBack className="text-xl text-gray-800" />
             </button>
-            <h1 className="text-2xl font-semibold text-gray-800">{getPageTitle()}</h1>
+            <h1 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">{getPageTitle()}</h1>
           </div>
         </div>
 
         {/* Content */}
         <div className="px-4 py-6">
           {isLoading ? (
-            <div className="flex justify-center items-center h-40">
+            <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
               <Spinner size={400} />
             </div>
           ) : error ? (
@@ -156,19 +192,24 @@ const ExploreMore: React.FC = () => {
           ) : (
             <>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                {displayedProducts.map((item, index) => (
-                  <div key={item.id} className="flex-shrink-0">
-                    <ProductCard
-                      imageUrl={getImageUrl(item.imagesUrl || (item as BasePack).imagesUrl)}
-                      packName={item.name}
-                      description={item.description || "Mixed flowers daily"}
-                      price={`₹${item.sellingPrice}/Day`}
-                      showDailyButton={true}
-                      showBestsellerTag={index === 0 || index === 2}
-                      onClick={() => handleProductClick(item)}
-                    />
-                  </div>
-                ))}
+                {displayedProducts.map((item, index) => {
+                  const priceUnit = activeFeature === "gpStore" 
+                    ? (item.type === "LEAVES" ? "kg" : "box")
+                    : "Day";
+                  return (
+                    <div key={item.id} className="flex-shrink-0">
+                      <ProductCard
+                        imageUrl={getImageUrl(item.imagesUrl || (item as BasePack).imagesUrl)}
+                        packName={item.name}
+                        description={item.description || "Mixed flowers daily"}
+                        price={`₹${item.sellingPrice}/${priceUnit}`}
+                        showDailyButton={true}
+                        showBestsellerTag={index === 0 || index === 2}
+                        onClick={() => handleProductClick(item)}
+                      />
+                    </div>
+                  );
+                })}
               </div>
               
               {filteredProducts.length === 0 && (

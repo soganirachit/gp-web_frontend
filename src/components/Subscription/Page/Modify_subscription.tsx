@@ -167,7 +167,7 @@ const ModifySubscription: React.FC = () => {
       });
 
       toast.success("Subscription updated successfully!");
-      navigate('/manage-my-subscription');
+      navigate('/gp-daily/manage-my-subscription');
     } catch (error: any) {
       console.error("Error updating subscription:", error);
       toast.error(error.message || "Failed to update subscription");
@@ -181,7 +181,7 @@ const ModifySubscription: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-[#FFFBEB]">
         <div className="text-center">
           <p className="text-gray-600 mb-4">No subscription data found.</p>
-          <button onClick={() => navigate('/manage-my-subscription')} className="text-blue-600 underline">
+          <button onClick={() => navigate('/gp-daily/manage-my-subscription')} className="text-blue-600 underline">
             Go Back
           </button>
         </div>

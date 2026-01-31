@@ -75,7 +75,7 @@ const StoreProductsPages: React.FC = () => {
   }, []);
 
   const handleProductClick = (product: Product | storeProducts ) => {
-    navigate(`/store/${product.id}`, { state: { product } });
+    navigate(`/gp-store/${product.id}`, { state: { product } });
   };
 
   return (
@@ -222,7 +222,7 @@ const StoreProductsPages: React.FC = () => {
         {/* Content */}
         <div className="px-8 pb-20">
           {isLoading ? (
-            <div className="flex justify-center items-center h-40">
+            <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
               <Spinner size={400} />
             </div>
           ) : error ? (

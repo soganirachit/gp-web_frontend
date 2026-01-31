@@ -13,9 +13,12 @@ import homeIcon from '../../assets/svg/adressbook/home.svg';
 import workIcon from '../../assets/svg/adressbook/office.svg';
 import othersIcon from '../../assets/svg/adressbook/others.svg';
 import defaultIcon from '../../assets/svg/adressbook/default.svg';
+import { useFeatureTheme } from '../../context/FeatureThemeContext';
 
 const Addresses: React.FC = () => {
   const navigate = useNavigate();
+  const { theme, feature } = useFeatureTheme();
+  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +39,7 @@ const Addresses: React.FC = () => {
     } catch (err: any) {
       setError(err.message || 'Failed to load addresses');
       if (err.message?.includes('login')) {
-        navigate('/login');
+        navigate(`${basePath}/login`);
       }
     } finally {
       setLoading(false);
@@ -48,7 +51,7 @@ const Addresses: React.FC = () => {
   }, [navigate]);
 
   const handleEdit = (address: Address) => {
-    navigate('/addresses/edit', { state: { address } });
+    navigate(`${basePath}/addresses/edit`, { state: { address } });
   };
 
   const handleDeleteClick = (id: string) => {
@@ -78,7 +81,7 @@ const Addresses: React.FC = () => {
     } catch (error: any) {
       setError(error.message || 'Failed to set default address');
       if (error.message.includes('login')) {
-        navigate('/login', { state: { returnUrl: location.pathname } });
+        navigate(`${basePath}/login`, { state: { returnUrl: location.pathname } });
       }
     } finally {
       setActionInProgress(false);
@@ -143,7 +146,8 @@ const Addresses: React.FC = () => {
               <p className="text-red-500 mb-4">{error}</p>
               <button
                 onClick={loadAddresses}
-                className="text-[#015D3A] font-medium hover:underline"
+                  className="font-medium hover:underline"
+                  style={{ color: theme.colors.primary }}
               >
                 Try Again
               </button>
@@ -154,8 +158,9 @@ const Addresses: React.FC = () => {
                 <div className="text-center py-8">
                   <p className="text-gray-600 mb-4">No addresses found</p>
                   <button
-                    onClick={() => navigate('/addresses/add')}
-                    className="text-[#015D3A] font-medium hover:underline"
+                    onClick={() => navigate(`${basePath}/addresses/add`)}
+                    className="font-medium hover:underline"
+                    style={{ color: theme.colors.primary }}
                   >
                     Add your first address
                   </button>
@@ -256,9 +261,13 @@ const Addresses: React.FC = () => {
 
               {/* Add New Address Button */}
               <button
-                onClick={() => navigate('/addresses/add')}
+                onClick={() => navigate(`${basePath}/addresses/add`)}
                 disabled={actionInProgress}
-                className="w-full flex items-center justify-center gap-2 bg-[#F9A11D] text-gray-900 py-3.5 rounded-[20px] text-base font-semibold hover:opacity-90 disabled:opacity-50 mb-8 shadow-sm"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-[20px] text-base font-semibold hover:opacity-90 disabled:opacity-50 mb-8 shadow-sm"
+                style={{ 
+                  backgroundColor: theme.colors.primary,
+                  color: feature === 'gpStore' ? 'white' : 'black'
+                }}
               >
                 <span className="text-xl font-light">+</span>
                 Add New Address

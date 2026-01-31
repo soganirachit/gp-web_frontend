@@ -4,9 +4,12 @@ import { motion } from "framer-motion";
 import { authService } from "../../../../services/auth.service";
 import { toast } from "react-hot-toast";
 import { FaStar, FaRedo, FaHeadset, FaTag } from "react-icons/fa";
+import { useFeatureTheme } from "../../../../context/FeatureThemeContext";
 
 const NameInput: React.FC = () => {
   const navigate = useNavigate();
+  const { feature, theme } = useFeatureTheme();
+  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -53,7 +56,7 @@ const NameInput: React.FC = () => {
 
       if (!token || !phoneNumber) {
         toast.error("Authentication required. Please login again.");
-        navigate("/login");
+        navigate(`${basePath}/login`);
         return;
       }
 
@@ -84,10 +87,10 @@ const NameInput: React.FC = () => {
               : "")
         );
 
-        navigate("/location", {
+        navigate(`${basePath}/location`, {
           state: {
             fromNameInput: true,
-            returnUrl: "/",
+            returnUrl: basePath,
           },
         });
       } else {
@@ -147,7 +150,10 @@ const NameInput: React.FC = () => {
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="Enter your first name"
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FAA222] transition-colors"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg transition-colors"
+                style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
+                onFocus={(e) => e.target.style.borderColor = theme.colors.primary}
+                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
               />
             </div>
 
@@ -158,7 +164,10 @@ const NameInput: React.FC = () => {
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="Enter your last name"
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FAA222] transition-colors"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg transition-colors"
+                style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
+                onFocus={(e) => e.target.style.borderColor = theme.colors.primary}
+                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
               />
             </div>
 
@@ -171,7 +180,10 @@ const NameInput: React.FC = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your.email@gmail.com"
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FAA222] transition-colors"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg transition-colors"
+                style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
+                onFocus={(e) => e.target.style.borderColor = theme.colors.primary}
+                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
               />
             </div>
 
@@ -194,10 +206,11 @@ const NameInput: React.FC = () => {
                       onChange={() =>
                         setGender(option.value as "male" | "female" | "other")
                       }
-                      className="appearance-none w-5 h-5 border-2 border-gray-300 rounded-full checked:border-[#FAA222] transition-colors"
+                      className="appearance-none w-5 h-5 border-2 border-gray-300 rounded-full transition-colors"
+                      style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
                     />
                     {gender === option.value && (
-                      <div className="absolute w-3 h-3 bg-[#FAA222] rounded-full" />
+                      <div className="absolute w-3 h-3 rounded-full" style={{ backgroundColor: theme.colors.primary }} />
                     )}
                   </div>
                   <span className="text-gray-700">{option.label}</span>
@@ -217,7 +230,10 @@ const NameInput: React.FC = () => {
                   value={customGender}
                   onChange={(e) => setCustomGender(e.target.value)}
                   placeholder="Enter your gender"
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#FAA222] transition-colors"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg transition-colors"
+                style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
+                onFocus={(e) => e.target.style.borderColor = theme.colors.primary}
+                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
                 />
               </motion.div>
             )}
@@ -230,7 +246,8 @@ const NameInput: React.FC = () => {
             whileTap={{ scale: 0.98 }}
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="w-full py-3.5 bg-[#FAA222] text-white rounded-xl font-medium hover:bg-[#E8911F] transition-colors"
+            className="w-full py-3.5 text-white rounded-xl font-medium transition-colors"
+            style={{ backgroundColor: theme.colors.primary }}
           >
             {isSubmitting ? (
               <motion.div

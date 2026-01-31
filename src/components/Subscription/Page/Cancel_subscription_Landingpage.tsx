@@ -15,14 +15,14 @@ const CancelSubscriptionLanding: React.FC = () => {
   // If no subscription provided, go back (safety check)
   React.useEffect(() => {
     if (!subscription) {
-      navigate('/manage-my-subscription');
+      navigate('/gp-daily/manage-my-subscription');
     }
   }, [subscription, navigate]);
 
   const handleProceedToReason = () => {
     if (!subscription) return;
     // Navigate to Reason page to capture reason and confirm cancellation there
-    navigate('/cancel-subscription-reason', { state: { subscription } });
+    navigate('/gp-daily/cancel-subscription-reason', { state: { subscription } });
   };
 
   return (
@@ -95,7 +95,7 @@ const CancelSubscriptionLanding: React.FC = () => {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => navigate('/pause-subscription', { state: { subscription } })}
+            onClick={() => navigate('/gp-daily/pause-subscription', { state: { subscription } })}
             className="w-full bg-[rgb(250,162,34)] text-gray-900 py-3 rounded-2xl font-semibold hover:opacity-90 transition-opacity text-sm"
           >
             Pause Instead of Canceling
@@ -112,7 +112,7 @@ const CancelSubscriptionLanding: React.FC = () => {
         >
           <div
             className="flex items-center cursor-pointer"
-            onClick={() => navigate('/modify-subscription', { state: { subscription } })}
+            onClick={() => navigate('/gp-daily/modify-subscription', { state: { subscription } })}
           >
             <span className="mr-3 flex-shrink-0">
               <img src={modifySvg} alt="Modify" className="w-5 h-5" />
@@ -143,7 +143,7 @@ const CancelSubscriptionLanding: React.FC = () => {
             Cancel Subscription
           </button>
           <button
-            onClick={() => navigate('/Products')}
+            onClick={() => navigate('/gp-daily/Products')}
             className="flex-1 border-2 py-3 rounded-[20px] font-semibold text-m bg-[rgb(250,162,34)] border-[rgb(250,162,34)] active:bg-[rgb(250,162,34)] text-gray-900 active:border-[rgb(250,162,34)] transition-colors"
           >
             Explore Packs

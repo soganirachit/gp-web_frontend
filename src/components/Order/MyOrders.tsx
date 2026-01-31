@@ -116,10 +116,10 @@ const MyOrders: React.FC = () => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-4 pb-24">
+        <div className="flex-1 px-4 pb-24 relative">
           {loading ? (
-            <div className="flex justify-center pt-20">
-              <Spinner size={40} />
+            <div className="absolute inset-0 bg-[#FFFBEB] flex items-center justify-center">
+              <Spinner size={400} />
             </div>
           ) : filteredOrders.length > 0 ? (
             <div className="space-y-4">

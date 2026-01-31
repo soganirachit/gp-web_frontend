@@ -15,8 +15,9 @@ import logo from "../../assets/All/logo.png";
 import Spinner from "../common/Spinner";
 import { IoArrowBack } from "react-icons/io5";
 import BottomNav from "../layout/BottomNav";
-import cautionIcon from "../../assets/svg/dp_daily svg/caution.svg";
-import deliveryTruckIcon from "../../assets/svg/dp_daily svg/delivery_truck.svg";
+import cautionIcon from "../../assets/svg/gp_daily svg/caution.svg";
+import deliveryTruckIcon from "../../assets/svg/gp_daily svg/delivery_truck.svg";
+import { useFeatureTheme } from "../../context/FeatureThemeContext";
 
 // Add interface for content items
 // interface ContentItem {
@@ -160,6 +161,8 @@ const ExistingSubscriptionModal: React.FC<ExistingSubscriptionModalProps> = ({
 const ProductPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { feature, theme } = useFeatureTheme();
+  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
 
   // Add quantity state
   const [quantity, setQuantity] = useState(1);
@@ -227,9 +230,9 @@ const ProductPage: React.FC = () => {
 
       const token = localStorage.getItem("token");
       if (!token) {
-        navigate("/login", {
+        navigate(`${basePath}/login`, {
           state: {
-            returnUrl: `/product/${id}`,
+            returnUrl: `${basePath}/product/${id}`,
           },
         });
         return;
@@ -273,9 +276,9 @@ const ProductPage: React.FC = () => {
     } catch (error: any) {
       if (error.message === "Session expired. Please login again.") {
         localStorage.removeItem("token");
-        navigate("/login", {
+        navigate(`${basePath}/login`, {
           state: {
-            returnUrl: `/product/${id}`,
+            returnUrl: `${basePath}/product/${id}`,
           },
         });
       } else {
@@ -409,9 +412,9 @@ const ProductPage: React.FC = () => {
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error("Please login to continue");
-        navigate("/login", {
+        navigate(`${basePath}/login`, {
           state: {
-            returnUrl: `/product/${id}`,
+            returnUrl: `${basePath}/product/${id}`,
           },
         });
         return;
@@ -493,7 +496,7 @@ const ProductPage: React.FC = () => {
       );
 
       // Navigate to address selection with subscription details
-      navigate("/address-selection", {
+      navigate(`${basePath}/address-selection`, {
         state: {
           subscriptionDetails,
           basePackId: id,
@@ -509,8 +512,8 @@ const ProductPage: React.FC = () => {
           localStorage.removeItem("token");
         }
         toast.error(error.message || "Please login to continue");
-        navigate("/login", {
-          state: { returnUrl: `/product/${id}` },
+        navigate(`${basePath}/login`, {
+          state: { returnUrl: `${basePath}/product/${id}` },
         });
         return;
       }
@@ -523,7 +526,7 @@ const ProductPage: React.FC = () => {
 
   const handleRechargeWallet = () => {
     setShowInsufficientBalanceModal(false);
-    navigate("/wallet", {
+    navigate(`${basePath}/wallet`, {
       state: {
         requiredAmount: balanceDetails.shortageAmount,
         currentBalance: balanceDetails.currentBalance,
@@ -538,7 +541,7 @@ const ProductPage: React.FC = () => {
 
   const handleViewSubscription = () => {
     setShowExistingSubscriptionModal(false);
-    navigate("/subscriptions");
+    navigate(`${basePath}/manage-my-subscription`);
   };
 
   // Add handler for day selection
@@ -557,7 +560,7 @@ const ProductPage: React.FC = () => {
 
   // Add function to handle product click
   const handleProductClick = (item: GarlandProduct | BasePack | Product) => {
-    navigate(`/product/${item.id}`);
+    navigate(`${basePath}/product/${item.id}`);
   };
 
   // Update the fetchGarlandProducts function
@@ -580,7 +583,7 @@ const ProductPage: React.FC = () => {
 
   if (loading || isCheckingBalance) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
@@ -593,7 +596,7 @@ const ProductPage: React.FC = () => {
           {error || "Product not found"}
         </div>
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate(basePath)}
           className="text-green-500 hover:text-green-600"
         >
           Return to Home

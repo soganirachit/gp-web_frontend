@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
-import faqIcon from '../../assets/svg/faq.svg';
-import faqUpIcon from '../../assets/svg/faqup.svg';
+import { useFeatureTheme } from '../../context/FeatureThemeContext';
 
 interface FAQItem {
   id: string;
@@ -18,6 +17,7 @@ interface FAQSection {
 const FAQ: React.FC = () => {
   const navigate = useNavigate();
   const [expandedFAQ, setExpandedFAQ] = useState<string>('faq-1-1'); // First FAQ expanded by default
+  const { theme } = useFeatureTheme();
 
   const faqSections: FAQSection[] = [
     {
@@ -121,7 +121,10 @@ const FAQ: React.FC = () => {
             <div key={sectionIndex}>
               {/* Section Header */}
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-1 h-6 bg-[#FAA222] rounded-full"></div>
+                <div
+                  className="w-1 h-6 rounded-full"
+                  style={{ backgroundColor: theme.colors.primary }}
+                ></div>
                 <h2 className="text-lg font-semibold text-gray-800">
                   {section.title}
                 </h2>
@@ -145,9 +148,9 @@ const FAQ: React.FC = () => {
                         </span>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {isExpanded ? (
-                            <img src={faqUpIcon} alt="Up" className="w-4 h-4 flex-shrink-0" />
+                            <img src={theme.assets.faqUpIcon} alt="Up" className="w-4 h-4 flex-shrink-0" />
                           ) : (
-                            <img src={faqIcon} alt="FAQ" className="w-4 h-4 flex-shrink-0" />
+                            <img src={theme.assets.faqIcon} alt="FAQ" className="w-4 h-4 flex-shrink-0" />
                           )}
                         </div>
                       </button>

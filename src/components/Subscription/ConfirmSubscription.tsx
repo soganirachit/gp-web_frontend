@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaMapMarkerAlt, FaCheck, FaClock, FaBox, FaRupeeSign } from "react-icons/fa";
-import ordercnfSvg from "../../assets/svg/dp_daily svg/ordercnf.svg";
-import flowerCnfSvg from "../../assets/svg/dp_daily svg/flower_cnf.svg";
-import paycnfSvg from "../../assets/svg/dp_daily svg/paycnf.svg";
-import clockSvg from "../../assets/svg/dp_daily svg/clock.svg";
-import savingsCnfSvg from "../../assets/svg/dp_daily svg/savings_cnf.svg";
+import ordercnfSvg from "../../assets/svg/gp_daily svg/ordercnf.svg";
+import flowerCnfSvg from "../../assets/svg/gp_daily svg/flower_cnf.svg";
+import paycnfSvg from "../../assets/svg/gp_daily svg/paycnf.svg";
+import clockSvg from "../../assets/svg/gp_daily svg/clock.svg";
+import savingsCnfSvg from "../../assets/svg/gp_daily svg/savings_cnf.svg";
 import allsetLogo from "../../assets/All/allset_logo.png";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
@@ -17,6 +17,7 @@ import BottomNavigation from "../layout/BottomNav";
 import { customerService } from "@/services/getcustomer.service";
 import { orderService } from "@/services/order.service";
 import RazorpayPayment from "../Payment/Rezorpay/RezorpayPayment";
+import { useFeatureTheme } from "../../context/FeatureThemeContext";
 
 interface SubscriptionDetails {
   basePackId: string;
@@ -76,6 +77,7 @@ interface Address {
 
 interface MapViewProps {
   address: Address | null;
+  themeColor?: string;
 }
 
 interface UserData {
@@ -317,13 +319,13 @@ const SuccessCheckmark = () => (
   </motion.div>
 );
 
-const MapView: React.FC<MapViewProps> = ({ address }) => {
+const MapView: React.FC<MapViewProps> = ({ address, themeColor = "#F15A22" }) => {
   const { isLoaded, loadError } = useGoogleMaps();
 
   if (!isLoaded) {
     return (
       <div className="w-full h-[250px] bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#F15A22]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2" style={{ borderColor: themeColor }}></div>
       </div>
     );
   }
@@ -369,7 +371,7 @@ const MapView: React.FC<MapViewProps> = ({ address }) => {
         }}
       >
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
-          <MdLocationOn className="text-[#F15A22] text-4xl drop-shadow-lg" />
+          <MdLocationOn className="text-4xl drop-shadow-lg" style={{ color: themeColor }} />
         </div>
       </GoogleMap>
       {/* Overlay to prevent any map interactions */}
@@ -381,6 +383,8 @@ const MapView: React.FC<MapViewProps> = ({ address }) => {
 const ConfirmSubscription: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { feature, theme } = useFeatureTheme();
+  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   // const locationState = location.state as LocationState;
   const [loading, setLoading] = useState(false);
   const [subscriptionDetails, setSubscriptionDetails] =
@@ -475,7 +479,7 @@ const ConfirmSubscription: React.FC = () => {
         if (!details && !isStoreProduct) {
           console.error("No subscription details found");
           toast.error("No subscription details found");
-          navigate("/");
+          navigate(basePath);
           return;
         }
 
@@ -513,7 +517,7 @@ const ConfirmSubscription: React.FC = () => {
               normalizedDetails
             );
             toast.error("Invalid subscription details");
-            navigate("/");
+            navigate(basePath);
             return;
           }
 
@@ -545,7 +549,7 @@ const ConfirmSubscription: React.FC = () => {
           // console.log('Selected address:', addressToUse);
 
           if (!addressToUse && !isStoreProduct) {
-            navigate("/subscription/confirm", {
+            navigate(`${basePath}/subscription/confirm`, {
               state: {
                 selectedAddress: address,
                 basePackId: normalizedDetails.basePackId,
@@ -560,11 +564,11 @@ const ConfirmSubscription: React.FC = () => {
           }
         } catch (error) {
           console.error("Error processing subscription details:", error);
-          navigate("/");
+          navigate(basePath);
         }
       } catch (error: any) {
         console.error("Error in loadData:", error);
-        navigate("/");
+        navigate(basePath);
       }
     };
 
@@ -694,17 +698,17 @@ const ConfirmSubscription: React.FC = () => {
           toast.error(
             "You already have an active subscription at this address"
           );
-          navigate("/");
+          navigate(basePath);
         } else if (errorMessage.includes("Authentication required")) {
           toast.error("Please login to continue");
-          navigate("/login", {
-            state: { returnUrl: "/subscription/confirm" },
+          navigate(`${basePath}/login`, {
+            state: { returnUrl: `${basePath}/subscription/confirm` },
           });
         } else if (errorMessage.includes("Insufficient wallet balance")) {
           toast.error("Insufficient wallet balance");
-          navigate("/wallet", {
+          navigate(`${basePath}/wallet`, {
             state: {
-              returnUrl: "/subscription/confirm",
+              returnUrl: `${basePath}/subscription/confirm`,
               requiredAmount: subscriptionDetails.amount,
             },
           });
@@ -1021,7 +1025,7 @@ const ConfirmSubscription: React.FC = () => {
                   disabled={isProcessingPayment}
                 />
                 <button
-                  onClick={() => navigate("/")}
+                  onClick={() => navigate(basePath)}
                   className="w-full text-[#015D3A] text-[15px] mt-3 font-medium hover:opacity-80 transition-opacity"
                 >
                   Back to Home
@@ -1032,12 +1036,13 @@ const ConfirmSubscription: React.FC = () => {
                 <button
                   onClick={handleConfirm}
                   disabled={loading}
-                  className="w-full bg-[#F15A22] text-white py-3.5 rounded-full text-[15px] font-medium mb-3 hover:bg-[#E04D15] transition-colors disabled:opacity-50"
+                  className="w-full text-white py-3.5 rounded-full text-[15px] font-medium mb-3 hover:opacity-90 transition-colors disabled:opacity-50"
+                  style={{ backgroundColor: theme.colors.primary }}
                 >
                   {loading ? "Confirming..." : "Confirm Subscription"}
                 </button>
                 <button
-                  onClick={() => navigate("/")}
+                  onClick={() => navigate(basePath)}
                   className="w-full text-[#015D3A] text-[15px] mt-3 font-medium hover:opacity-80 transition-opacity"
                 >
                   Back to Home
@@ -1098,7 +1103,7 @@ const ConfirmSubscription: React.FC = () => {
                     state: confirmedSubscriptionData.address.state || '',
                     pincode: confirmedSubscriptionData.address.pincode || '',
                     coordinates: confirmedSubscriptionData.address.coordinates
-                  } : null)} />
+                  } : null)} themeColor={theme.colors.primary} />
                 </div>
               </div>
 
@@ -1166,9 +1171,10 @@ const ConfirmSubscription: React.FC = () => {
                         key={day}
                         className={`flex-1 py-2 rounded-2xl text-sm font-semibold transition-colors ${
                           isSelected
-                            ? 'bg-[rgb(250,162,34)] text-black'
+                            ? 'text-black'
                             : 'bg-gray-100 text-gray-700 border-2 border-gray-300'
                         }`}
+                        style={isSelected ? { backgroundColor: theme.colors.primary } : {}}
                         disabled
                       >
                         {day}
@@ -1205,7 +1211,8 @@ const ConfirmSubscription: React.FC = () => {
 
             {/* Savings Banner */}
             <motion.div
-              className="bg-[rgb(250,162,34)] bg-opacity-20 rounded-xl mx-4 p-4 mb-4 flex items-center justify-center relative overflow-hidden min-h-[80px]"
+              className="bg-opacity-20 rounded-xl mx-4 p-4 mb-4 flex items-center justify-center relative overflow-hidden min-h-[80px]"
+              style={{ backgroundColor: `${theme.colors.primary}33` }}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.1 }}
@@ -1240,8 +1247,9 @@ const ConfirmSubscription: React.FC = () => {
               transition={{ delay: 1.3 }}
             >
               <button
-                onClick={() => navigate('/manage-my-subscription')}
-                className="w-full bg-[rgb(250,162,34)] text-grey-900 py-3.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+                onClick={() => navigate(`${basePath}/manage-my-subscription`)}
+                className="w-full text-grey-900 py-3.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: theme.colors.primary }}
               >
                 View My Subscription
               </button>

@@ -13,10 +13,13 @@ import { orderService } from "../../services/order.service";
 import { subscriptionService } from "../../services/subscription.service";
 import { customerService } from "../../services/getcustomer.service";
 import { FaPen } from "react-icons/fa";
+import { useFeatureTheme } from "../../context/FeatureThemeContext";
 
 const AddressSelection: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { feature, theme } = useFeatureTheme();
+  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const [loading, setLoading] = useState(true);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
@@ -89,7 +92,7 @@ const AddressSelection: React.FC = () => {
     if (isAuthError) {
       localStorage.setItem("redirectAfterLogin", location.pathname);
       localStorage.removeItem("selectedDeliveryAddress");
-      navigate("/login", {
+      navigate(`${basePath}/login`, {
         state: {
           returnUrl: location.pathname,
           message: error.message,
@@ -513,7 +516,7 @@ const AddressSelection: React.FC = () => {
               }));
 
               // Navigate directly to thank you page
-              navigate("/subscription/confirm", {
+              navigate(`${basePath}/subscription/confirm`, {
                 state: {
                   isConfirmed: true,
                   isStoreProduct: true,
@@ -570,7 +573,7 @@ const AddressSelection: React.FC = () => {
       const subscriptionData = localStorage.getItem("currentSubscription");
       if (!subscriptionData) {
         toast.error("Subscription details not found. Please try again.");
-        navigate("/");
+        navigate(basePath);
         return;
       }
 
@@ -660,7 +663,7 @@ const AddressSelection: React.FC = () => {
           toast.success("Subscription confirmed successfully!");
 
           // Navigate to ConfirmSubscription.tsx to show thank you page
-          navigate("/subscription/confirm", {
+          navigate(`${basePath}/subscription/confirm`, {
             state: {
               isConfirmed: true,
               isStoreProduct: false,
@@ -689,17 +692,17 @@ const AddressSelection: React.FC = () => {
           toast.error(
             "You already have an active subscription at this address"
           );
-          navigate("/");
+          navigate(basePath);
         } else if (errorMessage.includes("Authentication required")) {
           toast.error("Please login to continue");
-          navigate("/login", {
-            state: { returnUrl: "/subscription/confirm" },
+          navigate(`${basePath}/login`, {
+            state: { returnUrl: `${basePath}/subscription/confirm` },
           });
         } else if (errorMessage.includes("Insufficient wallet balance")) {
           toast.error("Insufficient wallet balance");
-          navigate("/wallet", {
+          navigate(`${basePath}/wallet`, {
             state: {
-              returnUrl: "/subscription/confirm",
+              returnUrl: `${basePath}/subscription/confirm`,
               requiredAmount: parsedData.amount,
             },
           });
@@ -1039,7 +1042,7 @@ const AddressSelection: React.FC = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate('/addresses/edit', { state: { address } });
+                              navigate(`${basePath}/addresses/edit`, { state: { address } });
                             }}
                             className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 bg-white flex items-center gap-2"
                           >
@@ -1090,8 +1093,9 @@ const AddressSelection: React.FC = () => {
             <div className="mt-auto pt-4 md:relative md:bg-transparent md:p-0">
               <div className="max-w-[800px] mx-auto space-y-3">
                 <button
-                  onClick={() => navigate('/addresses/add')}
-                  className="w-full flex items-center justify-center gap-2 bg-[#F9A11D] text-gray-900 py-4 rounded-xl text-base font-semibold hover:opacity-90 shadow-sm"
+                  onClick={() => navigate(`${basePath}/addresses/add`)}
+                  className="w-full flex items-center justify-center gap-2 text-gray-900 py-4 rounded-xl text-base font-semibold hover:opacity-90 shadow-sm"
+                  style={{ backgroundColor: theme.colors.primary }}
                 >
                   <span className="text-2xl font-semibold">+</span>
                   Add New Address
@@ -1101,9 +1105,10 @@ const AddressSelection: React.FC = () => {
                   onClick={handleContinue}
                   disabled={!selectedAddress || loading}
                   className={`w-full py-4 rounded-xl text-base font-semibold text-gray-900 shadow-sm ${selectedAddress && !loading
-                    ? 'bg-[#F9A11D] hover:opacity-90'
+                    ? 'hover:opacity-90'
                     : 'bg-gray-300 cursor-not-allowed'
                     }`}
+                  style={selectedAddress && !loading ? { backgroundColor: theme.colors.primary } : {}}
                 >
                   {loading ? 'Processing...' : 'Continue & Pay'}
                 </button>

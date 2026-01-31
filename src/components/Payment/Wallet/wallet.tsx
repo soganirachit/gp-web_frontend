@@ -16,9 +16,9 @@ import BottomNav from "../../layout/BottomNav";
 import { TransactionType } from "@/interfaces";
 import { format, parseISO } from "date-fns";
 import { INR } from "@/components/constants";
-import lowbalanceIcon from "../../../assets/svg/lowbalance.svg";
-import depositIcon from "../../../assets/svg/deposit.svg";
-import enableIcon from "../../../assets/svg/enable.svg";
+import lowbalanceIcon from "../../../assets/svg/gp_daily svg/lowbalance.svg";
+import depositIcon from "../../../assets/svg/gp_daily svg/deposit.svg";
+import enableIcon from "../../../assets/svg/gp_daily svg/enable.svg";
 import Spinner from "../../common/Spinner";
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];

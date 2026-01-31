@@ -19,9 +19,9 @@ import garlandSvg from '../assets/svg/garland.svg';
 import bannerSvg from '../assets/svg/banner.svg';
 import bottomBannerSvg from '../assets/svg/bottom_banner.svg';
 import logoSvg from '../assets/svg/logo.svg';
-import profilehomeIcon from '../assets/svg/dp_daily svg/profilehome.svg';
-import profilelogoIcon from '../assets/svg/dp_daily svg/profilelogo.svg';
-import locationhomeIcon from '../assets/svg/dp_daily svg/locationhome.svg';
+import profilehomeIcon from '../assets/svg/gp_daily svg/profilehome.svg';
+import profilelogoIcon from '../assets/svg/gp_daily svg/profilelogo.svg';
+import locationhomeIcon from '../assets/svg/gp_daily svg/locationhome.svg';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -114,7 +114,7 @@ const HomePage: React.FC = () => {
                 src={profilehomeIcon}
                 alt="Profile"
                 className=" absolute inset-0 w-12 h-12 object-contain cursor-pointer self-center justify-self-center"
-                onClick={() => navigate("/Account")}
+                onClick={() => navigate("/gp-daily/account")}
               />
               <img
                 src={profilelogoIcon}
@@ -210,7 +210,7 @@ const HomePage: React.FC = () => {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, delay: 0.2 }}
               className="bg-[#E8F5E9] rounded-2xl p-2 sm:p-3 cursor-pointer hover:shadow-lg transition-shadow relative overflow-visible min-h-0"
-              onClick={() => navigate('/store', { state: { mode: 'store' } })}
+              onClick={() => navigate('/gp-store', { state: { mode: 'store' } })}
             >
               <div className="flex flex-col h-full">
                 {/* Top Section: Truck and Logo with overlap */}

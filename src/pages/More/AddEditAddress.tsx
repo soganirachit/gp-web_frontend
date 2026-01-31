@@ -8,9 +8,12 @@ import { GoogleMap, Autocomplete } from '@react-google-maps/api';
 import { useGoogleMaps } from '../../hooks/useGoogleMaps';
 
 import { customerService } from '../../services/getcustomer.service';
+import { useFeatureTheme } from '../../context/FeatureThemeContext';
 
 const AddEditAddress: React.FC = () => {
   const navigate = useNavigate();
+  const { feature, theme } = useFeatureTheme();
+  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const location = useLocation();
   const isEdit = location.pathname.includes('edit');
   const existingAddress = location.state?.address as Address | undefined;
@@ -199,7 +202,7 @@ const AddEditAddress: React.FC = () => {
         await addressService.createAddress(addressData);
         toast.success('Address added successfully');
       }
-      navigate(-1);
+      navigate(`${basePath}/addresses`);
     } catch (error) {
       console.error('Failed to save address:', error);
       toast.error(isEdit ? 'Failed to update address' : 'Failed to add address');
@@ -337,7 +340,8 @@ const AddEditAddress: React.FC = () => {
         </div>
         <button
           onClick={() => window.location.reload()}
-          className="bg-orange-500 text-white px-4 py-2 rounded-lg"
+          className="text-white px-4 py-2 rounded-lg"
+          style={{ backgroundColor: theme.colors.primary }}
         >
           Retry
         </button>
@@ -349,7 +353,7 @@ const AddEditAddress: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 mx-auto mb-4" style={{ borderColor: theme.colors.primary }}></div>
           <p className="text-gray-600">Loading map...</p>
         </div>
       </div>
@@ -445,7 +449,16 @@ const AddEditAddress: React.FC = () => {
                     placeholder="Search anything...."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full p-3 pl-4 pr-10 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-md"
+                    className="w-full p-3 pl-4 pr-10 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent shadow-md"
+                    style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = theme.colors.primary;
+                      e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.primary}33`;
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#d1d5db';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   />
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                     <svg
@@ -549,7 +562,16 @@ const AddEditAddress: React.FC = () => {
               placeholder="e.g. John Doe"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-[#FFFBF7]"
+              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:border-transparent bg-[#FFFBF7]"
+              style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = theme.colors.primary;
+                e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.primary}33`;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             />
           </div>
 
@@ -563,7 +585,16 @@ const AddEditAddress: React.FC = () => {
               placeholder="00000 00000"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-[#FFFBF7]"
+              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:border-transparent bg-[#FFFBF7]"
+              style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = theme.colors.primary;
+                e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.primary}33`;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             />
           </div>
 
@@ -577,7 +608,16 @@ const AddEditAddress: React.FC = () => {
               value={formData.completeAddress}
               onChange={(e) => setFormData({ ...formData, completeAddress: e.target.value })}
               rows={3}
-              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-[#FFFBF7]"
+              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm resize-none focus:outline-none focus:ring-2 focus:border-transparent bg-[#FFFBF7]"
+              style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = theme.colors.primary;
+                e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.primary}33`;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             />
           </div>
 
@@ -591,7 +631,16 @@ const AddEditAddress: React.FC = () => {
               placeholder="302021"
               value={pincode}
               onChange={(e) => setPincode(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-[#FFFBF7]"
+              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:border-transparent bg-[#FFFBF7]"
+              style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = theme.colors.primary;
+                e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.primary}33`;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             />
           </div>
 
@@ -606,7 +655,16 @@ const AddEditAddress: React.FC = () => {
               placeholder="e.g., 2nd Floor"
               value={formData.floor}
               onChange={(e) => setFormData({ ...formData, floor: e.target.value })}
-              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-[#FFFBF7]"
+              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:border-transparent bg-[#FFFBF7]"
+              style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = theme.colors.primary;
+                e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.primary}33`;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             />
           </div>
 
@@ -620,7 +678,16 @@ const AddEditAddress: React.FC = () => {
               placeholder="e.g., Near City Mall"
               value={formData.landmark}
               onChange={(e) => setFormData({ ...formData, landmark: e.target.value })}
-              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-[#FFFBF7]"
+              className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:border-transparent bg-[#FFFBF7]"
+              style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = theme.colors.primary;
+                e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.primary}33`;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             />
           </div>
 
@@ -637,9 +704,14 @@ const AddEditAddress: React.FC = () => {
                     setFormData(prev => ({ ...prev, type: type as 'Home' | 'Work' | 'Others' }));
                   }}
                   className={`flex-1 py-2.5 px-2 rounded-2xl border-2 transition-colors text-sm font-semibold whitespace-nowrap ${selectedType === type
-                    ? 'border-[#FAA222] bg-[#FAA222] text-gray-800'
+                    ? ''
                     : 'border-gray-200 bg-[#F3F4F6] text-gray-500'
                     }`}
+                  style={selectedType === type ? {
+                    borderColor: theme.colors.primary,
+                    backgroundColor: theme.colors.primary,
+                    color: feature === 'gpStore' ? 'white' : 'black'
+                  } : {}}
                 >
                   {type}
                 </button>
@@ -654,9 +726,13 @@ const AddEditAddress: React.FC = () => {
             onClick={handleSubmit}
             disabled={isSubmitting || isValidatingLocation}
             className={`w-full py-4 rounded-[20px] font-medium transition-colors ${isSubmitting || isValidatingLocation
-              ? 'bg-gray-400 text-grey-700 cursor-not-allowed'
-              : 'bg-[#FAA222] hover:bg-[#DD7600] text-grey-500'
+              ? 'bg-gray-400 cursor-not-allowed'
+              : ''
               }`}
+            style={isSubmitting || isValidatingLocation ? {} : {
+              backgroundColor: theme.colors.primary,
+              color: feature === 'gpStore' ? 'white' : 'black'
+            }}
           >
             {isValidatingLocation ? 'Validating Location...' :
               isSubmitting ? 'Saving Address...' : 'Cofirm Location And Proceed'}

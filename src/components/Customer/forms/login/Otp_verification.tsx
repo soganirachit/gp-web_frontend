@@ -7,7 +7,7 @@ import { useAuth } from '../../../../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import { FaWhatsapp } from 'react-icons/fa';
 import { MdEdit } from 'react-icons/md';
-import otpLogo from '../../../../assets/All/otp_logo.png';
+import { useFeatureTheme } from '../../../../context/FeatureThemeContext';
 
 interface LocationState {
   phoneNumber: string;
@@ -18,6 +18,8 @@ const OTPVerification: React.FC = () => {
   const location = useLocation();
   const { login } = useAuth();
   const phoneNumber = (location.state as LocationState)?.phoneNumber;
+  const { theme, feature } = useFeatureTheme();
+  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
 
   const [otp, setOtp] = useState<string[]>(new Array(6).fill(""));
   const [countdown, setCountdown] = useState<number>(29);
@@ -26,7 +28,7 @@ const OTPVerification: React.FC = () => {
 
   useEffect(() => {
     if (!phoneNumber) {
-      navigate('/login');
+      navigate(`${basePath}/login`);
       return;
     }
 
@@ -121,30 +123,30 @@ const OTPVerification: React.FC = () => {
             const addresses = await addressService.getAllAddresses();
             if (addresses && addresses.length > 0) {
               // User has addresses, go directly to home
-              navigate('/', {
+              navigate(basePath, {
                 state: {
-                  returnUrl: '/'
+                  returnUrl: basePath
                 }
               });
             } else {
               // User has no addresses, go to location page
-              navigate('/location', {
+              navigate(`${basePath}/location`, {
                 state: {
-                  returnUrl: '/'
+                  returnUrl: basePath
                 }
               });
             }
           } catch (error) {
             // If there's an error checking addresses, assume user needs to set location
             console.error('Error checking addresses:', error);
-            navigate('/location', {
+            navigate(`${basePath}/location`, {
               state: {
-                returnUrl: '/'
+                returnUrl: basePath
               }
             });
           }
         } else {
-          navigate('/name-input');
+          navigate(`${basePath}/name-input`);
         }
       }
     } catch (err: any) {
@@ -174,11 +176,11 @@ const OTPVerification: React.FC = () => {
   };
 
   const handleEditNumber = () => {
-    navigate('/login');
+    navigate(`${basePath}/login`);
   };
 
   return (
-    <div className="min-h-screen w-screen bg-white fixed inset-0 flex flex-col items-center justify-center px-3 sm:px-4 py-4 sm:py-6 md:py-8 overflow-y-auto">
+    <div className={`min-h-screen w-screen fixed inset-0 flex flex-col items-center justify-center px-3 sm:px-4 py-4 sm:py-6 md:py-8 overflow-y-auto ${theme.classes.authPageBackground}`}>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -190,7 +192,7 @@ const OTPVerification: React.FC = () => {
           {/* OTP Graphic */}
           <div className="relative w-full max-w-[280px] sm:max-w-xs h-48 sm:h-56 md:h-64 flex items-center justify-center mb-4 sm:mb-6">
             <img
-              src={otpLogo}
+              src={theme.assets.otpHero}
               alt="OTP Graphic"
               className="w-full h-full object-contain"
             />
@@ -198,9 +200,9 @@ const OTPVerification: React.FC = () => {
 
           {/* Carousel Indicators */}
           <div className="flex gap-1.5 sm:gap-2 mt-2 sm:mt-4">
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#FAA222]"></div>
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#FAA222]/30"></div>
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#FAA222]/30"></div>
+            <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${theme.classes.authIndicatorActive}`}></div>
+            <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${theme.classes.authIndicatorInactive}`}></div>
+            <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${theme.classes.authIndicatorInactive}`}></div>
           </div>
         </div>
 
@@ -251,7 +253,7 @@ const OTPVerification: React.FC = () => {
                   onChange={(e) => handleChange(e.target, index)}
                   onKeyDown={(e) => handleKeyDown(e, index)}
                   onPaste={(e) => handlePaste(e)}
-                  className="w-10 h-12 sm:w-12 sm:h-14 md:w-14 md:h-16 border-2 border-[#FAA222] rounded-lg sm:rounded-xl text-center text-lg sm:text-xl md:text-2xl font-semibold focus:border-[#E8911F] focus:outline-none focus:ring-2 focus:ring-[#FAA222]/20 transition-all duration-200 bg-white"
+                  className={`w-10 h-12 sm:w-12 sm:h-14 md:w-14 md:h-16 border-2 rounded-lg sm:rounded-xl text-center text-lg sm:text-xl md:text-2xl font-semibold focus:outline-none focus:ring-2 transition-all duration-200 bg-white ${theme.classes.otpInputBorder}`}
                   disabled={isSubmitting}
                 />
               ))}
@@ -262,7 +264,7 @@ const OTPVerification: React.FC = () => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               disabled={isSubmitting || otp.join('').length !== 6}
-              className="w-full py-3 sm:py-3.5 md:py-4 px-4 bg-[#FAA222] text-black rounded-lg sm:rounded-xl font-semibold hover:bg-[#E8911F] transition-colors duration-200 text-base sm:text-lg"
+              className={`w-full py-3 sm:py-3.5 md:py-4 px-4 rounded-lg sm:rounded-xl font-semibold transition-colors duration-200 text-base sm:text-lg ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
             >
               {isSubmitting ? (
                 <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
@@ -278,8 +280,19 @@ const OTPVerification: React.FC = () => {
               disabled={countdown > 0}
               className={`text-xs sm:text-sm ${countdown > 0
                 ? 'text-gray-400 cursor-not-allowed'
-                : 'text-gray-600 hover:text-[#FAA222] transition-colors'
+                : 'text-gray-600 transition-colors'
                 }`}
+              style={countdown === 0 ? { '--hover-color': theme.colors.primary } as React.CSSProperties & { '--hover-color': string } : {}}
+              onMouseEnter={(e) => {
+                if (countdown === 0) {
+                  e.currentTarget.style.color = theme.colors.primary;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (countdown === 0) {
+                  e.currentTarget.style.color = '#4b5563';
+                }
+              }}
             >
               {countdown > 0 ? (
                 `Didn't get it? Resend code (${countdown}s)`
