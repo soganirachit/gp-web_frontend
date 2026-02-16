@@ -10,9 +10,9 @@ interface SpinnerProps {
 
 const Spinner: React.FC<SpinnerProps> = ({ size = 40, className = '', isLoading = true }) => {
   const { feature } = useFeatureTheme();
-  
+
   if (!isLoading) return null;
-  
+
   // For GP Store, apply green filter to match the theme color (#2A6B28)
   // Using CSS filter to convert the orange spinner to green
   const getSpinnerStyle = () => {
@@ -20,23 +20,24 @@ const Spinner: React.FC<SpinnerProps> = ({ size = 40, className = '', isLoading 
       width: `${size}px`,
       height: `${size}px`
     };
-    
+
     if (feature === 'gpStore') {
       // Filter to convert orange spinner to green (#2A6B28) - the GP Store primary color
       // This filter converts the color to match the GP Store theme green
       return {
         ...baseStyle,
-        filter: 'brightness(0) saturate(100%) invert(28%) sepia(68%) saturate(1200%) hue-rotate(85deg) brightness(0.32) contrast(1.15)',
+        // Lighter green filter (approx #5da15b)
+        filter: 'brightness(0) saturate(100%) invert(53%) sepia(35%) saturate(735%) hue-rotate(76deg) brightness(95%) contrast(85%)',
       };
     }
-    
+
     return baseStyle;
   };
-  
+
   return (
     <div className={`flex items-center justify-center ${className}`}>
-      <img 
-        src={spinnerSvg} 
+      <img
+        src={spinnerSvg}
         alt="Loading..."
         className="animate-spin"
         style={getSpinnerStyle()}

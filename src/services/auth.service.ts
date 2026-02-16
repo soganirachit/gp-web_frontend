@@ -21,8 +21,8 @@ export const authService = {
       if (!API_URL) {
         throw new Error("API base URL is not configured");
       }
-      const response = await axios.post(`${API_URL}/send-otp`, {
-        whatsappNumber: phoneNumber,
+      const response = await axios.post(`${API_URL}/send-otp/`, {
+        phone: phoneNumber,
       });
       return response.data;
     } catch (error: any) {
@@ -40,15 +40,46 @@ export const authService = {
    */
   async verifyOTP(phoneNumber: string, otp: string) {
     try {
-      const response = await axios.post(`${API_URL}/verify-otp`, {
-        whatsappNumber: phoneNumber,
+      const response = await axios.post(`${API_URL}/verify-otp/`, {
+        phone: phoneNumber,
         otp,
       });
 
-      // Store the authentication token and phone number in localStorage if verification successful
-      if (response.data.token) {
-        localStorage.setItem("token", response.data.token);
-        localStorage.setItem("phoneNumber", phoneNumber);
+      // Handle new Django API response structure: { success, message, data: { access_token, refresh_token, user, is_new_user } }
+      if (response.data.success && response.data.data) {
+        const { access_token, refresh_token, user, is_new_user } = response.data.data;
+        
+        // Store tokens and user info in localStorage
+        if (access_token) {
+          localStorage.setItem("token", access_token);
+          localStorage.setItem("phoneNumber", phoneNumber);
+        }
+        
+        if (refresh_token) {
+          localStorage.setItem("refresh_token", refresh_token);
+        }
+
+        // Store user info if available
+        if (user) {
+          if (user.full_name) {
+            localStorage.setItem("userName", user.full_name);
+          }
+          if (user.id) {
+            localStorage.setItem("userId", user.id.toString());
+          }
+        }
+
+        // Return formatted response for backward compatibility
+        return {
+          success: true,
+          message: response.data.message || "Number verified successfully",
+          access_token,
+          refresh_token,
+          user,
+          is_new_user: is_new_user || false,
+          userExists: !is_new_user, // For backward compatibility
+          userName: user?.full_name || user?.first_name + " " + user?.last_name || phoneNumber,
+        };
       }
 
       return response.data;
@@ -58,7 +89,7 @@ export const authService = {
   },
 
   /**
-   * Completes user onboarding by updating their full name
+   * Completes user onboarding by updating their profile
    * @param firstName - User's first name
    * @param lastName - User's last name
    * @param gender - User's gender
@@ -66,7 +97,6 @@ export const authService = {
    * @returns Response data from the server
    * @throws Error if token missing or request fails
    */
-
   async completeOnboarding(
     firstName: string,
     lastName: string,
@@ -83,40 +113,46 @@ export const authService = {
         };
       }
 
-      const response = await axios.post(
-        `${API_URL}/create-customer`,
-        { firstName, lastName, gender, email },
+      // New Django API endpoint: PUT /users/me/update/
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+      const response = await axios.put(
+        `${baseUrl}/users/me/update/`,
+        {
+          first_name: firstName,
+          last_name: lastName,
+          gender: gender.toLowerCase(), // Convert to lowercase as per API
+          email: email,
+        },
         {
           headers: {
-            Authorization: token,
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
         }
       );
 
-      if (
-        response.data.message === "Full name updated successfully" ||
-        response.data.message === "User created successfully" ||
-        response.data.message === "Profile updated successfully"
-      ) {
+      // Handle Django API response structure
+      if (response.data.success) {
+        const user = response.data.data?.user || response.data.data;
         return {
           success: true,
-          message: response.data.message,
-          customerId: response.data.customerId,
-          userName: response.data.userName,
+          message: response.data.message || "Profile updated successfully",
+          customerId: user?.id,
+          userName: user?.full_name || `${firstName} ${lastName}`,
+          user: user,
         };
       }
 
       return {
         success: false,
-        error: response.data.message || "Failed to update name",
+        error: response.data.message || "Failed to update profile",
       };
     } catch (error) {
       if (axios.isAxiosError(error)) {
         return {
           success: false,
           error:
-            error.response?.data?.message || "Failed to complete onboarding",
+            error.response?.data?.message || error.response?.data?.error || "Failed to complete onboarding",
         };
       }
       return {
@@ -181,6 +217,44 @@ export const authService = {
   // },
 
   /**
+   * Refreshes access token using refresh token
+   * @param refreshToken - Refresh token (optional, will use stored token if not provided)
+   * @returns New access token
+   * @throws Error if refresh fails
+   */
+  async refreshToken(refreshToken?: string) {
+    try {
+      const token = refreshToken || localStorage.getItem("refresh_token");
+      
+      if (!token) {
+        throw new Error("Refresh token not found");
+      }
+
+      const response = await axios.post(`${API_URL}/refresh/`, {
+        refresh: token,
+      });
+
+      if (response.data.access) {
+        localStorage.setItem("token", response.data.access);
+        if (response.data.refresh) {
+          localStorage.setItem("refresh_token", response.data.refresh);
+        }
+        return {
+          access_token: response.data.access,
+          refresh_token: response.data.refresh,
+        };
+      }
+
+      return response.data;
+    } catch (error: any) {
+      // If refresh fails, clear tokens
+      localStorage.removeItem("token");
+      localStorage.removeItem("refresh_token");
+      throw error.response?.data || error;
+    }
+  },
+
+  /**
    * Checks if user is currently authenticated
    * @returns Boolean indicating if valid token exists
    */
@@ -190,11 +264,38 @@ export const authService = {
   },
 
   /**
-   * Logs out user by removing stored auth data
+   * Logs out user by calling API and removing stored auth data
    */
-  logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("phoneNumber");
-    localStorage.removeItem("userName");
+  async logout() {
+    try {
+      const token = localStorage.getItem("token");
+      
+      // Call logout API endpoint if token exists
+      if (token) {
+        try {
+          await axios.post(
+            `${API_URL}/logout/`,
+            {},
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+        } catch (error) {
+          // Continue with local cleanup even if API call fails
+          console.error("Logout API call failed:", error);
+        }
+      }
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      // Always clear local storage
+      localStorage.removeItem("token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("phoneNumber");
+      localStorage.removeItem("userName");
+      localStorage.removeItem("userId");
+    }
   },
 };

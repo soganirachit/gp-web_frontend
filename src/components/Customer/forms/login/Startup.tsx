@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../../../context/AuthContext';
-import { getFeatureFromPath } from '../../../../config/features';
+import { getFeatureFromPath, FEATURE_FLAGS } from '../../../../config/features';
 import { useFeatureTheme } from '../../../../context/FeatureThemeContext';
 
 const Startup: React.FC = () => {
@@ -31,7 +31,12 @@ const Startup: React.FC = () => {
       }
     }
     
-    const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+    // If gp-daily is disabled, force gp-store
+    let finalFeature = feature;
+    if (feature === 'gpDaily' && !FEATURE_FLAGS.gpDailyEnabled) {
+      finalFeature = 'gpStore';
+    }
+    const basePath = finalFeature === 'gpStore' ? '/gp-store' : '/gp-daily';
 
     // If user is already logged in, redirect immediately without showing splash
     if (isLoggedIn) {

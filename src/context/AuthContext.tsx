@@ -4,8 +4,8 @@ interface AuthContextType {
   isLoggedIn: boolean;
   phoneNumber: string | null;
   checkLoginStatus: () => boolean;
-  login: (token: string, phone: string) => void;
-  logout: () => void;
+  login: (token: string, phone: string, refreshToken?: string) => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,16 +45,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return isValid;
   };
 
-  const login = (token: string, phone: string) => {
+  const login = (token: string, phone: string, refreshToken?: string) => {
     localStorage.setItem('token', token);
     localStorage.setItem('phoneNumber', phone);
+    if (refreshToken) {
+      localStorage.setItem('refresh_token', refreshToken);
+    }
     setIsLoggedIn(true);
     setPhoneNumber(phone);
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('phoneNumber');
+  const logout = async () => {
+    // Call authService logout which handles API call
+    const { authService } = await import('../services/auth.service');
+    await authService.logout();
     setIsLoggedIn(false);
     setPhoneNumber(null);
   };

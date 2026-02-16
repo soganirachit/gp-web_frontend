@@ -111,7 +111,7 @@ const Login = () => {
                             className={`w-full py-3 sm:py-3.5 md:py-4 px-4 rounded-lg sm:rounded-xl font-semibold transition-colors duration-200 text-base sm:text-lg ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
                         >
                             {isLoading ? (
-                                <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
+                                <div className={`w-5 h-5 sm:w-6 sm:h-6 border-2 border-t-transparent rounded-full animate-spin mx-auto ${feature === 'gpDaily' ? 'border-black' : 'border-white'}`} />
                             ) : (
                                 "Get OTP"
                             )}

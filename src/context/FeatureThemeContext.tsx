@@ -10,6 +10,7 @@ import {
   type FeatureTheme,
   featureThemes,
   getFeatureFromPath,
+  FEATURE_FLAGS,
 } from "../config/features";
 
 interface FeatureThemeContextValue {
@@ -37,11 +38,19 @@ export const FeatureThemeProvider: React.FC<FeatureThemeProviderProps> = ({
     const params = new URLSearchParams(location.search);
     const featureParam = params.get("feature");
     if (featureParam === "gpStore") return "gpStore";
-    if (featureParam === "gpDaily") return "gpDaily";
+    if (featureParam === "gpDaily") {
+      // If gp-daily is disabled, return gpStore instead
+      return FEATURE_FLAGS.gpDailyEnabled ? "gpDaily" : "gpStore";
+    }
     return null;
   };
 
-  const activeFeature = feature ?? getFeatureFromQuery() ?? getFeatureFromPath(location.pathname);
+  let activeFeature = feature ?? getFeatureFromQuery() ?? getFeatureFromPath(location.pathname);
+  
+  // Force gpStore if gp-daily is disabled and user tried to access gp-daily
+  if (activeFeature === "gpDaily" && !FEATURE_FLAGS.gpDailyEnabled) {
+    activeFeature = "gpStore";
+  }
 
   const value = useMemo(
     () => ({

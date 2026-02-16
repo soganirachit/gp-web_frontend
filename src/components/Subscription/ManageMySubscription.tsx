@@ -908,7 +908,7 @@ const ManageMySubscription: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-4 md:gap-8">
-                        <span className="px-3 py-1 bg-[#FEE2E2] text-[#EF4444] text-[10px] font-medium rounded-full">
+                        <span className="px-3 py-1 bg-[#FEE2E2] text-[#EF4444] text-xs font-medium rounded-full">
                           Cancelled
                         </span>
 

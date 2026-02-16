@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { MdLocationOn, MdKeyboardArrowDown, MdAccessTime } from 'react-icons/md';
 import { FaLeaf, FaUsers, FaBox } from 'react-icons/fa';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { addressService, Address } from '../services/address.service';
+import { FEATURE_FLAGS } from '../config/features';
 import ProfileIcon from '../assets/icon/Profile.png';
 import SearchIcon from '../assets/icon/Search.png';
 import storyImage from '../assets/Banner/Story.png';
@@ -28,6 +29,7 @@ const HomePage: React.FC = () => {
   const { isLoggedIn } = useAuth();
   const [deliveryLocation, setDeliveryLocation] = useState<string>('');
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
+  const [showComingSoonModal, setShowComingSoonModal] = useState(false);
 
   // Function to fetch the latest address from API
   const fetchLatestAddress = useCallback(async () => {
@@ -114,7 +116,7 @@ const HomePage: React.FC = () => {
                 src={profilehomeIcon}
                 alt="Profile"
                 className=" absolute inset-0 w-12 h-12 object-contain cursor-pointer self-center justify-self-center"
-                onClick={() => navigate("/gp-daily/account")}
+                onClick={() => navigate(FEATURE_FLAGS.gpDailyEnabled ? "/gp-daily/account" : "/gp-store/account")}
               />
               <img
                 src={profilelogoIcon}
@@ -159,13 +161,23 @@ const HomePage: React.FC = () => {
 
           {/* Service Cards Section */}
           <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-6">
-            {/* Genda Phool Daily Card */}
+            {/* Genda Phool Daily Card - Visible but disabled if feature is off */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, delay: 0.1 }}
-              className="bg-[#FFF5E6] rounded-2xl p-2 sm:p-3 cursor-pointer hover:shadow-lg transition-shadow relative overflow-visible min-h-0"
-              onClick={() => navigate('/gp-daily', { state: { mode: 'daily' } })}
+              className={`bg-[#FFF5E6] rounded-2xl p-2 sm:p-3 transition-shadow relative overflow-visible min-h-0 ${
+                FEATURE_FLAGS.gpDailyEnabled 
+                  ? 'cursor-pointer hover:shadow-lg' 
+                  : 'cursor-pointer opacity-60'
+              }`}
+              onClick={() => {
+                if (FEATURE_FLAGS.gpDailyEnabled) {
+                  navigate('/gp-daily', { state: { mode: 'daily' } });
+                } else {
+                  setShowComingSoonModal(true);
+                }
+              }}
             >
               <div className="flex flex-col h-full">
                 {/* Top Section: Scooter and Logo with overlap */}
@@ -452,7 +464,47 @@ const HomePage: React.FC = () => {
           </motion.div>
         </div>
       </div>
-    </div >
+
+      {/* Coming Soon Modal */}
+      <AnimatePresence>
+        {showComingSoonModal && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowComingSoonModal(false)}
+          >
+            <motion.div
+              className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-[#FFF5E6] rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-3xl">🌺</span>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                  Coming Soon!
+                </h3>
+                <p className="text-gray-600">
+                  Genda Phool Daily feature is currently under development. Stay tuned for updates!
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowComingSoonModal(false)}
+                className="w-full py-3 bg-[#FAA222] text-black rounded-lg font-semibold hover:bg-[#DD7600] transition-colors"
+              >
+                Got it
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 

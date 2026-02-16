@@ -106,19 +106,29 @@ const OTPVerification: React.FC = () => {
       setError('');
       const response = await authService.verifyOTP(phoneNumber, otpString);
 
-      if (response.message === "Number verified successfully") {
-        toast.success('OTP verified successfully!');
+      // Handle new Django API response structure
+      if (response.success && response.message) {
+        toast.success(response.message || 'OTP verified successfully!');
 
-        if (response.token) {
-          login(response.token, phoneNumber);
+        // Login with tokens
+        if (response.access_token) {
+          login(response.access_token, phoneNumber, response.refresh_token);
         }
 
-        if (response.userExists) {
-          if (response.userName) {
+        // Store user info if available
+        if (response.user) {
+          if (response.user.full_name) {
+            localStorage.setItem('userName', response.user.full_name);
+          } else if (response.userName) {
             localStorage.setItem('userName', response.userName);
           }
+        }
 
-          // Check if user already has addresses
+        // Check if user is new or existing
+        const isNewUser = response.is_new_user || !response.userExists;
+
+        if (!isNewUser) {
+          // Existing user - check if they have addresses
           try {
             const addresses = await addressService.getAllAddresses();
             if (addresses && addresses.length > 0) {
@@ -146,13 +156,17 @@ const OTPVerification: React.FC = () => {
             });
           }
         } else {
+          // New user - go to name input page
           navigate(`${basePath}/name-input`);
         }
+      } else {
+        throw new Error(response.message || 'OTP verification failed');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid OTP');
+      const errorMessage = err.response?.data?.message || err.message || err.error || 'Invalid OTP';
+      setError(errorMessage);
       setOtp(new Array(6).fill(""));
-      toast.error(err.response?.data?.message || 'Invalid OTP');
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -267,7 +281,7 @@ const OTPVerification: React.FC = () => {
               className={`w-full py-3 sm:py-3.5 md:py-4 px-4 rounded-lg sm:rounded-xl font-semibold transition-colors duration-200 text-base sm:text-lg ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
             >
               {isSubmitting ? (
-                <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
+                <div className={`w-5 h-5 sm:w-6 sm:h-6 border-2 border-t-transparent rounded-full animate-spin mx-auto ${feature === 'gpDaily' ? 'border-black' : 'border-white'}`} />
               ) : (
                 'Continue'
               )}

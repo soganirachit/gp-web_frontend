@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import { addressService } from "../../services/address.service";
+import { useFeatureTheme } from "../../context/FeatureThemeContext";
 
 // List of cities where delivery is available
 const SERVICED_CITIES = [
@@ -40,6 +41,7 @@ const SERVICED_CITIES = [
 const HomePageLocation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme, feature } = useFeatureTheme();
   const returnUrl = location.state?.returnUrl || "/Allset";
   const [locationSearchQuery, setLocationSearchQuery] = useState("");
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
@@ -401,7 +403,7 @@ const HomePageLocation: React.FC = () => {
           <div className="space-y-3">
             <button
               onClick={handleChangeLocation}
-              className="w-full py-3 bg-green-500 text-white rounded-lg font-medium"
+              className={`w-full py-3 rounded-lg font-medium ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
             >
               Change Location
             </button>
@@ -427,7 +429,7 @@ const HomePageLocation: React.FC = () => {
         </p>
         <button
           onClick={() => window.location.reload()}
-          className="bg-green-500 text-white px-4 py-2 rounded-lg"
+          className={`px-4 py-2 rounded-lg ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
         >
           Retry
         </button>
@@ -561,9 +563,9 @@ const HomePageLocation: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen max-w-[800px] mx-auto flex flex-col bg-[#FFFBEB]">
+    <div className={`min-h-screen max-w-[800px] mx-auto flex flex-col ${theme.classes.authPageBackground}`}>
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#FFFBEB] ">
+      <div className={`sticky top-0 z-10 ${theme.classes.authPageBackground}`}>
         <div className="max-w-[800px] mx-auto px-4 py-3">
           <button
             onClick={() => navigate(-1)}
@@ -598,7 +600,10 @@ const HomePageLocation: React.FC = () => {
                     placeholder="Search for a location..."
                     value={locationSearchQuery}
                     onChange={(e) => setLocationSearchQuery(e.target.value)}
-                    className="w-full p-3 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    className="w-full p-3 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent"
+                    style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
+                    onFocus={(e) => e.target.style.borderColor = theme.colors.primary}
+                    onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
                   />
                   <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                     <svg
@@ -812,7 +817,7 @@ const HomePageLocation: React.FC = () => {
         <div className="max-w-[800px] w-full mx-auto px-4 mt-4 bottom-4 left-0 right-0 md:static md:px-0 md:mt-6">
           <button
             onClick={handleSaveLocation}
-            className="w-full py-3 bg-[#F15A22] text-white rounded-3xl font-medium hover:bg-[#F15A22]/90 transition-colors"
+            className={`w-full py-3 rounded-3xl font-medium transition-colors ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
           >
             Confirm Location
           </button>

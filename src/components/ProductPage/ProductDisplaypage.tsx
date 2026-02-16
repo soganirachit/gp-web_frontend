@@ -245,18 +245,18 @@ const ProductPage: React.FC = () => {
       } catch (productError) {
         // If product fetch fails, try base pack
         try {
-      const data = await basePackService.getProductById(id);
-      const extendedData: ExtendedBasePack = {
-        ...data,
-        mrpPerPackDaily: Math.ceil(data.sellingPrice * 1.2),
-        mrpPerPackAlternate: Math.ceil(data.sellingPrice * 1.2),
-        description: data.description || "",
-        contents: data.contents || [],
-        sellingPricePerPackDaily: 0,
-        sellingPricePerPackAlternate: 0,
-        surcharge: 0,
-      };
-      setBasePack(extendedData);
+          const data = await basePackService.getProductById(id);
+          const extendedData: ExtendedBasePack = {
+            ...data,
+            mrpPerPackDaily: Math.ceil(data.sellingPrice * 1.2),
+            mrpPerPackAlternate: Math.ceil(data.sellingPrice * 1.2),
+            description: data.description || "",
+            contents: data.contents || [],
+            sellingPricePerPackDaily: 0,
+            sellingPricePerPackAlternate: 0,
+            surcharge: 0,
+          };
+          setBasePack(extendedData);
         } catch (basePackError) {
           setError("Failed to fetch product details");
         }
@@ -332,7 +332,7 @@ const ProductPage: React.FC = () => {
     let originalPrice = 0;
 
     const basePrice = currentProduct.sellingPrice;
-    
+
     // Calculate static original price (20% markup)
     const staticOriginalPrice = Math.ceil(basePrice * 1.2);
 
@@ -349,7 +349,7 @@ const ProductPage: React.FC = () => {
   const getProductImage = () => {
     const currentProduct = product || basePack;
     if (!currentProduct) return "";
-    
+
     if (product?.imagesUrl) {
       if (Array.isArray(product.imagesUrl)) {
         return product.imagesUrl[0] || "";
@@ -377,12 +377,12 @@ const ProductPage: React.FC = () => {
   // Get includes list - fetch from backend or use static fallback
   const getIncludesList = (): string[] => {
     const contents = getProductContents();
-    
+
     // If we have contents from backend, extract names
     if (contents && contents.length > 0) {
       return contents.map(item => item.name);
     }
-    
+
     // Static fallback list (matches screenshot)
     return ["Bel Leaves", "Lotus", "Marigold", "White Lotus"];
   };
@@ -423,6 +423,7 @@ const ProductPage: React.FC = () => {
       const currentProduct = product || basePack;
       if (!currentProduct || !id) {
         toast.error("Product information not available");
+        setIsCheckingBalance(false);
         return;
       }
 
@@ -455,10 +456,10 @@ const ProductPage: React.FC = () => {
       }
 
       // If we have sufficient balance, prepare subscription details
-      const productImage = product 
+      const productImage = product
         ? (Array.isArray(product.imagesUrl) ? product.imagesUrl[0] : product.imagesUrl)
         : (basePack as any)?.imagesUrl;
-      
+
       const subscriptionDetails = {
         basePackId: id,
         productId: product?.id || id,
@@ -484,9 +485,11 @@ const ProductPage: React.FC = () => {
           : ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"],
       };
 
+
       // Validate CUSTOM subscription has at least one delivery day
       if (selectedType === "CUSTOM" && (!selectedDays || selectedDays.length === 0)) {
         toast.error("Please select at least one delivery day for custom subscription");
+        setIsCheckingBalance(false);
         return;
       }
 
@@ -519,7 +522,6 @@ const ProductPage: React.FC = () => {
       }
 
       toast.error(error.message || "Failed to proceed with subscription");
-    } finally {
       setIsCheckingBalance(false);
     }
   };
@@ -550,7 +552,7 @@ const ProductPage: React.FC = () => {
     if (deliveryFrequency === "Mon-Sat") {
       return; // Prevent any changes in Mon-Sat mode
     }
-    
+
     if (selectedDays.includes(day)) {
       setSelectedDays(selectedDays.filter((d) => d !== day));
     } else {
@@ -613,48 +615,48 @@ const ProductPage: React.FC = () => {
       <div className="max-w-[800px] mx-auto relative">
         {/* Header */}
         <div className="sticky top-0 bg-[#FFFBEB] z-10 px-4 py-4 flex items-center gap-3 border-b border-gray-200">
-            <button
-              onClick={() => navigate(-1)}
-              className="hover:bg-gray-100 rounded-full p-2 transition-colors"
-            >
+          <button
+            onClick={() => navigate(-1)}
+            className="hover:bg-gray-100 rounded-full p-2 transition-colors"
+          >
             <IoArrowBack className="text-xl" />
-            </button>
+          </button>
           <h1 className="text-2xl font-semibold text-gray-900">{categoryName}</h1>
-          </div>
+        </div>
 
         {/* Main Content */}
         <div className="px-4">
           {/* Product Image */}
           <div className="mt-4">
             <div className="aspect-square w-full rounded-xl overflow-hidden">
-                <img
+              <img
                 src={getProductImage()}
                 alt={getProductName()}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+                className="w-full h-full object-cover"
+              />
             </div>
+          </div>
 
           {/* Product Info - Name, Price, Weight */}
           <div className="mt-4">
             <div className="flex justify-between items-start gap-3">
               <h1 className="text-3xl font-semibold text-gray-900 flex-1">
                 {getProductName()}
-                  </h1>
+              </h1>
               <span className="text-base font-medium text-gray-900 bg-[rgb(250,162,34)] px-5 py-2 rounded-2xl whitespace-nowrap">
                 {getProductWeight()}
-                      </span>
-                </div>
+              </span>
+            </div>
 
-                {/* Price Section */}
+            {/* Price Section */}
             <div className="mt-3 flex items-center gap-3">
               <span className="text-2xl font-bold text-gray-900">
-                    ₹{getPriceDisplay().price}/Pack
-                  </span>
+                ₹{getPriceDisplay().price}/Pack
+              </span>
               {getPriceDisplay().originalPrice > getPriceDisplay().price && (
                 <span className="text-2xl font-bold text-gray-500 line-through">
-                    ₹{getPriceDisplay().originalPrice}
-                  </span>
+                  ₹{getPriceDisplay().originalPrice}
+                </span>
               )}
             </div>
           </div>
@@ -669,34 +671,34 @@ const ProductPage: React.FC = () => {
                   className="flex-1 min-w-[calc(50%-0.375rem)] sm:min-w-0 text-xs sm:text-sm font-medium text-gray-900 bg-white border border-[rgb(250,162,34)] px-2 sm:px-4 py-1.5 sm:py-2 rounded-2xl text-center"
                 >
                   {item}
-                    </span>
-                ))}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Quantity Section */}
+          <div className="mt-6 pl-4 pr-12 ">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Quantity</h3>
+              <div className="flex items-center gap-4">
+                <button
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 hover:bg-[rgb(250,162,34)] hover:text-white transition-colors"
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                >
+                  <span className="text-xl leading-none">−</span>
+                </button>
+                <span className="text-lg font-medium w-8 text-center">
+                  {quantity}
+                </span>
+                <button
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 hover:bg-[rgb(250,162,34)] hover:text-white transition-colors"
+                  onClick={() => setQuantity(quantity + 1)}
+                >
+                  <span className="text-xl leading-none">+</span>
+                </button>
               </div>
             </div>
-
-              {/* Quantity Section */}
-          <div className="mt-6 pl-4 pr-12 ">
-                <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Quantity</h3>
-                  <div className="flex items-center gap-4">
-                    <button
-                  className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 hover:bg-[rgb(250,162,34)] hover:text-white transition-colors"
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    >
-                  <span className="text-xl leading-none">−</span>
-                    </button>
-                <span className="text-lg font-medium w-8 text-center">
-                      {quantity}
-                    </span>
-                    <button
-                  className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 hover:bg-[rgb(250,162,34)] hover:text-white transition-colors"
-                      onClick={() => setQuantity(quantity + 1)}
-                    >
-                  <span className="text-xl leading-none">+</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
+          </div>
 
           {/* Combine with Section */}
           {combineProducts.length > 0 && (
@@ -721,7 +723,7 @@ const ProductPage: React.FC = () => {
                       <div className="p-2.5 sm:p-4">
                         <h4 className="text-sm sm:text-base font-semibold text-gray-900 truncate mb-1.5 sm:mb-2">
                           {item.name}
-                    </h4>
+                        </h4>
                         <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-4">
                           <span className="text-xs sm:text-sm text-gray-500 line-through">
                             ₹{Math.ceil(item.sellingPrice * 1.2)}
@@ -732,12 +734,12 @@ const ProductPage: React.FC = () => {
                         </div>
                         {itemQty > 0 ? (
                           <div className="flex items-center justify-center gap-2 sm:gap-3">
-                        <button
+                            <button
                               onClick={() => handleCombineQuantity(item.id, -1)}
                               className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white border-2 border-gray-700 text-gray-600 flex items-center justify-center hover:bg-[rgb(250,162,34)] hover:border-[rgb(250,162,34)] hover:text-white transition-colors shadow-sm"
                             >
                               <span className="text-base sm:text-lg leading-none font-medium">−</span>
-                        </button>
+                            </button>
                             <span className="text-sm sm:text-base font-semibold text-gray-900 min-w-[20px] sm:min-w-[24px] text-center">{itemQty}</span>
                             <button
                               onClick={() => handleCombineQuantity(item.id, 1)}
@@ -745,14 +747,14 @@ const ProductPage: React.FC = () => {
                             >
                               <span className="text-base sm:text-lg leading-none font-medium">+</span>
                             </button>
-                    </div>
+                          </div>
                         ) : (
-                  <button
+                          <button
                             onClick={() => handleCombineQuantity(item.id, 1)}
                             className="w-full bg-[rgb(250,162,34)] text-gray-900 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm"
                           >
                             + Add
-</button>
+                          </button>
                         )}
                       </div>
                     </div>
@@ -766,80 +768,76 @@ const ProductPage: React.FC = () => {
           <div className="mt-6">
             <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm">
               <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-3 sm:mb-4">Select Delivery Days</h3>
-              
+
               {/* Delivery Frequency Tabs */}
               <div className="flex gap-1.5 sm:gap-2 mb-3 sm:mb-4 w-full sm:w-[70%]">
-                  <button
-                    onClick={() => {
+                <button
+                  onClick={() => {
                     setDeliveryFrequency("Daily");
-                      setSelectedType("DAILY");
+                    setSelectedType("DAILY");
                     setSelectedDays([]);
-                    }}
-                  className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-semibold transition-colors ${
-                    deliveryFrequency === "Daily"
-                      ? "bg-[rgb(250,162,34)] text-gray-900"
-                      : "bg-white border-2 border-gray-400 text-gray-900"
-                  }`}
+                  }}
+                  className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-semibold transition-colors ${deliveryFrequency === "Daily"
+                    ? "bg-[rgb(250,162,34)] text-gray-900"
+                    : "bg-white border-2 border-gray-400 text-gray-900"
+                    }`}
                 >
                   Daily
-                  </button>
-                  <button
-                    onClick={() => {
+                </button>
+                <button
+                  onClick={() => {
                     setDeliveryFrequency("Mon-Sat");
                     setSelectedType("CUSTOM");
                     setSelectedDays(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
-                    }}
-                  className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-semibold transition-colors ${
-                    deliveryFrequency === "Mon-Sat"
-                      ? "bg-[rgb(250,162,34)] text-gray-900"
-                      : "bg-white border-2 border-gray-400 text-gray-900"
-                  }`}
+                  }}
+                  className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-semibold transition-colors ${deliveryFrequency === "Mon-Sat"
+                    ? "bg-[rgb(250,162,34)] text-gray-900"
+                    : "bg-white border-2 border-gray-400 text-gray-900"
+                    }`}
                 >
                   Mon-Sat
-                  </button>
-                  <button
-                    onClick={() => {
+                </button>
+                <button
+                  onClick={() => {
                     setDeliveryFrequency("Customize");
-                      setSelectedType("CUSTOM");
+                    setSelectedType("CUSTOM");
                     // Pre-select all days when switching to Customize mode
                     setSelectedDays(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
-                    }}
-                  className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-semibold transition-colors ${
-                    deliveryFrequency === "Customize"
-                      ? "bg-[rgb(250,162,34)] text-gray-900"
-                      : "bg-white border-2 border-gray-400 text-gray-900"
-                  }`}
-                  >
+                  }}
+                  className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-semibold transition-colors ${deliveryFrequency === "Customize"
+                    ? "bg-[rgb(250,162,34)] text-gray-900"
+                    : "bg-white border-2 border-gray-400 text-gray-900"
+                    }`}
+                >
                   Customize
-                  </button>
-            </div>
+                </button>
+              </div>
 
               {/* Individual Day Selectors */}
               {(deliveryFrequency === "Customize" || deliveryFrequency === "Mon-Sat") && (
                 <div className="mb-3 sm:mb-4">
                   <div className="flex gap-0.5 sm:gap-1 justify-between">
                     {weekDays.map((day) => (
-                        <button
+                      <button
                         key={day.day}
                         onClick={() => {
                           if (deliveryFrequency === "Customize" && day.enabled) {
                             handleDaySelection(day.day);
                           }
-                          }}
-                        className={`w-14 sm:w-20 h-8 sm:h-10 rounded-2xl flex items-center justify-center text-xs sm:text-sm font-semibold transition-colors ${
-                          !day.enabled
-                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                            : selectedDays.includes(day.day)
+                        }}
+                        className={`w-14 sm:w-20 h-8 sm:h-10 rounded-2xl flex items-center justify-center text-xs sm:text-sm font-semibold transition-colors ${!day.enabled
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : selectedDays.includes(day.day)
                             ? "bg-[rgb(250,162,34)] text-gray-900"
                             : "bg-white border-2 border-gray-400 text-gray-900"
-                        }`}
+                          }`}
                         disabled={!day.enabled || deliveryFrequency === "Mon-Sat"}
                       >
                         {day.day}
-                        </button>
-                ))}
-            </div>
-          </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {/* Warning Message */}
@@ -849,7 +847,7 @@ const ProductPage: React.FC = () => {
                   <p className="text-xs sm:text-sm font-bold text-gray-700">
                     Please select at least 3 days for a 1-week subscription
                   </p>
-            </div>
+                </div>
               )}
 
               {/* Subscribe Button */}
@@ -863,21 +861,20 @@ const ProductPage: React.FC = () => {
                   handleSubscribe();
                 }}
                 disabled={deliveryFrequency === "Customize" && selectedDays.length < 3}
-                className={`w-full py-3 sm:py-3.5 rounded-2xl text-sm sm:text-[15px] font-semibold ${
-                  deliveryFrequency === "Customize" && selectedDays.length < 3
-                    ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                    : "bg-[rgb(250,162,34)] text-black hover:opacity-90"
-                }`}
+                className={`w-full py-3 sm:py-3.5 rounded-2xl text-sm sm:text-[15px] font-semibold ${deliveryFrequency === "Customize" && selectedDays.length < 3
+                  ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                  : "bg-[rgb(250,162,34)] text-black hover:opacity-90"
+                  }`}
               >
                 {deliveryFrequency === "Daily"
                   ? `Subscribe for ₹${getPriceDisplay().price}/Pack`
                   : deliveryFrequency === "Mon-Sat"
-                  ? `Subscribe for ₹${getPriceDisplay().price}/Pack`
-                  : selectedDays.length >= 3
-                  ? `Subscribe for ₹${getPriceDisplay().price}/Pack`
-                  : "Select at least 3 days to subscribe"}
+                    ? `Subscribe for ₹${getPriceDisplay().price}/Pack`
+                    : selectedDays.length >= 3
+                      ? `Subscribe for ₹${getPriceDisplay().price}/Pack`
+                      : "Select at least 3 days to subscribe"}
               </button>
-                            </div>
+            </div>
           </div>
 
           {/* Delivery Information Banner */}
@@ -896,19 +893,18 @@ const ProductPage: React.FC = () => {
               {/* Tabs */}
               <div className="flex border-b border-gray-200">
                 {(["Description", "Product Info", "More"] as const).map((tab) => (
-                              <button
+                  <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`flex-1 py-4 text-sm font-medium transition-colors ${
-                      activeTab === tab
-                        ? "text-gray-900 border-b-2 border-gray-900"
-                        : "text-gray-500"
-                    }`}
+                    className={`flex-1 py-4 text-sm font-medium transition-colors ${activeTab === tab
+                      ? "text-gray-900 border-b-2 border-gray-900"
+                      : "text-gray-500"
+                      }`}
                   >
                     {tab}
-                              </button>
+                  </button>
                 ))}
-                            </div>
+              </div>
 
               {/* Tab Content */}
               <div className="p-4">
@@ -923,9 +919,9 @@ const ProductPage: React.FC = () => {
                         <span className="text-sm text-gray-600">
                           {item.name} {item.description && `- ${item.description}`}
                         </span>
-                        </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
                 {activeTab === "Product Info" && (
                   <div className="text-sm text-gray-600">
@@ -935,10 +931,10 @@ const ProductPage: React.FC = () => {
                 {activeTab === "More" && (
                   <div className="text-sm text-gray-600">
                     <p>Additional information coming soon.</p>
-                </div>
+                  </div>
                 )}
+              </div>
             </div>
-          </div>
           </div>
         </div>
 

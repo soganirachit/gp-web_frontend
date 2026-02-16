@@ -246,14 +246,13 @@ const NameInput: React.FC = () => {
             whileTap={{ scale: 0.98 }}
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="w-full py-3.5 text-white rounded-xl font-medium transition-colors"
-            style={{ backgroundColor: theme.colors.primary }}
+            className={`w-full py-3.5 rounded-xl font-medium transition-colors ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
           >
             {isSubmitting ? (
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                className="w-5 h-5 border-2 border-white border-t-transparent rounded-full mx-auto"
+                className={`w-5 h-5 border-2 border-t-transparent rounded-full mx-auto ${feature === 'gpDaily' ? 'border-black' : 'border-white'}`}
               />
             ) : (
               "Continue"

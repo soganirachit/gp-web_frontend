@@ -23,6 +23,12 @@ import storeFaqUpIcon from "../assets/svg/gp_store_svg/storefaqup.svg";
 
 export type Feature = "gpDaily" | "gpStore";
 
+// Feature flags - Set to false to disable gp-daily feature
+export const FEATURE_FLAGS = {
+  gpDailyEnabled: false, // Set to false to disable gp-daily, only gp-store will be accessible
+  gpStoreEnabled: true,
+} as const;
+
 export interface FeatureThemeAssets {
   loginHero: string;
   otpHero: string;
@@ -70,7 +76,7 @@ export const featureThemes: Record<Feature, FeatureTheme> = {
     },
     classes: {
       authPageBackground: "bg-[#FFFBEB]",
-      primaryButton: "bg-[#FAA222] text-white",
+      primaryButton: "bg-[#FAA222] text-black",
       primaryButtonHover: "hover:bg-[#DD7600]",
       authIndicatorActive: "bg-[#FAA222]",
       authIndicatorInactive: "bg-gray-300",
@@ -128,8 +134,12 @@ export const getFeatureFromPath = (pathname: string): Feature => {
     return "gpStore";
   }
   if (pathname.startsWith("/gp-daily")) {
+    // If gp-daily is disabled, redirect to gp-store
+    if (!FEATURE_FLAGS.gpDailyEnabled) {
+      return "gpStore";
+    }
     return "gpDaily";
   }
-  // Default to gpDaily if no feature prefix is found
-  return "gpDaily";
+  // Default to gpStore if gp-daily is disabled, otherwise gpDaily
+  return FEATURE_FLAGS.gpDailyEnabled ? "gpDaily" : "gpStore";
 };

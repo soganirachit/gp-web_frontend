@@ -14,6 +14,7 @@ import { subscriptionService } from "../../services/subscription.service";
 import { customerService } from "../../services/getcustomer.service";
 import { FaPen } from "react-icons/fa";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import Spinner from "../common/Spinner";
 
 const AddressSelection: React.FC = () => {
   const navigate = useNavigate();
@@ -824,6 +825,15 @@ const AddressSelection: React.FC = () => {
   };
 
 
+
+  if (loading && addresses.length === 0 && !showAddForm) {
+    return (
+      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+        <Spinner size={400} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#FFFBEB]">
       {/* Header */}
@@ -1068,8 +1078,20 @@ const AddressSelection: React.FC = () => {
                   {/* Row 3: Location - City - Phone */}
                   <div className="flex items-center text-gray-500 text-sm gap-2">
                     <FaMapMarkerAlt className="text-gray-900" />
-                    <span className="font-medium text-gray-700">{address.city}</span>
-                    <span className="ml-3 font-medium text-gray-800">+91 {address.associatedPhoneNumber}</span>
+                    <span className="font-medium text-gray-700">
+                      {address.city && address.city.toLowerCase() !== 'unknown' ? (
+                        address.city
+                      ) : (
+                        <span className="italic">NA</span>
+                      )}
+                    </span>
+                    <span className="ml-3 font-medium text-gray-800">
+                      {address.associatedPhoneNumber ? (
+                        `+91 ${address.associatedPhoneNumber}`
+                      ) : (
+                        <span className="italic">NA</span>
+                      )}
+                    </span>
                   </div>
                 </div>
               ))}

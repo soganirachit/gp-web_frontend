@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FaChevronRight,
@@ -10,6 +10,7 @@ import {
 } from 'react-icons/io5';
 import BottomNav from '../../components/layout/BottomNav';
 import { customerService } from '@/services/getcustomer.service';
+import Spinner from '../../components/common/Spinner';
 
 // Import SVG icons
 import subscriptionIcon from '../../assets/icon/subscription.svg';
@@ -36,8 +37,11 @@ const Settings: React.FC = () => {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
 
-  const [, setLoading] = useState(false);
-  const [, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedStore, setSelectedStore] = useState<string>('');
+  const [isStoreDropdownOpen, setIsStoreDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -57,6 +61,23 @@ const Settings: React.FC = () => {
         setLoading(false);
       });
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsStoreDropdownOpen(false);
+      }
+    };
+
+    if (isStoreDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isStoreDropdownOpen]);
 
   // GP Store menu items (6 options only)
   const gpStoreMenuItems = [
@@ -219,11 +240,20 @@ const Settings: React.FC = () => {
     return `+91 ${phone}`;
   };
 
+  // Show full-page loader while data is loading
+  if (loading) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${theme.classes.authPageBackground}`}>
+        <Spinner size={400} />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#FFFBEB]">
-      <div className="w-full max-w-[800px] mx-auto">
+    <div className={`min-h-screen ${theme.classes.authPageBackground} overflow-x-hidden`} style={{ width: '100%', maxWidth: '100vw' }}>
+      <div className="w-full max-w-[800px] mx-auto" style={{ width: '100%', maxWidth: '100%' }}>
         {/* Content Container */}
-        <div className="w-full px-4">
+        <div className="w-full px-4 overflow-x-hidden" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
           {/* User Profile Card */}
           <div className="bg-white mt-4 p-4 rounded-xl shadow-sm relative">
             <button
@@ -232,26 +262,118 @@ const Settings: React.FC = () => {
             >
               <IoCreateOutline className="text-xl" />
             </button>
-            <div className="flex items-center gap-4">
-              <div className="relative w-20 h-20 flex-shrink-0 flex items-center justify-center">
-                <img
-                  src={theme.assets.profileBackground}
-                  alt="Profile background"
-                  className="absolute inset-0 w-full h-full object-contain"
-                />
-                <img
-                  src={theme.assets.profileLogo}
-                  alt="Account"
-                  className="relative z-10 w-7 h-7 object-contain"
-                />
+              <div className="flex items-center gap-4">
+                <div className="relative w-20 h-20 flex-shrink-0 flex items-center justify-center">
+                  <img
+                    src={theme.assets.profileBackground}
+                    alt="Profile background"
+                    className="absolute inset-0 w-full h-full object-contain"
+                  />
+                  <img
+                    src={theme.assets.profileLogo}
+                    alt="Account"
+                    className="relative z-10 w-7 h-7 object-contain"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg font-semibold text-gray-900 truncate">{userName || 'User Name'}</h2>
+                  <p className="text-gray-500 text-[15px] mt-0.5">{formatPhoneNumber(userPhone)}</p>
+                  <p className={`text-[15px] mt-0.5 ${hasEmail ? 'text-gray-500' : 'text-blue-600'}`}>
+                    {userEmail || 'No email'}
+                  </p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-semibold text-gray-900 truncate">{userName || 'User Name'}</h2>
-                <p className="text-gray-500 text-[15px] mt-0.5">{formatPhoneNumber(userPhone)}</p>
-                <p className={`text-[15px] mt-0.5 ${hasEmail ? 'text-gray-500' : 'text-blue-600'}`}>
-                  {userEmail || 'No email'}
-                </p>
-              </div>
+          </div>
+
+          <div className="bg-white mt-4 rounded-xl shadow-sm p-3 sm:p-4" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+            <h3 className="text-[15px] font-medium text-gray-900 mb-3">Select Store</h3>
+            <div ref={dropdownRef} className="relative w-full" style={{ width: '100%', maxWidth: '100%' }}>
+              {/* Custom Dropdown Button */}
+              <button
+                type="button"
+                onClick={() => setIsStoreDropdownOpen(!isStoreDropdownOpen)}
+                className="w-full bg-gray-50 border border-gray-200 text-gray-700 py-3 pl-3 sm:pl-4 pr-8 sm:pr-10 rounded-lg text-left text-sm sm:text-base focus:outline-none focus:bg-white focus:border-gray-500 transition-colors flex items-center justify-between"
+                style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
+              >
+                <span className="truncate">
+                  {selectedStore || 'Choose a store'}
+                </span>
+                <FaChevronRight 
+                  className={`transform transition-transform flex-shrink-0 text-xs text-gray-400 ${isStoreDropdownOpen ? 'rotate-180' : 'rotate-90'}`}
+                  style={{ marginLeft: '8px' }}
+                />
+              </button>
+
+              {/* Custom Dropdown Options */}
+              {isStoreDropdownOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-10" 
+                    onClick={() => setIsStoreDropdownOpen(false)}
+                  />
+                  <div 
+                    className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
+                    style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStore('');
+                        setIsStoreDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base text-gray-700 hover:bg-gray-50 transition-colors truncate"
+                      style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
+                    >
+                      Choose a store
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStore('GendaPhool Store - Indiranagar');
+                        setIsStoreDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base transition-colors truncate ${
+                        selectedStore === 'GendaPhool Store - Indiranagar' 
+                          ? 'bg-gray-100 text-gray-900' 
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                      style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
+                    >
+                      GendaPhool Store - Indiranagar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStore('GendaPhool Store - Koramangala');
+                        setIsStoreDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base transition-colors truncate ${
+                        selectedStore === 'GendaPhool Store - Koramangala' 
+                          ? 'bg-gray-100 text-gray-900' 
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                      style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
+                    >
+                      GendaPhool Store - Koramangala
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStore('GendaPhool Store - Whitefield');
+                        setIsStoreDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base transition-colors truncate ${
+                        selectedStore === 'GendaPhool Store - Whitefield' 
+                          ? 'bg-gray-100 text-gray-900' 
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                      style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
+                    >
+                      GendaPhool Store - Whitefield
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -301,7 +423,7 @@ const Settings: React.FC = () => {
             <button
               onClick={handleLogoutClick}
               className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-semibold transition-colors"
-              style={{ 
+              style={{
                 backgroundColor: theme.colors.primary,
                 color: feature === 'gpStore' ? 'white' : 'black'
               }}

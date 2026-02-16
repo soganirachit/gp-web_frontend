@@ -5,6 +5,7 @@ import { IoArrowBack } from 'react-icons/io5';
 
 import { basePackService, BasePack } from '../../../services/basepack.service';
 import { subscriptionService } from '../../../services/subscription.service';
+import Spinner from '../../../components/common/Spinner';
 
 // Mock data removed in favor of API call
 
@@ -47,6 +48,7 @@ const ModifySubscription: React.FC = () => {
   const [addOns, setAddOns] = useState<{ [key: string]: number }>({});
   const [availableAddOns, setAvailableAddOns] = useState<BasePack[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -92,11 +94,14 @@ const ModifySubscription: React.FC = () => {
   useEffect(() => {
     const fetchAddOns = async () => {
       try {
+        setIsLoading(true);
         const products = await basePackService.getAllBasePacks();
         setAvailableAddOns(products.slice(0, 3));
       } catch (error) {
         console.error("Failed to fetch add-ons", error);
         toast.error("Failed to load add-ons");
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -175,6 +180,14 @@ const ModifySubscription: React.FC = () => {
       setIsUpdating(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[#FFFBEB]">
+        <Spinner size={400} />
+      </div>
+    );
+  }
 
   if (!subscription) {
     return (

@@ -19,7 +19,7 @@ import locationhomeIcon from "../assets/svg/gp_daily svg/locationhome.svg";
 import profilehomeIcon from "../assets/svg/gp_daily svg/profilehome.svg";
 import profilelogoIcon from "../assets/svg/gp_daily svg/profilelogo.svg";
 import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
-import midBannerPng from "../assets/svg/gp_store_svg/mid_banner.png";
+import bannerSvg from "../assets/svg/gp_store_svg/banner.svg";
 import BottomNavigation from "../components/layout/BottomNav";
 import namasteSvg from '../assets/svg/namaste.svg';
 
@@ -133,7 +133,7 @@ const GpStore_Homepage: React.FC = () => {
 
     if (isPageLoading) {
         return (
-            <div className="min-h-screen bg-[#F0F8F0] flex items-center justify-center">
+            <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
                 <Spinner size={400} />
             </div>
         );
@@ -270,18 +270,25 @@ const GpStore_Homepage: React.FC = () => {
 
                     {/* Promotional Banner */}
                     <div className="px-4 py-4">
-                        <div className="relative rounded-2xl overflow-hidden">
+                        <div className="relative w-full rounded-2xl overflow-hidden bg-[#F1FCF0]">
+                            <div className="absolute inset-0 flex flex-col justify-center pl-6 sm:pl-10 z-10 w-3/4 sm:w-2/3">
+                                <h2 className="font-ibm-plex-serif text-2xl sm:text-3xl font-semibold text-[#1A1A1A] leading-tight mb-4 sm:mb-6">
+                                    Wedding Bliss,
+                                    <br />
+                                    Wrapped in Gifts
+                                </h2>
+                                <button
+                                    onClick={() => navigate(`${basePath}/Products`)}
+                                    className="w-fit bg-[#2A6B28] text-white px-6 py-2.5 sm:px-8 sm:py-3 rounded-lg font-medium text-sm sm:text-base tracking-wide hover:bg-[#1e4d1c] transition-colors shadow-sm"
+                                >
+                                    SHOP NOW
+                                </button>
+                            </div>
                             <img
-                                src={midBannerPng}
-                                alt="Wedding Bliss, Wrapped in Gifts"
-                                className="w-full h-auto"
+                                src={bannerSvg}
+                                alt="Wedding Bliss"
+                                className="w-full h-auto object-cover ml-auto"
                             />
-                            <button
-                                onClick={() => navigate(`${basePath}/Products`)}
-                                className="absolute bottom-6 left-6 bg-[#2A6B28] text-white px-6 py-2.5 rounded-lg font-medium text-sm hover:bg-[#1e4d1c] transition-colors shadow-lg"
-                            >
-                                SHOP NOW
-                            </button>
                         </div>
                     </div>
 

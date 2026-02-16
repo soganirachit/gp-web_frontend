@@ -41,7 +41,7 @@ const ExploreMore: React.FC = () => {
     if (activeFeature === "gpStore") {
       navigate(`/gp-store/product/${product.id}`, { state: { product } });
     } else {
-      navigate(`/gp-daily/product/${product.id}`, { state: { product } });
+    navigate(`/gp-daily/product/${product.id}`, { state: { product } });
     }
   };
 
@@ -57,14 +57,14 @@ const ExploreMore: React.FC = () => {
           const activeStoreProducts = storeProductsResult.filter((item: StoreProduct) => item.isAvailable);
           setStoreProducts(activeStoreProducts);
         } else {
-          const [productsResult, basePacksResult] = await Promise.all([
-            productService.getAllProducts(),
-            basePackService.getAllBasePacks().catch(() => [])
-          ]);
+        const [productsResult, basePacksResult] = await Promise.all([
+          productService.getAllProducts(),
+          basePackService.getAllBasePacks().catch(() => [])
+        ]);
 
-          const activeProducts = productsResult.filter((item: Product) => item.isActive);
-          setProducts(activeProducts);
-          setBasePacks(basePacksResult);
+        const activeProducts = productsResult.filter((item: Product) => item.isActive);
+        setProducts(activeProducts);
+        setBasePacks(basePacksResult);
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -197,17 +197,17 @@ const ExploreMore: React.FC = () => {
                     ? (item.type === "LEAVES" ? "kg" : "box")
                     : "Day";
                   return (
-                    <div key={item.id} className="flex-shrink-0">
-                      <ProductCard
-                        imageUrl={getImageUrl(item.imagesUrl || (item as BasePack).imagesUrl)}
-                        packName={item.name}
-                        description={item.description || "Mixed flowers daily"}
+                  <div key={item.id} className="flex-shrink-0">
+                    <ProductCard
+                      imageUrl={getImageUrl(item.imagesUrl || (item as BasePack).imagesUrl)}
+                      packName={item.name}
+                      description={item.description || "Mixed flowers daily"}
                         price={`₹${item.sellingPrice}/${priceUnit}`}
-                        showDailyButton={true}
-                        showBestsellerTag={index === 0 || index === 2}
-                        onClick={() => handleProductClick(item)}
-                      />
-                    </div>
+                      showDailyButton={true}
+                      showBestsellerTag={index === 0 || index === 2}
+                      onClick={() => handleProductClick(item)}
+                    />
+                  </div>
                   );
                 })}
               </div>
