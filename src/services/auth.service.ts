@@ -234,6 +234,21 @@ export const authService = {
         refresh: token,
       });
 
+      // Handle Django API response structure: { success, message, data: { access_token } }
+      if (response.data.success && response.data.data) {
+        const { access_token } = response.data.data;
+        
+        if (access_token) {
+          localStorage.setItem("token", access_token);
+          return {
+            access_token,
+            success: true,
+            message: response.data.message || "Token refreshed successfully",
+          };
+        }
+      }
+
+      // Fallback for old response format (if any)
       if (response.data.access) {
         localStorage.setItem("token", response.data.access);
         if (response.data.refresh) {
@@ -265,37 +280,61 @@ export const authService = {
 
   /**
    * Logs out user by calling API and removing stored auth data
+   * @returns Response with success status and message
    */
   async logout() {
-    try {
-      const token = localStorage.getItem("token");
-      
-      // Call logout API endpoint if token exists
-      if (token) {
-        try {
-          await axios.post(
-            `${API_URL}/logout/`,
-            {},
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-        } catch (error) {
-          // Continue with local cleanup even if API call fails
-          console.error("Logout API call failed:", error);
+    let apiResponse = null;
+    const token = localStorage.getItem("token");
+    
+    // Call logout API endpoint if token exists
+    if (token) {
+      try {
+        const response = await axios.post(
+          `${API_URL}/logout/`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        // Handle Django API response structure: { success, message, data: null }
+        if (response.data.success) {
+          apiResponse = {
+            success: true,
+            message: response.data.message || "Logged out successfully",
+          };
+        } else {
+          apiResponse = response.data;
         }
+      } catch (error: any) {
+        // Continue with local cleanup even if API call fails
+        console.error("Logout API call failed:", error);
+        apiResponse = {
+          success: false,
+          message: error.response?.data?.message || "Logout API call failed, but local logout completed",
+          error: error.response?.data || error,
+        };
       }
-    } catch (error) {
-      console.error("Logout error:", error);
-    } finally {
-      // Always clear local storage
-      localStorage.removeItem("token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("phoneNumber");
-      localStorage.removeItem("userName");
-      localStorage.removeItem("userId");
     }
+    
+    // Always clear local storage regardless of API call result
+    localStorage.removeItem("token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("phoneNumber");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userId");
+    // Clear cart data on logout
+    localStorage.removeItem("gp_store_cart");
+    localStorage.removeItem("gp_store_cart_delivery_info");
+    // Dispatch event to notify cart context
+    window.dispatchEvent(new Event('tokenRemoved'));
+
+    // Return success if no token was present (already logged out) or if API call succeeded
+    return apiResponse || {
+      success: true,
+      message: "Logged out successfully",
+    };
   },
 };

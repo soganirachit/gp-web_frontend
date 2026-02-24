@@ -5,8 +5,9 @@ import { MdKeyboardArrowDown } from "react-icons/md";
 import { motion } from "framer-motion";
 import { useFeatureTheme } from "../context/FeatureThemeContext";
 import { addressService } from "../services/address.service";
-import { storeProductService, Product } from "../services/storeProduct.service";
 import { customerService } from "../services/getcustomer.service";
+import { productService, Category, BestSeller } from "../services/product.service";
+import { storeService } from "../services/store.service";
 import { toast } from "react-hot-toast";
 import Spinner from "../components/common/Spinner";
 import ErrorBoundary from "../components/ErrorBoundary";
@@ -23,17 +24,6 @@ import bannerSvg from "../assets/svg/gp_store_svg/banner.svg";
 import BottomNavigation from "../components/layout/BottomNav";
 import namasteSvg from '../assets/svg/namaste.svg';
 
-// Category cards data
-const categoryCards = [
-    { id: 1, name: "Exotic Flowers & Bouquets", image: "https://via.placeholder.com/160" },
-    { id: 2, name: "Pooja Flowers & Leaves", image: "https://via.placeholder.com/160" },
-    { id: 3, name: "Festival Season", image: "https://via.placeholder.com/160" },
-    { id: 4, name: "Wedding Specials", image: "https://via.placeholder.com/160" },
-    { id: 5, name: "Pooja Samagri", image: "https://via.placeholder.com/160" },
-    { id: 6, name: "Customized Orders", image: "https://via.placeholder.com/160" },
-    { id: 7, name: "Pooja Garlands", image: "https://via.placeholder.com/160" },
-    { id: 8, name: "Customized Design", image: "https://via.placeholder.com/160" },
-];
 
 const GpStore_Homepage: React.FC = () => {
     const navigate = useNavigate();
@@ -42,10 +32,15 @@ const GpStore_Homepage: React.FC = () => {
     const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
 
     const [deliveryLocation, setDeliveryLocation] = useState<string>("");
+    const [addressType, setAddressType] = useState<string>("Home");
     const [isLoadingAddress, setIsLoadingAddress] = useState(true);
-    const [products, setProducts] = useState<Product[]>([]);
+    const [products, setProducts] = useState<BestSeller[]>([]);
     const [isLoadingProducts, setIsLoadingProducts] = useState(true);
     const [userFirstName, setUserFirstName] = useState<string>("");
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+    const [bestSellers, setBestSellers] = useState<BestSeller[]>([]);
+    const [isLoadingBestSellers, setIsLoadingBestSellers] = useState(true);
 
     const fetchCustomerName = async () => {
         try {
@@ -62,17 +57,102 @@ const GpStore_Homepage: React.FC = () => {
         }
     };
 
-    const fetchProducts = async () => {
+    const fetchProducts = async (signal?: AbortSignal) => {
         try {
             setIsLoadingProducts(true);
-            const fetchedProducts = await storeProductService.getAllStoreProducts();
-            const activeProducts = fetchedProducts.filter((p) => p.isAvailable);
-            setProducts(activeProducts);
-        } catch (error) {
+            // Use productService instead of storeProductService
+            // Get best sellers or all products based on store ID
+            const storeId = storeService.getStoreIdForProducts();
+            
+            // Ensure store ID is available before fetching (especially for non-logged-in users)
+            if (!storeId) {
+                console.warn("Store ID not available, products may not load correctly");
+            }
+            
+            const fetchedProducts = await productService.getBestSellers(storeId || undefined, signal);
+            // Best sellers are already filtered, but ensure we have products
+            setProducts(fetchedProducts || []);
+        } catch (error: any) {
+            // Don't log error if request was aborted (component unmounted)
+            if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+                console.log('Products request was canceled');
+                return;
+            }
             console.error("Error fetching products:", error);
+            // If 401 error, user might not be authenticated - this is OK for non-logged-in users
+            // Products should still be accessible without auth if store_id is provided
+            if (error?.response?.status === 401) {
+                console.warn("Products endpoint returned 401 - store_id might be required");
+            }
             setProducts([]);
         } finally {
             setIsLoadingProducts(false);
+        }
+    };
+
+    const fetchCategories = async (signal?: AbortSignal) => {
+        try {
+            setIsLoadingCategories(true);
+            const storeId = storeService.getStoreIdForProducts();
+            
+            // Ensure store ID is available before fetching
+            if (!storeId) {
+                console.warn("Store ID not available, categories may not load correctly");
+            }
+            
+            const fetchedCategories = await productService.getCategories(
+                storeId || undefined,
+                "store",
+                signal
+            );
+            // Filter only active categories and sort by display_order
+            const activeCategories = fetchedCategories
+                .filter((cat) => cat.is_active)
+                .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+            setCategories(activeCategories);
+        } catch (error: any) {
+            // Don't log error if request was aborted (component unmounted)
+            if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+                console.log('Categories request was canceled');
+                return;
+            }
+            console.error("Error fetching categories:", error);
+            // If 401 error, user might not be authenticated - this is OK for non-logged-in users
+            if (error?.response?.status === 401) {
+                console.warn("Categories endpoint returned 401 - store_id might be required");
+            }
+            setCategories([]);
+        } finally {
+            setIsLoadingCategories(false);
+        }
+    };
+
+    const fetchBestSellers = async (signal?: AbortSignal) => {
+        try {
+            setIsLoadingBestSellers(true);
+            const storeId = storeService.getStoreIdForProducts();
+            
+            // Ensure store ID is available before fetching
+            if (!storeId) {
+                console.warn("Store ID not available, best sellers may not load correctly");
+            }
+            
+            const fetchedBestSellers = await productService.getBestSellers(storeId || undefined, signal);
+            setBestSellers(fetchedBestSellers);
+        } catch (error: any) {
+            // Don't log error if request was aborted (component unmounted)
+            if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+                console.log('Best sellers request was canceled');
+                return;
+            }
+            console.error("Error fetching best sellers:", error);
+            // If 401 error, user might not be authenticated - this is OK for non-logged-in users
+            if (error?.response?.status === 401) {
+                console.warn("Best sellers endpoint returned 401 - store_id might be required");
+            }
+            setBestSellers([]);
+        } finally {
+            setIsLoadingBestSellers(false);
         }
     };
 
@@ -80,56 +160,115 @@ const GpStore_Homepage: React.FC = () => {
         try {
             setIsLoadingAddress(true);
             const addresses = await addressService.getAllAddresses();
-            const latestAddress = addresses
+            // Get default address first, otherwise get the latest address
+            const defaultAddress = addresses.find(addr => addr.isDefault);
+            const selectedAddress = defaultAddress || addresses
                 .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
 
-            if (latestAddress) {
+            if (selectedAddress) {
                 const formattedAddress = [
-                    latestAddress.houseNo,
-                    latestAddress.streetName,
-                    latestAddress.area,
-                    latestAddress.city,
-                    latestAddress.state,
-                    latestAddress.pincode
+                    selectedAddress.houseNo,
+                    selectedAddress.streetName,
+                    selectedAddress.area,
+                    selectedAddress.city,
+                    selectedAddress.state,
+                    selectedAddress.pincode
                 ].filter(Boolean).join(', ');
                 setDeliveryLocation(formattedAddress);
+                setAddressType(selectedAddress.type || "Home");
             } else {
                 setDeliveryLocation("");
+                setAddressType("Home");
             }
         } catch (error) {
             console.error("Error fetching address:", error);
             setDeliveryLocation(localStorage.getItem("userLocation") || "");
+            setAddressType("Home");
         } finally {
             setIsLoadingAddress(false);
         }
     }, []);
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
-        if (token) {
-            fetchCustomerName();
-        }
-        fetchProducts();
-        fetchLatestAddress();
-    }, [fetchLatestAddress]);
+        let isMounted = true;
+        const abortController = new AbortController();
+        
+        const initializeStore = async () => {
+            const token = localStorage.getItem("token");
+            
+            if (token) {
+                // User is logged in
+                if (isMounted) {
+                    fetchCustomerName();
+                    fetchLatestAddress();
+                }
+            } else {
+                // User is not logged in - set address loading to false immediately
+                if (isMounted) {
+                    setIsLoadingAddress(false);
+                }
+                
+                // Get temporary store ID from location FIRST before fetching products
+                const existingTempStoreId = storeService.getTemporaryStoreId();
+                if (!existingTempStoreId) {
+                    try {
+                        await storeService.getStoreFromLocation();
+                        // Wait a bit to ensure store ID is set
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    } catch (error: any) {
+                        console.error("Error getting store from location:", error);
+                        // Continue without store ID - products might still load
+                    }
+                }
+            }
+            
+            // Only fetch if component is still mounted
+            if (isMounted) {
+                // Fetch data after store ID is available (especially important for non-logged-in users)
+                // Small delay to ensure store ID is set in localStorage
+                setTimeout(() => {
+                    if (isMounted) {
+                        fetchProducts(abortController.signal);
+                        fetchCategories(abortController.signal);
+                        fetchBestSellers(abortController.signal);
+                    }
+                }, token ? 0 : 200); // Small delay for non-logged-in users to ensure store ID is set
+            }
+        };
+
+        initializeStore();
+        
+        // Cleanup function to cancel requests and prevent state updates if component unmounts
+        return () => {
+            isMounted = false;
+            abortController.abort();
+        };
+        // Only run once on mount, fetchLatestAddress is stable due to useCallback
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleLocationClick = () => {
-        navigate(`${basePath}/location`, { state: { returnUrl: basePath } });
+        navigate(`${basePath}/addresses`);
     };
 
-    const handleProductClick = (product: Product) => {
-        navigate(`${basePath}/product/${product.id}`, { state: { product } });
+    const handleProductClick = (product: BestSeller) => {
+        const productSlug = product.slug;
+        navigate(`${basePath}/product/${productSlug}`, { state: { product } });
     };
 
-    const getImageUrl = (imagesUrl?: string | string[]): string => {
-        if (!imagesUrl) return "https://via.placeholder.com/160";
-        if (Array.isArray(imagesUrl)) {
-            return imagesUrl[0] || "https://via.placeholder.com/160";
+    const handleBestSellerClick = (bestSeller: BestSeller) => {
+        navigate(`${basePath}/product/${bestSeller.slug}`, { state: { product: bestSeller } });
+    };
+
+    const getImageUrl = (image?: string | string[] | null): string => {
+        if (!image) return "https://via.placeholder.com/160";
+        if (Array.isArray(image)) {
+            return image[0] || "https://via.placeholder.com/160";
         }
-        return imagesUrl;
+        return image;
     };
 
-    const isPageLoading = isLoadingAddress || isLoadingProducts;
+    const isPageLoading = isLoadingAddress || isLoadingProducts || isLoadingCategories || isLoadingBestSellers;
 
     if (isPageLoading) {
         return (
@@ -139,8 +278,7 @@ const GpStore_Homepage: React.FC = () => {
         );
     }
 
-    // Get best products (first 3)
-    const bestProducts = products.slice(0, 3);
+    // Get premium products (fallback to products if best sellers not available)
     const premiumProducts = products.slice(3, 6);
 
     return (
@@ -168,7 +306,7 @@ const GpStore_Homepage: React.FC = () => {
                                         onClick={handleLocationClick}
                                     >
                                         <div className="flex flex-col min-w-0">
-                                            <span className="text-sm sm:text-base font-bold text-gray-800">Home</span>
+                                            <span className="text-sm sm:text-base font-bold text-gray-800">{addressType}</span>
                                             <span className="text-xs sm:text-sm text-gray-700 truncate font-medium">
                                                 {isLoadingAddress ? 'Loading...' : deliveryLocation || 'Tap to set address'}
                                             </span>
@@ -247,21 +385,34 @@ const GpStore_Homepage: React.FC = () => {
                     <div className="px-4 py-4">
                         <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800 mb-6">Pick your Blooms</h2>
                         <div className="grid grid-cols-4 gap-3">
-                            {categoryCards.map((card) => (
+                            {categories.map((category) => (
                                 <div
-                                    key={card.id}
+                                    key={category.id}
                                     className="flex flex-col items-center cursor-pointer"
-                                    onClick={() => navigate(`${basePath}/Products`)}
+                                    onClick={() => navigate(`${basePath}/products?category=${category.slug}`, { state: { categoryName: category.name, categorySlug: category.slug } })}
                                 >
-                                    <div className="w-full aspect-square bg-white rounded-2xl overflow-hidden mb-2 shadow-sm">
-                                        <img
-                                            src={card.image}
-                                            alt={card.name}
-                                            className="w-full h-full object-cover"
-                                        />
+                                    <div 
+                                        className="w-full aspect-square bg-white rounded-2xl overflow-hidden mb-2 shadow-sm flex items-center justify-center"
+                                        style={{ backgroundColor: category.color_code || '#ffffff' }}
+                                    >
+                                        {category.icon ? (
+                                            <img
+                                                src={category.icon}
+                                                alt={category.name}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    // Fallback to placeholder if image fails to load
+                                                    (e.target as HTMLImageElement).src = "https://via.placeholder.com/160";
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                                                {category.name.charAt(0)}
+                                            </div>
+                                        )}
                                     </div>
                                     <span className="text-xs text-center text-gray-700 font-medium leading-tight">
-                                        {card.name}
+                                        {category.name}
                                     </span>
                                 </div>
                             ))}
@@ -305,29 +456,55 @@ const GpStore_Homepage: React.FC = () => {
                             </button>
                         </div>
                         <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                            {bestProducts.map((product) => (
-                                <div
-                                    key={product.id}
-                                    className="flex-shrink-0 w-[160px] bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
-                                    onClick={() => handleProductClick(product)}
-                                >
-                                    <div className="aspect-square bg-[#FFFBEB] overflow-hidden">
-                                        <img
-                                            src={getImageUrl(product.imagesUrl)}
-                                            alt={product.name}
-                                            className="w-full h-full object-cover"
-                                        />
+                            {bestSellers.length > 0 ? (
+                                bestSellers.map((bestSeller) => (
+                                    <div
+                                        key={bestSeller.id}
+                                        className="flex-shrink-0 w-[160px] bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer relative"
+                                        onClick={() => handleBestSellerClick(bestSeller)}
+                                    >
+                                        <div className="aspect-square bg-[#FFFBEB] overflow-hidden relative">
+                                            {/* Label Badge - positioned over image */}
+                                            {bestSeller.labels && bestSeller.labels.length > 0 && (
+                                                <div className="absolute top-2 left-2 z-10">
+                                                    <span
+                                                        className="inline-block text-white text-[10px] font-semibold px-2 py-1 rounded"
+                                                        style={{ backgroundColor: bestSeller.labels[0].color_code || '#2A6B28' }}
+                                                    >
+                                                        {bestSeller.labels[0].name.toUpperCase()}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <img
+                                                src={bestSeller.primary_image || "https://via.placeholder.com/160"}
+                                                alt={bestSeller.name}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    (e.target as HTMLImageElement).src = "https://via.placeholder.com/160";
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="p-3">
+                                            <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
+                                                {bestSeller.name}
+                                            </h3>
+                                            {bestSeller.short_description && (
+                                                <p className="text-xs text-gray-500 mb-1 truncate">
+                                                    {bestSeller.short_description}
+                                                </p>
+                                            )}
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-gray-900 text-base font-bold">
+                                                    ₹{bestSeller.current_price}
+                                                </p>
+                                                <FaChevronRight className="text-gray-400 text-sm" />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="p-3">
-                                        <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
-                                            {product.name}
-                                        </h3>
-                                        <p className="text-[#2A6B28] text-base font-bold">
-                                            ₹{product.sellingPrice}/{product.type === "LEAVES" ? "kg" : "box"}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
+                                ))
+                            ) : (
+                                <div className="text-gray-500 text-sm">No best sellers available</div>
+                            )}
                         </div>
                     </div>
 
@@ -352,7 +529,7 @@ const GpStore_Homepage: React.FC = () => {
                                 >
                                     <div className="aspect-square bg-[#FFFBEB] overflow-hidden">
                                         <img
-                                            src={getImageUrl(product.imagesUrl)}
+                                            src={getImageUrl(product.primary_image)}
                                             alt={product.name}
                                             className="w-full h-full object-cover"
                                         />
@@ -362,7 +539,7 @@ const GpStore_Homepage: React.FC = () => {
                                             {product.name}
                                         </h3>
                                         <p className="text-[#2A6B28] text-base font-bold">
-                                            ₹{product.sellingPrice}/{product.type === "LEAVES" ? "kg" : "box"}
+                                            ₹{product.current_price}/{product.unit || "box"}
                                         </p>
                                     </div>
                                 </div>

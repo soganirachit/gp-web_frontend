@@ -50,6 +50,7 @@ const Home2: React.FC = () => {
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const [, setDays] = useState<DayInfo[]>([]);
   const [deliveryLocation, setDeliveryLocation] = useState<string>("");
+  const [addressType, setAddressType] = useState<string>("Home");
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number>(0);
@@ -275,27 +276,32 @@ const Home2: React.FC = () => {
       setIsLoadingAddress(true);
       const addresses = await addressService.getAllAddresses();
 
-      const latestAddress = addresses
+      // Get default address first, otherwise get the latest address
+      const defaultAddress = addresses.find(addr => addr.isDefault);
+      const selectedAddress = defaultAddress || addresses
         .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       [0];
 
-      if (latestAddress) {
+      if (selectedAddress) {
         const formattedAddress = [
-          latestAddress.houseNo,
-          latestAddress.streetName,
-          latestAddress.area,
-          latestAddress.city,
-          latestAddress.state,
-          latestAddress.pincode
+          selectedAddress.houseNo,
+          selectedAddress.streetName,
+          selectedAddress.area,
+          selectedAddress.city,
+          selectedAddress.state,
+          selectedAddress.pincode
         ].filter(Boolean).join(', ');
 
         setDeliveryLocation(formattedAddress);
+        setAddressType(selectedAddress.type || "Home");
       } else {
         setDeliveryLocation("");
+        setAddressType("Home");
       }
     } catch (error) {
       console.error("Error fetching address:", error);
       setDeliveryLocation(localStorage.getItem("userLocation") || "");
+      setAddressType("Home");
     } finally {
       setIsLoadingAddress(false);
     }
@@ -404,7 +410,7 @@ const Home2: React.FC = () => {
   };
 
   const handleLocationClick = () => {
-    navigate(`${basePath}/location`, { state: { returnUrl: basePath } });
+    navigate(`${basePath}/addresses`);
   };
 
   // Helper function to get image URL (handles both string and array)
@@ -467,7 +473,7 @@ const Home2: React.FC = () => {
                     onClick={handleLocationClick}
                   >
                     <div className="flex flex-col min-w-0">
-                      <span className="text-sm sm:text-base font-bold text-gray-800">Home</span>
+                      <span className="text-sm sm:text-base font-bold text-gray-800">{addressType}</span>
                       <span className="text-xs sm:text-sm text-gray-700 truncate font-medium">
                         {isLoadingAddress ? 'Loading...' : deliveryLocation || 'Tap to set address'}
                       </span>

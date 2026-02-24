@@ -66,18 +66,12 @@ export const customerService = {
         },
       });
 
-      // Handle Django API response structure: { success, message, data: { user } }
-      let user: DjangoUser;
-      
-      if (response.data.success && response.data.data?.user) {
-        user = response.data.data.user;
-      } else if (response.data.data) {
-        user = response.data.data;
-      } else if (response.data.user) {
-        user = response.data.user;
-      } else {
-        user = response.data;
+      // Handle Django API response structure: { success, message, data: { user object } }
+      if (!response.data.success || !response.data.data) {
+        throw new Error(response.data.message || "Failed to fetch customer data");
       }
+
+      const user: DjangoUser = response.data.data;
 
       // Map Django user structure to legacy CustomerDetails format
       const customerDetails: CustomerDetails = {
@@ -94,7 +88,11 @@ export const customerService = {
       return [customerDetails];
     } catch (error: unknown) {
       console.error("Error fetching customer:", error);
-      if (error instanceof Error || error instanceof AxiosError) {
+      if (error instanceof AxiosError) {
+        const errorMessage = error.response?.data?.message || error.message || "Failed to fetch customer data";
+        throw new Error(errorMessage);
+      }
+      if (error instanceof Error) {
         throw error;
       }
       throw new Error("An unknown error occurred");
@@ -114,18 +112,19 @@ export const customerService = {
         },
       });
 
-      // Handle Django API response structure
-      if (response.data.success && response.data.data?.user) {
-        return response.data.data.user;
-      } else if (response.data.data) {
-        return response.data.data;
-      } else if (response.data.user) {
-        return response.data.user;
+      // Handle Django API response structure: { success, message, data: { user object } }
+      if (!response.data.success || !response.data.data) {
+        throw new Error(response.data.message || "Failed to fetch user data");
       }
-      return response.data;
+
+      return response.data.data;
     } catch (error: unknown) {
       console.error("Error fetching current user:", error);
-      if (error instanceof Error || error instanceof AxiosError) {
+      if (error instanceof AxiosError) {
+        const errorMessage = error.response?.data?.message || error.message || "Failed to fetch user data";
+        throw new Error(errorMessage);
+      }
+      if (error instanceof Error) {
         throw error;
       }
       throw new Error("An unknown error occurred");

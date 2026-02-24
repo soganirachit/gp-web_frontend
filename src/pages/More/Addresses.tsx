@@ -190,9 +190,11 @@ const Addresses: React.FC = () => {
                                 {address.type || 'Others'}
                               </h3>
 
-                              <span className="bg-[#E6F4EA] text-[#1E8E3E] text-xs px-2 py-1 rounded-2xl font-semibold">
-                                Default
-                              </span>
+                              {address.isDefault && (
+                                <span className="bg-[#E6F4EA] text-[#1E8E3E] text-xs px-2 py-1 rounded-2xl font-semibold">
+                                  Default
+                                </span>
+                              )}
 
                             </div>
 

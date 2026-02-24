@@ -23,9 +23,19 @@ import storeFaqUpIcon from "../assets/svg/gp_store_svg/storefaqup.svg";
 
 export type Feature = "gpDaily" | "gpStore";
 
-// Feature flags - Set to false to disable gp-daily feature
+// Feature flags - Loaded from environment variables at build time
+// VITE_GP_DAILY_ENABLED should be set to "true" or "false" in .env file
+const getGpDailyEnabled = (): boolean => {
+  const envValue = import.meta.env.VITE_GP_DAILY_ENABLED;
+  if (envValue === undefined || envValue === null) {
+    return false; // Default to disabled if not set
+  }
+  // Convert string to boolean (handles "true", "True", "TRUE", "1", etc.)
+  return String(envValue).toLowerCase() === "true" || String(envValue) === "1";
+};
+
 export const FEATURE_FLAGS = {
-  gpDailyEnabled: false, // Set to false to disable gp-daily, only gp-store will be accessible
+  gpDailyEnabled: getGpDailyEnabled(), // Loaded from VITE_GP_DAILY_ENABLED env variable at build time
   gpStoreEnabled: true,
 } as const;
 

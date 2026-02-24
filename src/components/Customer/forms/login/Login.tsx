@@ -26,22 +26,47 @@ const Login = () => {
             const otpPath = `${basePath}/otp-verification`;
             navigate(otpPath, { state: { phoneNumber } });
         } catch (err: any) {
-            setError(
-                err?.error || err?.response?.data?.message || "Failed to send OTP"
-            );
+            let errorMessage = err?.error || err?.response?.data?.message || err?.message || "Failed to send OTP";
+            
+            // Handle throttling error with user-friendly message
+            if (errorMessage.includes("throttled") || errorMessage.includes("Expected available")) {
+                const match = errorMessage.match(/(\d+)\s*seconds?/i);
+                if (match) {
+                    const seconds = parseInt(match[1]);
+                    const minutes = Math.ceil(seconds / 60);
+                    errorMessage = `Too many requests. Please wait ${minutes} minute${minutes > 1 ? 's' : ''} before requesting another OTP.`;
+                } else {
+                    errorMessage = "Too many OTP requests. Please wait a few minutes before trying again.";
+                }
+            }
+            
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }
     };
 
+    const handleSkip = () => {
+        navigate('/gp-store');
+    };
+
     return (
         <div className={`min-h-screen w-screen fixed inset-0 flex flex-col items-center justify-center px-3 sm:px-4 py-4 sm:py-6 md:py-8 overflow-y-auto ${theme.classes.authPageBackground}`}>
+            {/* Skip Button - Top Right Corner */}
+            <button
+                onClick={handleSkip}
+                className="absolute top-4 sm:top-6 right-4 sm:right-6 text-gray-600 hover:text-gray-800 text-sm sm:text-base font-medium px-3 sm:px-4 py-2 transition-colors z-20"
+            >
+                Skip
+            </button>
+
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
                 className="w-full max-w-md relative z-10 flex flex-col"
             >
+
                 {/* Top Section - Orange Graphic with Badge */}
                 <div className="relative mb-4 sm:mb-6 md:mb-8 flex flex-col items-center">
                     {/* OTP Graphic */}

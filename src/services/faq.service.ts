@@ -1,34 +1,65 @@
 import axios from 'axios';
+import { getApiUrl } from '../config/api.config';
+import { headerService } from './headers.service';
 
-// Add a fallback value for the API base URL with the correct port
-export const API_BASE_URL = process.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+// Ensure API URL includes /api/v1 if not already in base URL
+const getFaqApiUrl = () => {
+  const baseUrl = getApiUrl();
+  // If base URL already includes /api/v1, don't add it again
+  if (baseUrl.includes('/api/v1')) {
+    return `${baseUrl}/support/faqs`;
+  }
+  // Otherwise, add /api/v1
+  return `${baseUrl}/api/v1/support/faqs`;
+};
+
+const API_URL = getFaqApiUrl();
 
 export interface FAQ {
-  id: string;
+  id: number;
   question: string;
   answer: string;
-  toBeDisplayed: 'VISIBLE' | 'HIDDEN';
-  createdAt: string;
-  updatedAt: string;
+  category: string;
+  category_display: string;
+  sort_order: number;
+}
+
+export interface FAQResponse {
+  success: boolean;
+  message: string;
+  data: FAQ[];
 }
 
 class FAQService {
   async getAllFaqs(): Promise<FAQ[]> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/faq`);
-      // Check if response.data is an array, if not, return an empty array
-      return Array.isArray(response.data) ? response.data : [];
-    } catch (error) {
+      const headers = headerService.getHeaders();
+      const response = await axios.get<FAQResponse>(API_URL, { headers });
+      
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      
+      console.error('FAQ API returned unsuccessful response:', response.data);
+      return [];
+    } catch (error: any) {
       console.error('Error fetching FAQs:', error);
       // Return empty array on error to prevent further errors
       return [];
     }
   }
 
-  async getFaqById(id: string): Promise<FAQ | null> {
+  async getFaqById(id: number): Promise<FAQ | null> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/faq/${id}`);
-      return response.data;
+      const headers = headerService.getHeaders();
+      const response = await axios.get<FAQResponse>(API_URL, { headers });
+      
+      if (response.data.success && response.data.data) {
+        const faq = response.data.data.find(f => f.id === id);
+        return faq || null;
+      }
+      
+      return null;
     } catch (error) {
       console.error(`Error fetching FAQ with ID ${id}:`, error);
       return null;

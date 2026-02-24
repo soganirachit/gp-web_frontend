@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { storeService } from '../services/store.service';
 
 interface AuthContextType {
   isLoggedIn: boolean;
@@ -22,6 +23,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return localStorage.getItem('phoneNumber');
   });
 
+  const checkLoginStatus = useCallback(() => {
+    const token = localStorage.getItem('token');
+    const phone = localStorage.getItem('phoneNumber');
+    const isValid = !!(token && phone);
+    setIsLoggedIn(isValid);
+    setPhoneNumber(phone);
+    return isValid;
+  }, []);
+
   useEffect(() => {
     // Check login status whenever the component mounts or localStorage changes
     const handleStorageChange = () => {
@@ -34,16 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, []);
-
-  const checkLoginStatus = () => {
-    const token = localStorage.getItem('token');
-    const phone = localStorage.getItem('phoneNumber');
-    const isValid = !!(token && phone);
-    setIsLoggedIn(isValid);
-    setPhoneNumber(phone);
-    return isValid;
-  };
+  }, [checkLoginStatus]);
 
   const login = (token: string, phone: string, refreshToken?: string) => {
     localStorage.setItem('token', token);
@@ -53,14 +54,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoggedIn(true);
     setPhoneNumber(phone);
+    
+    // Clear temporary store ID when user logs in (they'll use their selected store)
+    storeService.clearTemporaryStoreId();
   };
 
   const logout = async () => {
-    // Call authService logout which handles API call
+    // Call authService logout which handles API call and always clears localStorage
     const { authService } = await import('../services/auth.service');
-    await authService.logout();
+    const result = await authService.logout();
+    
+    // Update local state regardless of API call result
     setIsLoggedIn(false);
     setPhoneNumber(null);
+    
+    // Log if there was an issue (but still proceed with logout)
+    if (!result.success) {
+      console.warn('Logout API call had issues, but local logout completed:', result.message);
+    }
   };
 
   return (

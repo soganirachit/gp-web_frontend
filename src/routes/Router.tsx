@@ -5,6 +5,7 @@ import { FEATURE_FLAGS } from '../config/features';
 
 // Context
 import { StoreProvider } from '../context/StoreContext';
+import { FeatureThemeProvider } from '../context/FeatureThemeContext';
 
 // ================== PUBLIC ROUTES COMPONENTS ==================
 // Main Pages
@@ -48,6 +49,7 @@ import EditAddress from '../pages/More/AddEditAddress';
 // Features
 import Location from '../features/location/Home_page_location';
 import OrderManagement from '../components/Order/MyOrders';
+import OrderDetails from '../components/Order/OrderDetails';
 
 // Subscription Components
 import ManageMySubscription from '../components/Subscription/ManageMySubscription';
@@ -67,10 +69,13 @@ import PaymentSuccessful from '../components/Payment/payment_successful';
 // Other Components
 import Refer from '../pages/Refer/Refer';
 import CustomerSupport from '../pages/More/CustomerSupport';
+import SupportTicketChat from '../pages/More/SupportTicketChat';
+import TicketQuestionForm from '../pages/More/TicketQuestionForm';
 import FAQ from '../pages/More/FAQ';
 import StoreProductsPages from '@/components/StoreProductsPage/page';
 import StorePage from '@/components/StoreProductsPage/storeProductsDisplayPage';
 import ManageMyStoreProducts from '@/components/StoreProductsPage/manageMyStoreProducts';
+import Cart from '@/features/cart/components/Cart';
 
 const router = createBrowserRouter([
   {
@@ -78,8 +83,8 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       // ================== PUBLIC ROUTES ==================
-      // Startup/Splash Screen - shown first
-      { path: '/', element: <Startup /> },
+      // Default route - redirect to home page
+      { path: '/', element: <Navigate to="/home" replace /> },
       { path: '/startup', element: <Startup /> },
       // { path: '/NewUser', element: <Unsubscribed_User_Home /> },
       { path: '/search', element: <Search /> },
@@ -166,6 +171,14 @@ const router = createBrowserRouter([
         path: '/gp-daily/customer-support', 
         element: FEATURE_FLAGS.gpDailyEnabled ? <ProtectedRoute><CustomerSupport /></ProtectedRoute> : <Navigate to="/gp-store/customer-support" replace />
       },
+      { 
+        path: '/gp-daily/customer-support/chat', 
+        element: FEATURE_FLAGS.gpDailyEnabled ? <ProtectedRoute><SupportTicketChat /></ProtectedRoute> : <Navigate to="/gp-store/customer-support/chat" replace />
+      },
+      { 
+        path: '/gp-daily/customer-support/questions', 
+        element: FEATURE_FLAGS.gpDailyEnabled ? <ProtectedRoute><TicketQuestionForm /></ProtectedRoute> : <Navigate to="/gp-store/customer-support/questions" replace />
+      },
 
 
       // GP Store
@@ -184,8 +197,13 @@ const router = createBrowserRouter([
       { path: '/gp-store/faq', element: <ProtectedRoute><FAQ /></ProtectedRoute> },
       { path: '/gp-store/refer', element: <ProtectedRoute><Refer /></ProtectedRoute> },
       { path: '/gp-store/customer-support', element: <ProtectedRoute><CustomerSupport /></ProtectedRoute> },
+      { path: '/gp-store/customer-support/chat', element: <ProtectedRoute><SupportTicketChat /></ProtectedRoute> },
+      { path: '/gp-store/customer-support/questions', element: <ProtectedRoute><TicketQuestionForm /></ProtectedRoute> },
       { path: '/gp-store/orders', element: <ProtectedRoute><OrderManagement /></ProtectedRoute> },
-      { path: '/gp-store/product/:id', element: <StorePage /> },
+      { path: '/gp-store/orders/:orderNumber', element: <ProtectedRoute><OrderDetails /></ProtectedRoute> },
+      { path: '/gp-store/product/:slug', element: <StorePage /> },
+      { path: '/gp-store/basket', element: <ProtectedRoute><Cart /></ProtectedRoute> },
+      { path: '/gp-daily/basket', element: FEATURE_FLAGS.gpDailyEnabled ? <ProtectedRoute><Cart /></ProtectedRoute> : <Navigate to="/gp-store/basket" replace /> },
 
       // ================== ORIGINAL PROTECTED ROUTES (RESTORED) ==================
 
@@ -202,6 +220,7 @@ const router = createBrowserRouter([
         element: <ProtectedRoute><Location /></ProtectedRoute> 
       },
       { path: '/gp-daily/orders', element: <ProtectedRoute><OrderManagement /></ProtectedRoute> },
+      { path: '/gp-daily/orders/:orderNumber', element: <ProtectedRoute><OrderDetails /></ProtectedRoute> },
       // { path: '/gp-store/orders', element: <ProtectedRoute><OrderManagement /></ProtectedRoute> },
 
       // Subscription Routes - Redirect to gp-store if gp-daily is disabled
@@ -259,13 +278,18 @@ const router = createBrowserRouter([
       // Other Protected Routes
       { path: '/refer', element: <ProtectedRoute><Refer /></ProtectedRoute> },
       { path: '/customer-support', element: <ProtectedRoute><CustomerSupport /></ProtectedRoute> },
+      { path: '/customer-support/chat', element: <ProtectedRoute><SupportTicketChat /></ProtectedRoute> },
       { path: '/faq', element: <ProtectedRoute><FAQ /></ProtectedRoute> },
     ],
   },
   // Standalone home page route without Layout wrapper
   {
     path: '/home',
-    element: <HomePage />,
+    element: (
+      <FeatureThemeProvider>
+        <HomePage />
+      </FeatureThemeProvider>
+    ),
   },
 ]);
 

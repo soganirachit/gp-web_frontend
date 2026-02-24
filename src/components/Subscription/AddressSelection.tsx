@@ -330,6 +330,20 @@ const AddressSelection: React.FC = () => {
     // }
 
     try {
+      // Check if coming from cart page (for both gp-store and gp-daily)
+      if (location.state?.fromCart) {
+        // Save selected address and navigate back to cart
+        localStorage.setItem('selectedDeliveryAddress', JSON.stringify(selectedAddress));
+        const cartPath = feature === 'gpStore' ? '/gp-store/basket' : '/gp-daily/basket';
+        navigate(cartPath, {
+          state: {
+            selectedAddress: selectedAddress,
+          },
+        });
+        toast.success('Address selected successfully');
+        return;
+      }
+
       // For store products, handle payment directly
       if (isStoreProduct) {
         // Ensure userData is loaded before proceeding
@@ -1029,11 +1043,11 @@ const AddressSelection: React.FC = () => {
                       <h3 className="text-lg font-semibold text-gray-800 capitalize">
                         {address.type || 'Home'}
                       </h3>
-                      {/* {address.isDefault && ( */}
-                      <span className="bg-[#C6F6D5] text-[#22543D] text-xs px-2 py-0.5 rounded-2xl font-semibold">
-                        Default
-                      </span>
-                      {/* // )} */}
+                      {address.isDefault && (
+                        <span className="bg-[#C6F6D5] text-[#22543D] text-xs px-2 py-0.5 rounded-2xl font-semibold">
+                          Default
+                        </span>
+                      )}
                     </div>
                     {/* Menu action */}
                     <div className="relative">
@@ -1116,7 +1130,9 @@ const AddressSelection: React.FC = () => {
               <div className="max-w-[800px] mx-auto space-y-3">
                 <button
                   onClick={() => navigate(`${basePath}/addresses/add`)}
-                  className="w-full flex items-center justify-center gap-2 text-gray-900 py-4 rounded-xl text-base font-semibold hover:opacity-90 shadow-sm"
+                  className={`w-full flex items-center justify-center gap-2 py-4 rounded-xl text-base font-semibold hover:opacity-90 shadow-sm ${
+                    feature === 'gpStore' ? 'text-white' : 'text-gray-900'
+                  }`}
                   style={{ backgroundColor: theme.colors.primary }}
                 >
                   <span className="text-2xl font-semibold">+</span>
@@ -1126,13 +1142,14 @@ const AddressSelection: React.FC = () => {
                 <button
                   onClick={handleContinue}
                   disabled={!selectedAddress || loading}
-                  className={`w-full py-4 rounded-xl text-base font-semibold text-gray-900 shadow-sm ${selectedAddress && !loading
-                    ? 'hover:opacity-90'
-                    : 'bg-gray-300 cursor-not-allowed'
-                    }`}
+                  className={`w-full py-4 rounded-xl text-base font-semibold shadow-sm ${
+                    selectedAddress && !loading
+                      ? `hover:opacity-90 ${feature === 'gpStore' ? 'text-white' : 'text-gray-900'}`
+                      : 'bg-gray-300 cursor-not-allowed text-gray-500'
+                  }`}
                   style={selectedAddress && !loading ? { backgroundColor: theme.colors.primary } : {}}
                 >
-                  {loading ? 'Processing...' : 'Continue & Pay'}
+                  {loading ? 'Processing...' : (location.state?.fromCart ? 'Continue' : 'Continue & Pay')}
                 </button>
               </div>
             </div>

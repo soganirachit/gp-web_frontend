@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { authService } from '../../../../services/auth.service';
 import { addressService } from '../../../../services/address.service';
 import { useAuth } from '../../../../context/AuthContext';
+import { useCart } from '../../../../context/CartContext';
 import { toast } from 'react-hot-toast';
 import { FaWhatsapp } from 'react-icons/fa';
 import { MdEdit } from 'react-icons/md';
@@ -11,13 +12,18 @@ import { useFeatureTheme } from '../../../../context/FeatureThemeContext';
 
 interface LocationState {
   phoneNumber: string;
+  returnUrl?: string;
+  fromCart?: boolean;
 }
 
 const OTPVerification: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
+  const { syncCartToAPI, items } = useCart();
   const phoneNumber = (location.state as LocationState)?.phoneNumber;
+  const returnUrl = (location.state as LocationState)?.returnUrl;
+  const fromCart = (location.state as LocationState)?.fromCart;
   const { theme, feature } = useFeatureTheme();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
 
@@ -124,6 +130,16 @@ const OTPVerification: React.FC = () => {
           }
         }
 
+        // Note: Cart sync is now handled automatically by CartContext when login is detected
+        // No need to manually sync here to avoid conflicts
+        // The CartContext will detect the login and sync the temp cart automatically
+
+        // If coming from cart checkout, redirect back to cart
+        if (fromCart && returnUrl) {
+          navigate(returnUrl);
+          return;
+        }
+
         // Check if user is new or existing
         const isNewUser = response.is_new_user || !response.userExists;
 
@@ -180,7 +196,21 @@ const OTPVerification: React.FC = () => {
       setCountdown(29);
       setError('');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to resend OTP');
+      let errorMessage = err?.response?.data?.message || err?.message || 'Failed to resend OTP';
+      
+      // Handle throttling error with user-friendly message
+      if (errorMessage.includes("throttled") || errorMessage.includes("Expected available")) {
+        const match = errorMessage.match(/(\d+)\s*seconds?/i);
+        if (match) {
+          const seconds = parseInt(match[1]);
+          const minutes = Math.ceil(seconds / 60);
+          errorMessage = `Too many requests. Please wait ${minutes} minute${minutes > 1 ? 's' : ''} before requesting another OTP.`;
+        } else {
+          errorMessage = "Too many OTP requests. Please wait a few minutes before trying again.";
+        }
+      }
+      
+      setError(errorMessage);
     }
   };
 

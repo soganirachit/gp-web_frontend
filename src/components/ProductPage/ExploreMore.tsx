@@ -39,7 +39,8 @@ const ExploreMore: React.FC = () => {
 
   const handleProductClick = (product: Product | BasePack | StoreProduct) => {
     if (activeFeature === "gpStore") {
-      navigate(`/gp-store/product/${product.id}`, { state: { product } });
+      const productSlug = (product as any).slug || product.id;
+      navigate(`/gp-store/product/${productSlug}`, { state: { product } });
     } else {
     navigate(`/gp-daily/product/${product.id}`, { state: { product } });
     }

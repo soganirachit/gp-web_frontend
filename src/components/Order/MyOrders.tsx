@@ -1,21 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaArrowLeft, FaFilter, FaSearch, FaStar, FaRegStar, FaChevronRight } from 'react-icons/fa';
+import { FaArrowLeft, FaFilter, FaSearch, FaChevronRight } from 'react-icons/fa';
 import { IoArrowBack } from "react-icons/io5";
 import BottomNavigation from '../layout/BottomNav';
 import { orderService } from '../../services/order.service';
 import { format } from 'date-fns';
 import Spinner from '../common/Spinner';
+import { useFeatureTheme } from '../../context/FeatureThemeContext';
 
 interface Order {
   id: string;
+  order_number?: string;
   status: string;
   createdAt: string;
   deliveryDate?: string;
-  deliveryTime?: string; // Added to match API response
+  deliveryTime?: string;
+  total_amount?: string;
+  preview_image?: string;
   product?: {
     name: string;
-    image: string[]; // Adjust based on actual API response, usually imagesUrl or image
+    image: string[];
     imagesUrl?: string[];
     price: number;
     sellingPrice?: number;
@@ -25,6 +29,8 @@ interface Order {
 
 const MyOrders: React.FC = () => {
   const navigate = useNavigate();
+  const { feature } = useFeatureTheme();
+  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,16 +42,42 @@ const MyOrders: React.FC = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const fetchedOrders = await orderService.getOrdersByCustomerId();
-      if (fetchedOrders) {
+      const fetchedOrders = await orderService.getOrders();
+      if (fetchedOrders && fetchedOrders.length > 0) {
+        // Transform API orders to match the component's Order interface
+        const transformedOrders: Order[] = fetchedOrders.map((order: any) => {
+          // Use the new API response structure with order_number, total_amount, and preview_image
+          return {
+            id: order.id?.toString() || order.order_number || Math.random().toString(),
+            order_number: order.order_number || `Order #${order.id}`,
+            status: order.status || 'pending',
+            createdAt: order.created_at || order.createdAt || new Date().toISOString(),
+            deliveryDate: order.delivery_date || order.deliveryDate,
+            deliveryTime: order.delivery_time_slot || order.deliveryTime,
+            total_amount: order.total_amount || order.total || '0',
+            preview_image: order.preview_image || null,
+            product: {
+              name: order.order_number || 'Order',
+              image: order.preview_image ? [order.preview_image] : [],
+              imagesUrl: order.preview_image ? [order.preview_image] : [],
+              price: parseFloat(order.total_amount || order.total || '0'),
+              sellingPrice: parseFloat(order.total_amount || order.total || '0'),
+            },
+            quantity: order.items_count || 1,
+          };
+        });
+        
         // Sort by newest first
-        const sortedOrders = fetchedOrders.sort((a: Order, b: Order) =>
+        const sortedOrders = transformedOrders.sort((a: Order, b: Order) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
         setOrders(sortedOrders);
+      } else {
+        setOrders([]);
       }
     } catch (error) {
       console.error("Failed to fetch orders", error);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -62,17 +94,21 @@ const MyOrders: React.FC = () => {
 
   const getStatusText = (order: Order) => {
     const s = order.status?.toLowerCase() || '';
-    const dateStr = order.deliveryTime || order.deliveryDate || order.createdAt;
-    const date = dateStr ? format(new Date(dateStr), 'MMM d') : '';
+    // Use created_at date since delivery_date is null in the API response
+    const date = format(new Date(order.createdAt), 'MMM d');
 
     if (s === 'delivered') return `Delivered on ${date}`;
     if (s === 'canceled' || s === 'cancelled') return `Canceled on ${date}`;
-    // Map "SCHEDULED" to "Expected Delivery" for UI clarity
-    if (s === 'scheduled') return `Expected Delivery on ${date}`;
-    return `Expected Delivery on ${date}`;
+    // For other statuses, show the order date instead of "Expected Delivery" 
+    // since there's no actual delivery_date in the response
+    if (s === 'out_for_delivery') return `Out for Delivery`;
+    if (s === 'scheduled') return `Scheduled`;
+    // Default: show status or order date
+    return `Ordered on ${date}`;
   };
 
   const filteredOrders = orders.filter(order =>
+    order.order_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     order.product?.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -116,7 +152,7 @@ const MyOrders: React.FC = () => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-4 pb-24 relative">
+        <div className="flex-1 px-4 pb-24 relative bg-[#FFFBEB]">
           {loading ? (
             <div className="absolute inset-0 bg-[#FFFBEB] flex items-center justify-center">
               <Spinner size={400} />
@@ -125,15 +161,19 @@ const MyOrders: React.FC = () => {
             <div className="space-y-4">
               {filteredOrders.map((order, index) => {
                 const statusColor = getStatusColor(order.status);
-                const productImg = order.product?.imagesUrl?.[0] || order.product?.image?.[0] || "https://via.placeholder.com/100";
+                const productImg = order.preview_image || order.product?.imagesUrl?.[0] || order.product?.image?.[0] || "https://via.placeholder.com/100";
 
                 return (
-                  <div key={order.id || index} className="flex gap-4 p-4 bg-white rounded-2xl border-b border-gray-50 shadow-sm">
+                  <div 
+                    key={order.id || index} 
+                    onClick={() => order.order_number && navigate(`${basePath}/orders/${order.order_number}`)}
+                    className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                  >
                     {/* Image */}
                     <div className="w-20 h-20 flex-shrink-0">
                       <img
                         src={productImg}
-                        alt={order.product?.name}
+                        alt={order.order_number || order.product?.name}
                         className="w-full h-full object-cover rounded-xl"
                       />
                     </div>
@@ -146,30 +186,16 @@ const MyOrders: React.FC = () => {
                             {getStatusText(order)}
                           </p>
                           <h3 className="text-base font-medium text-gray-900 mb-1 truncate">
-                            {order.product?.name} {order.quantity > 1 ? `x${order.quantity}` : ''}
+                            {order.order_number || order.product?.name}
                           </h3>
-
-                          {/* Ratings (Only for Delivered) */}
-                          {order.status.toLowerCase() === 'delivered' && (
-                            <div className="mb-1">
-                              <div className="flex gap-0.5 mb-1">
-                                {[1, 2, 3, 4, 5].map((s) => (
-                                  <FaRegStar key={s} size={14} className="text-gray-400" />
-                                ))}
-                              </div>
-                              <p className="text-xs text-gray-400">Rate this product</p>
-                            </div>
-                          )}
-
-                          {/* Fallback for non-delivered ratings spacer or other info */}
-                          {order.status.toLowerCase() !== 'delivered' && (
-                            <div className="h-4"></div>
-                          )}
+                          <p className="text-sm font-semibold text-gray-700">
+                            ₹{order.total_amount || order.product?.sellingPrice || '0.00'}
+                          </p>
                         </div>
 
-                        <button className="pt-1 text-gray-400">
+                        <div className="pt-1 text-gray-400">
                           <FaChevronRight size={14} />
-                        </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -188,7 +214,7 @@ const MyOrders: React.FC = () => {
         </div>
 
         {/* Bottom Nav */}
-        <div className="sticky bottom-0 bg-white border-t border-gray-100 pb-2">
+        <div className="sticky bottom-0 z-20">
           <BottomNavigation />
         </div>
       </div>

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useFeatureTheme } from '../context/FeatureThemeContext';
+import { FEATURE_FLAGS } from '../config/features';
 import { MdLocationOn, MdKeyboardArrowDown, MdAccessTime } from 'react-icons/md';
 import { FaLeaf, FaUsers, FaBox } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { addressService, Address } from '../services/address.service';
-import { FEATURE_FLAGS } from '../config/features';
 import ProfileIcon from '../assets/icon/Profile.png';
 import SearchIcon from '../assets/icon/Search.png';
 import storyImage from '../assets/Banner/Story.png';
@@ -27,7 +28,9 @@ import locationhomeIcon from '../assets/svg/gp_daily svg/locationhome.svg';
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
+  const { feature } = useFeatureTheme();
   const [deliveryLocation, setDeliveryLocation] = useState<string>('');
+  const [addressType, setAddressType] = useState<string>('Home');
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
 
@@ -37,29 +40,33 @@ const HomePage: React.FC = () => {
       setIsLoadingAddress(true);
       const addresses = await addressService.getAllAddresses();
 
-      // Sort by updatedAt in descending order and get the most recent address
-      const latestAddress = addresses
+      // Get default address first, otherwise get the latest address
+      const defaultAddress = addresses.find(addr => addr.isDefault);
+      const selectedAddress = defaultAddress || addresses
         .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       [0];
 
-      if (latestAddress) {
+      if (selectedAddress) {
         const formattedAddress = [
-          latestAddress.houseNo,
-          latestAddress.streetName,
-          latestAddress.area,
-          latestAddress.city,
-          latestAddress.state,
-          latestAddress.pincode
+          selectedAddress.houseNo,
+          selectedAddress.streetName,
+          selectedAddress.area,
+          selectedAddress.city,
+          selectedAddress.state,
+          selectedAddress.pincode
         ].filter(Boolean).join(', ');
 
         setDeliveryLocation(formattedAddress);
+        setAddressType(selectedAddress.type || 'Home');
       } else {
         setDeliveryLocation('');
+        setAddressType('Home');
       }
     } catch (error) {
       console.error('Error fetching address:', error);
       // Fallback to localStorage if API fails
       setDeliveryLocation(localStorage.getItem('userLocation') || '');
+      setAddressType('Home');
     } finally {
       setIsLoadingAddress(false);
     }
@@ -80,7 +87,8 @@ const HomePage: React.FC = () => {
   }, [fetchLatestAddress]);
 
   const handleLocationClick = () => {
-    navigate('/location', { state: { returnUrl: '/home' } });
+    const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+    navigate(`${basePath}/addresses`);
   };
 
   return (
@@ -101,7 +109,7 @@ const HomePage: React.FC = () => {
                 onClick={handleLocationClick}
               >
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm sm:text-base font-bold text-gray-800">Home</span>
+                  <span className="text-sm sm:text-base font-bold text-gray-800">{addressType}</span>
                   <span className="text-xs sm:text-sm text-gray-600 truncate font-medium">
                     {isLoadingAddress ? 'Loading...' : deliveryLocation || 'Tap to set address'}
                   </span>
@@ -116,7 +124,7 @@ const HomePage: React.FC = () => {
                 src={profilehomeIcon}
                 alt="Profile"
                 className=" absolute inset-0 w-12 h-12 object-contain cursor-pointer self-center justify-self-center"
-                onClick={() => navigate(FEATURE_FLAGS.gpDailyEnabled ? "/gp-daily/account" : "/gp-store/account")}
+                onClick={() => navigate("/gp-daily/account")}
               />
               <img
                 src={profilelogoIcon}
@@ -161,19 +169,19 @@ const HomePage: React.FC = () => {
 
           {/* Service Cards Section */}
           <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-6">
-            {/* Genda Phool Daily Card - Visible but disabled if feature is off */}
+            {/* Genda Phool Daily Card */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, delay: 0.1 }}
-              className={`bg-[#FFF5E6] rounded-2xl p-2 sm:p-3 transition-shadow relative overflow-visible min-h-0 ${
-                FEATURE_FLAGS.gpDailyEnabled 
-                  ? 'cursor-pointer hover:shadow-lg' 
-                  : 'cursor-pointer opacity-60'
-              }`}
+              className={`bg-[#FFF5E6] rounded-2xl p-2 sm:p-3 cursor-pointer hover:shadow-lg transition-shadow relative overflow-visible min-h-0 ${!FEATURE_FLAGS.gpDailyEnabled ? 'opacity-60' : ''}`}
               onClick={() => {
                 if (FEATURE_FLAGS.gpDailyEnabled) {
-                  navigate('/gp-daily', { state: { mode: 'daily' } });
+                  if (isLoggedIn) {
+                    navigate('/gp-daily', { state: { mode: 'daily' } });
+                  } else {
+                    navigate('/gp-daily/startup', { state: { mode: 'daily' } });
+                  }
                 } else {
                   setShowComingSoonModal(true);
                 }
@@ -222,7 +230,13 @@ const HomePage: React.FC = () => {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, delay: 0.2 }}
               className="bg-[#E8F5E9] rounded-2xl p-2 sm:p-3 cursor-pointer hover:shadow-lg transition-shadow relative overflow-visible min-h-0"
-              onClick={() => navigate('/gp-store', { state: { mode: 'store' } })}
+              onClick={() => {
+                if (isLoggedIn) {
+                  navigate('/gp-store', { state: { mode: 'store' } });
+                } else {
+                  navigate('/gp-store/login', { state: { mode: 'store' } });
+                }
+              }}
             >
               <div className="flex flex-col h-full">
                 {/* Top Section: Truck and Logo with overlap */}
@@ -465,46 +479,42 @@ const HomePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Coming Soon Modal */}
+      {/* Coming Soon Modal for GP Daily */}
       <AnimatePresence>
         {showComingSoonModal && (
           <motion.div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={() => setShowComingSoonModal(false)}
           >
             <motion.div
-              className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl"
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-[#FFF5E6] rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl">🌺</span>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">
+              <div className="text-center">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
                   Coming Soon!
                 </h3>
-                <p className="text-gray-600">
-                  Genda Phool Daily feature is currently under development. Stay tuned for updates!
+                <p className="text-gray-600 mb-6">
+                  Genda Phool Daily is currently not available in your area. We're working hard to bring this service to you soon!
                 </p>
+                <button
+                  onClick={() => setShowComingSoonModal(false)}
+                  className="w-full py-3 bg-[#FAA222] text-black font-semibold rounded-xl hover:bg-[#DD7600] transition-colors"
+                >
+                  Got it
+                </button>
               </div>
-
-              <button
-                onClick={() => setShowComingSoonModal(false)}
-                className="w-full py-3 bg-[#FAA222] text-black rounded-lg font-semibold hover:bg-[#DD7600] transition-colors"
-              >
-                Got it
-              </button>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </div >
   );
 };
 

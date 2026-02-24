@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import homeIcon from "../../assets/icon/navbar/home.svg";
 import dailyIcon from "../../assets/icon/navbar/daily.svg";
 import walletIcon from "../../assets/icon/navbar/wallet.svg";
@@ -9,11 +9,26 @@ import orderStoreIcon from "../../assets/svg/gp_store_svg/orderstore.svg";
 import activeBg from "../../assets/All/Vector (1).png";
 import storeGreenBanner from "../../assets/svg/gp_store_svg/greenbanner.svg";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import { useCart } from "../../context/CartContext";
+import { useAuth } from "../../context/AuthContext";
 
 const BottomNav: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { theme, feature } = useFeatureTheme();
+  const { items } = useCart();
+  const { isLoggedIn } = useAuth();
   const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
+  const cartItemCount = items.length;
+
+  const handleBasketClick = (e: React.MouseEvent) => {
+    if (!isLoggedIn) {
+      e.preventDefault();
+      navigate(`${basePath}/login`, {
+        state: { returnUrl: `${basePath}/basket` }
+      });
+    }
+  };
 
   const isActive = (paths: string | string[]) => {
     if (Array.isArray(paths)) {
@@ -99,28 +114,34 @@ const BottomNav: React.FC = () => {
             </Link>
 
             <Link
-              to={`${basePath}/products`}
-              className={`flex flex-col items-center justify-center flex-1 relative ${isActive([`${basePath}/products`, "/gp-store/store", "/manage-my-storeProducts"])
+              to={isLoggedIn ? "/gp-store/basket" : "#"}
+              onClick={handleBasketClick}
+              className={`flex flex-col items-center justify-center flex-1 relative ${isActive("/gp-store/basket")
                 ? theme.classes.bottomNavActiveText
                 : theme.classes.bottomNavInactiveText
                 }`}
             >
-              {isActive([`${basePath}/products`, "/gp-store/store", "/manage-my-storeProducts"]) && (
+              {isActive("/gp-store/basket") && (
                 <img
                   src={storeGreenBanner}
                   alt=""
                   className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 object-contain pointer-events-none"
                 />
               )}
-              <img
-                src={basketIcon}
-                alt="Basket"
-                className={`w-7 h-7 mb-1 relative z-10 ${isActive([`${basePath}/products`, "/gp-store/store", "/manage-my-storeProducts"])
-                  ? "brightness-0 invert"
-                  : "opacity-90"
-                  }`}
-              />
-              <span className={`text-sm font-medium relative z-10 ${isActive([`${basePath}/products`, "/gp-store/store", "/manage-my-storeProducts"]) ? "text-white" : ""}`}>Basket</span>
+              <div className="relative">
+                <img
+                  src={basketIcon}
+                  alt="Basket"
+                  className={`w-7 h-7 mb-1 relative z-10 ${isActive("/gp-store/basket") ? "brightness-0 invert" : "opacity-90"
+                    }`}
+                />
+                {cartItemCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-white text-[#2A6B28] text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5 z-20 border-2 border-[#2A6B28] shadow-md">
+                    {cartItemCount > 99 ? '99+' : cartItemCount}
+                  </span>
+                )}
+              </div>
+              <span className={`text-sm font-medium relative z-10 ${isActive("/gp-store/basket") ? "text-white" : ""}`}>Basket</span>
             </Link>
 
             <Link
@@ -250,28 +271,36 @@ const BottomNav: React.FC = () => {
           </Link>
 
           <Link
-            to="/gp-store"
-            className={`flex flex-col items-center justify-center flex-1 relative ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts"])
+            to={isLoggedIn ? `${basePath}/basket` : "#"}
+            onClick={handleBasketClick}
+            className={`flex flex-col items-center justify-center flex-1 relative ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts", `${basePath}/basket`])
               ? theme.classes.bottomNavActiveText
               : theme.classes.bottomNavInactiveText
               }`}
           >
-            {isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts"]) && (
+            {isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts", `${basePath}/basket`]) && (
               <img
                 src={activeBg}
                 alt=""
                 className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 object-contain pointer-events-none"
               />
             )}
-            <img
-              src={basketIcon}
-              alt="Basket"
-              className={`w-7 h-7 mb-1 relative z-10 ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts"])
-                ? ""
-                : "opacity-90"
-                }`}
-            />
-            <span className={`text-sm font-medium relative z-10 ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts"]) ? "text-gray-700" : ""}`}>Basket</span>
+            <div className="relative">
+              <img
+                src={basketIcon}
+                alt="Basket"
+                className={`w-7 h-7 mb-1 relative z-10 ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts", `${basePath}/basket`])
+                  ? ""
+                  : "opacity-90"
+                  }`}
+              />
+              {cartItemCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-[#2A6B28] text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 z-20">
+                  {cartItemCount > 99 ? '99+' : cartItemCount}
+                </span>
+              )}
+            </div>
+            <span className={`text-sm font-medium relative z-10 ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts", `${basePath}/basket`]) ? "text-gray-700" : ""}`}>Basket</span>
           </Link>
 
           <Link

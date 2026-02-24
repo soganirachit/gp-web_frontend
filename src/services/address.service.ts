@@ -1,11 +1,32 @@
-import axios from "axios";
-import { getAddressesUrl, getPolygonUrl, getApiUrl } from "../config/api.config";
-import { headerService } from "./headers.service";
+import axios, { AxiosError } from "axios";
+import { getApiUrl } from "../config/api.config";
 
+// API Address structure (from Django backend)
+interface ApiAddress {
+  id?: number;
+  user_id?: number;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  pincode?: string;
+  address_type?: "home" | "work" | "other";
+  is_default?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  latitude?: number | string;
+  longitude?: number | string;
+  receiver_name?: string;
+  receiver_phone?: string;
+  landmark?: string;
+}
+
+// Frontend Address interface (for backward compatibility)
 export interface Address {
   id: string;
   userId: string;
-  name?: string; // Added name field
+  name?: string;
   houseNo: string;
   streetName: string;
   landmark?: string;
@@ -13,7 +34,7 @@ export interface Address {
   city: string;
   state: string;
   pincode: string;
-  associatedPhoneNumber: string; // <-- changed
+  associatedPhoneNumber: string;
   isDefault: boolean;
   type: "Home" | "Work" | "Others";
   societyName?: string;
@@ -24,14 +45,14 @@ export interface Address {
 }
 
 export interface AddressInput {
-  name?: string; // Added name field
+  name?: string;
   houseNo: string;
   streetName: string;
   area: string;
   city: string;
   state: string;
   pincode: string;
-  associatedPhoneNumber: string; // <-- changed
+  associatedPhoneNumber: string;
   societyName?: string;
   district?: string;
   coordinates?: string;
@@ -39,92 +60,221 @@ export interface AddressInput {
   setAsDefault?: boolean;
 }
 
-export interface PolygonData {
-  points: Array<{ lat: number; lng: number }>;
-}
+const API_URL = `${getApiUrl()}/users/addresses`;
 
+// Helper: Convert API address to frontend format
+const mapApiToFrontend = (apiAddr: ApiAddress): Address => {
+  // Handle latitude and longitude - they can be number or string
+  const lat = apiAddr.latitude !== undefined && apiAddr.latitude !== null 
+    ? (typeof apiAddr.latitude === 'string' ? parseFloat(apiAddr.latitude) : apiAddr.latitude)
+    : null;
+  const lng = apiAddr.longitude !== undefined && apiAddr.longitude !== null
+    ? (typeof apiAddr.longitude === 'string' ? parseFloat(apiAddr.longitude) : apiAddr.longitude)
+    : null;
+  
+  // Map address_type to capitalized type (API can return "other" or "others")
+  const typeMap: Record<string, "Home" | "Work" | "Others"> = {
+    home: "Home",
+    work: "Work",
+    other: "Others",  // API returns "other" (singular)
+    others: "Others"  // Handle both for backward compatibility
+  };
 
+  // Handle pincode - can be in postal_code or pincode field
+  const pincode = apiAddr.pincode || apiAddr.postal_code || "";
+
+  // Filter out "unknown" or "Unknown" values for city and state
+  const city = apiAddr.city && apiAddr.city.toLowerCase() !== 'unknown' ? apiAddr.city : "";
+  const state = apiAddr.state && apiAddr.state.toLowerCase() !== 'unknown' ? apiAddr.state : "";
+
+  return {
+    id: (apiAddr.id !== undefined && apiAddr.id !== null) ? apiAddr.id.toString() : "",
+    userId: (apiAddr.user_id !== undefined && apiAddr.user_id !== null) ? apiAddr.user_id.toString() : "",
+    name: apiAddr.receiver_name || "",
+    houseNo: apiAddr.address_line1 || "",
+    streetName: apiAddr.address_line2 || "",
+    area: apiAddr.landmark || apiAddr.address_line2 || "",
+    city: city,
+    state: state,
+    pincode: pincode,
+    isDefault: apiAddr.is_default || false,
+    type: (apiAddr.address_type && typeMap[apiAddr.address_type]) ? typeMap[apiAddr.address_type] : "Home",
+    coordinates: lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng) ? `${lat},${lng}` : undefined,
+    createdAt: apiAddr.created_at || "",
+    updatedAt: apiAddr.updated_at || "",
+    associatedPhoneNumber: apiAddr.receiver_phone || "",
+  };
+};
+
+// Helper: Convert frontend format to API format
+const mapFrontendToApi = (input: AddressInput): Record<string, any> => {
+  // Map frontend type to API type (API expects "other" not "others")
+  const typeMap: Record<string, string> = {
+    "Home": "home",
+    "Work": "work",
+    "Others": "other"  // API expects "other" (singular), not "others"
+  };
+  const apiType = input.type ? typeMap[input.type] || "home" : "home";
+
+  const apiData: Record<string, any> = {
+    address_line1: input.houseNo || "",
+    address_line2: input.streetName || input.area || "",
+    city: input.city || "",
+    state: input.state || "",
+    pincode: input.pincode || "",
+    address_type: apiType,
+    is_default: input.setAsDefault || false,
+  };
+
+  // Add receiver_name and receiver_phone if provided
+  if (input.name) {
+    apiData.receiver_name = input.name;
+  }
+  if (input.associatedPhoneNumber) {
+    apiData.receiver_phone = input.associatedPhoneNumber;
+  }
+
+  // Add landmark if provided
+  if (input.area) {
+    apiData.landmark = input.area;
+  }
+
+  // Add coordinates if available
+  // Round to 7 decimal places to ensure max 10 digits total (including decimal point)
+  if (input.coordinates) {
+    const [lat, lng] = input.coordinates.split(',').map(Number);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      // Round to 7 decimal places to ensure coordinates don't exceed 10 digits total
+      apiData.latitude = Math.round(lat * 10000000) / 10000000;
+      apiData.longitude = Math.round(lng * 10000000) / 10000000;
+    }
+  }
+
+  return apiData;
+};
+
+const getHeaders = () => {
+  const token = localStorage.getItem("token");
+  return {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+};
 
 class AddressService {
   async getAllAddresses(): Promise<Address[]> {
     try {
-      const response = await axios.get(getAddressesUrl(), {
-        headers: headerService.getHeaders(),
+      const response = await axios.get(`${API_URL}/`, {
+        headers: getHeaders(),
       });
 
-      if (response.data && Array.isArray(response.data.data)) {
-        return response.data.data;
-      } else if (Array.isArray(response.data)) {
-        return response.data;
+      // Handle API response: { success, message, data: [addresses] }
+      if (response.data.success && Array.isArray(response.data.data)) {
+        return response.data.data.map(mapApiToFrontend);
       }
       return [];
     } catch (error) {
-      throw headerService.handleError(error);
+      console.error("Error fetching addresses:", error);
+      if (error instanceof AxiosError) {
+        throw new Error(error.response?.data?.message || error.message || "Failed to fetch addresses");
+      }
+      throw error;
     }
   }
 
   async getAddressById(id: string): Promise<Address> {
     try {
-      const response = await axios.get(`${getAddressesUrl()}/${id}`, {
-        headers: headerService.getHeaders(),
+      const response = await axios.get(`${API_URL}/${id}/`, {
+        headers: getHeaders(),
       });
-      return response.data.data;
+
+      if (response.data.success && response.data.data) {
+        return mapApiToFrontend(response.data.data);
+      }
+      throw new Error(response.data.message || "Address not found");
     } catch (error) {
-      throw headerService.handleError(error);
+      console.error("Error fetching address:", error);
+      if (error instanceof AxiosError) {
+        throw new Error(error.response?.data?.message || error.message || "Failed to fetch address");
+      }
+      throw error;
     }
   }
 
   async createAddress(addressInput: AddressInput): Promise<Address> {
     try {
-      const response = await axios.post(getAddressesUrl(), addressInput, {
-        headers: headerService.getHeaders(),
+      const apiData = mapFrontendToApi(addressInput);
+      const response = await axios.post(`${API_URL}/`, apiData, {
+        headers: getHeaders(),
       });
-      return response.data.data;
+
+      if (response.data.success && response.data.data) {
+        return mapApiToFrontend(response.data.data);
+      }
+      throw new Error(response.data.message || "Failed to create address");
     } catch (error) {
-      throw headerService.handleError(error);
+      console.error("Error creating address:", error);
+      if (error instanceof AxiosError) {
+        throw new Error(error.response?.data?.message || error.message || "Failed to create address");
+      }
+      throw error;
     }
   }
 
-  async updateAddress(
-    id: string,
-    addressInput: Partial<AddressInput>
-  ): Promise<Address> {
+  async updateAddress(id: string, addressInput: Partial<AddressInput>): Promise<Address> {
     try {
-      const response = await axios.put(
-        `${getAddressesUrl()}/${id}`,
-        addressInput,
-        {
-          headers: headerService.getHeaders(),
-        }
-      );
-      return response.data.data;
+      const apiData = mapFrontendToApi(addressInput as AddressInput);
+      const response = await axios.put(`${API_URL}/${id}/`, apiData, {
+        headers: getHeaders(),
+      });
+
+      if (response.data.success && response.data.data) {
+        return mapApiToFrontend(response.data.data);
+      }
+      throw new Error(response.data.message || "Failed to update address");
     } catch (error) {
-      throw headerService.handleError(error);
+      console.error("Error updating address:", error);
+      if (error instanceof AxiosError) {
+        throw new Error(error.response?.data?.message || error.message || "Failed to update address");
+      }
+      throw error;
     }
   }
 
   async deleteAddress(id: string): Promise<void> {
     try {
-      await axios.delete(`${getAddressesUrl()}/${id}`, {
-        headers: headerService.getHeaders(),
+      const response = await axios.delete(`${API_URL}/${id}/`, {
+        headers: getHeaders(),
       });
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to delete address");
+      }
     } catch (error) {
-      throw headerService.handleError(error);
+      console.error("Error deleting address:", error);
+      if (error instanceof AxiosError) {
+        throw new Error(error.response?.data?.message || error.message || "Failed to delete address");
+      }
+      throw error;
     }
   }
 
   async setDefaultAddress(id: string): Promise<Address> {
     try {
-      const response = await axios.put(
-        `${getAddressesUrl()}/${id}/default`,
-        {},
-        {
-          headers: headerService.getHeaders(),
-        }
-      );
-      return response.data.data;
+      const response = await axios.post(`${API_URL}/${id}/set-default/`, {}, {
+        headers: getHeaders(),
+      });
+
+      if (response.data.success && response.data.data) {
+        return mapApiToFrontend(response.data.data);
+      }
+      throw new Error(response.data.message || "Failed to set default address");
     } catch (error) {
-      throw headerService.handleError(error);
+      console.error("Error setting default address:", error);
+      if (error instanceof AxiosError) {
+        throw new Error(error.response?.data?.message || error.message || "Failed to set default address");
+      }
+      throw error;
     }
   }
 
@@ -137,26 +287,27 @@ class AddressService {
         return { isValid: false, message: 'Invalid coordinates format' };
       }
 
-      // Use the new delivery zone check API
       const response = await axios.post(
-        `${getApiUrl()}/polygon/check-delivery-zone`,
-        {
-          latitude: lat,
-          longitude: lng
-        },
-        {
-          headers: headerService.getHeaders(),
-        }
+        `${getApiUrl()}/stores/validate-coverage/`,
+        { latitude: lat, longitude: lng },
+        { headers: getHeaders() }
       );
 
-      const { isDeliverable, message } = response.data;
+      // Handle API response structure: { success, message, data: { serviceable, reason, nearest_store, distance_km, store, zone } }
+      const isServiceable = response.data.success && response.data.data?.serviceable === true;
+      const message = response.data.message || response.data.data?.reason || 
+        (isServiceable ? 'Address is within delivery area' : 'Address is outside delivery area');
 
       return {
-        isValid: isDeliverable,
-        message: message || (isDeliverable ? 'Address is within delivery area' : 'Address is outside delivery area')
+        isValid: isServiceable,
+        message: message
       };
     } catch (error) {
       console.error('Error validating address:', error);
+      if (error instanceof AxiosError) {
+        const errorMessage = error.response?.data?.message || error.response?.data?.data?.reason || 'Failed to validate address location';
+        return { isValid: false, message: errorMessage };
+      }
       return { isValid: false, message: 'Failed to validate address location' };
     }
   }

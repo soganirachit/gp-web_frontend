@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { walletService } from "../../../services/wallet.service";
 import { toast } from "react-hot-toast";
 import { useAuth } from "../../../context/AuthContext";
+import { useCart, CartItem, CartDeliveryInfo } from "../../../context/CartContext";
 import RazorpayPayment from "../../Payment/Rezorpay/RezorpayPayment";
 import { IoWarningOutline } from "react-icons/io5";
 import { useNetworkRecovery } from "../../../hooks/useNetworkRecovery";
@@ -20,6 +21,8 @@ import lowbalanceIcon from "../../../assets/svg/gp_daily svg/lowbalance.svg";
 import depositIcon from "../../../assets/svg/gp_daily svg/deposit.svg";
 import enableIcon from "../../../assets/svg/gp_daily svg/enable.svg";
 import Spinner from "../../common/Spinner";
+import { orderService } from "../../../services/order.service";
+import { addressService, Address } from "../../../services/address.service";
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
 const MIN_AMOUNT = 1;
