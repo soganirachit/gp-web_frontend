@@ -1,10 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
-import BottomNavigation from '../../components/layout/BottomNav';
+import { FaPaperPlane } from 'react-icons/fa';
 import { supportService, TicketQuestion, PredefinedAnswers } from '../../services/support.service';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import Spinner from '../../components/common/Spinner';
+
+interface ChatMessage {
+  id: string;
+  type: 'question' | 'answer';
+  content: string;
+  questionId?: string;
+  timestamp: Date;
+}
 
 const TicketQuestionForm: React.FC = () => {
   const navigate = useNavigate();
@@ -20,18 +28,40 @@ const TicketQuestionForm: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [textInput, setTextInput] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Scroll to top on mount
+    window.scrollTo(0, 0);
     fetchQuestions();
   }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatMessages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const fetchQuestions = async () => {
     try {
       setLoading(true);
       const fetchedQuestions = await supportService.getTicketQuestions();
-      // Sort by order field
-      const sortedQuestions = fetchedQuestions.sort((a, b) => a.order - b.order);
-      setQuestions(sortedQuestions);
+      setQuestions(fetchedQuestions);
+      
+      // Add first question as a chat message
+      if (fetchedQuestions.length > 0) {
+        setChatMessages([{
+          id: 'q-0',
+          type: 'question',
+          content: fetchedQuestions[0].question,
+          questionId: fetchedQuestions[0].id,
+          timestamp: new Date()
+        }]);
+      }
     } catch (error) {
       console.error('Error fetching questions:', error);
     } finally {
@@ -39,98 +69,135 @@ const TicketQuestionForm: React.FC = () => {
     }
   };
 
-  const handleAnswerChange = (questionId: number, value: string) => {
-    const question = questions.find(q => q.id === questionId);
-    if (!question) return;
-
-    // Map question to answer key based on question text
-    const questionText = question.question_text.toLowerCase();
-    let answerKey: keyof PredefinedAnswers;
-
-    if (questionText.includes('type of issue') || questionText.includes('issue type')) {
-      answerKey = 'issue_type';
-    } else if (questionText.includes('item') && questionText.includes('affected')) {
-      answerKey = 'affected_items';
-    } else if (questionText.includes('describe') || questionText.includes('problem')) {
-      answerKey = 'description'; // API uses "description" not "problem_description"
-    } else if (questionText.includes('notice') || questionText.includes('when')) {
-      answerKey = 'noticed_when';
-    } else {
-      // Fallback: use question ID or order
-      answerKey = 'issue_type'; // Default fallback
-    }
-
-    setAnswers(prev => ({
-      ...prev,
+  const handleAnswerSelect = (questionId: string, value: string, label: string) => {
+    // Save answer
+    const answerKey = questionId as keyof PredefinedAnswers;
+    const updatedAnswers = {
+      ...answers,
       [answerKey]: value
-    }));
+    };
+    setAnswers(updatedAnswers);
+
+    // Add answer as chat message
+    setChatMessages(prev => [...prev, {
+      id: `a-${Date.now()}`,
+      type: 'answer',
+      content: label,
+      questionId: questionId,
+      timestamp: new Date()
+    }]);
+
+    // Move to next question after a short delay, passing updated answers
+    setTimeout(() => {
+      moveToNextQuestion(updatedAnswers);
+    }, 500);
   };
 
-  const handleNext = () => {
+  const handleTextAnswerSend = () => {
+    if (!textInput.trim()) return;
+
+    const currentQuestion = questions[currentQuestionIndex];
+    if (!currentQuestion) return;
+
+    const answerKey = currentQuestion.id as keyof PredefinedAnswers;
+    const answerValue = textInput.trim();
+    
+    // Save answer
+    const updatedAnswers = {
+      ...answers,
+      [answerKey]: answerValue
+    };
+    setAnswers(updatedAnswers);
+
+    // Add answer as chat message
+    setChatMessages(prev => [...prev, {
+      id: `a-${Date.now()}`,
+      type: 'answer',
+      content: answerValue,
+      questionId: currentQuestion.id,
+      timestamp: new Date()
+    }]);
+
+    // Clear input
+    setTextInput('');
+
+    // Move to next question after a short delay, passing updated answers
+    setTimeout(() => {
+      moveToNextQuestion(updatedAnswers);
+    }, 500);
+  };
+
+  const moveToNextQuestion = (updatedAnswers?: PredefinedAnswers) => {
+    const answersToCheck = updatedAnswers || answers;
+    
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
+      const nextIndex = currentQuestionIndex + 1;
+      setCurrentQuestionIndex(nextIndex);
+      
+      // Add next question as chat message
+      const nextQuestion = questions[nextIndex];
+      setChatMessages(prev => [...prev, {
+        id: `q-${nextIndex}`,
+        type: 'question',
+        content: nextQuestion.question,
+        questionId: nextQuestion.id,
+        timestamp: new Date()
+      }]);
+    } else {
+      // All questions answered, check and submit
+      // Use the updated answers if provided, otherwise use current state
+      const finalAnswers = updatedAnswers || answers;
+      handleSubmit(finalAnswers);
     }
   };
 
-  const handlePrevious = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
-    }
-  };
-
-  const handleSubmit = async () => {
+  const handleSubmit = async (answersToSubmit?: PredefinedAnswers) => {
     if (!orderId) {
       alert('Order ID is missing');
       return;
     }
 
-    // Validate all questions are answered
-    const currentQuestion = questions[currentQuestionIndex];
-    if (!currentQuestion) return;
-
-    const questionText = currentQuestion.question_text.toLowerCase();
-    let answerKey: keyof PredefinedAnswers;
+    // Use provided answers or current state
+    const finalAnswers = answersToSubmit || answers;
     
-    if (questionText.includes('type of issue') || questionText.includes('issue type')) {
-      answerKey = 'issue_type';
-    } else if (questionText.includes('item') && questionText.includes('affected')) {
-      answerKey = 'affected_items';
-    } else if (questionText.includes('describe') || questionText.includes('problem')) {
-      answerKey = 'problem_description';
-    } else if (questionText.includes('notice') || questionText.includes('when')) {
-      answerKey = 'noticed_when';
-    } else {
-      answerKey = 'issue_type';
-    }
-
-    if (!answers[answerKey]) {
-      alert('Please answer this question before submitting');
-      return;
-    }
-
     // Check if all required questions are answered
     const requiredAnswers = ['issue_type', 'affected_items', 'description', 'noticed_when'];
-    const allAnswered = requiredAnswers.every(key => answers[key as keyof PredefinedAnswers]);
+    const allAnswered = requiredAnswers.every(key => {
+      const answer = finalAnswers[key as keyof PredefinedAnswers];
+      return answer !== undefined && answer !== null && answer !== '';
+    });
 
     if (!allAnswered) {
-      alert('Please answer all questions before submitting');
+      console.log('Missing answers:', finalAnswers);
+      console.log('Required:', requiredAnswers);
+      // Wait a bit and try again with current state
+      setTimeout(() => {
+        const currentAnswers = answers;
+        const retryAllAnswered = requiredAnswers.every(key => {
+          const answer = currentAnswers[key as keyof PredefinedAnswers];
+          return answer !== undefined && answer !== null && answer !== '';
+        });
+        if (retryAllAnswered) {
+          handleSubmit(currentAnswers);
+        }
+      }, 200);
       return;
     }
 
     try {
       setSubmitting(true);
-      const ticket = await supportService.createTicket(parseInt(orderId), answers);
+      const ticket = await supportService.createTicket(parseInt(orderId), finalAnswers);
       
       if (ticket) {
         // Navigate to chat screen
         navigate(`${basePath}/customer-support/chat?ticket=${ticket.ticket_number}`);
       } else {
         alert('Failed to create ticket. Please try again.');
+        setSubmitting(false);
       }
     } catch (error) {
       console.error('Error creating ticket:', error);
       alert('Failed to create ticket. Please try again.');
-    } finally {
       setSubmitting(false);
     }
   };
@@ -176,29 +243,22 @@ const TicketQuestionForm: React.FC = () => {
   }
 
   const currentQuestion = questions[currentQuestionIndex];
-  const questionText = currentQuestion.question_text.toLowerCase();
-  let answerKey: keyof PredefinedAnswers;
-  
-  if (questionText.includes('type of issue') || questionText.includes('issue type')) {
-    answerKey = 'issue_type';
-  } else if (questionText.includes('item') && questionText.includes('affected')) {
-    answerKey = 'affected_items';
-  } else if (questionText.includes('describe') || questionText.includes('problem')) {
-    answerKey = 'description'; // API uses "description" not "problem_description"
-  } else if (questionText.includes('notice') || questionText.includes('when')) {
-    answerKey = 'noticed_when';
-  } else {
-    answerKey = 'issue_type';
-  }
+  const isLastQuestion = currentQuestionIndex === questions.length - 1;
+  const currentAnswer = currentQuestion ? answers[currentQuestion.id as keyof PredefinedAnswers] : '';
 
-  const currentAnswer = answers[answerKey] || '';
+  // Calculate bottom offset for input bar based on options
+  const hasOptions = !submitting && currentQuestion && !currentAnswer && currentQuestion.type === 'choice' && currentQuestion.options;
+  const optionsCount = hasOptions && currentQuestion.options ? currentQuestion.options.length : 0;
+  const optionsHeight = optionsCount * 40 + 16; // Approximate height per option + padding
+  const inputBarHeight = 80;
+  const totalBottomHeight = (hasOptions ? optionsHeight : 0) + inputBarHeight;
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB] flex flex-col">
-      <div className="max-w-[800px] mx-auto w-full flex flex-col flex-1">
+    <div className="fixed inset-0 bg-[#FFFBEB] flex flex-col overflow-hidden">
+      <div className="max-w-[800px] mx-auto w-full h-full flex flex-col relative">
         {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#FFFBEB] z-10">
-          <div className="flex items-center gap-3 mb-4">
+        <div className="p-4 pt-6 flex-shrink-0 bg-[#FFFBEB] border-b border-gray-200 z-10">
+          <div className="flex items-center gap-3 mb-2">
             <button
               onClick={() => navigate(-1)}
               className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
@@ -215,96 +275,101 @@ const TicketQuestionForm: React.FC = () => {
             {questions.map((_, index) => (
               <div
                 key={index}
-                className={`flex-1 h-2 rounded-full ${
-                  index === currentQuestionIndex
+                className={`flex-1 h-1.5 rounded-full ${
+                  index <= currentQuestionIndex
                     ? 'bg-[#166534]'
-                    : index < currentQuestionIndex
-                    ? 'bg-green-400'
                     : 'bg-gray-300'
                 }`}
               />
             ))}
           </div>
           <p className="text-xs text-gray-500 mt-2 text-center">
-            Question {currentQuestionIndex + 1} of {questions.length}
+            {currentQuestionIndex + 1} of {questions.length} questions
           </p>
         </div>
 
-        {/* Question Form */}
-        <div className="flex-1 px-4 pb-24 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-6 shadow-sm mt-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              {currentQuestion.question_text}
-            </h2>
-
-            {currentQuestion.question_type === 'choice' && currentQuestion.choices ? (
-              <div className="space-y-3">
-                {currentQuestion.choices.map((choice) => (
-                  <button
-                    key={choice}
-                    type="button"
-                    onClick={() => handleAnswerChange(currentQuestion.id, choice)}
-                    className={`w-full text-left p-4 rounded-xl border-2 transition-colors ${
-                      currentAnswer === choice
-                        ? 'border-[#166534] bg-green-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <span className="font-medium text-gray-900">{choice}</span>
-                  </button>
-                ))}
+        {/* Chat Messages - Scrollable area */}
+        <div 
+          className="flex-1 px-4 py-4 overflow-y-auto min-h-0"
+          style={{ paddingBottom: `${totalBottomHeight}px` }}
+        >
+          <div className="space-y-4">
+            {chatMessages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.type === 'question' ? 'justify-start' : 'justify-end'}`}
+              >
+                <div className={`max-w-[75%] rounded-2xl p-4 ${
+                  message.type === 'question'
+                    ? 'bg-gray-200 text-gray-900'
+                    : 'bg-[#166534] text-white'
+                }`}>
+                  <p className="text-base whitespace-pre-wrap">{message.content}</p>
+                </div>
               </div>
-            ) : (
+            ))}
+            {submitting && (
+              <div className="flex justify-start">
+                <div className="bg-gray-200 text-gray-900 rounded-2xl p-4">
+                  <p className="text-base">Creating your support ticket...</p>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+
+        {/* Choice Options - Fixed above input bar */}
+        {!submitting && currentQuestion && !currentAnswer && currentQuestion.type === 'choice' && currentQuestion.options && (
+          <div className="fixed bottom-0 left-0 right-0 bg-[#FFFBEB] border-t border-gray-200/50 px-4 py-2 z-20 max-w-[800px] mx-auto">
+            <div className="space-y-1.5">
+              {currentQuestion.options.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleAnswerSelect(currentQuestion.id, option.value, option.label)}
+                  className="w-full text-left p-2 rounded-lg border border-gray-200 bg-white hover:border-[#166534] hover:bg-green-50 transition-colors text-sm"
+                >
+                  <span className="font-medium text-gray-900">{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Fixed Text Input Bar - Fixed to bottom */}
+        {!submitting && currentQuestion && !currentAnswer && (
+          <div 
+            className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 z-30 max-w-[800px] mx-auto"
+            style={{ bottom: hasOptions ? `${optionsHeight}px` : '0' }}
+          >
+            <div className="flex gap-2 items-end">
               <textarea
-                value={currentAnswer}
-                onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                placeholder="Type your answer here..."
-                className="w-full p-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#166534] resize-none"
-                rows={6}
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleTextAnswerSend();
+                  }
+                }}
+                placeholder={currentQuestion.type === 'choice' ? "Or type your answer..." : (currentQuestion.placeholder || "Type your answer...")}
+                className="flex-1 p-2.5 border border-gray-300 rounded-xl focus:outline-none focus:border-[#166534] resize-none bg-gray-50 text-sm"
+                rows={1}
               />
-            )}
+              <button
+                onClick={handleTextAnswerSend}
+                disabled={!textInput.trim()}
+                className="p-2.5 bg-[#166534] text-white rounded-xl hover:bg-[#145028] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+              >
+                <FaPaperPlane size={16} />
+              </button>
+            </div>
           </div>
-        </div>
-
-        {/* Navigation Buttons */}
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
-          <div className="flex gap-3">
-            {currentQuestionIndex > 0 && (
-              <button
-                onClick={handlePrevious}
-                className="flex-1 py-3 px-4 bg-gray-200 text-gray-800 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
-              >
-                Previous
-              </button>
-            )}
-            {currentQuestionIndex < questions.length - 1 ? (
-              <button
-                onClick={handleNext}
-                disabled={!currentAnswer}
-                className="flex-1 py-3 px-4 bg-[#166534] text-white rounded-xl font-semibold hover:bg-[#145028] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={!currentAnswer || submitting}
-                className="flex-1 py-3 px-4 bg-[#166534] text-white rounded-xl font-semibold hover:bg-[#145028] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {submitting ? 'Submitting...' : 'Submit'}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Bottom Navigation */}
-        <div className="sticky bottom-0 z-20">
-          <BottomNavigation />
-        </div>
+        )}
       </div>
     </div>
   );
 };
 
 export default TicketQuestionForm;
-

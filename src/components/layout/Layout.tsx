@@ -39,11 +39,11 @@ const Layout: React.FC = () => {
   const routesWithOwnBottomNav = ["/account", "/Account"];
   const hasOwnBottomNav = routesWithOwnBottomNav.includes(location.pathname);
 
-  // Routes that should not show BottomNav (location pages)
+  // Routes that should not show BottomNav (location pages, support question form)
   const routesWithoutBottomNav = ["/location"];
   const shouldHideBottomNav = routesWithoutBottomNav.includes(
     location.pathname
-  );
+  ) || location.pathname.includes("/customer-support/questions");
 
   // Routes that should not have top padding
   const routesWithoutTopPadding = ["/gp-daily", "/gp-store"];

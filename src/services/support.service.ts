@@ -9,12 +9,15 @@ export interface SupportTicket {
   id: number;
   ticket_number: string;
   subject: string;
-  description: string;
+  description?: string; // Optional - not always present in list view
   status: string;
   priority: string;
-  order_number?: string;
+  order_number?: string | null;
   created_at: string;
   updated_at: string;
+  agent_requested?: boolean;
+  callback_requested?: boolean;
+  messages_count?: number;
 }
 
 export interface SupportMessage {
@@ -47,15 +50,21 @@ export interface EligibleOrder {
   status: string;
   delivered_at: string;
   total_amount: string;
+  items_preview?: string; // Preview of items in the order
   created_at: string;
 }
 
+export interface TicketQuestionOption {
+  value: string;
+  label: string;
+}
+
 export interface TicketQuestion {
-  id: number;
-  question_text: string;
-  question_type: 'choice' | 'text';
-  choices?: string[]; // For choice type questions
-  order: number; // Order in which question should be displayed
+  id: string; // e.g., "issue_type", "affected_items", etc.
+  question: string; // Question text
+  type: 'choice' | 'text'; // Question type
+  options?: TicketQuestionOption[]; // For choice type questions (array of {value, label})
+  placeholder?: string; // For text type questions
 }
 
 export interface PredefinedAnswers {
@@ -75,8 +84,16 @@ class SupportService {
       if (!headers) {
         return [];
       }
-      const response = await axios.get<EligibleOrder[]>(`${SUPPORT_API_URL}/eligible-orders/`, { headers });
-      return response.data;
+      const response = await axios.get<{ success: boolean; message: string; data: EligibleOrder[] }>(`${SUPPORT_API_URL}/eligible-orders/`, { headers });
+      // Handle wrapped response structure
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      // Fallback: if response.data is directly an array
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      return [];
     } catch (error: any) {
       console.error('Error fetching eligible orders:', error);
       headerService.handleError(error);
@@ -93,8 +110,18 @@ class SupportService {
       if (!headers) {
         return [];
       }
-      const response = await axios.get<TicketQuestion[]>(`${SUPPORT_API_URL}/ticket-questions/`, { headers });
-      return response.data;
+      const response = await axios.get<{ success: boolean; message: string; data: TicketQuestion[] } | TicketQuestion[]>(`${SUPPORT_API_URL}/ticket-questions/`, { headers });
+      console.log('Ticket questions API response:', response.data);
+      
+      // Handle wrapped response structure
+      if (response.data && typeof response.data === 'object' && 'data' in response.data && Array.isArray(response.data.data)) {
+        return response.data.data;
+      }
+      // Fallback: if response.data is directly an array
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      return [];
     } catch (error: any) {
       console.error('Error fetching ticket questions:', error);
       headerService.handleError(error);
@@ -111,8 +138,18 @@ class SupportService {
       if (!headers) {
         return [];
       }
-      const response = await axios.get<SupportTicket[]>(`${API_URL}/`, { headers });
-      return response.data;
+      const response = await axios.get<{ count: number; next: string | null; previous: string | null; results: SupportTicket[] } | SupportTicket[]>(`${API_URL}/`, { headers });
+      console.log('Tickets API response:', response.data);
+      
+      // Handle paginated response structure
+      if (response.data && typeof response.data === 'object' && 'results' in response.data && Array.isArray(response.data.results)) {
+        return response.data.results;
+      }
+      // Fallback: if response.data is directly an array
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      return [];
     } catch (error: any) {
       console.error('Error fetching support tickets:', error);
       headerService.handleError(error);
@@ -158,7 +195,7 @@ class SupportService {
       if (!headers) {
         return null;
       }
-      const response = await axios.post<SupportTicket>(
+      const response = await axios.post<{ success: boolean; message: string; data: SupportTicket } | SupportTicket>(
         `${API_URL}/create/`,
         {
           order_id: orderId,
@@ -167,7 +204,12 @@ class SupportService {
         },
         { headers }
       );
-      return response.data;
+      // Handle wrapped response structure
+      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+        return response.data.data;
+      }
+      // Fallback: if response.data is directly the ticket
+      return response.data as SupportTicket;
     } catch (error: any) {
       console.error('Error creating support ticket:', error);
       headerService.handleError(error);

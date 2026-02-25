@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { IoArrowBack, IoCreateOutline } from 'react-icons/io5';
 import { BsCalendar4 } from 'react-icons/bs';
 import { MdLocationOn } from 'react-icons/md';
@@ -69,12 +69,52 @@ const Cart: React.FC = () => {
   const timeSlots = ['8-11 AM', '11 AM-2 PM', '2-6 PM', '6-9 PM'];
 
   // Load cart from API when component mounts (if logged in)
+  // But wait for sync to complete if coming from login
   useEffect(() => {
     if (isLoggedIn) {
-      loadCartFromAPI();
+      // Check if we're coming from login (cart redirect)
+      const fromCart = location.state?.fromCart;
+      const hasTempCart = localStorage.getItem('gp_store_temp_cart');
+      
+      // If coming from login and temp cart exists, wait for sync to complete
+      if (fromCart && hasTempCart) {
+        console.log('Coming from login with temp cart, waiting for sync...');
+        // Wait for sync to complete before loading from API
+        // The CartContext will handle merging and syncing the temp cart
+        let attempts = 0;
+        const maxAttempts = 20; // 4 seconds max (20 * 200ms)
+        
+        const checkSync = setInterval(() => {
+          attempts++;
+          const stillHasTempCart = localStorage.getItem('gp_store_temp_cart');
+          const isCurrentlySyncing = isSyncing;
+          const hasLocalItems = items.length > 0;
+          
+          // If temp cart is cleared and not syncing, sync is complete
+          // Also check if we have local items (merged from temp cart)
+          if ((!stillHasTempCart && !isCurrentlySyncing) || (hasLocalItems && !isCurrentlySyncing && attempts > 3)) {
+            clearInterval(checkSync);
+            console.log('Sync complete, loading cart from API...');
+            // Small delay to ensure sync is fully complete
+            setTimeout(() => {
+              loadCartFromAPI();
+            }, 500);
+          } else if (attempts >= maxAttempts) {
+            // Fallback: load after max attempts even if temp cart still exists
+            clearInterval(checkSync);
+            console.log('Max attempts reached, loading cart from API...');
+            loadCartFromAPI();
+          }
+        }, 200);
+        
+        return () => clearInterval(checkSync);
+      } else {
+        // Normal load - user is already logged in
+        loadCartFromAPI();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoggedIn]);
+  }, [isLoggedIn, location.state]);
 
   // Fetch default address or use selected address from navigation
   useEffect(() => {

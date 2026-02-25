@@ -44,10 +44,12 @@ const CustomerSupport: React.FC = () => {
       setLoading(true);
       // Fetch eligible orders (delivered in last 12 hours)
       const eligibleOrders = await supportService.getEligibleOrders();
+      console.log('Fetched eligible orders:', eligibleOrders);
       setOrders(eligibleOrders);
       
       // Fetch support tickets
       const supportTickets = await supportService.getTickets();
+      console.log('Fetched support tickets:', supportTickets);
       setTickets(supportTickets);
     } catch (err) {
       console.error("Failed to fetch data:", err);
@@ -165,18 +167,30 @@ const CustomerSupport: React.FC = () => {
                       Select an order to create support ticket
                     </button>
                     {orders.map((order) => {
+                      const orderDate = formatDate(order.delivered_at);
                       return (
                         <button
                           key={order.id}
                           type="button"
                           onClick={() => handleOrderSelect(order)}
-                          className={`w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base transition-colors truncate ${
+                          className={`w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base transition-colors ${
                             selectedOrderNumber === order.order_number 
                               ? 'bg-gray-100 text-gray-900 font-medium' 
                               : 'text-gray-700 hover:bg-gray-50'
                           }`}
                         >
-                          {order.order_number}
+                          <div className="flex flex-col">
+                            <span className="font-semibold">{order.order_number}</span>
+                            {order.items_preview && (
+                              <span className="text-xs text-gray-500 truncate mt-1">
+                                {order.items_preview}
+                              </span>
+                            )}
+                            <div className="flex items-center justify-between mt-1">
+                              <span className="text-xs text-gray-500">₹{parseFloat(order.total_amount).toLocaleString('en-IN')}</span>
+                              <span className="text-xs text-gray-500">{orderDate}</span>
+                            </div>
+                          </div>
                         </button>
                       );
                     })}
@@ -207,9 +221,16 @@ const CustomerSupport: React.FC = () => {
                         <h3 className="font-semibold text-gray-900 text-base mb-1">
                           {ticket.subject}
                         </h3>
-                        <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                          {ticket.description}
-                        </p>
+                        {ticket.description && (
+                          <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                            {ticket.description}
+                          </p>
+                        )}
+                        {ticket.messages_count !== undefined && (
+                          <p className="text-xs text-gray-500 mb-1">
+                            {ticket.messages_count} message{ticket.messages_count !== 1 ? 's' : ''}
+                          </p>
+                        )}
                         {ticket.order_number && (
                           <p className="text-xs text-gray-500 mb-1">
                             Order: {ticket.order_number}

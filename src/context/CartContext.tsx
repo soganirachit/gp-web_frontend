@@ -556,14 +556,21 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         console.log('Setting cart items from API:', apiItems);
         setItems(apiItems);
       } else {
-        // API cart is empty - but don't clear local cart if we have pending adds
-        // This prevents clearing items that were just added but API hasn't processed yet
-        if (pendingAdds.size === 0) {
-          console.log('API cart is empty and no pending adds, clearing local cart');
+        // API cart is empty - but don't clear local cart if we have:
+        // 1. Pending adds (items being added to API)
+        // 2. Items without apiCartItemId (from temp cart, need syncing)
+        const hasUnsavedItems = items.some(item => !item.apiCartItemId);
+        if (pendingAdds.size === 0 && !hasUnsavedItems) {
+          console.log('API cart is empty and no pending adds or unsaved items, clearing local cart');
           setItems([]);
         } else {
-          console.log('API cart is empty but have pending adds, keeping local cart items');
+          console.log('API cart is empty but have pending adds or unsaved items, keeping local cart items', {
+            pendingAdds: pendingAdds.size,
+            hasUnsavedItems,
+            itemsCount: items.length
+          });
           // Keep local items - they will be synced when API processes them
+          // Don't call setItems([]) - preserve existing items
         }
       }
     } catch (error: any) {
@@ -731,8 +738,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       const token = localStorage.getItem('token');
       const prevToken = localStorage.getItem('prevToken'); // Track previous token state
       
-      if (token && !prevToken) {
-        // User just logged in (token exists but didn't exist before)
+      // Check if token changed from null/undefined to a value (user just logged in)
+      const tokenChanged = token && (!prevToken || prevToken !== token);
+      
+      if (tokenChanged) {
+        // User just logged in (token exists but didn't exist before, or token changed)
         // Merge temp cart items into state and sync to API
         const tempCart = localStorage.getItem(TEMP_CART_KEY);
         if (tempCart) {
@@ -774,6 +784,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                 
                 return mergedItems;
               });
+            } else {
+              // No temp cart items, but still mark as processed
+              localStorage.removeItem(TEMP_CART_KEY);
             }
           } catch (error) {
             console.error('Error processing temp cart on login:', error);
@@ -781,12 +794,14 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         }
         
         // Mark that we've processed this login
-        localStorage.setItem('prevToken', token);
+        if (token) {
+          localStorage.setItem('prevToken', token);
+        }
       } else if (!token && prevToken) {
         // User logged out - clear prevToken marker
         localStorage.removeItem('prevToken');
-      } else if (token) {
-        // User is logged in - update prevToken to current token
+      } else if (token && prevToken === token) {
+        // User is logged in and token hasn't changed - update prevToken to current token
         localStorage.setItem('prevToken', token);
       } else {
         // Token removed - clear regular cart and delivery info
