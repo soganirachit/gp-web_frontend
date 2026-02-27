@@ -290,7 +290,7 @@ const FixedHeader: React.FC = () => {
   };
 
   return (
-    <div className="bg-[#FFFBEB] sticky top-0 z-10">
+    <div className="bg-[#f8f6f1] sticky top-0 z-10">
       <div className={`max-w-[800px] mx-auto px-4 ${
       ['/login', '/otp-verification', '/name-input', '/allset'].includes(location.pathname) 
         ? 'py-2' 

@@ -77,7 +77,7 @@ const Profile: React.FC = () => {
   };
 
   return (
-    <div className="bg-[#FFFBEB] min-h-screen">
+    <div className="bg-[#f8f6f1] min-h-screen">
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
         <div className="px-4 pt-4 flex items-center gap-3">

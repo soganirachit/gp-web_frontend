@@ -183,7 +183,7 @@ const ModifySubscription: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#FFFBEB]">
+      <div className="h-screen flex items-center justify-center bg-[#f8f6f1]">
         <Spinner size={400} />
       </div>
     );
@@ -191,7 +191,7 @@ const ModifySubscription: React.FC = () => {
 
   if (!subscription) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FFFBEB]">
+      <div className="min-h-screen flex items-center justify-center bg-[#f8f6f1]">
         <div className="text-center">
           <p className="text-gray-600 mb-4">No subscription data found.</p>
           <button onClick={() => navigate('/gp-daily/manage-my-subscription')} className="text-blue-600 underline">
@@ -206,7 +206,7 @@ const ModifySubscription: React.FC = () => {
   const productImage = subscription.productDetails?.imagesUrl?.[0] || "https://t4.ftcdn.net/jpg/05/65/22/45/360_F_565224520_XvHkj0jS5jI4jZg7jZg7jZg7jZg7jZg7.jpg";
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB] font-sans">
+    <div className="min-h-screen bg-[#f8f6f1] font-sans">
       <div className="max-w-[800px] mx-auto p-4 md:p-6 pb-24">
 
         {/* Header */}

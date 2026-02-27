@@ -204,7 +204,7 @@ const TicketQuestionForm: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
@@ -212,7 +212,7 @@ const TicketQuestionForm: React.FC = () => {
 
   if (!orderId || !orderNumber) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600 mb-4">Order information is missing</p>
           <button
@@ -228,7 +228,7 @@ const TicketQuestionForm: React.FC = () => {
 
   if (questions.length === 0) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600 mb-4">No questions available</p>
           <button
@@ -254,10 +254,10 @@ const TicketQuestionForm: React.FC = () => {
   const totalBottomHeight = (hasOptions ? optionsHeight : 0) + inputBarHeight;
 
   return (
-    <div className="fixed inset-0 bg-[#FFFBEB] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-[#f8f6f1] flex flex-col overflow-hidden">
       <div className="max-w-[800px] mx-auto w-full h-full flex flex-col relative">
         {/* Header */}
-        <div className="p-4 pt-6 flex-shrink-0 bg-[#FFFBEB] border-b border-gray-200 z-10">
+        <div className="p-4 pt-6 flex-shrink-0 bg-[#f8f6f1] border-b border-gray-200 z-10">
           <div className="flex items-center gap-3 mb-2">
             <button
               onClick={() => navigate(-1)}
@@ -320,53 +320,65 @@ const TicketQuestionForm: React.FC = () => {
         </div>
 
         {/* Choice Options - Fixed above input bar */}
-        {!submitting && currentQuestion && !currentAnswer && currentQuestion.type === 'choice' && currentQuestion.options && (
-          <div className="fixed bottom-0 left-0 right-0 bg-[#FFFBEB] border-t border-gray-200/50 px-4 py-2 z-20 max-w-[800px] mx-auto">
-            <div className="space-y-1.5">
-              {currentQuestion.options.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => handleAnswerSelect(currentQuestion.id, option.value, option.label)}
-                  className="w-full text-left p-2 rounded-lg border border-gray-200 bg-white hover:border-[#166534] hover:bg-green-50 transition-colors text-sm"
-                >
-                  <span className="font-medium text-gray-900">{option.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Bottom Container (Options + Input) */}
+{!submitting && currentQuestion && !currentAnswer && (
+  <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30 max-w-[800px] mx-auto">
 
-        {/* Fixed Text Input Bar - Fixed to bottom */}
-        {!submitting && currentQuestion && !currentAnswer && (
-          <div 
-            className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 z-30 max-w-[800px] mx-auto"
-            style={{ bottom: hasOptions ? `${optionsHeight}px` : '0' }}
-          >
-            <div className="flex gap-2 items-end">
-              <textarea
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleTextAnswerSend();
-                  }
-                }}
-                placeholder={currentQuestion.type === 'choice' ? "Or type your answer..." : (currentQuestion.placeholder || "Type your answer...")}
-                className="flex-1 p-2.5 border border-gray-300 rounded-xl focus:outline-none focus:border-[#166534] resize-none bg-gray-50 text-sm"
-                rows={1}
-              />
-              <button
-                onClick={handleTextAnswerSend}
-                disabled={!textInput.trim()}
-                className="p-2.5 bg-[#166534] text-white rounded-xl hover:bg-[#145028] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-              >
-                <FaPaperPlane size={16} />
-              </button>
-            </div>
-          </div>
-        )}
+    {/* Choice Options */}
+    {currentQuestion.type === 'choice' && currentQuestion.options && (
+      <div className="px-4 py-3 bg-[#f8f6f1] border-b border-gray-200">
+        <div className="space-y-2">
+          {currentQuestion.options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() =>
+                handleAnswerSelect(currentQuestion.id, option.value, option.label)
+              }
+              className="w-full text-center p-2 rounded-lg border border-gray-200 bg-white hover:border-[#166534] hover:bg-green-50 transition-colors text-sm"
+            >
+              <span className="font-medium text-gray-900">
+                {option.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {/* Text Input */}
+    <div className="p-3 bg-white">
+      <div className="flex gap-2 items-end">
+        <textarea
+          value={textInput}
+          onChange={(e) => setTextInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleTextAnswerSend();
+            }
+          }}
+          placeholder={
+            currentQuestion.type === 'choice'
+              ? "Or type your answer..."
+              : currentQuestion.placeholder || "Type your answer..."
+          }
+          className="flex-1 h-12 p-2 border border-gray-300 rounded-xl focus:outline-none focus:border-[#166534] resize-none bg-gray-50 text-sm"
+          rows={1}
+        />
+        <button
+          onClick={handleTextAnswerSend}
+          disabled={!textInput.trim()}
+          className="p-2.5 bg-[#166534] text-white rounded-xl hover:bg-[#145028] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+        >
+          <FaPaperPlane size={16} />
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+      
       </div>
     </div>
   );

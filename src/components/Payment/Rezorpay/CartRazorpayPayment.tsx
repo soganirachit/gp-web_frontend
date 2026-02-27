@@ -1,10 +1,4 @@
-import { useEffect, useState } from "react";
-
-declare global {
-  interface Window {
-    Razorpay: new (options: RazorpayOptions) => RazorpayInstance;
-  }
-}
+import React, { useEffect, useState, forwardRef } from "react";
 
 // Type declaration for Razorpay
 interface RazorpayOptions {
@@ -60,7 +54,7 @@ interface CartRazorpayPaymentProps {
   disabled?: boolean;
 }
 
-const CartRazorpayPayment: React.FC<CartRazorpayPaymentProps> = ({
+const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentProps>(({
   razorpayOrderId,
   amount,
   currency,
@@ -73,11 +67,18 @@ const CartRazorpayPayment: React.FC<CartRazorpayPaymentProps> = ({
   className = "w-full py-3 bg-[#FF5722] text-white rounded-lg font-medium",
   buttonText = "Pay Now",
   disabled = false,
-}) => {
+}, ref) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handlePayment = () => {
     try {
+      console.log('CartRazorpayPayment - handlePayment called', {
+        hasWindowRazorpay: typeof (window as any).Razorpay !== 'undefined',
+        razorpayOrderId,
+        amount,
+        currency,
+      });
+
       setIsLoading(true);
 
       const options: RazorpayOptions = {
@@ -113,7 +114,14 @@ const CartRazorpayPayment: React.FC<CartRazorpayPaymentProps> = ({
         },
       };
 
-      const razorpayInstance = new window.Razorpay(options);
+      const RazorpayConstructor = (window as any).Razorpay;
+
+      if (typeof RazorpayConstructor !== 'function') {
+        console.error('CartRazorpayPayment - Razorpay script not loaded');
+        throw new Error('Payment gateway is not ready. Please wait a moment and try again.');
+      }
+
+      const razorpayInstance = new RazorpayConstructor(options);
       razorpayInstance.open();
       setIsLoading(false);
     } catch (error) {
@@ -142,6 +150,7 @@ const CartRazorpayPayment: React.FC<CartRazorpayPaymentProps> = ({
 
   return (
     <button
+      ref={ref}
       onClick={handlePayment}
       className={className}
       disabled={isLoading || disabled}
@@ -155,7 +164,7 @@ const CartRazorpayPayment: React.FC<CartRazorpayPaymentProps> = ({
       )}
     </button>
   );
-};
+});
 
 export default CartRazorpayPayment;
 

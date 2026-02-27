@@ -49,7 +49,7 @@ const SearchPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB] relative">
+    <div className="min-h-screen bg-[#f8f6f1] relative">
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
         <div className="p-4 md:p-6 flex items-center justify-between">
@@ -114,9 +114,9 @@ const SearchPage: React.FC = () => {
                   onClick={() => handleProductClick(item)}
                 >
                   <div className="p-3">
-                    <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
+                    <div className="bg-[#f8f6f1] rounded-2xl overflow-hidden aspect-square">
                       <img 
-                        src={item.imagesUrl || 'https://via.placeholder.com/160'} 
+                        src={(Array.isArray(item.imagesUrl) ? item.imagesUrl[0] : item.imagesUrl) || 'https://via.placeholder.com/160'}
                         alt={item.name}
                         className="w-full h-full object-cover"
                       />

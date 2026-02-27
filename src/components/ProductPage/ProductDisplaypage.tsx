@@ -585,7 +585,7 @@ const ProductPage: React.FC = () => {
 
   if (loading || isCheckingBalance) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
@@ -611,10 +611,10 @@ const ProductPage: React.FC = () => {
   const categoryName = product?.category === "PUJA" ? "Puja Pack" : product?.category === "EXOTIC" ? "Exotic Pack" : "Puja Pack";
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB] pb-24">
+    <div className="min-h-screen bg-[#f8f6f1] pb-24">
       <div className="max-w-[800px] mx-auto relative">
         {/* Header */}
-        <div className="sticky top-0 bg-[#FFFBEB] z-10 px-4 py-4 flex items-center gap-3 border-b border-gray-200">
+        <div className="sticky top-0 bg-[#f8f6f1] z-10 px-4 py-4 flex items-center gap-3 border-b border-gray-200">
           <button
             onClick={() => navigate(-1)}
             className="hover:bg-gray-100 rounded-full p-2 transition-colors"

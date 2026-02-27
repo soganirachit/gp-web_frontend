@@ -28,6 +28,15 @@ export interface CreateCheckoutOrderResponse {
   amount: number; // in paise
   currency: string;
   key_id?: string; // Razorpay key ID (if provided by API)
+  // Some backends may return the full Razorpay order object instead
+  order?: {
+    id: string;
+    amount: number;
+    currency: string;
+    [key: string]: any;
+  };
+  // Fallback field name in case API uses order_id instead of razorpay_order_id
+  order_id?: string;
 }
 
 export interface VerifyPaymentRequest {
@@ -68,29 +77,35 @@ class PaymentService {
   ): Promise<CreateCheckoutOrderResponse> {
     try {
       const headers = headerService.getHeaders();
-      console.log('Payment Service - Headers:', { 
+      console.log('Payment Service - Headers:', {
         hasAuth: !!headers.Authorization,
         authPrefix: headers.Authorization?.substring(0, 10),
         url: `${API_URL}/create-order/`,
-        data 
+        data
       });
-      
-      const response = await axios.post<any>(
+
+      const response = await axios.post(
         `${API_URL}/create-order/`,
         data,
         { headers }
       );
-      
-      console.log('Payment Service - Response:', response.data);
-      
-      // Check if the response indicates failure
+
+      console.log('Payment Service - Raw Response:', response.data);
+
       if (response.data && response.data.success === false) {
         const errorMessage = response.data.message || 'Authentication failed';
         console.error('API returned error:', errorMessage, response.data);
         throw new Error(errorMessage);
       }
-      
-      return response.data;
+
+      // Some APIs wrap the actual payload under a `data` key
+      // e.g. { success: true, data: { razorpay_order_id, amount, currency, key_id } }
+      const raw = response.data;
+      const maybeWrapped = (raw && raw.data) ? raw.data : raw;
+
+      console.log('Payment Service - Normalized create-order payload:', maybeWrapped);
+
+      return maybeWrapped;
     } catch (error: any) {
       console.error('Error creating checkout order:', error);
       console.error('Error details:', {
@@ -99,21 +114,76 @@ class PaymentService {
         status: error.response?.status,
         headers: error.response?.headers
       });
-      
-      // If it's already an Error with a message, throw it
+
       if (error instanceof Error) {
         throw error;
       }
-      
-      // Check if response has success: false
+
       if (error.response?.data?.success === false) {
         throw new Error(error.response.data.message || 'Authentication failed');
       }
-      
-      // Otherwise, handle through headerService
+
       headerService.handleError(error);
       throw error;
     }
+  }
+
+  /**
+   * Step 2: Open Razorpay checkout UI
+   * Call this with the razorpay_order_id returned from Step 1
+   * Resolves with payment details on success, rejects on failure/dismissal
+   */
+  async openRazorpayCheckout(options: {
+    razorpayOrderId: string;
+    amount: number;          // in paise (e.g. 50000 = ₹500)
+    currency?: string;       // default: 'INR'
+    razorpayKeyId: string;
+    prefill?: {
+      name?: string;
+      email?: string;
+      contact?: string;
+    };
+    description?: string;
+    theme?: {
+      color?: string;
+    };
+  }): Promise<{
+    razorpay_payment_id: string;
+    razorpay_order_id: string;
+    razorpay_signature: string;
+  }> {
+    return new Promise((resolve, reject) => {
+      const rzpOptions = {
+        key: options.razorpayKeyId,
+        amount: options.amount,
+        currency: options.currency || 'INR',
+        order_id: options.razorpayOrderId,
+        description: options.description || 'Order Payment',
+        prefill: {
+          name: options.prefill?.name || '',
+          email: options.prefill?.email || '',
+          contact: options.prefill?.contact || '',
+        },
+        theme: {
+          color: options.theme?.color || '#3399cc',
+        },
+        handler: function (response: {
+          razorpay_payment_id: string;
+          razorpay_order_id: string;
+          razorpay_signature: string;
+        }) {
+          // Payment successful — resolve with details to pass into Step 3
+          console.log('Razorpay payment successful:', response);
+          resolve(response);
+        },
+        modal: {
+          ondismiss: function () {
+            console.log('Razorpay checkout dismissed by user');
+            reject(new Error('Payment cancelled by user'));
+          },
+        },
+      };
+    });
   }
 
   /**
@@ -125,29 +195,26 @@ class PaymentService {
   ): Promise<VerifyPaymentResponse> {
     try {
       const headers = headerService.getHeaders();
-      const response = await axios.post<any>(
+      const response = await axios.post(
         `${API_URL}/verify/`,
         data,
         { headers }
       );
-      
-      // Check if the response indicates failure
+
       if (response.data && response.data.success === false) {
         const errorMessage = response.data.message || 'Payment verification failed';
         console.error('API returned error:', errorMessage);
         throw new Error(errorMessage);
       }
-      
+
       return response.data;
     } catch (error: any) {
       console.error('Error verifying payment:', error);
-      
-      // If it's already an Error with a message, throw it
+
       if (error instanceof Error) {
         throw error;
       }
-      
-      // Otherwise, handle through headerService
+
       headerService.handleError(error);
       throw error;
     }
@@ -162,10 +229,11 @@ class PaymentService {
   ): Promise<PaymentStatusResponse> {
     try {
       const headers = headerService.getHeaders();
-      const response = await axios.get<PaymentStatusResponse>(
+      const response = await axios.get(
         `${API_URL}/status/${razorpayOrderId}/`,
         { headers }
       );
+
       return response.data;
     } catch (error: any) {
       console.error('Error getting payment status:', error);

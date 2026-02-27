@@ -70,7 +70,7 @@ const PauseSubscription: React.FC = () => {
     if (!subscription) return null;
 
     return (
-        <div className="min-h-screen bg-[#FFFBEB] flex flex-col pb-20 font-sans">
+        <div className="min-h-screen bg-[#f8f6f1] flex flex-col pb-20 font-sans">
             <div className="max-w-[800px] mx-auto px-4">
                 {/* Header */}
                 <div className="pt-4 px-4 flex items-center gap-3 mb-6">

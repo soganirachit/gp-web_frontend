@@ -337,7 +337,7 @@ const StorePage: React.FC = () => {
 
   if (loading || isCheckingBalance) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
@@ -362,10 +362,10 @@ const StorePage: React.FC = () => {
   const categoryName = product?.category_name || "Products";
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB]">
+    <div className="min-h-screen bg-[#f8f6f1]">
       <div className="max-w-[800px] mx-auto relative pb-20">
         {/* Header */}
-        <div className="sticky top-0 bg-[#FFFBEB] z-10 px-4 py-4 flex items-center gap-3 border-b border-gray-200">
+        <div className="sticky top-0 bg-[#f8f6f1] z-10 px-4 py-4 flex items-center gap-3 border-b border-gray-200">
           <button
             onClick={() => navigate(-1)}
             className="hover:bg-gray-100 rounded-full p-2 transition-colors"
@@ -397,7 +397,7 @@ const StorePage: React.FC = () => {
               {product.name}
             </h1>
             {getPriceDisplay().discountPercentage > 0 && (
-              <span className="bg-[#2A6B28] text-white text-sm font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap">
+              <span className="bg-[#19411F] text-white text-sm font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap">
                 Save {getPriceDisplay().discountPercentage}%
               </span>
             )}
@@ -453,7 +453,7 @@ const StorePage: React.FC = () => {
                 {quantity}
               </span>
               <button
-                className="w-10 h-10 rounded-full flex items-center justify-center bg-[#2A6B28] text-white text-xl font-medium hover:bg-[#1e5a1c] transition-colors"
+                className="w-10 h-10 rounded-full flex items-center justify-center bg-[#19411F] text-white text-xl font-medium hover:bg-[#1e5a1c] transition-colors"
                 onClick={() => setQuantity(quantity + 1)}
               >
                 +
@@ -474,7 +474,7 @@ const StorePage: React.FC = () => {
                     onClick={() => setSelectedVariant(variant)}
                     className={`flex flex-col items-center text-center p-3 rounded-2xl border-2 transition-all ${
                       selectedVariant?.id === variant.id
-                        ? 'bg-[#E6F4EA] border-[#2A6B28]'
+                        ? 'bg-[#E6F4EA] border-[#19411F]'
                         : 'bg-white border-gray-200'
                     }`}
                     style={{ 
@@ -485,7 +485,7 @@ const StorePage: React.FC = () => {
                     }}
                   >
                     <span className={`text-sm font-semibold mb-1 ${
-                      selectedVariant?.id === variant.id ? 'text-[#2A6B28]' : 'text-gray-900'
+                      selectedVariant?.id === variant.id ? 'text-[#19411F]' : 'text-gray-900'
                     }`}>
                       {variant.name}
                     </span>
@@ -515,7 +515,7 @@ const StorePage: React.FC = () => {
                   }
                 }}
                 placeholder="Add a personalized message..."
-                className="w-full p-3 rounded-lg border-2 border-gray-200 focus:border-[#2A6B28] focus:outline-none resize-none"
+                className="w-full p-3 rounded-lg border-2 border-gray-200 focus:border-[#19411F] focus:outline-none resize-none"
                 rows={4}
                 maxLength={500}
               />
@@ -528,7 +528,7 @@ const StorePage: React.FC = () => {
           {/* Add to Basket Button */}
           <button
             onClick={createStoreOrder}
-            className="w-full bg-[#2A6B28] text-white py-3.5 rounded-[25px] text-base font-semibold mt-6 mb-6 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-[#19411F] text-white py-3.5 rounded-[25px] text-base font-semibold mt-6 mb-6 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={!product || (isLoggedIn && product.in_stock === false)}
           >
             {!isLoggedIn || product?.in_stock !== false ? "Add to Basket" : "Out of Stock"}
@@ -544,7 +544,7 @@ const StorePage: React.FC = () => {
                   onClick={() => setActiveTab(tab)}
                   className={`flex-1 py-3 text-center text-sm font-medium transition-colors ${
                     activeTab === tab
-                      ? "text-[#2A6B28] border-b-2 border-[#2A6B28]"
+                      ? "text-[#19411F] border-b-2 border-[#19411F]"
                       : "text-gray-600 hover:text-gray-900"
                   }`}
                 >
@@ -655,13 +655,13 @@ const StorePage: React.FC = () => {
                       <div className="absolute top-2 left-2 z-10">
                         <span
                           className="inline-block text-white text-[10px] font-semibold px-2 py-1 rounded"
-                          style={{ backgroundColor: item.labels[0].color_code || '#2A6B28' }}
+                          style={{ backgroundColor: item.labels[0].color_code || '#19411F' }}
                         >
                           {item.labels[0].name.toUpperCase()}
                         </span>
                       </div>
                     )}
-                    <div className="aspect-square bg-[#FFFBEB] overflow-hidden">
+                    <div className="aspect-square bg-[#f8f6f1] overflow-hidden">
                       <img
                         src={
                           item.primary_image ||

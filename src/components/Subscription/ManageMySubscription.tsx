@@ -748,7 +748,7 @@ const ManageMySubscription: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
@@ -756,7 +756,7 @@ const ManageMySubscription: React.FC = () => {
 
   if (subscriptions.length === 0) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB]">
+      <div className="min-h-screen bg-[#f8f6f1]">
         <div className="max-w-md mx-auto p-4">
           <div className="bg-white rounded-lg p-6 shadow-sm text-center">
             <svg
@@ -790,10 +790,10 @@ const ManageMySubscription: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB]">
+    <div className="min-h-screen bg-[#f8f6f1]">
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
-        <div className="p-4 md:p-6 sticky top-0 bg-[#FFFBEB] z-10">
+        <div className="p-4 md:p-6 sticky top-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3 mb-6">
             <button
               onClick={() => navigate(-1)}

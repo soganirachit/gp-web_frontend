@@ -842,16 +842,16 @@ const AddressSelection: React.FC = () => {
 
   if (loading && addresses.length === 0 && !showAddForm) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB]">
+    <div className="min-h-screen bg-[#f8f6f1]">
       {/* Header */}
-      {/* <div className="bg-[#FFFBEB] sticky top-0 z-10 border-b">
+      {/* <div className="bg-[#f8f6f1] sticky top-0 z-10 border-b">
         <div className="max-w-[800px] mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

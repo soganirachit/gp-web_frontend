@@ -4,7 +4,7 @@ import allsetLogo from '../../assets/All/allset_logo.png';
 
 const PaymentSuccessful = () => {
     return (
-        <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center p-4">
+        <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center p-4">
             <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -12,7 +12,7 @@ const PaymentSuccessful = () => {
                 className="w-full max-w-sm"
             >
                 {/* Container */}
-                <div className="bg-[#FFFBEB] p-8 sm:p-12 flex flex-col items-center justify-center relative">
+                <div className="bg-[#f8f6f1] p-8 sm:p-12 flex flex-col items-center justify-center relative">
 
                     {/* Success Icon */}
                     <motion.img

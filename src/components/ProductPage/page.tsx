@@ -178,17 +178,17 @@ const ProductPage: React.FC = () => {
 
   if (isLoading || isLoadingAddress) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB]">
-      <div className="max-w-[800px] mx-auto bg-[#FFFBEB] min-h-screen pb-20">
+    <div className="min-h-screen bg-[#f8f6f1]">
+      <div className="max-w-[800px] mx-auto bg-[#f8f6f1] min-h-screen pb-20">
         {/* Top Navigation Bar */}
-        <div className="bg-[#FFFBEB] sticky top-0 z-20 px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200">
+        <div className="bg-[#f8f6f1] sticky top-0 z-20 px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
             {/* Location Section */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
@@ -241,7 +241,7 @@ const ProductPage: React.FC = () => {
         </div>
 
         {/* Primary and Secondary Category Filters */}
-        <div className="bg-[#FFFBEB] px-4 pt-4">
+        <div className="bg-[#f8f6f1] px-4 pt-4">
           <div className="bg-white rounded-2xl p-2 mb-3 border border-gray-200">
             <div className="relative flex gap-2">
               {/* Sliding Orange Background */}
@@ -344,7 +344,7 @@ const ProductPage: React.FC = () => {
         </div>
 
         {/* Sort and Filter Buttons */}
-        <div className="bg-[#FFFBEB] px-8 py-2 flex items-center justify-start gap-2">
+        <div className="bg-[#f8f6f1] px-8 py-2 flex items-center justify-start gap-2">
           <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-[#222222]">
             <img src={sortIcon} alt="Sort" className="w-4 h-4" />
             Sort

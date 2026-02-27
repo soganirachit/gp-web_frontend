@@ -137,11 +137,12 @@ const HomePage: React.FC = () => {
           {/* Search Bar */}
           <div className="mt-2 sm:mt-3">
             <div
-              className="bg-gray-50 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 cursor-pointer shadow-sm border border-gray-200"
+              className=" rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between sm:gap-8 cursor-pointer shadow-sm border border-[#808080]"
               onClick={() => navigate('/search')}
             >
+              <span className="text-[#808080] text-sm sm:text-base font-medium">Search anything.....</span>
               <img src={SearchIcon} alt="Search" className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="text-gray-400 text-sm sm:text-base font-medium">Search anything.....</span>
+
             </div>
           </div>
         </div>
@@ -258,16 +259,16 @@ const HomePage: React.FC = () => {
                       </div>
                       {/* Text overlapping SVGs at the bottom - hidden on mobile, shown on larger screens */}
                       <div className="absolute bottom-7 left-0 right-0 z-10 px-2 hidden sm:block">
-                        <p className="text-[#2A6B28] text-base leading-tight">
+                        <p className="text-[#19411F] text-base leading-tight">
                           From last minute floral needs to grand bouquets, we got it all!
                         </p>
                       </div>
                     </div>
-                    <span className="text-[#2A6B28] text-lg sm:text-2xl font-bold flex-shrink-0 ml-auto self-center">›</span>
+                    <span className="text-[#19411F] text-lg sm:text-2xl font-bold flex-shrink-0 ml-auto self-center">›</span>
                   </div>
                   {/* Text below SVGs on mobile */}
                   <div className="mt-0 sm:hidden">
-                    <p className="text-[#2A6B28] text-xs leading-tight px-1">
+                    <p className="text-[#19411F] text-xs leading-tight px-1">
                       From last minute floral needs to grand bouquets, we got it all!
                     </p>
                   </div>
@@ -338,22 +339,22 @@ const HomePage: React.FC = () => {
           >
             <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">WHY CHOOSE US</h2>
             <div className="grid grid-cols-2 gap-2 sm:gap-4">
-              <div className="bg-[#FFFBEB] rounded-xl p-3 sm:p-4 text-center">
+              <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center">
                 <FaLeaf className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-gray-800" />
                 <div className="text-lg sm:text-2xl font-bold text-gray-800 mb-1">100,000+</div>
                 <div className="text-xs sm:text-sm text-gray-600">Orders Delivered</div>
               </div>
-              <div className="bg-[#FFFBEB] rounded-xl p-3 sm:p-4 text-center">
+              <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center">
                 <FaUsers className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-gray-800" />
                 <div className="text-lg sm:text-2xl font-bold text-gray-800 mb-1">40%</div>
                 <div className="text-xs sm:text-sm text-gray-600">Women Employees</div>
               </div>
-              <div className="bg-[#FFFBEB] rounded-xl p-3 sm:p-4 text-center">
+              <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center">
                 <FaBox className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-gray-800" />
                 <div className="text-base sm:text-xl font-bold text-gray-800 mb-1">Eco-Friendly</div>
                 <div className="text-xs sm:text-sm text-gray-600">Packaging</div>
               </div>
-              <div className="bg-[#FFFBEB] rounded-xl p-3 sm:p-4 text-center">
+              <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center">
                 <MdAccessTime className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-gray-800" />
                 <div className="text-base sm:text-xl font-bold text-gray-800 mb-1">Freshly Plucked</div>
                 <div className="text-xs sm:text-sm text-gray-600">by 5:00 AM</div>

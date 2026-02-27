@@ -1004,8 +1004,8 @@ const ConfirmSubscription: React.FC = () => {
     );
   }
   return (
-    <div className="min-h-screen bg-[#FFFBEB] flex justify-center items-center px-4">
-      <div className="bg-[#FFFBEB] w-full max-w-[800px] rounded-xl pb-24">
+    <div className="min-h-screen bg-[#f8f6f1] flex justify-center items-center px-4">
+      <div className="bg-[#f8f6f1] w-full max-w-[800px] rounded-xl pb-24">
         {/* Show confirm buttons if not confirmed */}
         {!isConfirmed && (
           <div className="px-4 pt-4">

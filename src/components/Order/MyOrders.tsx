@@ -34,6 +34,7 @@ const MyOrders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(4);
 
   useEffect(() => {
     fetchOrders();
@@ -66,7 +67,7 @@ const MyOrders: React.FC = () => {
             quantity: order.items_count || 1,
           };
         });
-        
+
         // Sort by newest first
         const sortedOrders = transformedOrders.sort((a: Order, b: Order) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -112,15 +113,18 @@ const MyOrders: React.FC = () => {
     order.product?.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const visibleOrders = filteredOrders.slice(0, visibleCount);
+  const hasMoreOrders = visibleCount < filteredOrders.length;
+
   // Mock data for UI testing if no API data matches exactly the screenshot structure
   // In a real scenario, we'd rely on 'orders'. For the purpose of "looking like this", 
   // I will use 'filteredOrders' but fallback to a layout that handles empty states gracefully or uses the type properly.
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB]">
+    <div className="min-h-screen bg-[#f8f6f1]">
       <div className="max-w-[800px] mx-auto min-h-screen flex flex-col">
         {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#FFFBEB] z-10">
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3 mb-6">
             <button
               onClick={() => navigate(-1)}
@@ -134,40 +138,57 @@ const MyOrders: React.FC = () => {
           {/* Search Bar */}
           <div className="flex gap-3">
             <div className="flex-1 relative">
+
+              <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
               <input
                 type="text"
                 placeholder="Search your order here"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#f9f9f9] border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-gray-300"
+                className="w-full bg-[#f8f6f1] border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-gray-300"
               />
-              <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             </div>
             <button className="w-12 h-[46px] flex items-center justify-center bg-white border border-gray-200 rounded-xl hover:bg-gray-50">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 6H20M7 12H17M10 18H14" stroke="#4B5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <g clip-path="url(#clip0_315_18148)">
+                  <path d="M13.9997 2.66699H9.33301" stroke="#222222" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M6.66667 2.66699H2" stroke="#222222" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M14 8H8" stroke="#222222" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M5.33333 8H2" stroke="#222222" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M14.0003 13.333H10.667" stroke="#222222" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M8 13.333H2" stroke="#222222" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M9.33301 1.33301V3.99967" stroke="#222222" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M5.33301 6.66699V9.33366" stroke="#222222" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M10.667 12V14.6667" stroke="#222222" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round" />
+                </g>
+                <defs>
+                  <clipPath id="clip0_315_18148">
+                    <rect width="16" height="16" fill="white" />
+                  </clipPath>
+                </defs>
               </svg>
+
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-4 pb-24 relative bg-[#FFFBEB]">
+        <div className="flex-1 px-4 pb-24 relative bg-[#f8f6f1]">
           {loading ? (
-            <div className="absolute inset-0 bg-[#FFFBEB] flex items-center justify-center">
+            <div className="absolute inset-0 bg-[#f8f6f1] flex items-center justify-center">
               <Spinner size={400} />
             </div>
           ) : filteredOrders.length > 0 ? (
             <div className="space-y-4">
-              {filteredOrders.map((order, index) => {
+              {visibleOrders.map((order, index) => {
                 const statusColor = getStatusColor(order.status);
                 const productImg = order.preview_image || order.product?.imagesUrl?.[0] || order.product?.image?.[0] || "https://via.placeholder.com/100";
 
                 return (
-                  <div 
-                    key={order.id || index} 
+                  <div
+                    key={order.id || index}
                     onClick={() => order.order_number && navigate(`${basePath}/orders/${order.order_number}`)}
-                    className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                    className="flex gap-4 p-4 border-b border-gray-200 cursor-pointer hover:shadow-md transition-shadow"
                   >
                     {/* Image */}
                     <div className="w-20 h-20 flex-shrink-0">
@@ -202,9 +223,14 @@ const MyOrders: React.FC = () => {
                 );
               })}
 
-              <button className="w-full py-4 text-center text-gray-500 font-medium underline">
-                Load More
-              </button>
+              {hasMoreOrders && (
+                <button
+                  className="w-full py-4 text-center text-gray-500 font-medium underline"
+                  onClick={() => setVisibleCount((prev) => prev + 4)}
+                >
+                  Load More
+                </button>
+              )}
             </div>
           ) : (
             <div className="text-center pt-20 text-gray-500">

@@ -88,7 +88,7 @@ const BottomNav: React.FC = () => {
                 className={`w-7 h-7 mb-1 relative z-10 ${isActive("/") ? "brightness-0 invert" : "opacity-90"
                   }`}
               />
-              <span className={`text-sm font-medium relative z-10 ${isActive("/") ? "text-white" : ""}`}>Home</span>
+              <span className={`text-xs font-medium relative z-10 ${isActive("/") ? "text-white" : "text-[#19411f]"}`}>Home</span>
             </Link>
 
             <Link
@@ -141,7 +141,7 @@ const BottomNav: React.FC = () => {
                   </span>
                 )}
               </div>
-              <span className={`text-sm font-medium relative z-10 ${isActive("/gp-store/basket") ? "text-white" : ""}`}>Basket</span>
+              <span className={`text-xs font-medium relative z-10 ${isActive("/gp-store/basket") ? "text-white" : "text-[#19411f]"}`}>Basket</span>
             </Link>
 
             <Link
@@ -164,7 +164,7 @@ const BottomNav: React.FC = () => {
                 className={`w-7 h-7 mb-1 relative z-10 ${isActive(`${basePath}/orders`) ? "brightness-0 invert" : "opacity-90"
                   }`}
               />
-              <span className={`text-sm font-medium relative z-10 ${isActive(`${basePath}/orders`) ? "text-white" : ""}`}>Order</span>
+              <span className={`text-xs font-medium relative z-10 ${isActive(`${basePath}/orders`) ? "text-white" : "text-[#19411f]"}`}>Order</span>
             </Link>
 
             <Link
@@ -189,7 +189,7 @@ const BottomNav: React.FC = () => {
                   : "opacity-90"
                   }`}
               />
-              <span className={`text-sm font-medium relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`]) ? "text-white" : ""}`}>Account</span>
+              <span className={`text-xs font-medium relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`]) ? "text-white" : "text-[#19411f]"}`}>Account</span>
             </Link>
           </div>
         </div>
@@ -222,7 +222,7 @@ const BottomNav: React.FC = () => {
               className={`w-7 h-7 mb-1 relative z-10 ${isActive("/") ? "" : "opacity-90"
                 }`}
             />
-            <span className={`text-sm font-medium relative z-10 ${isActive("/") ? "text-gray-700" : ""}`}>Home</span>
+            <span className={`text-xs font-medium relative z-10 ${isActive("/") ? "text-gray-700" : ""}`}>Home</span>
           </Link>
 
           <Link
@@ -267,7 +267,7 @@ const BottomNav: React.FC = () => {
               className={`w-7 h-7 mb-1 relative z-10 ${isActive(`${basePath}/wallet`) ? "" : "opacity-90"
                 }`}
             />
-            <span className={`text-sm font-medium relative z-10 ${isActive(`${basePath}/wallet`) ? "text-gray-700" : ""}`}>Wallet</span>
+            <span className={`text-xs font-medium relative z-10 ${isActive(`${basePath}/wallet`) ? "text-gray-700" : ""}`}>Wallet</span>
           </Link>
 
           <Link
@@ -300,7 +300,7 @@ const BottomNav: React.FC = () => {
                 </span>
               )}
             </div>
-            <span className={`text-sm font-medium relative z-10 ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts", `${basePath}/basket`]) ? "text-gray-700" : ""}`}>Basket</span>
+            <span className={`text-xs font-medium relative z-10 ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts", `${basePath}/basket`]) ? "text-gray-700" : ""}`}>Basket</span>
           </Link>
 
           <Link
@@ -325,7 +325,7 @@ const BottomNav: React.FC = () => {
                 : "opacity-90"
                 }`}
             />
-            <span className={`text-sm font-medium relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`]) ? "text-gray-700" : ""}`}>Account</span>
+            <span className={`text-xs font-medium relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`]) ? "text-gray-700" : ""}`}>Account</span>
           </Link>
         </div>
       </div>

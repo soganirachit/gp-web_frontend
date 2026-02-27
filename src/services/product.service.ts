@@ -90,7 +90,6 @@ export const productService = {
   async getAllProducts(): Promise<Product[]> {
     try {
       const response = await api.get(PRODUCTS_BASE);
-      // Ensure we're getting an array from the response
       if (response.data && Array.isArray(response.data.data)) {
         return response.data.data;
       } else if (Array.isArray(response.data)) {
@@ -111,14 +110,11 @@ export const productService = {
   async getProductById(id: string): Promise<Product> {
     try {
       const response = await api.get(`${PRODUCTS_BASE}/${id}`);
-      
-      // Handle different response formats
       if (response.data && response.data.data) {
         return response.data.data;
       } else if (response.data) {
         return response.data;
       }
-      
       throw new Error("Invalid response format");
     } catch (error: unknown) {
       console.error("Error fetching product:", error);
@@ -132,8 +128,6 @@ export const productService = {
   async getProductBySlug(slug: string): Promise<any> {
     try {
       const response = await api.get(`${PRODUCTS_BASE}/${slug}`);
-      
-      // Handle the new API response format: { success: true, message: "...", data: {...} }
       if (response.data && response.data.success && response.data.data) {
         return response.data.data;
       } else if (response.data && response.data.data) {
@@ -141,7 +135,6 @@ export const productService = {
       } else if (response.data) {
         return response.data;
       }
-      
       throw new Error("Invalid response format");
     } catch (error: unknown) {
       console.error("Error fetching product by slug:", error);
@@ -155,16 +148,12 @@ export const productService = {
   async getCategories(storeId?: number, availabilityType?: string, signal?: AbortSignal): Promise<Category[]> {
     try {
       const params: Record<string, any> = {};
-      if (storeId) {
-        params.store_id = storeId;
-      }
-      if (availabilityType) {
-        params.availability_type = availabilityType;
-      }
+      if (storeId) params.store_id = storeId;
+      if (availabilityType) params.availability_type = availabilityType;
 
       const response = await api.get(`${PRODUCTS_BASE}/categories/`, {
         params,
-        signal, // AbortSignal to cancel request if component unmounts
+        signal,
       });
 
       if (response.data && response.data.success && Array.isArray(response.data.data)) {
@@ -177,7 +166,6 @@ export const productService = {
       }
     } catch (error: unknown) {
       console.error("Error fetching categories:", error);
-      // Don't log error if request was aborted (component unmounted)
       if (error instanceof AxiosError && (error.code === 'ERR_CANCELED' || error.name === 'AbortError')) {
         return [];
       }
@@ -191,13 +179,11 @@ export const productService = {
   async getBestSellers(storeId?: number, signal?: AbortSignal): Promise<BestSeller[]> {
     try {
       const params: Record<string, any> = {};
-      if (storeId) {
-        params.store_id = storeId;
-      }
+      if (storeId) params.store_id = storeId;
 
       const response = await api.get(`${PRODUCTS_BASE}/best-sellers/`, {
         params,
-        signal, // AbortSignal to cancel request if component unmounts
+        signal,
       });
 
       if (response.data && response.data.success && Array.isArray(response.data.data)) {
@@ -210,7 +196,6 @@ export const productService = {
       }
     } catch (error: unknown) {
       console.error("Error fetching best sellers:", error);
-      // Don't log error if request was aborted (component unmounted)
       if (error instanceof AxiosError && (error.code === 'ERR_CANCELED' || error.name === 'AbortError')) {
         return [];
       }
@@ -223,41 +208,68 @@ export const productService = {
 
   async getProductsByCategory(categorySlug: string, storeId?: number, availabilityType?: string): Promise<any[]> {
     try {
-      const params: Record<string, any> = {
-        category: categorySlug,
-      };
-      if (storeId) {
-        params.store_id = storeId;
-      }
-      if (availabilityType) {
-        params.availability_type = availabilityType;
-      }
+      const params: Record<string, any> = { category: categorySlug };
+      if (storeId) params.store_id = storeId;
+      if (availabilityType) params.availability_type = availabilityType;
 
-      const response = await api.get(`${PRODUCTS_BASE}/`, {
-        params,
-      });
+      const response = await api.get(`${PRODUCTS_BASE}/`, { params });
 
-      // Handle paginated response format: { count, next, previous, results: [...] }
       if (response.data && response.data.results && Array.isArray(response.data.results)) {
         return response.data.results;
       }
-      // Handle success response format: { success: true, data: [...] }
       if (response.data && response.data.success && Array.isArray(response.data.data)) {
         return response.data.data;
       }
-      // Handle direct array response
       if (Array.isArray(response.data)) {
         return response.data;
       }
-      
+
       console.error("Unexpected response format:", response.data);
       return [];
     } catch (error: unknown) {
-      // Don't log error if request was aborted (component unmounted)
       if (error instanceof AxiosError && (error.code === 'ERR_CANCELED' || error.name === 'AbortError')) {
         return [];
       }
       console.error("Error fetching products by category:", error);
+      if (error instanceof Error || error instanceof AxiosError) {
+        throw error;
+      }
+      throw new Error("An unknown error occurred");
+    }
+  },
+
+  // NEW: Fetch products from api/v1/products/ with ordering param
+  // e.g. ordering="-order_count" for descending by order count (Premium Packs)
+  async getProductsByOrdering(ordering: string, storeId?: number, signal?: AbortSignal): Promise<BestSeller[]> {
+    try {
+      const params: Record<string, any> = { ordering };
+      if (storeId) params.store_id = storeId;
+
+      const response = await api.get(`${PRODUCTS_BASE}/`, {
+        params,
+        signal,
+      });
+
+      // Handle paginated response: { count, next, previous, results: [...] }
+      if (response.data && response.data.results && Array.isArray(response.data.results)) {
+        return response.data.results;
+      }
+      // Handle success wrapper: { success: true, data: [...] }
+      if (response.data && response.data.success && Array.isArray(response.data.data)) {
+        return response.data.data;
+      }
+      // Handle direct array
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+
+      console.error("Unexpected response format:", response.data);
+      return [];
+    } catch (error: unknown) {
+      console.error("Error fetching products by ordering:", error);
+      if (error instanceof AxiosError && (error.code === 'ERR_CANCELED' || error.name === 'AbortError')) {
+        return [];
+      }
       if (error instanceof Error || error instanceof AxiosError) {
         throw error;
       }

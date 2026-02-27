@@ -119,14 +119,14 @@ const Addresses: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB] px-4">
+    <div className="min-h-screen bg-[#f8f6f1] px-4">
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
         <div className="py-4 flex items-center mb-2">

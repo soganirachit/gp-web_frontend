@@ -66,6 +66,7 @@ export interface FeatureThemeClasses {
   authIndicatorInactive: string;
   bottomNavActiveText: string;
   bottomNavInactiveText: string;
+  otpInputBorder: string;
 }
 
 export interface FeatureTheme {
@@ -85,13 +86,14 @@ export const featureThemes: Record<Feature, FeatureTheme> = {
       primary: "#FAA222",
     },
     classes: {
-      authPageBackground: "bg-[#FFFBEB]",
+      authPageBackground: "bg-[#f8f6f1]",
       primaryButton: "bg-[#FAA222] text-black",
       primaryButtonHover: "hover:bg-[#DD7600]",
       authIndicatorActive: "bg-[#FAA222]",
       authIndicatorInactive: "bg-gray-300",
       bottomNavActiveText: "text-[#FAA222]",
       bottomNavInactiveText: "text-gray-500",
+      otpInputBorder: "border-[#FAA222] focus:ring-[#FAA222]",
     },
     assets: {
       loginHero: loginLogoDaily,
@@ -113,16 +115,17 @@ export const featureThemes: Record<Feature, FeatureTheme> = {
   gpStore: {
     feature: "gpStore",
     colors: {
-      primary: "#2A6B28",
+      primary: "#19411f",
     },
     classes: {
       authPageBackground: "bg-[#F0F8F0]",
-      primaryButton: "bg-[#2A6B28] text-white",
+      primaryButton: "bg-[#19411f] text-white",
       primaryButtonHover: "hover:bg-[#1e4d1c]",
-      authIndicatorActive: "bg-[#2A6B28]",
+      authIndicatorActive: "bg-[#19411f]",
       authIndicatorInactive: "bg-gray-300",
-      bottomNavActiveText: "text-[#2A6B28]",
+      bottomNavActiveText: "text-[#19411f]",
       bottomNavInactiveText: "text-gray-500",
+      otpInputBorder: "border-[#19411f] focus:ring-[#19411f]",
     },
     assets: {
       loginHero: loginLogoStore,

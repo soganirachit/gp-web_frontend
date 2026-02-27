@@ -263,17 +263,17 @@ const StoreProductsPages: React.FC = () => {
   // Show full-screen loader while initial data is loading
   if (isPageLoading) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB]">
-      <div className="max-w-[800px] mx-auto bg-[#FFFBEB] min-h-screen pb-20">
+    <div className="min-h-screen bg-[#f8f6f1]">
+      <div className="max-w-[800px] mx-auto bg-[#f8f6f1] min-h-screen pb-20">
         {/* Top Header with Location and Search */}
-        <div className="sticky top-0 z-20 bg-[#FFFBEB] border-b border-gray-200">
+        <div className="sticky top-0 z-20 bg-[#f8f6f1] border-b border-gray-200">
           <div className="px-4 py-3">
             {/* Location Section */}
             <div className="flex items-center gap-1.5 mb-3">

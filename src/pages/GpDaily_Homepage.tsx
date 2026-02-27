@@ -435,7 +435,7 @@ const Home2: React.FC = () => {
 
   if (isPageLoading) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
@@ -443,7 +443,7 @@ const Home2: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-[#FFFBEB] pb-24">
+      <div className="min-h-screen bg-[#f8f6f1] pb-24">
         <div className="max-w-[800px] mx-auto">
           {/* Top Header with Gradient Background */}
           <div className="relative px-3 sm:px-4 pt-0 pb-8 sm:pb-12" style={{

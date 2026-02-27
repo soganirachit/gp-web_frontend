@@ -14,9 +14,9 @@ const SupportTicketChat: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { feature } = useFeatureTheme();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
-  
+
   const ticketNumber = searchParams.get('ticket');
-  
+
   const [ticket, setTicket] = useState<SupportTicketDetail | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -40,9 +40,7 @@ const SupportTicketChat: React.FC = () => {
     }
   }, [ticketNumber]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -56,7 +54,7 @@ const SupportTicketChat: React.FC = () => {
         if (ticketData) {
           setTicket(ticketData);
           setMessages(ticketData.messages || []);
-          
+
           // Fetch order details if order_number exists
           if (ticketData.order_number) {
             try {
@@ -101,24 +99,30 @@ const SupportTicketChat: React.FC = () => {
 
   const handleSendMessage = async () => {
     if ((!newMessage.trim() && !selectedImage) || !ticketNumber) return;
-    
+
     try {
       setSending(true);
+
       const message = await supportService.addMessage(
         ticketNumber,
         newMessage.trim() || undefined,
         selectedImage || undefined
       );
+
       if (message) {
-        setMessages([...messages, message]);
+        setMessages(prev => [...prev, message]);
         setNewMessage('');
         setSelectedImage(null);
         setImagePreview(null);
+
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
-        // Refresh ticket to get updated messages
-        await fetchTicketDetails();
+
+        // ✅ Scroll ONLY after sending
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -129,13 +133,13 @@ const SupportTicketChat: React.FC = () => {
 
   const handleRequestAgent = async () => {
     if (!ticketNumber) return;
-    
+
     try {
       setRequestingAgent(true);
       const success = await supportService.requestAgent(ticketNumber);
       if (success) {
         alert('Agent request sent successfully. An agent will contact you soon.');
-        await fetchTicketDetails(); // Refresh to update agent_requested status
+        // await fetchTicketDetails(); // Refresh to update agent_requested status
       } else {
         alert('Failed to request agent. Please try again.');
       }
@@ -149,7 +153,7 @@ const SupportTicketChat: React.FC = () => {
 
   const handleRequestCallback = async () => {
     if (!ticketNumber) return;
-    
+
     try {
       setRequestingCallback(true);
       const success = await supportService.requestCallback(ticketNumber);
@@ -169,11 +173,11 @@ const SupportTicketChat: React.FC = () => {
 
   const handleCloseTicket = async () => {
     if (!ticketNumber) return;
-    
+
     if (!window.confirm('Are you sure you want to close this ticket?')) {
       return;
     }
-    
+
     try {
       setClosingTicket(true);
       const success = await supportService.updateTicketStatus(ticketNumber, 'closed');
@@ -205,7 +209,7 @@ const SupportTicketChat: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
@@ -213,7 +217,7 @@ const SupportTicketChat: React.FC = () => {
 
   if (!ticket) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600 mb-4">Ticket not found</p>
           <button
@@ -228,10 +232,10 @@ const SupportTicketChat: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB] flex flex-col">
+    <div className="h-screen bg-[#f8f6f1] flex flex-col overflow-hidden">
       <div className="max-w-[800px] mx-auto w-full flex flex-col flex-1">
         {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#FFFBEB] z-10">
+        <div className="p-0 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3 mb-4">
             <button
               onClick={() => navigate(-1)}
@@ -252,9 +256,9 @@ const SupportTicketChat: React.FC = () => {
 
         {/* Action Buttons - Request Agent/Callback */}
         {ticket && ticket.status !== 'closed' && (
-          <div className="px-4 py-3 bg-white border-b border-gray-200">
+          <div className="px-4 py-3  mb-2">
             <div className="flex gap-2">
-              {!ticket.agent_requested && (
+              {/* {!ticket.agent_requested && (
                 <button
                   onClick={handleRequestAgent}
                   disabled={requestingAgent}
@@ -263,14 +267,14 @@ const SupportTicketChat: React.FC = () => {
                   <FaUser size={16} />
                   {requestingAgent ? 'Requesting...' : 'Request Agent'}
                 </button>
-              )}
+              )} */}
               {!ticket.callback_requested && (
                 <button
-                  onClick={handleRequestCallback}
-                  disabled={requestingCallback}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  onClick={handleRequestCallback}         // ← was missing
+                  disabled={requestingCallback}           // ← was missing
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-[#FCFBF8] border border-gray-200 text-gray-800 rounded-xl font-semibold hover:bg-[#F5F5F5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm leading-none"
                 >
-                  <FaPhone size={16} />
+                  <FaPhone size={14} className="rotate-90 align-middle" />
                   {requestingCallback ? 'Requesting...' : 'Request Callback'}
                 </button>
               )}
@@ -278,7 +282,7 @@ const SupportTicketChat: React.FC = () => {
                 <button
                   onClick={handleCloseTicket}
                   disabled={closingTicket}
-                  className="px-4 py-2.5 bg-gray-200 text-gray-800 rounded-xl font-semibold hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5  bg-[#FCFBF8] text-gray-800 rounded-xl font-semibold hover:bg-gray-300 transition-colors border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   {closingTicket ? 'Closing...' : 'Close'}
                 </button>
@@ -294,18 +298,34 @@ const SupportTicketChat: React.FC = () => {
         )}
 
         {/* Messages */}
-        <div className="flex-1 px-4 pb-20 overflow-y-auto">
+        <div className="flex-1 px-4 overflow-y-auto pb-[140px]">
           {ticket && (
             <div className="mb-4">
               <div className="bg-white rounded-xl p-4 shadow-sm">
-                <p className="text-sm text-gray-700">{ticket.description}</p>
+                <div className="text-sm text-gray-700 space-y-2">
+                  {ticket.description?.split('\n').map((line, index) => {
+                    const colonIndex = line.indexOf(':');
+                    if (colonIndex > -1) {
+                      // Extract label and value parts
+                      const label = line.substring(0, colonIndex + 1); // include colon
+                      const value = line.substring(colonIndex + 1).trim();
+
+                      return (
+                        <p key={index}>
+                          <span className="font-semibold">{label}</span> {value}
+                        </p>
+                      );
+                    }
+                    // If no colon, just render line normally
+                    return <p key={index}>{line}</p>;
+                  })}
+                </div>
                 <div className="mt-2 flex items-center gap-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                    ticket.status === 'open' ? 'bg-yellow-100 text-yellow-800' :
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${ticket.status === 'open' ? 'bg-yellow-100 text-yellow-800' :
                     ticket.status === 'resolved' ? 'bg-green-100 text-green-800' :
-                    ticket.status === 'closed' ? 'bg-gray-100 text-gray-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
+                      ticket.status === 'closed' ? 'bg-gray-100 text-gray-800' :
+                        'bg-gray-100 text-gray-800'
+                    }`}>
                     {ticket.status}
                   </span>
                   <span className="text-xs text-gray-500">
@@ -317,42 +337,42 @@ const SupportTicketChat: React.FC = () => {
           )}
 
           <div className="space-y-4">
-            {messages.map((message) => {
-              const isInternal = message.is_internal;
-              const dateTime = formatDateTime(message.created_at);
-              
-              return (
-                <div
-                  key={message.id}
-                  className={`flex ${isInternal ? 'justify-start' : 'justify-end'}`}
-                >
-                  <div className={`max-w-[75%] rounded-2xl p-3 ${
-                    isInternal
+            {messages
+              .filter((message) => message.message !== ticket.description)
+              .map((message) => {
+                const isInternal = message.is_internal;
+                const dateTime = formatDateTime(message.created_at);
+
+                return (
+                  <div
+                    key={message.id}
+                    className={`flex ${isInternal ? 'justify-start' : 'justify-end'}`}
+                  >
+                    <div className={`max-w-[75%] rounded-2xl p-3 ${isInternal
                       ? 'bg-gray-200 text-gray-900'
                       : 'bg-[#166534] text-white'
-                  }`}>
-                    <p className="text-sm whitespace-pre-wrap">{message.message}</p>
-                    <div className={`flex items-center gap-2 mt-2 ${
-                      isInternal ? 'text-gray-600' : 'text-white/80'
-                    }`}>
-                      <span className="text-xs">
-                        {message.created_by_name}
-                      </span>
-                      <span className="text-xs">
-                        {dateTime.time}
-                      </span>
+                      }`}>
+                      <p className="text-sm whitespace-pre-wrap">{message.message}</p>
+                      <div className={`flex items-center gap-2 mt-2 ${isInternal ? 'text-gray-600' : 'text-white/80'
+                        }`}>
+                        <span className="text-xs">
+                          {message.created_by_name}
+                        </span>
+                        <span className="text-xs">
+                          {dateTime.time}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
             <div ref={messagesEndRef} />
           </div>
         </div>
 
         {/* Message Input */}
         {ticket && ticket.status !== 'closed' && (
-          <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
+          <div className="fixed bottom-[70px] left-0 right-0 bg-white border-t border-gray-200 p-4 z-30">
             {/* Image Preview */}
             {imagePreview && (
               <div className="mb-3 relative">
@@ -369,7 +389,7 @@ const SupportTicketChat: React.FC = () => {
                 </button>
               </div>
             )}
-            
+
             <div className="flex gap-3 items-end">
               <input
                 type="file"
@@ -396,7 +416,7 @@ const SupportTicketChat: React.FC = () => {
                 }}
                 placeholder="Type your message..."
                 className="flex-1 p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#166534] resize-none"
-                rows={2}
+                rows={1}
                 disabled={sending || !ticketNumber}
               />
               <button
@@ -409,7 +429,7 @@ const SupportTicketChat: React.FC = () => {
             </div>
           </div>
         )}
-        
+
         {ticket && ticket.status === 'closed' && (
           <div className="sticky bottom-0 bg-gray-100 border-t border-gray-200 p-4 text-center">
             <p className="text-gray-600 text-sm">This ticket is closed. You cannot send new messages.</p>
@@ -417,7 +437,7 @@ const SupportTicketChat: React.FC = () => {
         )}
 
         {/* Bottom Navigation */}
-        <div className="sticky bottom-0 z-20">
+        <div className="fixed bottom-0 left-0 right-0 z-20">
           <BottomNavigation />
         </div>
       </div>

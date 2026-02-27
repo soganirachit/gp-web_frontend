@@ -272,7 +272,7 @@ const GpStore_Homepage: React.FC = () => {
 
     if (isPageLoading) {
         return (
-            <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+            <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
                 <Spinner size={400} />
             </div>
         );
@@ -283,7 +283,7 @@ const GpStore_Homepage: React.FC = () => {
 
     return (
         <ErrorBoundary>
-            <div className="min-h-screen bg-[#FFFBEB] pb-24">
+            <div className="min-h-screen bg-[#f8f6f1] pb-24">
                 <div className="max-w-[800px] mx-auto">
                     {/* Top Header with Green Background */}
                     <div className="relative px-3 sm:px-4 pt-0 pb-8 sm:pb-12" style={{
@@ -334,11 +334,11 @@ const GpStore_Homepage: React.FC = () => {
                             {/* Search Bar */}
                             <div className="mt-4 sm:mt-5">
                                 <div
-                                    className="bg-white rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 cursor-pointer shadow-sm border border-gray-200"
+                                    className="bg-white rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 cursor-pointer shadow-sm border border-gray-200 justify-between"
                                     onClick={() => navigate('/search')}
                                 >
-                                    <img src={SearchIcon} alt="Search" className="w-4 h-4 sm:w-5 sm:h-5" />
                                     <span className="text-gray-400 text-sm sm:text-base font-medium">Search anything....</span>
+                                    <img src={SearchIcon} alt="Search" className="w-4 h-4 sm:w-5 sm:h-5" />
                                 </div>
                             </div>
 
@@ -423,14 +423,14 @@ const GpStore_Homepage: React.FC = () => {
                     <div className="px-4 py-4">
                         <div className="relative w-full rounded-2xl overflow-hidden bg-[#F1FCF0]">
                             <div className="absolute inset-0 flex flex-col justify-center pl-6 sm:pl-10 z-10 w-3/4 sm:w-2/3">
-                                <h2 className="font-ibm-plex-serif text-2xl sm:text-3xl font-semibold text-[#1A1A1A] leading-tight mb-4 sm:mb-6">
+                                <h2 className="font-ibm-plex-serif text-xl sm:text-3xl font-semibold text-[#1A1A1A] leading-tight mb-4 sm:mb-6">
                                     Wedding Bliss,
                                     <br />
                                     Wrapped in Gifts
                                 </h2>
                                 <button
                                     onClick={() => navigate(`${basePath}/Products`)}
-                                    className="w-fit bg-[#2A6B28] text-white px-6 py-2.5 sm:px-8 sm:py-3 rounded-lg font-medium text-sm sm:text-base tracking-wide hover:bg-[#1e4d1c] transition-colors shadow-sm"
+                                    className="w-fit bg-[#19411F] text-white px-6 py-2.5 sm:px-8 sm:py-3 rounded-lg font-medium text-sm sm:text-base tracking-wide hover:bg-[#1e4d1c] transition-colors shadow-sm"
                                 >
                                     SHOP NOW
                                 </button>
@@ -448,7 +448,7 @@ const GpStore_Homepage: React.FC = () => {
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">Best Sellers</h2>
                             <button
-                                onClick={() => navigate("/gp-store/explore-more?category=Best&section=Best Sellers")}
+                               onClick={() => navigate(`${basePath}/explore-more?category=Best&section=Best Sellers`)}
                                 className="flex items-center gap-1 text-gray-500 text-sm font-medium"
                             >
                                 <span>Explore More</span>
@@ -463,13 +463,13 @@ const GpStore_Homepage: React.FC = () => {
                                         className="flex-shrink-0 w-[160px] bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer relative"
                                         onClick={() => handleBestSellerClick(bestSeller)}
                                     >
-                                        <div className="aspect-square bg-[#FFFBEB] overflow-hidden relative">
+                                        <div className="aspect-square bg-[#f8f6f1] overflow-hidden relative">
                                             {/* Label Badge - positioned over image */}
                                             {bestSeller.labels && bestSeller.labels.length > 0 && (
                                                 <div className="absolute top-2 left-2 z-10">
                                                     <span
                                                         className="inline-block text-white text-[10px] font-semibold px-2 py-1 rounded"
-                                                        style={{ backgroundColor: bestSeller.labels[0].color_code || '#2A6B28' }}
+                                                        style={{ backgroundColor: bestSeller.labels[0].color_code || '#19411F' }}
                                                     >
                                                         {bestSeller.labels[0].name.toUpperCase()}
                                                     </span>
@@ -527,7 +527,7 @@ const GpStore_Homepage: React.FC = () => {
                                     className="flex-shrink-0 w-[160px] bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
                                     onClick={() => handleProductClick(product)}
                                 >
-                                    <div className="aspect-square bg-[#FFFBEB] overflow-hidden">
+                                    <div className="aspect-square bg-[#f8f6f1] overflow-hidden">
                                         <img
                                             src={getImageUrl(product.primary_image)}
                                             alt={product.name}
@@ -538,7 +538,7 @@ const GpStore_Homepage: React.FC = () => {
                                         <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
                                             {product.name}
                                         </h3>
-                                        <p className="text-[#2A6B28] text-base font-bold">
+                                        <p className="text-[#19411F] text-base font-bold">
                                             ₹{product.current_price}/{product.unit || "box"}
                                         </p>
                                     </div>

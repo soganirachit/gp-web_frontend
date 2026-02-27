@@ -238,14 +238,14 @@ const Wallet = () => {
 
   if (isLoadingBalance) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB]">
+    <div className="min-h-screen bg-[#f8f6f1]">
       <div className="max-w-[800px] mx-auto">
         {/* Network Status & Header */}
         {!isOnline && (

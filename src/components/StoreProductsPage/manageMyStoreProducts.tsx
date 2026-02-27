@@ -400,7 +400,7 @@ const ManageMyStoreProducts: React.FC = () => {
 
   if (orders.length === 0) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB]">
+      <div className="min-h-screen bg-[#f8f6f1]">
         <div className="max-w-md mx-auto p-4">
           {/* <div className="flex items-center mb-6">
             <button onClick={() => navigate(-1)} className="text-gray-600">
@@ -440,7 +440,7 @@ const ManageMyStoreProducts: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB]">
+    <div className="min-h-screen bg-[#f8f6f1]">
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
         <div className="p-4 md:p-6 flex items-center justify-between">

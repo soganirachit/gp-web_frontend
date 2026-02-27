@@ -16,6 +16,7 @@ import {
 interface FeatureThemeContextValue {
   feature: Feature;
   theme: FeatureTheme;
+  basePath: string; 
 }
 
 const FeatureThemeContext = createContext<FeatureThemeContextValue | undefined>(
@@ -56,6 +57,7 @@ export const FeatureThemeProvider: React.FC<FeatureThemeProviderProps> = ({
     () => ({
       feature: activeFeature,
       theme: featureThemes[activeFeature],
+      basePath: activeFeature === 'gpStore' ? '/gp-store' : '/gp-daily', 
     }),
     [activeFeature]
   );

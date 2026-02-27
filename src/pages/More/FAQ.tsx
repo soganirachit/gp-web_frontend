@@ -65,7 +65,7 @@ const FAQ: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB] pb-24">
+    <div className="min-h-screen bg-[#f8f6f1] pb-24">
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
         <div className="px-4 pt-4 flex items-center gap-3">

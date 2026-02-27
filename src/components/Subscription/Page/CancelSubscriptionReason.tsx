@@ -49,7 +49,7 @@ const CancelSubscriptionReason: React.FC = () => {
     };
 
     return (
-        <div className="bg-[#FFFBEB] min-h-screen pb-6">
+        <div className="bg-[#f8f6f1] min-h-screen pb-6">
             <div className="max-w-[800px] mx-auto px-4">
 
                 {/* Navbar */}

@@ -25,7 +25,7 @@ const CancelSubscriptionSuccess: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#FFFBEB] flex flex-col pb-20 font-sans">
+        <div className="min-h-screen bg-[#f8f6f1] flex flex-col pb-20 font-sans">
             <div className="max-w-[500px] w-full mx-auto flex-1 flex flex-col px-4 pt-8">
 
                 {/* Top Success Card */}

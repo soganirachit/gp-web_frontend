@@ -5,7 +5,7 @@
 /* Custom base styles */
 @layer base {
   body {
-    @apply bg-[#FFFBEB];
+    @apply bg-[#f8f6f1];
   }
   
   /* IBM Plex Serif font family */
@@ -17,7 +17,7 @@
 /* Custom components */
 @layer components {
   .card-background {
-    @apply bg-[#FFFBEB];
+    @apply bg-[#f8f6f1];
   }
 }
 

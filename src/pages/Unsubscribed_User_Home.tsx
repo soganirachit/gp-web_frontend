@@ -27,7 +27,7 @@ interface Product {
   description: string;
   imageUrl?: string;
   sellingPrice: number;
-  type: string;
+  type?: string;
   allowedSubscriptionType: string;
   tags: string[];
   weight?: number;
@@ -45,7 +45,7 @@ function Unsubscribed_User_Home() {
   };
 
   const handlePageClick = () => {
-    navigate('/home'); // Navigate to main home page
+    navigate('/home');
   };
 
   useEffect(() => {
@@ -53,7 +53,7 @@ function Unsubscribed_User_Home() {
       try {
         setIsLoadingProducts(true);
         const data = await productService.getAllProducts();
-        setProducts(data);
+        setProducts(data as Product[]);
       } catch (error) {
         console.error('Error fetching products:', error);
       } finally {
@@ -74,14 +74,14 @@ function Unsubscribed_User_Home() {
 
   if (isLoadingProducts) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
   }
 
   return (
-    <div className="bg-[#FFFBEB] min-h-screen cursor-pointer" onClick={handlePageClick}>
+    <div className="bg-[#f8f6f1] min-h-screen cursor-pointer" onClick={handlePageClick}>
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
         {/* <div className="flex items-center justify-between p-4 md:p-6">
@@ -311,7 +311,7 @@ function Unsubscribed_User_Home() {
                       onClick={() => handleProductClick(item)}
                     >
                       <div className="p-3">
-                        <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
+                        <div className="bg-[#f8f6f1] rounded-2xl overflow-hidden aspect-square">
                           <img
                             src={item.imageUrl || 'https://via.placeholder.com/160'}
                             alt={item.name}
@@ -362,7 +362,7 @@ function Unsubscribed_User_Home() {
                       onClick={() => handleProductClick(item)}
                     >
                       <div className="p-3">
-                        <div className="bg-[#FFFBEB] rounded-2xl overflow-hidden aspect-square">
+                        <div className="bg-[#f8f6f1] rounded-2xl overflow-hidden aspect-square">
                           <img
                             src={item.imageUrl || 'https://via.placeholder.com/160'}
                             alt={item.name}

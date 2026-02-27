@@ -168,7 +168,7 @@ const OrderDetails: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
@@ -176,7 +176,7 @@ const OrderDetails: React.FC = () => {
 
   if (error || !order) {
     return (
-      <div className="min-h-screen bg-[#FFFBEB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600 mb-4">{error || 'Order not found'}</p>
           <button
@@ -199,7 +199,7 @@ const OrderDetails: React.FC = () => {
   const deliveredEvent = order.timeline.find(e => e.status === 'delivered');
   const outForDeliveryEvent = order.timeline.find(e => e.status === 'out_for_delivery');
   const cancelledEvent = order.timeline.find(e => e.status === 'cancelled' || e.status === 'canceled');
-  
+
   // Determine timeline points to show
   const timelinePoints: Array<{
     label: string;
@@ -254,10 +254,10 @@ const OrderDetails: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB]">
+    <div className="min-h-screen bg-[#f8f6f1]">
       <div className="max-w-[800px] mx-auto min-h-screen flex flex-col">
         {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#FFFBEB] z-10">
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3 mb-4">
             <button
               onClick={() => navigate(-1)}
@@ -270,16 +270,16 @@ const OrderDetails: React.FC = () => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-4 pb-24 relative bg-[#FFFBEB]">
+        <div className="flex-1 px-4 pb-24 relative bg-[#f8f6f1]">
           <div className="space-y-4">
             {/* Order Item Card */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
-              <div className="flex items-start justify-between mb-3">
+            <div className="p-4">
+              {/* <div className="flex items-start justify-between mb-3">
                 <h2 className="text-lg font-bold text-gray-900">Order Items</h2>
                 <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${getStatusColor(order.status)} flex-shrink-0`}>
                   {getStatusText(order.status)}
                 </span>
-              </div>
+              </div> */}
               <div className="space-y-3">
                 {order.items.map((item, index) => (
                   <div key={item.id || index} className="flex gap-3">
@@ -290,12 +290,25 @@ const OrderDetails: React.FC = () => {
                         className="w-full h-full object-cover rounded-xl"
                       />
                     </div>
-                    <div className="flex-1 min-w-0 flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{item.product.name}</p>
-                        <p className="text-xs text-gray-600 mt-0.5">x{item.quantity}</p>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      {/* First row: name + status */}
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {item.product.name}
+                        </p>
+                        <span
+                          className={`px-3 py-1 rounded-lg text-xs font-semibold ${getStatusColor(
+                            order.status
+                          )} flex-shrink-0`}
+                        >
+                          {getStatusText(order.status)}
+                        </span>
                       </div>
-                      <p className="text-sm font-semibold text-gray-900 ml-2">₹{item.subtotal}</p>
+                      {/* Second row: quantity + price */}
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-gray-600">x{item.quantity}</p>
+                        <p className="text-sm font-semibold text-gray-900">₹{item.subtotal}</p>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -310,14 +323,14 @@ const OrderDetails: React.FC = () => {
                 {timelinePoints.length > 1 && (
                   <div className="absolute left-12 right-12 top-4 h-0.5 bg-[#16A249]"></div>
                 )}
-                
+
                 <div className={`flex ${timelinePoints.length === 1 ? 'justify-center' : 'justify-between'} items-start`}>
                   {timelinePoints.map((point, index) => (
                     <div key={index} className="flex flex-col items-center relative z-10">
                       <div className="w-8 h-8 bg-[#16A249] rounded-full flex items-center justify-center mb-2">
                         {point.icon === 'cancel' ? (
                           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 4L4 12M4 4L12 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M12 4L4 12M4 4L12 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         ) : (
                           <img src={point.icon} alt={point.label} className="w-4 h-4" />
@@ -343,8 +356,8 @@ const OrderDetails: React.FC = () => {
                     <img src={detailshomeIcon} alt="Home" className="w-5 h-5 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-900">
-                        {order.delivery_address.address_type === 'home' ? 'Home' : 
-                         order.delivery_address.address_type === 'work' ? 'Work' : 'Other'}{' '}
+                        {order.delivery_address.address_type === 'home' ? 'Home' :
+                          order.delivery_address.address_type === 'work' ? 'Work' : 'Other'}{' '}
                         <span className="text-sm font-normal text-gray-600">
                           {order.delivery_address.address_line1}
                           {order.delivery_address.address_line2 && `, ${order.delivery_address.address_line2}`}
@@ -405,10 +418,10 @@ const OrderDetails: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                 </svg>
                 <span className="text-sm text-gray-600">
-                  Payment Method: {order.payment_method === 'wallet' ? 'Wallet' : 
-                                   order.payment_method === 'razorpay' ? 'Razor Pay' : 
-                                   order.payment_method === 'cod' ? 'Cod' :
-                                   order.payment_method?.charAt(0).toUpperCase() + order.payment_method?.slice(1) || 'N/A'}
+                  Payment Method: {order.payment_method === 'wallet' ? 'Wallet' :
+                    order.payment_method === 'razorpay' ? 'Razor Pay' :
+                      order.payment_method === 'cod' ? 'Cod' :
+                        order.payment_method?.charAt(0).toUpperCase() + order.payment_method?.slice(1) || 'N/A'}
                 </span>
               </div>
             </div>
@@ -440,7 +453,7 @@ const OrderDetails: React.FC = () => {
             <div className="flex justify-center">
               <button
                 onClick={() => navigate(`${basePath}`)}
-                className="px-8 py-3 bg-[#166534] text-white rounded-xl font-semibold hover:bg-[#145028] transition-colors"
+                className="px-8 py-3 bg-[#19411f] text-white rounded-xl font-semibold hover:bg-[#145028] transition-colors"
               >
                 Shop More from Genda Phool Store
               </button>
@@ -450,9 +463,9 @@ const OrderDetails: React.FC = () => {
             {order.status === 'delivered' && (
               <div className="bg-white rounded-2xl p-4 shadow-sm">
                 <div className="flex items-start gap-3 mb-3">
-                  <img 
-                    src={supportIcon} 
-                    alt="Support" 
+                  <img
+                    src={supportIcon}
+                    alt="Support"
                     className="w-5 h-5 mt-0.5 flex-shrink-0"
                   />
                   <p className="text-lg text-[#19411F] flex-1">

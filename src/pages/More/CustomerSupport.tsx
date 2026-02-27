@@ -96,17 +96,17 @@ const CustomerSupport: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="bg-[#FFFBEB] min-h-screen flex items-center justify-center">
+      <div className="bg-[#f8f6f1] min-h-screen flex items-center justify-center">
         <Spinner size={400} />
       </div>
     );
   }
 
   return (
-    <div className="bg-[#FFFBEB] min-h-screen">
+    <div className="bg-[#f8f6f1] min-h-screen">
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#FFFBEB] z-10">
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3 mb-4">
             <button
               onClick={() => navigate(-1)}

@@ -53,7 +53,7 @@ const Layout: React.FC = () => {
 
   return (
     <FeatureThemeProvider>
-    <div className="min-h-screen bg-[#FFFBEB]">
+    <div className="min-h-screen bg-[#f8f6f1]">
       {/* Fixed Header - Hide on auth routes */}
       {/* {!isAuthRoute && <FixedHeader />} */}
 

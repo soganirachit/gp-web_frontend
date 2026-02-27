@@ -26,7 +26,7 @@ const CancelSubscriptionLanding: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB] flex flex-col pb-20">
+    <div className="min-h-screen bg-[#f8f6f1] flex flex-col pb-20">
       <div className="max-w-[500px] w-full mx-auto flex-1 flex flex-col px-4 pt-8">
         {/* Badge with Sad Face Icon */}
         <motion.div

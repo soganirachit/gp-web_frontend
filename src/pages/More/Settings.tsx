@@ -55,6 +55,11 @@ const Settings: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!isLoggedIn) {
+      setLoading(false);
+      return;
+    }
+  
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -377,7 +382,7 @@ const Settings: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB]">
+    <div className="min-h-screen bg-[#f8f6f1]">
       <div className="w-full max-w-[800px] mx-auto">
         {/* Content Container */}
         <div className="w-full px-4">
@@ -423,12 +428,12 @@ const Settings: React.FC = () => {
                 className="w-full bg-gray-50 border border-gray-200 text-gray-700 py-3 pl-3 sm:pl-4 pr-8 sm:pr-10 rounded-lg text-left text-sm sm:text-base focus:outline-none focus:bg-white focus:border-gray-500 transition-colors flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="truncate">
-                  {isLoadingStores 
-                    ? 'Loading stores...' 
+                  {isLoadingStores
+                    ? 'Loading stores...'
                     : selectedStore || (stores.length === 0 ? 'No stores available' : 'Choose a store')
                   }
                 </span>
-                <FaChevronRight 
+                <FaChevronRight
                   className={`transform transition-transform flex-shrink-0 text-xs text-gray-400 ${isStoreDropdownOpen ? 'rotate-180' : 'rotate-90'}`}
                   style={{ marginLeft: '8px' }}
                 />
@@ -437,11 +442,11 @@ const Settings: React.FC = () => {
               {/* Custom Dropdown Options */}
               {isStoreDropdownOpen && stores.length > 0 && (
                 <>
-                  <div 
-                    className="fixed inset-0 z-10" 
+                  <div
+                    className="fixed inset-0 z-10"
                     onClick={() => setIsStoreDropdownOpen(false)}
                   />
-                  <div 
+                  <div
                     className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
                   >
                     <button
@@ -458,11 +463,10 @@ const Settings: React.FC = () => {
                           setIsStoreDropdownOpen(false);
                         }
                       }}
-                      className={`w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base transition-colors truncate ${
-                        !selectedStore 
-                          ? 'bg-gray-100 text-gray-900' 
+                      className={`w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base transition-colors truncate ${!selectedStore
+                          ? 'bg-gray-100 text-gray-900'
                           : 'text-gray-700 hover:bg-gray-50'
-                      }`}
+                        }`}
                     >
                       Choose a store
                     </button>
@@ -482,11 +486,10 @@ const Settings: React.FC = () => {
                             setIsStoreDropdownOpen(false);
                           }
                         }}
-                        className={`w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base transition-colors ${
-                          selectedStoreId === store.id 
-                            ? 'bg-gray-100 text-gray-900 font-medium' 
+                        className={`w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base transition-colors ${selectedStoreId === store.id
+                            ? 'bg-gray-100 text-gray-900 font-medium'
                             : 'text-gray-700 hover:bg-gray-50'
-                        }`}
+                          }`}
                       >
                         <div className="truncate">{store.name}</div>
                         {store.distance_km && (
@@ -572,15 +575,17 @@ const Settings: React.FC = () => {
             )}
           </div>
 
-          {/* Delete Account Link */}
-          <div className="mb-4 text-center">
-            <button
-              onClick={handleDeleteAccountClick}
-              className="text-red-500 text-[15px] hover:text-red-700 transition-colors underline"
-            >
-              Delete Account
-            </button>
-          </div>
+          {/* Delete Account Link - Show only when logged in */}
+          {isLoggedIn && (
+            <div className="mb-4 text-center">
+              <button
+                onClick={handleDeleteAccountClick}
+                className="text-red-500 text-[15px] hover:text-red-700 transition-colors underline"
+              >
+                Delete Account
+              </button>
+            </div>
+          )}
 
           {/* Legal Disclaimer */}
           <div className="mb-20 text-center">
