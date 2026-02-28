@@ -23,6 +23,8 @@ import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
 import bannerSvg from "../assets/svg/gp_store_svg/banner.svg";
 import BottomNavigation from "../components/layout/BottomNav";
 import namasteSvg from '../assets/svg/namaste.svg';
+import logoSvg from '../assets/svg/logo.svg';
+
 
 
 const GpStore_Homepage: React.FC = () => {
@@ -283,7 +285,7 @@ const GpStore_Homepage: React.FC = () => {
 
     return (
         <ErrorBoundary>
-            <div className="min-h-screen bg-[#f8f6f1] pb-24">
+            <div className="min-h-screen bg-[#f8f6f1] ">
                 <div className="max-w-[800px] mx-auto">
                     {/* Top Header with Green Background */}
                     <div className="relative px-3 sm:px-4 pt-0 pb-8 sm:pb-12" style={{
@@ -556,6 +558,25 @@ const GpStore_Homepage: React.FC = () => {
                         />
                     </div>
                 </div>
+                {/* Branding Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.9 }}
+            className="mb-8 sm:mb-10"
+          >
+            <div className="flex flex-col gap-2 items-start">
+              <img
+                src={logoSvg}
+                alt="Genda Phool Logo"
+                className="h-24 sm:h-32 w-auto"
+              />
+              <div className="flex items-center gap-2">
+                <p className="text-gray-600 text-xs sm:text-sm">Blossomed In Vadodara!</p>
+                <span className="text-pink-500 text-sm sm:text-base">❤</span>
+              </div>
+            </div>
+          </motion.div>
 
                 {/* Bottom Navigation */}
                 <BottomNavigation />

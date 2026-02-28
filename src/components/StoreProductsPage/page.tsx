@@ -484,7 +484,7 @@ const StoreProductsPages: React.FC = () => {
                 <div className="flex justify-center mb-6">
                   <button
                     onClick={handleLoadMore}
-                    className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                    className="px-6 py-2.5 underline text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
                   >
                     Load More
                   </button>

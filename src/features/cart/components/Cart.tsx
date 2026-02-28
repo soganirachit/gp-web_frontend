@@ -120,11 +120,11 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black bg-opacity-40 z-40" onClick={onClose} />
+      {/* Backdrop — covers everything including bottom nav */}
+      <div className="fixed inset-0 bg-black bg-opacity-40 z-40" style={{ zIndex: 48 }} onClick={onClose} />
 
       {/* Bottom sheet */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl max-h-[75vh] flex flex-col">
+      <div className="fixed bottom-20 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl max-h-[calc(100vh-5rem)] flex flex-col">
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-gray-300 rounded-full" />
