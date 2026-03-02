@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { IoArrowBack } from "react-icons/io5";
-import { productService } from "../../services/product.service";
+import { productService, getEffectivePrice, getBasePrice, showStrikeBase } from "../../services/product.service";
 import type { Product, BestSeller } from "../../services/product.service";
 import { basePackService, BasePack } from "../../services/basepack.service";
 import { storeService } from "../../services/store.service";
@@ -24,10 +24,12 @@ const ExploreMore: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [bestSellers, setBestSellers] = useState<BestSeller[]>([]);
   const [premiumProducts, setPremiumProducts] = useState<BestSeller[]>([]);
+  const [allStoreProducts, setAllStoreProducts] = useState<BestSeller[]>([]);
   const [basePacks, setBasePacks] = useState<BasePack[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [displayedCount, setDisplayedCount] = useState(6);
+  const fetchIdRef = useRef(0);
 
   // Helper function to get image URL
   const getImageUrl = (imagesUrl?: string | string[]): string => {
@@ -47,8 +49,9 @@ const ExploreMore: React.FC = () => {
     }
   };
 
-  // Fetch data
+  // Fetch data based on category/section query params
   useEffect(() => {
+    const id = ++fetchIdRef.current;
     const abortController = new AbortController();
 
     const fetchData = async () => {
@@ -62,26 +65,41 @@ const ExploreMore: React.FC = () => {
           const sectionUpper = section.toUpperCase();
 
           if (categoryUpper === "BEST" || sectionUpper.includes("BEST")) {
-            // → api/v1/products/best-sellers/
+            // → GET api/v1/products/best-sellers/
             const fetched = await productService.getBestSellers(
               storeId || undefined,
               abortController.signal
             );
+            if (id !== fetchIdRef.current) return;
             setBestSellers(fetched || []);
+
           } else if (categoryUpper === "PREMIUM" || sectionUpper.includes("PREMIUM")) {
-            // → api/v1/products/?ordering=-order_count
+            // → GET api/v1/products/?ordering=-order_count
             const fetched = await productService.getProductsByOrdering(
               "-order_count",
               storeId || undefined,
               abortController.signal
             );
+            if (id !== fetchIdRef.current) return;
             setPremiumProducts(fetched || []);
+
+          } else if (categoryUpper === "ALL" || sectionUpper.includes("ALL")) {
+            // → GET api/v1/products/  (no ordering param)
+            const fetched = await productService.getProductsByOrdering(
+              undefined,
+              storeId || undefined,
+              abortController.signal
+            );
+            if (id !== fetchIdRef.current) return;
+            setAllStoreProducts(fetched || []);
+
           } else {
             // Fallback: best sellers
             const fetched = await productService.getBestSellers(
               storeId || undefined,
               abortController.signal
             );
+            if (id !== fetchIdRef.current) return;
             setBestSellers(fetched || []);
           }
         } else {
@@ -90,15 +108,19 @@ const ExploreMore: React.FC = () => {
             productService.getAllProducts(),
             basePackService.getAllBasePacks().catch(() => []),
           ]);
+          if (id !== fetchIdRef.current) return;
           const activeProducts = productsResult.filter((item: Product) => item.isActive);
           setProducts(activeProducts);
           setBasePacks(basePacksResult);
         }
       } catch (error) {
+        if (id !== fetchIdRef.current) return;
         console.error("Error fetching data:", error);
         setError("Failed to load products");
       } finally {
-        setIsLoading(false);
+        if (id === fetchIdRef.current) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -109,7 +131,7 @@ const ExploreMore: React.FC = () => {
     };
   }, [activeFeature, category, section]);
 
-  // Get filtered products based on category/section
+  // Return the correct product list based on active section
   const getFilteredProducts = (): any[] => {
     if (activeFeature === "gpStore") {
       const categoryUpper = category.toUpperCase();
@@ -120,6 +142,9 @@ const ExploreMore: React.FC = () => {
       }
       if (categoryUpper === "PREMIUM" || sectionUpper.includes("PREMIUM")) {
         return premiumProducts;
+      }
+      if (categoryUpper === "ALL" || sectionUpper.includes("ALL")) {
+        return allStoreProducts;
       }
       return bestSellers;
     }
@@ -205,11 +230,10 @@ const ExploreMore: React.FC = () => {
         ? item.unit || (item.type === "LEAVES" ? "kg" : "box")
         : "Day";
 
-    const price = item.current_price
-      ? `₹${item.current_price}/${priceUnit}`
-      : item.sellingPrice
-      ? `₹${item.sellingPrice}/${priceUnit}`
-      : "";
+    const effective = getEffectivePrice(item);
+    const base = getBasePrice(item);
+    const showStrike = showStrikeBase(item);
+    const price = effective > 0 ? `₹${effective}/${priceUnit}` : "";
 
     const imageUrl = item.primary_image || getImageUrl(item.imagesUrl);
 
@@ -222,6 +246,7 @@ const ExploreMore: React.FC = () => {
             item.short_description || item.description || "Mixed flowers daily"
           }
           price={price}
+          originalPrice={showStrike ? base : undefined}
           showDailyButton={true}
           showBestsellerTag={index === 0 || index === 2}
           onClick={() => handleProductClick(item)}
@@ -230,19 +255,29 @@ const ExploreMore: React.FC = () => {
     );
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen relative bg-[#f8f6f1]">
+        <div className="absolute inset-0 bg-[#f8f6f1] flex items-center justify-center">
+          <Spinner size={400} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
       <div className="max-w-[800px] mx-auto bg-[#f8f6f1] min-h-screen pb-20">
         {/* Header */}
-        <div className="bg-[#f8f6f1] sticky top-0 z-20 px-4 py-4 border-b border-gray-200">
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-20 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
             >
-              <IoArrowBack className="text-xl text-gray-800" />
+              <IoArrowBack size={24} />
             </button>
-            <h1 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">
+            <h1 className="text-2xl font-bold font-serif text-gray-900">
               {getPageTitle()}
             </h1>
           </div>
@@ -250,11 +285,7 @@ const ExploreMore: React.FC = () => {
 
         {/* Content */}
         <div className="px-4 py-6">
-          {isLoading ? (
-            <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
-              <Spinner size={400} />
-            </div>
-          ) : error ? (
+          {error ? (
             <div className="text-red-500 text-center py-4 text-base">{error}</div>
           ) : (
             <>

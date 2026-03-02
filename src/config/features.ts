@@ -118,7 +118,7 @@ export const featureThemes: Record<Feature, FeatureTheme> = {
       primary: "#19411f",
     },
     classes: {
-      authPageBackground: "bg-[#F0F8F0]",
+      authPageBackground: "bg-[#f7f5f0]",
       primaryButton: "bg-[#19411f] text-white",
       primaryButtonHover: "hover:bg-[#1e4d1c]",
       authIndicatorActive: "bg-[#19411f]",

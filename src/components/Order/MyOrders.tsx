@@ -116,9 +116,6 @@ const MyOrders: React.FC = () => {
   const visibleOrders = filteredOrders.slice(0, visibleCount);
   const hasMoreOrders = visibleCount < filteredOrders.length;
 
-  // Mock data for UI testing if no API data matches exactly the screenshot structure
-  // In a real scenario, we'd rely on 'orders'. For the purpose of "looking like this", 
-  // I will use 'filteredOrders' but fallback to a layout that handles empty states gracefully or uses the type properly.
 
   return (
     <div className="min-h-screen bg-[#f8f6f1]">

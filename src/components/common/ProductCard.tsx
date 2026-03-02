@@ -6,6 +6,8 @@ interface ProductCardProps {
   packName: string;
   description: string;
   price: string;
+  /** If set and less than effective price, show struck-through MRP before price (e.g. ~~₹149~~ ₹129) */
+  originalPrice?: number;
   showDailyButton?: boolean;
   showBestsellerTag?: boolean;
   onClick?: () => void;
@@ -17,6 +19,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   packName,
   description,
   price,
+  originalPrice,
   showDailyButton = false,
   showBestsellerTag = false,
   onClick,
@@ -69,9 +72,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
         </div>
 
-        {/* Price and Chevron */}
+        {/* Price and Chevron — optional struck-through MRP when originalPrice provided */}
         <div className="flex items-center justify-between mt-1.5 sm:mt-3">
           <span className="text-sm sm:text-base md:text-lg font-semibold text-gray-900">
+            {originalPrice != null && originalPrice > 0 && (
+              <span className="text-gray-500 font-medium line-through mr-1">₹{originalPrice}</span>
+            )}
             {price}
           </span>
           <FaChevronRight className="text-black text-xs sm:text-sm md:text-base" />

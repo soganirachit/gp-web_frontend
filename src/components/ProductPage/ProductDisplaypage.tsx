@@ -585,8 +585,10 @@ const ProductPage: React.FC = () => {
 
   if (loading || isCheckingBalance) {
     return (
-      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
-        <Spinner size={400} />
+      <div className="min-h-screen relative bg-[#f8f6f1]">
+        <div className="absolute inset-0 bg-[#f8f6f1] flex items-center justify-center">
+          <Spinner size={400} />
+        </div>
       </div>
     );
   }
@@ -614,14 +616,16 @@ const ProductPage: React.FC = () => {
     <div className="min-h-screen bg-[#f8f6f1] pb-24">
       <div className="max-w-[800px] mx-auto relative">
         {/* Header */}
-        <div className="sticky top-0 bg-[#f8f6f1] z-10 px-4 py-4 flex items-center gap-3 border-b border-gray-200">
-          <button
-            onClick={() => navigate(-1)}
-            className="hover:bg-gray-100 rounded-full p-2 transition-colors"
-          >
-            <IoArrowBack className="text-xl" />
-          </button>
-          <h1 className="text-2xl font-semibold text-gray-900">{categoryName}</h1>
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
+            >
+              <IoArrowBack size={24} />
+            </button>
+            <h1 className="text-2xl font-bold font-serif text-gray-900">{categoryName}</h1>
+          </div>
         </div>
 
         {/* Main Content */}

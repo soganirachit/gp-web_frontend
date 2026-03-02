@@ -54,12 +54,22 @@ interface DeliveryAddress {
   receiver_phone: string;
 }
 
+interface SubscriptionInfo {
+  subscription_id: number;
+  plan_name: string;
+  scheduled_date: string;
+  subscription_status: string;
+  quantity: string;
+}
+
 interface OrderDetails {
   id: number;
   order_number: string;
   store_name: string;
   delivery_address: DeliveryAddress | null;
   order_type: string;
+  order_type_label?: string;
+  subscription_info?: SubscriptionInfo | null;
   status: string;
   payment_status: string;
   payment_method: string;
@@ -168,8 +178,10 @@ const OrderDetails: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
-        <Spinner size={400} />
+      <div className="min-h-screen relative bg-[#f8f6f1]">
+        <div className="absolute inset-0 bg-[#f8f6f1] flex items-center justify-center">
+          <Spinner size={400} />
+        </div>
       </div>
     );
   }
@@ -257,8 +269,8 @@ const OrderDetails: React.FC = () => {
     <div className="min-h-screen bg-[#f8f6f1]">
       <div className="max-w-[800px] mx-auto min-h-screen flex flex-col">
         {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
-          <div className="flex items-center gap-3 mb-4">
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
               className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
@@ -442,12 +454,56 @@ const OrderDetails: React.FC = () => {
                     </button>
                   </div>
                 </div>
+                {(order.order_type_label || order.order_type) && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Order Type</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {order.order_type_label ||
+                        (order.order_type === 'online'
+                          ? 'Store Order'
+                          : order.order_type === 'pos'
+                            ? 'POS Order'
+                            : order.order_type === 'subscription'
+                              ? 'Subscription Order'
+                              : order.order_type)}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Placed On</span>
                   <span className="text-sm font-medium text-gray-900">{formatDate(order.created_at)}</span>
                 </div>
               </div>
             </div>
+
+            {/* Subscription Info - only for subscription orders */}
+            {order.order_type === 'subscription' && order.subscription_info && (
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Subscription</h2>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Plan</span>
+                    <span className="text-sm font-medium text-gray-900">{order.subscription_info.plan_name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Scheduled Date</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {formatDate(order.subscription_info.scheduled_date)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Status</span>
+                    <span className="text-sm font-medium text-gray-900 capitalize">
+                      {order.subscription_info.subscription_status?.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Quantity</span>
+                    <span className="text-sm font-medium text-gray-900">{order.subscription_info.quantity}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Shop More Button */}
             <div className="flex justify-center">

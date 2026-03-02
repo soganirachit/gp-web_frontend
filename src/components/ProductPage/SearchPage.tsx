@@ -52,14 +52,14 @@ const SearchPage: React.FC = () => {
     <div className="min-h-screen bg-[#f8f6f1] relative">
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
-        <div className="p-4 md:p-6 flex items-center justify-between">
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate(-1)} className="hover:bg-gray-100 rounded-full p-2 transition-colors">
-              <IoArrowBack className="text-xl md:text-2xl" />
+            <button onClick={() => navigate(-1)} className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors">
+              <IoArrowBack size={24} />
             </button>
-            <h1 className="text-xl md:text-2xl font-medium">Search</h1>
+            <h1 className="text-2xl font-bold font-serif text-gray-900">Search</h1>
           </div>
-          <div className="flex items-center gap-4">
+          {/* <div className="flex items-center gap-4">
             <img 
               src={walletImage} 
               alt="Wallet" 
@@ -72,7 +72,7 @@ const SearchPage: React.FC = () => {
               className="w-6 h-6 md:w-8 md:h-8" 
               onClick={() => navigate('/account')}
             />
-          </div>
+          </div> */}
         </div>
 
         {/* Search Input */}
@@ -94,7 +94,7 @@ const SearchPage: React.FC = () => {
         </div>
 
         {/* Search Results */}
-        <div className="px-4 min-h-[60vh] flex flex-col pb-48">
+        <div className="px-4 min-h-[50vh] flex flex-col pb-48">
           {searchQuery === '' ? (
             <div className="text-center text-gray-500 mt-8">
               Start typing to search

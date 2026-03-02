@@ -218,9 +218,17 @@ const CustomerSupport: React.FC = () => {
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 text-base mb-1">
-                          {ticket.subject}
-                        </h3>
+                        <div className="flex items-center gap-2 mb-1">
+                          {ticket.has_unread_by_customer && (
+                            <span
+                              className="inline-flex h-2.5 w-2.5 rounded-full bg-red-500"
+                              aria-label="unread messages"
+                            />
+                          )}
+                          <h3 className="font-semibold text-gray-900 text-base">
+                            {ticket.subject}
+                          </h3>
+                        </div>
                         {ticket.description && (
                           <p className="text-sm text-gray-600 mb-2 line-clamp-2">
                             {ticket.description}

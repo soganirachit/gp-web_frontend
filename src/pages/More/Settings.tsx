@@ -33,8 +33,11 @@ import { useFeatureTheme } from '../../context/FeatureThemeContext';
 const Settings: React.FC = () => {
   const navigate = useNavigate();
   const { theme, feature } = useFeatureTheme();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, logout } = useAuth();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+  // Treat as logged out if context says so OR token is missing (e.g. after logout that didn't update context)
+  const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('token');
+  const showAsLoggedOut = !isLoggedIn || !hasToken;
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -297,8 +300,9 @@ const Settings: React.FC = () => {
     setShowLogoutDialog(true);
   };
 
-  const handleLogoutConfirm = () => {
-    localStorage.clear();
+  const handleLogoutConfirm = async () => {
+    setShowLogoutDialog(false);
+    await logout();
     navigate(`${basePath}/login`);
   };
 
@@ -371,6 +375,38 @@ const Settings: React.FC = () => {
     if (!phone || phone.length < 10) return phone;
     return `+91 ${phone}`;
   };
+
+  // When not logged in (or no token), show minimal account page with Login button only
+  if (showAsLoggedOut) {
+    return (
+      <div className="min-h-screen bg-[#f8f6f1]">
+        <div className="w-full max-w-[800px] mx-auto">
+          <div className="w-full px-4 pt-6">
+            <p className="text-gray-600 text-center mb-6">Login to access your account</p>
+            <button
+              onClick={handleLoginClick}
+              className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-semibold transition-colors"
+              style={{
+                backgroundColor: theme.colors.primary,
+                color: feature === 'gpStore' ? 'white' : 'black'
+              }}
+            >
+              <IoLogInOutline className="text-xl" />
+              <span className="text-[15px]">Login</span>
+            </button>
+            <div className="mb-20 mt-8 text-center">
+              <p className="text-xs text-gray-400">
+                By continuing, you agree to our{' '}
+                <a href="#" className="text-gray-500 underline">Terms of Service</a> and{' '}
+                <a href="#" className="text-gray-500 underline">Privacy Policy</a>
+              </p>
+            </div>
+          </div>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
 
   // Show full-page loader while data is loading
   if (loading) {

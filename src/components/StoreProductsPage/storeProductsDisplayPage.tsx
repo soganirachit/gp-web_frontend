@@ -11,7 +11,7 @@ import Spinner from "../common/Spinner";
 import { IoArrowBack } from "react-icons/io5";
 import { FaChevronRight } from "react-icons/fa";
 import BottomNav from "../layout/BottomNav";
-import { productService } from "../../services/product.service";
+import { productService, getEffectivePrice, getBasePrice, showStrikeBase } from "../../services/product.service";
 import DatePicker from "react-datepicker";
 import clockIcon from "../../assets/svg/gp_store_svg/clock.svg";
 import deliveryIcon from "../../assets/svg/gp_store_svg/delivery.svg";
@@ -177,14 +177,16 @@ const StorePage: React.FC = () => {
   }, [slug, navigate]);
 
   const getPriceDisplay = () => {
-    if (!product) return { price: 0, originalPrice: 0, savings: 0, discountPercentage: 0 };
-    
-    // Use variant price if a variant is selected, otherwise use product price
-    const price = selectedVariant ? selectedVariant.final_price : product.current_price;
-    const originalPrice = parseFloat(product.base_price);
+    if (!product) return { price: 0, originalPrice: 0, savings: 0, discountPercentage: 0, showStrike: false };
+    // Actual amount customer pays: effective_price (store-level); variant overrides with final_price
+    const price = selectedVariant
+      ? (selectedVariant.final_price ?? (parseFloat(product.effective_price) || product.current_price))
+      : (parseFloat(product.effective_price) || product.current_price);
+    const originalPrice = parseFloat(product.base_price) || 0;
     const savings = originalPrice - price;
     const discountPercentage = originalPrice > 0 ? Math.round((savings / originalPrice) * 100) : 0;
-    return { price, originalPrice, savings, discountPercentage };
+    const showStrike = originalPrice > 0 && price < originalPrice;
+    return { price, originalPrice, savings, discountPercentage, showStrike };
   };
   
   const getActiveVariants = () => {
@@ -276,7 +278,7 @@ const StorePage: React.FC = () => {
       }
       setIsCheckingBalance(true);
       const minDays = 7;
-      const pricePerPack = product.current_price;
+      const pricePerPack = parseFloat(product.effective_price) || product.current_price;
       const totalPrice = pricePerPack * minDays * quantity;
       const { balance } = (await walletService.getWalletBalance()) || {};
       if (balance < totalPrice) {
@@ -337,8 +339,10 @@ const StorePage: React.FC = () => {
 
   if (loading || isCheckingBalance) {
     return (
-      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
-        <Spinner size={400} />
+      <div className="min-h-screen relative bg-[#f8f6f1]">
+        <div className="absolute inset-0 bg-[#f8f6f1] flex items-center justify-center">
+          <Spinner size={400} />
+        </div>
       </div>
     );
   }
@@ -365,14 +369,16 @@ const StorePage: React.FC = () => {
     <div className="min-h-screen bg-[#f8f6f1]">
       <div className="max-w-[800px] mx-auto relative pb-20">
         {/* Header */}
-        <div className="sticky top-0 bg-[#f8f6f1] z-10 px-4 py-4 flex items-center gap-3 border-b border-gray-200">
-          <button
-            onClick={() => navigate(-1)}
-            className="hover:bg-gray-100 rounded-full p-2 transition-colors"
-          >
-            <IoArrowBack className="text-xl" />
-          </button>
-          <h1 className="font-ibm-plex-serif text-2xl font-bold text-gray-900">{categoryName}</h1>
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
+            >
+              <IoArrowBack size={24} />
+            </button>
+            <h1 className="text-2xl font-bold font-serif text-gray-900">{categoryName}</h1>
+          </div>
         </div>
 
         {/* Main Content */}
@@ -396,23 +402,23 @@ const StorePage: React.FC = () => {
             <h1 className="font-ibm-plex-serif text-2xl font-bold text-gray-900 flex-1">
               {product.name}
             </h1>
-            {getPriceDisplay().discountPercentage > 0 && (
+            {getPriceDisplay().showStrike && getPriceDisplay().discountPercentage > 0 && (
               <span className="bg-[#19411F] text-white text-sm font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap">
                 Save {getPriceDisplay().discountPercentage}%
               </span>
             )}
           </div>
 
-          {/* Price Section */}
+          {/* Price Section — effective_price (or variant final_price); strike base only when effective < base */}
           <div className="mt-4 flex items-center gap-3">
-            <span className="text-2xl font-bold text-gray-900">
-              ₹{getPriceDisplay().price}
-            </span>
-            {getPriceDisplay().savings > 0 && (
+            {getPriceDisplay().showStrike && (
               <span className="text-xl font-medium text-gray-500 line-through">
                 ₹{getPriceDisplay().originalPrice.toFixed(0)}
               </span>
             )}
+            <span className="text-2xl font-bold text-gray-900">
+              ₹{getPriceDisplay().price}
+            </span>
           </div>
 
           {/* Delivery Information Card */}
@@ -687,7 +693,10 @@ const StorePage: React.FC = () => {
                       )}
                       <div className="flex items-center justify-between">
                         <p className="text-base font-bold text-gray-900">
-                          ₹{item.current_price || item.effective_price || 0}/
+                          {showStrikeBase(item) && (
+                            <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(item)}</span>
+                          )}
+                          ₹{getEffectivePrice(item)}/
                         </p>
                         <FaChevronRight className="text-gray-400 text-sm" />
                       </div>

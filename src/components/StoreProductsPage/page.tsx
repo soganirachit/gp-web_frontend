@@ -5,7 +5,7 @@ import { FaChevronRight } from "react-icons/fa";
 import { IoFilterOutline, IoSwapVerticalOutline } from "react-icons/io5";
 import searchImage from "../../assets/icon/Search.png";
 import locationhomeIcon from "../../assets/svg/gp_daily svg/locationhome.svg";
-import { productService, Category } from "../../services/product.service";
+import { productService, Category, getEffectivePrice, getBasePrice, showStrikeBase } from "../../services/product.service";
 import { storeService } from "../../services/store.service";
 import { addressService } from "../../services/address.service";
 import Spinner from "../common/Spinner";
@@ -164,12 +164,7 @@ const StoreProductsPages: React.FC = () => {
     fetchLatestAddress();
   }, [categorySlug, stateCategoryName, fetchLatestAddress]);
 
-  const getItemPrice = (item: any): number => {
-    if (item.current_price !== undefined) {
-      return item.current_price;
-    }
-    return item.sellingPrice || 0;
-  };
+  const getItemPrice = (item: any): number => getEffectivePrice(item);
 
   const sortProducts = (items: any[], sortType: string) => {
     return [...items].sort((a, b) => {
@@ -263,8 +258,10 @@ const StoreProductsPages: React.FC = () => {
   // Show full-screen loader while initial data is loading
   if (isPageLoading) {
     return (
-      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
-        <Spinner size={400} />
+      <div className="min-h-screen relative bg-[#f8f6f1]">
+        <div className="absolute inset-0 bg-[#f8f6f1] flex items-center justify-center">
+          <Spinner size={400} />
+        </div>
       </div>
     );
   }
@@ -274,7 +271,7 @@ const StoreProductsPages: React.FC = () => {
       <div className="max-w-[800px] mx-auto bg-[#f8f6f1] min-h-screen pb-20">
         {/* Top Header with Location and Search */}
         <div className="sticky top-0 z-20 bg-[#f8f6f1] border-b border-gray-200">
-          <div className="px-4 py-3">
+          <div className="px-4 pt-6 pb-3">
             {/* Location Section */}
             <div className="flex items-center gap-1.5 mb-3">
               <img
@@ -301,7 +298,7 @@ const StoreProductsPages: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search anything....."
-                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#2A6B28] focus:border-transparent"
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#19411f] focus:border-transparent"
               />
               <img
                 src={searchImage}
@@ -319,8 +316,8 @@ const StoreProductsPages: React.FC = () => {
                 onClick={() => handleCategoryClick(null)}
                 className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   !selectedCategorySlug
-                    ? 'bg-[#2A6B28] text-white'
-                    : 'bg-gray-100 text-gray-700'
+                    ? 'bg-[#19411f] text-white'
+                    : ' text-[#222222]'
                 }`}
               >
                 All
@@ -331,8 +328,8 @@ const StoreProductsPages: React.FC = () => {
                   onClick={() => handleCategoryClick(category.slug)}
                   className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                     selectedCategorySlug === category.slug
-                      ? 'bg-[#2A6B28] text-white'
-                      : 'bg-gray-100 text-gray-700'
+                      ? 'bg-[#19411f] text-white'
+                      : ' text-[#222222]'
                   }`}
                 >
                   {category.name}
@@ -344,12 +341,12 @@ const StoreProductsPages: React.FC = () => {
             <div className="flex items-center gap-3 mt-3">
               <button
                 onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-                className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 bg-[#fff] border border[#E9E6E2] rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
               >
                 <IoSwapVerticalOutline className="w-4 h-4" />
                 <span>Sort</span>
               </button>
-              <button className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
+              <button className="flex items-center gap-2 px-3 py-2 bg-[#fff] border border-[#E9E6E2] rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
                 <IoFilterOutline className="w-4 h-4" />
                 <span>Filter</span>
               </button>
@@ -377,7 +374,7 @@ const StoreProductsPages: React.FC = () => {
                       }}
                       className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 ${
                         sortBy === option.value 
-                          ? 'bg-[#2A6B28] text-white' 
+                          ? 'bg-[#19411f] text-white' 
                           : 'text-gray-700 hover:text-gray-900'
                       }`}
                     >
@@ -460,15 +457,18 @@ const StoreProductsPages: React.FC = () => {
                         </h3>
                         {/* Bestseller Badge */}
                         {item.labels && item.labels.some((label: any) => label.slug === 'best-seller') && (
-                          <span className="bg-[#2A6B28] text-white text-[10px] font-semibold px-2 py-0.5 rounded flex-shrink-0">
+                          <span className="bg-[#19411f] text-white text-[10px] font-semibold px-2 py-0.5 rounded flex-shrink-0">
                             Bestseller
                           </span>
                         )}
                       </div>
                       
-                      {/* Price and Arrow */}
+                      {/* Price and Arrow — effective_price only; show struck base when effective < base */}
                       <div className="flex items-center justify-between mt-2">
                         <p className="text-gray-900 text-base font-bold">
+                          {showStrikeBase(item) && (
+                            <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(item)}</span>
+                          )}
                           ₹{getItemPrice(item)}/
                         </p>
                         <FaChevronRight className="text-gray-400 text-sm" />

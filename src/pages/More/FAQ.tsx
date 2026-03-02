@@ -81,7 +81,7 @@ const FAQ: React.FC = () => {
         {/* FAQ Sections */}
         <div className="px-4 py-6 space-y-8">
           {isLoading ? (
-            <div className="min-h-[400px] flex items-center justify-center">
+            <div className="min-h-[400px] flex items-center justify-center bg-[#f8f6f1]">
               <Spinner size={400} />
             </div>
           ) : faqSections.length === 0 ? (

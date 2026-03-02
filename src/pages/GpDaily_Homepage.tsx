@@ -79,9 +79,6 @@ const Home2: React.FC = () => {
   const [isValidatingDeliveryZone, setIsValidatingDeliveryZone] =
     useState(false);
 
-  // API status - hardcoded for now
-  const [apiStatus, setApiStatus] = useState<number>(200);
-
   useGoogleMaps();
 
   const fetchWalletBalance = async () => {
@@ -524,9 +521,7 @@ const Home2: React.FC = () => {
             </div>
           </div>
 
-          {/* Conditional Banners - Only show if API status is 200 */}
-          {apiStatus === 200 && (
-            <div className="px-4 py-4 space-y-4">
+          <div className="px-4 py-4 space-y-4">
               {/* Order in Hold Banner - Only show after balance is loaded */}
               {!isLoadingBalance && walletBalance < 100 && (
                 <div className="bg-[#FE5053] rounded-2xl p-4 text-white">
@@ -598,7 +593,6 @@ const Home2: React.FC = () => {
                 </div>
               </div>
             </div>
-          )}
 
           {/* Main Content */}
           <div className="px-4 py-4 space-y-6">
@@ -616,8 +610,8 @@ const Home2: React.FC = () => {
               </div>
 
               {isLoadingPacks ? (
-                <div className="flex justify-center items-center h-40">
-                  <Spinner size={400} />
+                <div className="flex justify-center items-center h-40" style={{ backgroundColor: '#f8f6f1' }}>
+                  <Spinner size={80} />
                 </div>
               ) : error ? (
                 <div className="text-red-500 text-center py-4">{error}</div>

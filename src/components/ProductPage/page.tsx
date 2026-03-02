@@ -178,8 +178,10 @@ const ProductPage: React.FC = () => {
 
   if (isLoading || isLoadingAddress) {
     return (
-      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
-        <Spinner size={400} />
+      <div className="min-h-screen relative bg-[#f8f6f1]">
+        <div className="absolute inset-0 bg-[#f8f6f1] flex items-center justify-center">
+          <Spinner size={400} />
+        </div>
       </div>
     );
   }
@@ -231,7 +233,7 @@ const ProductPage: React.FC = () => {
           {/* Search Bar */}
           <div className="mt-2 sm:mt-3">
             <div
-              className="bg-gray-50 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 cursor-pointer shadow-sm border border-gray-200"
+              className="rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 cursor-pointer shadow-sm border border-gray-200"
               onClick={() => navigate('/search')}
             >
               <img src={SearchIcon} alt="Search" className="w-4 h-4 sm:w-5 sm:h-5" />

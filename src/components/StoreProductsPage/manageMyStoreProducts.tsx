@@ -392,8 +392,10 @@ const ManageMyStoreProducts: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Spinner size={400} />
+      <div className="min-h-screen relative bg-[#f8f6f1]">
+        <div className="absolute inset-0 bg-[#f8f6f1] flex items-center justify-center">
+          <Spinner size={400} />
+        </div>
       </div>
     );
   }
@@ -443,16 +445,16 @@ const ManageMyStoreProducts: React.FC = () => {
     <div className="min-h-screen bg-[#f8f6f1]">
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
-        <div className="p-4 md:p-6 flex items-center justify-between">
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
-              className="hover:bg-gray-100 rounded-full p-2 transition-colors"
+              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
             >
-              <IoArrowBack className="text-xl md:text-2xl" />
+              <IoArrowBack size={24} />
             </button>
-            <h1 className="text-xl md:text-2xl font-medium">
-              Manage Store 
+            <h1 className="text-2xl font-bold font-serif text-gray-900">
+              Manage Store
             </h1>
           </div>
           <div className="flex items-center gap-4">

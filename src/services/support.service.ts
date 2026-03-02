@@ -18,6 +18,7 @@ export interface SupportTicket {
   agent_requested?: boolean;
   callback_requested?: boolean;
   messages_count?: number;
+  has_unread_by_customer?: boolean;
 }
 
 export interface SupportMessage {
@@ -42,6 +43,7 @@ export interface SupportTicketDetail {
   messages: SupportMessage[];
   agent_requested?: boolean;
   callback_requested?: boolean;
+  has_unread_by_customer?: boolean;
 }
 
 export interface EligibleOrder {
@@ -167,11 +169,22 @@ class SupportService {
       if (!headers) {
         return null;
       }
-      const response = await axios.get<SupportTicketDetail>(
+      const response = await axios.get<
+        { success: boolean; message: string; data: SupportTicketDetail } | SupportTicketDetail
+      >(
         `${API_URL}/${ticketNumber}/`,
         { headers }
       );
-      return response.data;
+
+      const data = response.data;
+
+      // Handle wrapped response structure: { success, message, data: {...ticket...} }
+      if (data && typeof data === 'object' && 'data' in data) {
+        return (data as { data: SupportTicketDetail }).data;
+      }
+
+      // Fallback: response is directly the ticket detail
+      return data as SupportTicketDetail;
     } catch (error: any) {
       console.error('Error fetching ticket details:', error);
       headerService.handleError(error);

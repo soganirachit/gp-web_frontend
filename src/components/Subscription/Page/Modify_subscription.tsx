@@ -7,7 +7,6 @@ import { basePackService, BasePack } from '../../../services/basepack.service';
 import { subscriptionService } from '../../../services/subscription.service';
 import Spinner from '../../../components/common/Spinner';
 
-// Mock data removed in favor of API call
 
 interface Subscription {
   id: string;

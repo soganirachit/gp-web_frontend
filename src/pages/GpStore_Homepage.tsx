@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { useFeatureTheme } from "../context/FeatureThemeContext";
 import { addressService } from "../services/address.service";
 import { customerService } from "../services/getcustomer.service";
-import { productService, Category, BestSeller } from "../services/product.service";
+import { productService, Category, BestSeller, getEffectivePrice, getBasePrice, showStrikeBase } from "../services/product.service";
 import { storeService } from "../services/store.service";
 import { toast } from "react-hot-toast";
 import Spinner from "../components/common/Spinner";
@@ -274,8 +274,10 @@ const GpStore_Homepage: React.FC = () => {
 
     if (isPageLoading) {
         return (
-            <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
-                <Spinner size={400} />
+            <div className="min-h-screen relative bg-[#f8f6f1]">
+                <div className="absolute inset-0 bg-[#f8f6f1] flex items-center justify-center">
+                    <Spinner size={400} />
+                </div>
             </div>
         );
     }
@@ -495,11 +497,14 @@ const GpStore_Homepage: React.FC = () => {
                                                     {bestSeller.short_description}
                                                 </p>
                                             )}
-                                            <div className="flex items-center justify-between">
+                                            <div className="flex items-center justify-between gap-2">
                                                 <p className="text-gray-900 text-base font-bold">
-                                                    ₹{bestSeller.current_price}
+                                                    {showStrikeBase(bestSeller) && (
+                                                        <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(bestSeller)}</span>
+                                                    )}
+                                                    ₹{getEffectivePrice(bestSeller)}
                                                 </p>
-                                                <FaChevronRight className="text-gray-400 text-sm" />
+                                                <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
                                             </div>
                                         </div>
                                     </div>
@@ -541,14 +546,57 @@ const GpStore_Homepage: React.FC = () => {
                                             {product.name}
                                         </h3>
                                         <p className="text-[#19411F] text-base font-bold">
-                                            ₹{product.current_price}/{product.unit || "box"}
+                                            {showStrikeBase(product) && (
+                                                <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(product)}</span>
+                                            )}
+                                            ₹{getEffectivePrice(product)}/{product.unit || "box"}
                                         </p>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </div>
-
+                     {/* all Packs Section */}
+                    <div className="px-4 py-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">All Packs</h2>
+                            <button
+                                onClick={() => navigate(`${basePath}/explore-more?category=All&section=All Packs`)}
+                                className="flex items-center gap-1 text-gray-500 text-sm font-medium"
+                            >
+                                <span>Explore More</span>
+                                <FaChevronRight className="text-xs" />
+                            </button>
+                        </div>
+                        <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
+                            {products.map((product) => (
+                                <div
+                                    key={product.id}
+                                    className="flex-shrink-0 w-[160px] bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
+                                    onClick={() => handleProductClick(product)}
+                                >
+                                    <div className="aspect-square bg-[#f8f6f1] overflow-hidden">
+                                        <img
+                                            src={getImageUrl(product.primary_image)}
+                                            alt={product.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                    <div className="p-3">
+                                        <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
+                                            {product.name}
+                                        </h3>
+                                        <p className="text-[#19411F] text-base font-bold">
+                                            {showStrikeBase(product) && (
+                                                <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(product)}</span>
+                                            )}
+                                            ₹{getEffectivePrice(product)}/{product.unit || "box"}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                     {/* Quote of the Day Section */}
                     <div>
                         <img
