@@ -250,7 +250,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             // Still show success since item is in local cart, but log warning
             console.warn('Item added to local cart only - store ID required for API sync');
             // Show user-friendly error
-            alert('Please select a store in Settings to sync your cart with the server.');
+            // Note: toast is not available in context, so we'll use console.warn
+            // The calling component should handle the toast notification
             return;
           }
           console.log('Calling addToCart API with storeId:', storeId, 'productId:', newItem.productId, 'quantity:', newItem.quantity);
@@ -743,6 +744,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       
       if (tokenChanged) {
         // User just logged in (token exists but didn't exist before, or token changed)
+        // Immediately fetch cart from API first
+        console.log('User logged in, fetching cart from API immediately...');
+        loadCartFromAPI().catch(err => {
+          console.error('Error loading cart from API on login:', err);
+        });
+        
         // Merge temp cart items into state and sync to API
         const tempCart = localStorage.getItem(TEMP_CART_KEY);
         if (tempCart) {

@@ -842,7 +842,7 @@ const AddressSelection: React.FC = () => {
 
   if (loading && addresses.length === 0 && !showAddForm) {
     return (
-      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
+      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
         <Spinner size={400} />
       </div>
     );
@@ -1142,7 +1142,7 @@ const AddressSelection: React.FC = () => {
                 <button
                   onClick={handleContinue}
                   disabled={!selectedAddress || loading}
-                  className={`w-full py-4 rounded-xl text-base font-semibold shadow-sm ${
+                  className={`w-full py-4 rounded-xl text-base font-semibold shadow-sm flex items-center justify-center ${
                     selectedAddress && !loading
                       ? `hover:opacity-90 ${feature === 'gpStore' ? 'text-white' : 'text-gray-900'}`
                       : 'bg-gray-300 cursor-not-allowed text-gray-500'

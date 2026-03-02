@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
 import { BsCalendar4 } from 'react-icons/bs';
 import { IoNotifications } from 'react-icons/io5'; // Using notification bell as alert
+import { toast } from 'react-hot-toast';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from 'date-fns';
@@ -42,7 +43,7 @@ const PauseSubscription: React.FC = () => {
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
             if (diffDays < 1) {
-                alert("Resume date must be in the future");
+                toast.error("Resume date must be in the future");
                 setIsSubmitting(false);
                 return;
             }
@@ -57,11 +58,11 @@ const PauseSubscription: React.FC = () => {
                     }
                 });
             } else {
-                alert(response.error || "Failed to pause subscription");
+                toast.error(response.error || "Failed to pause subscription");
             }
         } catch (error: any) {
             console.error("Pause Error:", error);
-            alert(error.message || "An error occurred");
+            toast.error(error.message || "An error occurred");
         } finally {
             setIsSubmitting(false);
         }

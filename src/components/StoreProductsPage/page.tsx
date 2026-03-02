@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { MdLocationOn, MdKeyboardArrowDown } from "react-icons/md";
-import { FaChevronRight } from "react-icons/fa";
+import { FaChevronRight, FaSearch } from "react-icons/fa";
 import { IoFilterOutline, IoSwapVerticalOutline } from "react-icons/io5";
 import searchImage from "../../assets/icon/Search.png";
 import locationhomeIcon from "../../assets/svg/gp_daily svg/locationhome.svg";
@@ -33,6 +33,7 @@ const StoreProductsPages: React.FC = () => {
   const [addressType, setAddressType] = useState<string>("Home");
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [displayedProducts, setDisplayedProducts] = useState(6); // For Load More functionality
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Memoize the category slug from URL
   const categorySlug = useMemo(() => searchParams.get('category'), [searchParams]);
@@ -249,8 +250,17 @@ const StoreProductsPages: React.FC = () => {
   };
 
   const sortedProducts = sortProducts(products, sortBy);
-  const visibleProducts = sortedProducts.slice(0, displayedProducts);
-  const hasMoreProducts = sortedProducts.length > displayedProducts;
+  
+  // Filter products based on search query
+  const filteredProducts = searchQuery.trim() === ''
+    ? sortedProducts
+    : sortedProducts.filter(item =>
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.short_description?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+  
+  const visibleProducts = filteredProducts.slice(0, displayedProducts);
+  const hasMoreProducts = filteredProducts.length > displayedProducts;
 
   // Combined loading state for full-screen loader
   const isPageLoading = isLoading || isLoadingCategories || isLoadingAddress;
@@ -258,10 +268,8 @@ const StoreProductsPages: React.FC = () => {
   // Show full-screen loader while initial data is loading
   if (isPageLoading) {
     return (
-      <div className="min-h-screen relative bg-[#f8f6f1]">
-        <div className="absolute inset-0 bg-[#f8f6f1] flex items-center justify-center">
-          <Spinner size={400} />
-        </div>
+      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
+        <Spinner size={400} />
       </div>
     );
   }
@@ -295,16 +303,13 @@ const StoreProductsPages: React.FC = () => {
 
             {/* Search Bar */}
             <div className="relative">
+              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
                 placeholder="Search anything....."
-                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#19411f] focus:border-transparent"
-              />
-              <img
-                src={searchImage}
-                alt="Search"
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 cursor-pointer"
-                onClick={() => navigate("/search")}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#19411f] focus:border-transparent"
               />
             </div>
           </div>

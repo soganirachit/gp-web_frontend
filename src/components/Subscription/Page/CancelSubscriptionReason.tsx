@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
+import { toast } from 'react-hot-toast';
 import { subscriptionService } from "../../../services/subscription.service";
 import alertIcon from '../../../assets/svg/cancelpage/alert.svg';
 
@@ -24,7 +25,7 @@ const CancelSubscriptionReason: React.FC = () => {
 
     const handleSubmit = async () => {
         if (!subscription) {
-            alert("No subscription found to cancel");
+            toast.error("No subscription found to cancel");
             return;
         }
 
@@ -42,7 +43,7 @@ const CancelSubscriptionReason: React.FC = () => {
             });
         } catch (error: any) {
             console.error("Cancellation failed", error);
-            alert(error.message || "Failed to cancel subscription. Please try again.");
+            toast.error(error.message || "Failed to cancel subscription. Please try again.");
         } finally {
             setIsCancelling(false);
         }

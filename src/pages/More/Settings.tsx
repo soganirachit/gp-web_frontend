@@ -411,7 +411,7 @@ const Settings: React.FC = () => {
   // Show full-page loader while data is loading
   if (loading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${theme.classes.authPageBackground}`}>
+      <div className={`fixed inset-0 flex items-center justify-center z-50 ${theme.classes.authPageBackground}`}>
         <Spinner size={400} />
       </div>
     );

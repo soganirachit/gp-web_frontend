@@ -1,3 +1,5 @@
+import { toast } from 'react-hot-toast';
+
 const baseUrl =  import.meta.env.VITE_API_BASE_URL
 const API_URL = `${baseUrl}/support-requests`;
 
@@ -21,16 +23,16 @@ export async function submitSupportRequest(
     );
     const data = await response.json();
     if (response.ok) {
-      alert("Request submitted successfully!");
+      toast.success("Request submitted successfully!");
       setMessage("");
       setRequestType("MISSED_DELIVERY");
     } else {
       console.error("Submission error:", data);
-      alert(data.error || "Failed to submit request.");
+      toast.error(data.error || "Failed to submit request.");
     }
   } catch (error) {
     console.error("Error:", error);
-    alert("Something went wrong while submitting the request.");
+    toast.error("Something went wrong while submitting the request.");
   }
 }
  // useEffect(() => {

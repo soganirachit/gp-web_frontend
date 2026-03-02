@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { authService } from "../../../../services/auth.service";
 import { useFeatureTheme } from "../../../../context/FeatureThemeContext";
 
@@ -8,9 +8,22 @@ const Login = () => {
     const [phoneNumber, setPhoneNumber] = useState("");
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const navigate = useNavigate();
     const { theme, feature } = useFeatureTheme();
     const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
+
+    // Array of images to cycle through
+    const images = [theme.assets.loginHero, theme.assets.otpHero];
+
+    // Auto-rotate images every 5 seconds
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentImageIndex((prevIndex) => (prevIndex + 1) % images.length);
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [images.length]);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -71,18 +84,24 @@ const Login = () => {
                 <div className="relative mb-4 sm:mb-6 md:mb-8 flex flex-col items-center">
                     {/* OTP Graphic */}
                     <div className="relative w-full max-w-[280px] sm:max-w-xs h-48 sm:h-56 md:h-64 flex items-center justify-center mb-4 sm:mb-6">
-                        <img
-                            src={theme.assets.loginHero}
-                            alt="Login Graphic"
-                            className="w-full h-full object-contain"
-                        />
+                        <AnimatePresence mode="wait">
+                            <motion.img
+                                key={currentImageIndex}
+                                src={images[currentImageIndex]}
+                                alt="Login Graphic"
+                                className="w-full h-full object-contain"
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                transition={{ duration: 0.5 }}
+                            />
+                        </AnimatePresence>
                     </div>
 
-                    {/* Carousel Indicators */}
+                    {/* Carousel Indicators - 2 dots */}
                     <div className="flex gap-1.5 sm:gap-2 mt-2 sm:mt-4">
-                        <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${theme.classes.authIndicatorActive}`}></div>
-                        <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${theme.classes.authIndicatorInactive}`}></div>
-                        <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${theme.classes.authIndicatorInactive}`}></div>
+                        <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-colors duration-300 ${currentImageIndex === 0 ? theme.classes.authIndicatorActive : theme.classes.authIndicatorInactive}`}></div>
+                        <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-colors duration-300 ${currentImageIndex === 1 ? theme.classes.authIndicatorActive : theme.classes.authIndicatorInactive}`}></div>
                     </div>
 
                 </div>
@@ -133,10 +152,10 @@ const Login = () => {
                             disabled={isLoading}
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
-                            className={`w-full py-3 sm:py-3.5 md:py-4 px-4 rounded-lg sm:rounded-xl font-semibold transition-colors duration-200 text-base sm:text-lg ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
+                            className={`w-full py-3 sm:py-3.5 md:py-4 px-4 rounded-lg sm:rounded-xl font-semibold transition-colors duration-200 text-base sm:text-lg flex items-center justify-center ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
                         >
                             {isLoading ? (
-                                <div className={`w-5 h-5 sm:w-6 sm:h-6 border-2 border-t-transparent rounded-full animate-spin mx-auto ${feature === 'gpDaily' ? 'border-black' : 'border-white'}`} />
+                                <div className={`w-5 h-5 sm:w-6 sm:h-6 border-2 border-t-transparent rounded-full animate-spin ${feature === 'gpDaily' ? 'border-black' : 'border-white'}`} />
                             ) : (
                                 "Get OTP"
                             )}

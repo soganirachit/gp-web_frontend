@@ -18,6 +18,7 @@ import { paymentService } from '../../../services/payment.service';
 import { orderService } from '../../../services/order.service';
 import { customerService } from '../../../services/getcustomer.service';
 import { cartService } from '../../../services/cart.service';
+import Spinner from '../../../components/common/Spinner';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -155,7 +156,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
               <button
                 onClick={handleManualApply}
                 disabled={!manualCode.trim() || isApplying}
-                className="bg-[#19411F] text-white px-5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#1e5a1c] transition-colors"
+                className="bg-[#19411F] text-white px-5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#1e5a1c] transition-colors flex items-center justify-center"
               >
                 {isApplying ? '...' : 'Apply'}
               </button>
@@ -228,7 +229,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                       <button
                         onClick={() => onApply(coupon.code)}
                         disabled={isApplying}
-                        className={`ml-3 flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
+                        className={`ml-3 flex-shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
                           isApplied
                             ? 'bg-[#19411F] text-white'
                             : 'bg-white border border-[#19411F] text-[#19411F] hover:bg-[#19411F] hover:text-white'
@@ -307,6 +308,7 @@ const Cart: React.FC = () => {
     total: number;
   } | null>(null);
   const [isLoadingCartTotals, setIsLoadingCartTotals] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   // Apply promo code
   const handleApplyPromoCode = async (code: string) => {
@@ -380,31 +382,54 @@ const Cart: React.FC = () => {
 
   // Load cart from API on mount
   useEffect(() => {
-    if (isLoggedIn) {
-      const fromCart = location.state?.fromCart;
-      const hasTempCart = localStorage.getItem('gp_store_temp_cart');
-      if (fromCart && hasTempCart) {
-        let attempts = 0;
-        const maxAttempts = 20;
-        const checkSync = setInterval(() => {
-          attempts++;
-          const stillHasTempCart = localStorage.getItem('gp_store_temp_cart');
-          const hasLocalItems = items.length > 0;
-          if ((!stillHasTempCart && !isSyncing) || (hasLocalItems && !isSyncing && attempts > 3)) {
-            clearInterval(checkSync);
-            setTimeout(() => { loadCartFromAPI(); }, 500);
-          } else if (attempts >= maxAttempts) {
-            clearInterval(checkSync);
-            loadCartFromAPI();
-          }
-        }, 200);
-        return () => clearInterval(checkSync);
+    const loadCart = async () => {
+      if (isLoggedIn) {
+        setIsInitialLoading(true);
+        const fromCart = location.state?.fromCart;
+        const hasTempCart = localStorage.getItem('gp_store_temp_cart');
+        if (fromCart && hasTempCart) {
+          let attempts = 0;
+          const maxAttempts = 20;
+          const checkSync = setInterval(async () => {
+            attempts++;
+            const stillHasTempCart = localStorage.getItem('gp_store_temp_cart');
+            const hasLocalItems = items.length > 0;
+            if ((!stillHasTempCart && !isSyncing) || (hasLocalItems && !isSyncing && attempts > 3)) {
+              clearInterval(checkSync);
+              setTimeout(async () => { 
+                await loadCartFromAPI();
+              }, 500);
+            } else if (attempts >= maxAttempts) {
+              clearInterval(checkSync);
+              await loadCartFromAPI();
+            }
+          }, 200);
+          return () => clearInterval(checkSync);
+        } else {
+          await loadCartFromAPI();
+        }
       } else {
-        loadCartFromAPI();
+        setIsInitialLoading(false);
       }
-    }
+    };
+    loadCart();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn, location.state]);
+
+  // Set initial loading to false once cart, address, and totals are all loaded
+  useEffect(() => {
+    if (isLoggedIn) {
+      if (!isLoadingAddress && !isLoadingCartTotals && !isSyncing) {
+        // Small delay to ensure all state updates are complete
+        const timer = setTimeout(() => {
+          setIsInitialLoading(false);
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      setIsInitialLoading(false);
+    }
+  }, [isLoggedIn, isLoadingAddress, isLoadingCartTotals, isSyncing]);
 
   // Fetch cart totals
   useEffect(() => {
@@ -432,7 +457,10 @@ const Cart: React.FC = () => {
   // Fetch address
   useEffect(() => {
     const fetchAddress = async () => {
-      if (!isLoggedIn) { setIsLoadingAddress(false); return; }
+      if (!isLoggedIn) { 
+        setIsLoadingAddress(false);
+        return; 
+      }
       if (location.state?.selectedAddress) {
         setDefaultAddress(location.state.selectedAddress);
         setIsLoadingAddress(false);
@@ -440,7 +468,11 @@ const Cart: React.FC = () => {
       }
       const storedAddress = localStorage.getItem('selectedDeliveryAddress');
       if (storedAddress) {
-        try { setDefaultAddress(JSON.parse(storedAddress)); setIsLoadingAddress(false); return; } catch (_) {}
+        try { 
+          setDefaultAddress(JSON.parse(storedAddress)); 
+          setIsLoadingAddress(false);
+          return; 
+        } catch (_) {}
       }
       try {
         setIsLoadingAddress(true);
@@ -675,6 +707,17 @@ const Cart: React.FC = () => {
     return <Navigate to={`${basePath}/login`} state={{ returnUrl: location.pathname, fromCart: true }} replace />;
   }
 
+  // Show loader until all data is loaded
+  const isPageLoading = isInitialLoading || (isLoggedIn && (isLoadingAddress || isLoadingCartTotals || isSyncing));
+  
+  if (isPageLoading) {
+    return (
+      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
+        <Spinner size={400} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
       <div className="max-w-[800px] mx-auto pb-20">
@@ -692,7 +735,7 @@ const Cart: React.FC = () => {
           {items.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500 text-lg">Your cart is empty</p>
-              <button onClick={() => navigate('/gp-store/products')} className="mt-4 bg-[#19411F] text-white px-6 py-2 rounded-lg hover:bg-[#1e5a1c] transition-colors">
+              <button onClick={() => navigate('/gp-store/products')} className="mt-4 bg-[#19411F] text-white px-6 py-2 rounded-lg hover:bg-[#1e5a1c] transition-colors flex items-center justify-center">
                 Browse Products
               </button>
             </div>
@@ -766,8 +809,8 @@ const Cart: React.FC = () => {
                         <div className="text-xs text-gray-500 mt-1 text-right">{editMessage.length}/500</div>
                       </div>
                       <div className="flex gap-3 pt-2">
-                        <button onClick={handleCancelEdit} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">Cancel</button>
-                        <button onClick={() => handleSaveEdit(item.id)} className="flex-1 px-4 py-2 bg-[#19411F] text-white rounded-lg hover:bg-[#1e5a1c] transition-colors text-sm font-medium">Save</button>
+                        <button onClick={handleCancelEdit} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center justify-center">Cancel</button>
+                        <button onClick={() => handleSaveEdit(item.id)} className="flex-1 px-4 py-2 bg-[#19411F] text-white rounded-lg hover:bg-[#1e5a1c] transition-colors text-sm font-medium flex items-center justify-center">Save</button>
                       </div>
                     </div>
                   )}
@@ -943,7 +986,7 @@ const Cart: React.FC = () => {
               <button
                 onClick={handleCheckout}
                 disabled={isProcessingPayment}
-                className="w-full bg-[#19411F] text-white py-4 rounded-[25px] text-base font-semibold hover:bg-[#1e5a1c] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-[#19411F] text-white py-4 rounded-[25px] text-base font-semibold hover:bg-[#1e5a1c] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {isProcessingPayment ? 'Processing...' : 'Checkout'}
               </button>

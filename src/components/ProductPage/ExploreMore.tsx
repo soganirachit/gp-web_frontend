@@ -257,10 +257,8 @@ const ExploreMore: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen relative bg-[#f8f6f1]">
-        <div className="absolute inset-0 bg-[#f8f6f1] flex items-center justify-center">
-          <Spinner size={400} />
-        </div>
+      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
+        <Spinner size={400} />
       </div>
     );
   }

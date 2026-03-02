@@ -331,12 +331,12 @@ const ManageMySubscription: React.FC = () => {
     try {
       await subscriptionService.toggleSubscriptionStatus(subscriptionId);
       await fetchSubscriptionDetails();
-      alert("Subscription resumed successfully");
+      toast.success("Subscription resumed successfully");
     } catch (error: any) {
       if (error.message?.includes("login")) {
-        alert("Please login to resume subscription");
+        toast.error("Please login to resume subscription");
       } else {
-        alert(error.message || "Failed to resume subscription");
+        toast.error(error.message || "Failed to resume subscription");
       }
     }
   };

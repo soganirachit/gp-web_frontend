@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
 import { FaPaperPlane } from 'react-icons/fa';
+import { toast } from 'react-hot-toast';
 import { supportService, TicketQuestion, PredefinedAnswers } from '../../services/support.service';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import Spinner from '../../components/common/Spinner';
@@ -153,7 +154,7 @@ const TicketQuestionForm: React.FC = () => {
 
   const handleSubmit = async (answersToSubmit?: PredefinedAnswers) => {
     if (!orderId) {
-      alert('Order ID is missing');
+      toast.error('Order ID is missing');
       return;
     }
 
@@ -192,19 +193,19 @@ const TicketQuestionForm: React.FC = () => {
         // Navigate to chat screen
         navigate(`${basePath}/customer-support/chat?ticket=${ticket.ticket_number}`);
       } else {
-        alert('Failed to create ticket. Please try again.');
+        toast.error('Failed to create ticket. Please try again.');
         setSubmitting(false);
       }
     } catch (error) {
       console.error('Error creating ticket:', error);
-      alert('Failed to create ticket. Please try again.');
+      toast.error('Failed to create ticket. Please try again.');
       setSubmitting(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
+      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
         <Spinner size={400} />
       </div>
     );

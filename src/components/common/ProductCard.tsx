@@ -40,7 +40,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Bestseller Tag */}
         {showBestsellerTag && (
-          <div className="absolute top-2 left-2 sm:top-3 sm:left-3 bg-[#FFB84D] px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-[10px] sm:text-xs font-medium text-gray-800">
+          <div className="absolute top-2 left-0 sm:top-3 sm:left-0 bg-[#19411F] px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-r text-[10px] sm:text-xs font-medium text-white">
             Bestseller
           </div>
         )}

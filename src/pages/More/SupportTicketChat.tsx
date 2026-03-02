@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
 import { FaPaperPlane, FaImage, FaPhone, FaUser } from 'react-icons/fa';
+import { toast } from 'react-hot-toast';
 import BottomNavigation from '../../components/layout/BottomNav';
 import { supportService, SupportTicketDetail, SupportMessage } from '../../services/support.service';
 import { orderService } from '../../services/order.service';
 import { format } from 'date-fns';
 import Spinner from '../../components/common/Spinner';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 
 const SupportTicketChat: React.FC = () => {
@@ -28,6 +30,7 @@ const SupportTicketChat: React.FC = () => {
   const [requestingAgent, setRequestingAgent] = useState(false);
   const [requestingCallback, setRequestingCallback] = useState(false);
   const [closingTicket, setClosingTicket] = useState(false);
+  const [showCloseTicketModal, setShowCloseTicketModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -77,7 +80,7 @@ const SupportTicketChat: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('Image size should be less than 5MB');
+        toast.error('Image size should be less than 5MB');
         return;
       }
       setSelectedImage(file);
@@ -138,14 +141,14 @@ const SupportTicketChat: React.FC = () => {
       setRequestingAgent(true);
       const success = await supportService.requestAgent(ticketNumber);
       if (success) {
-        alert('Agent request sent successfully. An agent will contact you soon.');
+        toast.success('Agent request sent successfully. An agent will contact you soon.');
         // await fetchTicketDetails(); // Refresh to update agent_requested status
       } else {
-        alert('Failed to request agent. Please try again.');
+        toast.error('Failed to request agent. Please try again.');
       }
     } catch (error) {
       console.error('Error requesting agent:', error);
-      alert('Failed to request agent. Please try again.');
+      toast.error('Failed to request agent. Please try again.');
     } finally {
       setRequestingAgent(false);
     }
@@ -158,38 +161,39 @@ const SupportTicketChat: React.FC = () => {
       setRequestingCallback(true);
       const success = await supportService.requestCallback(ticketNumber);
       if (success) {
-        alert('Callback request sent successfully. We will call you soon.');
+        toast.success('Callback request sent successfully. We will call you soon.');
         await fetchTicketDetails(); // Refresh to update callback_requested status
       } else {
-        alert('Failed to request callback. Please try again.');
+        toast.error('Failed to request callback. Please try again.');
       }
     } catch (error) {
       console.error('Error requesting callback:', error);
-      alert('Failed to request callback. Please try again.');
+      toast.error('Failed to request callback. Please try again.');
     } finally {
       setRequestingCallback(false);
     }
   };
 
-  const handleCloseTicket = async () => {
-    if (!ticketNumber) return;
+  const handleCloseTicketClick = () => {
+    setShowCloseTicketModal(true);
+  };
 
-    if (!window.confirm('Are you sure you want to close this ticket?')) {
-      return;
-    }
+  const handleCloseTicketConfirm = async () => {
+    if (!ticketNumber) return;
+    setShowCloseTicketModal(false);
 
     try {
       setClosingTicket(true);
       const success = await supportService.updateTicketStatus(ticketNumber, 'closed');
       if (success) {
-        alert('Ticket closed successfully.');
+        toast.success('Ticket closed successfully.');
         await fetchTicketDetails(); // Refresh to update status
       } else {
-        alert('Failed to close ticket. Please try again.');
+        toast.error('Failed to close ticket. Please try again.');
       }
     } catch (error) {
       console.error('Error closing ticket:', error);
-      alert('Failed to close ticket. Please try again.');
+      toast.error('Failed to close ticket. Please try again.');
     } finally {
       setClosingTicket(false);
     }
@@ -209,7 +213,7 @@ const SupportTicketChat: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
+      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
         <Spinner size={400} />
       </div>
     );
@@ -280,7 +284,7 @@ const SupportTicketChat: React.FC = () => {
               )}
               {ticket.status !== 'closed' && (
                 <button
-                  onClick={handleCloseTicket}
+                  onClick={handleCloseTicketClick}
                   disabled={closingTicket}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5  bg-[#FCFBF8] text-gray-800 rounded-xl font-semibold hover:bg-gray-300 transition-colors border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
@@ -441,6 +445,18 @@ const SupportTicketChat: React.FC = () => {
           <BottomNavigation />
         </div>
       </div>
+
+      {/* Close Ticket Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showCloseTicketModal}
+        title="Close Ticket"
+        message="Are you sure you want to close this ticket?"
+        confirmText="Yes, Close"
+        cancelText="Cancel"
+        onConfirm={handleCloseTicketConfirm}
+        onCancel={() => setShowCloseTicketModal(false)}
+        confirmButtonColor="#DC2626"
+      />
     </div>
   );
 };

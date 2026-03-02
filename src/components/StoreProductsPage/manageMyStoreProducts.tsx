@@ -137,12 +137,12 @@ const ManageMyStoreProducts: React.FC = () => {
     try {
       await subscriptionService.toggleSubscriptionStatus(subscriptionId);
       await fetchOrderDetails();
-      alert("Subscription resumed successfully");
+      toast.success("Subscription resumed successfully");
     } catch (error: any) {
       if (error.message?.includes("login")) {
-        alert("Please login to resume subscription");
+        toast.error("Please login to resume subscription");
       } else {
-        alert(error.message || "Failed to resume subscription");
+        toast.error(error.message || "Failed to resume subscription");
       }
     }
   };
@@ -392,10 +392,8 @@ const ManageMyStoreProducts: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen relative bg-[#f8f6f1]">
-        <div className="absolute inset-0 bg-[#f8f6f1] flex items-center justify-center">
-          <Spinner size={400} />
-        </div>
+      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
+        <Spinner size={400} />
       </div>
     );
   }
@@ -478,7 +476,7 @@ const ManageMyStoreProducts: React.FC = () => {
           <div className="mb-6">
             <button
               onClick={() => navigate(basePath)}
-              className="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition-colors"
+              className="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center"
             >
               Browse Other Products
             </button>

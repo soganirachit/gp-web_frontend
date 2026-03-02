@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { FaChevronRight } from "react-icons/fa";
+import { FaChevronRight, FaSearch } from "react-icons/fa";
 import { MdKeyboardArrowDown } from "react-icons/md";
 import { motion } from "framer-motion";
 import { useFeatureTheme } from "../context/FeatureThemeContext";
@@ -43,6 +43,8 @@ const GpStore_Homepage: React.FC = () => {
     const [isLoadingCategories, setIsLoadingCategories] = useState(true);
     const [bestSellers, setBestSellers] = useState<BestSeller[]>([]);
     const [isLoadingBestSellers, setIsLoadingBestSellers] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [allProductsForSearch, setAllProductsForSearch] = useState<BestSeller[]>([]);
 
     const fetchCustomerName = async () => {
         try {
@@ -233,6 +235,22 @@ const GpStore_Homepage: React.FC = () => {
                         fetchProducts(abortController.signal);
                         fetchCategories(abortController.signal);
                         fetchBestSellers(abortController.signal);
+                        
+                        // Fetch all products for search
+                        const fetchAllProductsForSearch = async () => {
+                            try {
+                                const storeId = storeService.getStoreIdForProducts();
+                                const allProducts = await productService.getProductsByOrdering(undefined, storeId || undefined, abortController.signal);
+                                if (isMounted) {
+                                    setAllProductsForSearch(allProducts || []);
+                                }
+                            } catch (error: any) {
+                                if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED' && isMounted) {
+                                    console.error("Error fetching all products for search:", error);
+                                }
+                            }
+                        };
+                        fetchAllProductsForSearch();
                     }
                 }, token ? 0 : 200); // Small delay for non-logged-in users to ensure store ID is set
             }
@@ -274,16 +292,39 @@ const GpStore_Homepage: React.FC = () => {
 
     if (isPageLoading) {
         return (
-            <div className="min-h-screen relative bg-[#f8f6f1]">
-                <div className="absolute inset-0 bg-[#f8f6f1] flex items-center justify-center">
-                    <Spinner size={400} />
-                </div>
+            <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
+                <Spinner size={400} />
             </div>
         );
     }
 
     // Get premium products (fallback to products if best sellers not available)
     const premiumProducts = products.slice(3, 6);
+
+    // Filter products based on search query - search through all products
+    const filteredAllProducts = searchQuery.trim() === ''
+        ? []
+        : allProductsForSearch.filter((item) => {
+            // Filter by search query - search in name, short_description, and description
+            const query = searchQuery.toLowerCase();
+            return item.name?.toLowerCase().includes(query) ||
+                   item.short_description?.toLowerCase().includes(query) ||
+                   item.description?.toLowerCase().includes(query);
+          });
+
+    const filteredBestSellers = searchQuery.trim() === '' 
+        ? bestSellers 
+        : bestSellers.filter(item => 
+            item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.short_description?.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+
+    const filteredPremiumProducts = searchQuery.trim() === ''
+        ? premiumProducts
+        : premiumProducts.filter(item =>
+            item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.short_description?.toLowerCase().includes(searchQuery.toLowerCase())
+          );
 
     return (
         <ErrorBoundary>
@@ -337,12 +378,15 @@ const GpStore_Homepage: React.FC = () => {
 
                             {/* Search Bar */}
                             <div className="mt-4 sm:mt-5">
-                                <div
-                                    className="bg-white rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 cursor-pointer shadow-sm border border-gray-200 justify-between"
-                                    onClick={() => navigate('/search')}
-                                >
-                                    <span className="text-gray-400 text-sm sm:text-base font-medium">Search anything....</span>
-                                    <img src={SearchIcon} alt="Search" className="w-4 h-4 sm:w-5 sm:h-5" />
+                                <div className="bg-white rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 shadow-sm border border-gray-200">
+                                    <FaSearch className="text-gray-400 w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search anything...."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="flex-1 bg-transparent text-gray-900 text-sm sm:text-base font-medium focus:outline-none placeholder:text-gray-400"
+                                    />
                                 </div>
                             </div>
 
@@ -434,7 +478,7 @@ const GpStore_Homepage: React.FC = () => {
                                 </h2>
                                 <button
                                     onClick={() => navigate(`${basePath}/Products`)}
-                                    className="w-fit bg-[#19411F] text-white px-6 py-2.5 sm:px-8 sm:py-3 rounded-lg font-medium text-sm sm:text-base tracking-wide hover:bg-[#1e4d1c] transition-colors shadow-sm"
+                                    className="w-fit bg-[#19411F] text-white px-6 py-2.5 sm:px-8 sm:py-3 rounded-lg font-medium text-sm sm:text-base tracking-wide hover:bg-[#1e4d1c] transition-colors shadow-sm flex items-center justify-center"
                                 >
                                     SHOP NOW
                                 </button>
@@ -447,7 +491,83 @@ const GpStore_Homepage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Best Section */}
+                    {/* Search Results Section - Show when search query exists */}
+                    {searchQuery.trim() && (
+                        <div className="px-4 py-4">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">
+                                    Search Results
+                                </h2>
+                                <span className="text-sm text-gray-500">
+                                    {filteredAllProducts.length} {filteredAllProducts.length === 1 ? 'result' : 'results'}
+                                </span>
+                            </div>
+                            {filteredAllProducts.length > 0 ? (
+                                <div className="grid grid-cols-2 gap-4">
+                                    {filteredAllProducts.map((product) => (
+                                        <div
+                                            key={product.id}
+                                            className="bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                                            onClick={() => handleProductClick(product)}
+                                        >
+                                            <div className="aspect-square bg-[#f8f6f1] overflow-hidden relative">
+                                                {/* Label Badge - positioned over image */}
+                                                {product.labels && product.labels.length > 0 && (
+                                                    <div className="absolute top-2 left-0 z-10">
+                                                        <span
+                                                            className="inline-block text-white text-[10px] font-semibold px-2 py-1 rounded-r bg-[#19411F]"
+                                                        >
+                                                            {product.labels[0].name.toUpperCase()}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                <img
+                                                    src={getImageUrl(product.primary_image)}
+                                                    alt={product.name}
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).src = "https://via.placeholder.com/160";
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="p-3">
+                                                <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
+                                                    {product.name}
+                                                </h3>
+                                                {product.short_description && (
+                                                    <p className="text-xs text-gray-500 mb-1 truncate">
+                                                        {product.short_description}
+                                                    </p>
+                                                )}
+                                                <div className="flex items-center justify-between gap-2 mt-2">
+                                                    <p className="text-gray-900 text-base font-bold">
+                                                        {showStrikeBase(product) && (
+                                                            <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(product)}</span>
+                                                        )}
+                                                        ₹{getEffectivePrice(product)}
+                                                    </p>
+                                                    <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-12">
+                                    <p className="text-gray-500 text-lg">No products found matching "{searchQuery}"</p>
+                                    <button
+                                        onClick={() => setSearchQuery('')}
+                                        className="mt-4 text-[#19411F] text-sm font-medium hover:underline"
+                                    >
+                                        Clear search
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Best Section - Hide when searching */}
+                    {!searchQuery.trim() && (
                     <div className="px-4 py-4">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">Best Sellers</h2>
@@ -460,8 +580,8 @@ const GpStore_Homepage: React.FC = () => {
                             </button>
                         </div>
                         <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                            {bestSellers.length > 0 ? (
-                                bestSellers.map((bestSeller) => (
+                            {filteredBestSellers.length > 0 ? (
+                                filteredBestSellers.map((bestSeller) => (
                                     <div
                                         key={bestSeller.id}
                                         className="flex-shrink-0 w-[160px] bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer relative"
@@ -472,8 +592,7 @@ const GpStore_Homepage: React.FC = () => {
                                             {bestSeller.labels && bestSeller.labels.length > 0 && (
                                                 <div className="absolute top-2 left-2 z-10">
                                                     <span
-                                                        className="inline-block text-white text-[10px] font-semibold px-2 py-1 rounded"
-                                                        style={{ backgroundColor: bestSeller.labels[0].color_code || '#19411F' }}
+                                                        className="inline-block text-white text-[10px] font-semibold px-2 py-1 rounded bg-[#19411F]"
                                                     >
                                                         {bestSeller.labels[0].name.toUpperCase()}
                                                     </span>
@@ -510,12 +629,16 @@ const GpStore_Homepage: React.FC = () => {
                                     </div>
                                 ))
                             ) : (
-                                <div className="text-gray-500 text-sm">No best sellers available</div>
+                                <div className="text-gray-500 text-sm">
+                                    {searchQuery.trim() ? 'No products found matching your search' : 'No best sellers available'}
+                                </div>
                             )}
                         </div>
                     </div>
+                    )}
 
-                    {/* Premium Packs Section */}
+                    {/* Premium Packs Section - Hide when searching */}
+                    {!searchQuery.trim() && (
                     <div className="px-4 py-4">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">Premium Packs</h2>
@@ -528,7 +651,8 @@ const GpStore_Homepage: React.FC = () => {
                             </button>
                         </div>
                         <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                            {premiumProducts.map((product) => (
+                            {filteredPremiumProducts.length > 0 ? (
+                                filteredPremiumProducts.map((product) => (
                                 <div
                                     key={product.id}
                                     className="flex-shrink-0 w-[160px] bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
@@ -553,10 +677,18 @@ const GpStore_Homepage: React.FC = () => {
                                         </p>
                                     </div>
                                 </div>
-                            ))}
+                                ))
+                            ) : (
+                                <div className="text-gray-500 text-sm">
+                                    {searchQuery.trim() ? 'No products found matching your search' : 'No premium products available'}
+                                </div>
+                            )}
                         </div>
                     </div>
-                     {/* all Packs Section */}
+                    )}
+
+                     {/* all Packs Section - Hide when searching */}
+                     {!searchQuery.trim() && (
                     <div className="px-4 py-4">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">All Packs</h2>
@@ -597,6 +729,8 @@ const GpStore_Homepage: React.FC = () => {
                             ))}
                         </div>
                     </div>
+                    )}
+
                     {/* Quote of the Day Section */}
                     <div>
                         <img

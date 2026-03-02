@@ -339,10 +339,8 @@ const StorePage: React.FC = () => {
 
   if (loading || isCheckingBalance) {
     return (
-      <div className="min-h-screen relative bg-[#f8f6f1]">
-        <div className="absolute inset-0 bg-[#f8f6f1] flex items-center justify-center">
-          <Spinner size={400} />
-        </div>
+      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
+        <Spinner size={400} />
       </div>
     );
   }
@@ -534,7 +532,7 @@ const StorePage: React.FC = () => {
           {/* Add to Basket Button */}
           <button
             onClick={createStoreOrder}
-            className="w-full bg-[#19411F] text-white py-3.5 rounded-[25px] text-base font-semibold mt-6 mb-6 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-[#19411F] text-white py-3.5 rounded-[25px] text-base font-semibold mt-6 mb-6 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             disabled={!product || (isLoggedIn && product.in_stock === false)}
           >
             {!isLoggedIn || product?.in_stock !== false ? "Add to Basket" : "Out of Stock"}
@@ -660,8 +658,7 @@ const StorePage: React.FC = () => {
                     {item.labels && item.labels.length > 0 && (
                       <div className="absolute top-2 left-2 z-10">
                         <span
-                          className="inline-block text-white text-[10px] font-semibold px-2 py-1 rounded"
-                          style={{ backgroundColor: item.labels[0].color_code || '#19411F' }}
+                          className="inline-block text-white text-[10px] font-semibold px-2 py-1 rounded bg-[#19411F]"
                         >
                           {item.labels[0].name.toUpperCase()}
                         </span>
