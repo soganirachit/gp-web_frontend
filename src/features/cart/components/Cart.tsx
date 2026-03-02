@@ -84,6 +84,21 @@ const applyCouponAPI = async (couponCode: string): Promise<ApplyCouponResponse> 
   return res.json();
 };
 
+const removeCouponAPI = async (): Promise<void> => {
+  const token = localStorage.getItem('token');
+  const res = await fetch('http://185.137.122.250:8083/api/v1/cart/remove-coupon/', {
+    method: 'POST',
+    headers: {
+      accept: '*/*',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.message || err?.detail || 'Failed to remove promo code');
+  }
+};
+
 // ─── PromoCodeModal ───────────────────────────────────────────────────────────
 
 interface PromoCodeModalProps {
@@ -354,9 +369,11 @@ const Cart: React.FC = () => {
   };
 
   const handleRemovePromoCode = async () => {
-    setAppliedPromoCode(null);
-    setPromoDiscount(0);
     try {
+      setIsApplyingPromo(true);
+      await removeCouponAPI();
+      setAppliedPromoCode(null);
+      setPromoDiscount(0);
       const cartData = await cartService.getCartData();
       setCartTotals({
         subtotal: parseFloat(cartData.subtotal || '0'),
@@ -365,9 +382,24 @@ const Cart: React.FC = () => {
         discountAmount: parseFloat(cartData.discount_amount || '0'),
         total: parseFloat(cartData.total || '0'),
       });
-    } catch (_) {}
-    toast.success('Promo code removed');
+      toast.success('Promo code removed');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to remove promo code');
+    } finally {
+      setIsApplyingPromo(false);
+    }
   };
+
+  // Automatically remove applied promo when leaving the basket page
+  useEffect(() => {
+    return () => {
+      if (appliedPromoCode) {
+        removeCouponAPI().catch((err) => {
+          console.error('Failed to auto-remove promo code on navigation:', err);
+        });
+      }
+    };
+  }, [appliedPromoCode]);
 
   // Trigger Razorpay button
   useEffect(() => {
@@ -548,8 +580,13 @@ const Cart: React.FC = () => {
       await updateCustomizedMessage(itemId, editMessage.trim());
       setEditingItemId(null);
       toast.success('Item updated successfully');
-    } catch (_) {
-      toast.error('Failed to update item. Please try again.');
+    } catch (error: any) {
+      // Prefer API message like "Only 55 units available" when present
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.detail ||
+        error?.message;
+      toast.error(apiMessage || 'Failed to update item. Please try again.');
     }
   };
 
@@ -735,7 +772,10 @@ const Cart: React.FC = () => {
           {items.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500 text-lg">Your cart is empty</p>
-              <button onClick={() => navigate('/gp-store/products')} className="mt-4 bg-[#19411F] text-white px-6 py-2 rounded-lg hover:bg-[#1e5a1c] transition-colors flex items-center justify-center">
+              <button
+                onClick={() => navigate('/gp-store/products')}
+                className="mt-4 mx-auto bg-[#19411F] text-white px-6 py-2 rounded-lg hover:bg-[#1e5a1c] transition-colors flex items-center justify-center"
+              >
                 Browse Products
               </button>
             </div>

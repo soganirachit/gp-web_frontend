@@ -70,6 +70,7 @@ export interface BestSeller {
   slug: string;
   sku: string;
   short_description?: string;
+  description?: string;
   category_name: string;
   availability_type: string;
   base_price: string;
