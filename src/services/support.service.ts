@@ -25,6 +25,7 @@ export interface SupportMessage {
   id: number;
   message: string;
   is_internal: boolean;
+  is_from_customer?: boolean;
   created_by_name: string;
   created_at: string;
 }

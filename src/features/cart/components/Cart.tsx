@@ -875,10 +875,12 @@ const Cart: React.FC = () => {
                   ))}
                 </div>
 
+                <h3 className="text-base font-semibold text-gray-900 mb-3 mt-4">Time Slot</h3>
+                
                 {showDatePicker && (
                   <>
                     <div className="fixed inset-0 bg-black bg-opacity-20 z-40" onClick={() => setShowDatePicker(false)} />
-                    <div ref={datePickerRef} className="absolute left-4 right-4 top-full mt-2 bg-white rounded-xl shadow-2xl z-50 p-4 border border-gray-200">
+                    <div ref={datePickerRef} className="absolute left-4 right-4 top-[calc(1rem+1.5rem+0.75rem+2.5rem+1rem+1rem)] bg-white rounded-xl shadow-2xl z-50 p-4 border border-gray-200">
                       <style>{`
                         .react-datepicker { border: none !important; font-family: inherit; }
                         .react-datepicker__header { background-color: white !important; border-bottom: 1px solid #e5e7eb !important; padding-top: 0.75rem; }
@@ -896,7 +898,6 @@ const Cart: React.FC = () => {
                   </>
                 )}
 
-                <h3 className="text-base font-semibold text-gray-900 mb-3 mt-4">Time Slot</h3>
                 <div className="grid grid-cols-4 gap-2">
                   {timeSlots.map((slot) => (
                     <button

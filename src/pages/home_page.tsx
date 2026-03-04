@@ -33,6 +33,7 @@ const HomePage: React.FC = () => {
   const [addressType, setAddressType] = useState<string>('Home');
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
+  const [isStoryExpanded, setIsStoryExpanded] = useState(false);
 
   // Function to fetch the latest address from API
   const fetchLatestAddress = useCallback(async () => {
@@ -323,7 +324,10 @@ const HomePage: React.FC = () => {
                 className="w-full h-auto object-cover"
               />
               <div className="absolute bottom-3 sm:bottom-6 right-3 sm:right-6">
-                <button className="bg-white/80 text-gray-800 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-sm sm:text-base font-medium border-2 border-gray-300/80 hover:bg-white transition-colors">
+                <button 
+                  onClick={() => setShowComingSoonModal(true)}
+                  className="bg-white/80 text-gray-800 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-sm sm:text-base font-medium border-2 border-gray-300/80 hover:bg-white transition-colors"
+                >
                   Book Now ›
                 </button>
               </div>
@@ -378,12 +382,39 @@ const HomePage: React.FC = () => {
               />
               <div className="p-4 sm:p-6">
                 <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2 sm:mb-3">The Blooming</h3>
-                <p className="text-gray-600 text-xs sm:text-sm leading-relaxed mb-2 sm:mb-3">
-                  Once upon a time, amidst the bustling streets of our childhood neighborhood, there was a figure who graced our mornings with a simple yet profound gesture. Each day, like clockwork, this person would cast a vibrant cascade of Puja flowers into the world, accompanied by the morning newspaper. It was a ritual that went beyond mere routine; it was a gesture of care, of connection, and of spreading joy.
-                </p>
-                <a href="#" className="text-gray-800 font-medium text-xs sm:text-sm hover:underline">
-                  Read full story ›
-                </a>
+                <div className="text-gray-600 text-xs sm:text-sm leading-relaxed mb-2 sm:mb-3">
+                  <p className="mb-3">
+                    Once upon a time, amidst the bustling streets of our childhood neighborhood, there was a figure who graced our mornings with a simple yet profound gesture. Each day, like clockwork, this person would cast a vibrant cascade of Puja flowers into the world, accompanied by the morning newspaper. It was a ritual that went beyond mere routine; it was a gesture of care, of connection, and of spreading joy.
+                  </p>
+                  {isStoryExpanded && (
+                    <div className="space-y-3">
+                      <p>
+                        This daily ritual left an indelible mark on our hearts. We watched as neighbors would step out, their faces lighting up at the sight of fresh flowers waiting at their doorstep. It wasn't just about the flowers—it was about the sense of community, the feeling of being cared for, and the beauty that a simple gesture could bring to someone's day.
+                      </p>
+                      <p>
+                        Years passed, and as we grew older, we realized that this tradition was fading away. The flower vendor, the morning routine, the sense of connection—all seemed to be disappearing in the fast-paced world we now lived in. But the memory of those mornings stayed with us, a reminder of how something so simple could mean so much.
+                      </p>
+                      <p>
+                        That's when the seed of Genda Phool was planted. We asked ourselves: What if we could bring back that sense of daily connection? What if we could ensure that every home could start their day with fresh, beautiful flowers? What if we could recreate that feeling of care and community, but make it accessible to everyone, everywhere?
+                      </p>
+                      <p>
+                        Today, Genda Phool is more than just a flower delivery service. We are a bridge between the timeless tradition of daily floral offerings and the modern world. We work directly with local farmers, ensuring that every flower is fresh, sustainably sourced, and delivered with the same care and attention that made those childhood mornings so special.
+                      </p>
+                      <p>
+                        From our humble beginnings in Vadodara, we've grown to serve thousands of families, bringing the joy of fresh flowers to their doorsteps every single day. Whether it's for your morning Puja, home decoration, or simply to brighten someone's day, we're here to make sure that the simple beauty of fresh flowers is never out of reach.
+                      </p>
+                      <p>
+                        Our story is still being written, one delivery at a time, one smile at a time. Join us in keeping this beautiful tradition alive, and let's continue to spread joy, one flower at a time.
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => setIsStoryExpanded(!isStoryExpanded)}
+                  className="text-gray-800 font-medium text-xs sm:text-sm hover:underline cursor-pointer"
+                >
+                  {isStoryExpanded ? 'Read less' : 'Read full story'} ›
+                </button>
               </div>
             </div>
           </motion.div>

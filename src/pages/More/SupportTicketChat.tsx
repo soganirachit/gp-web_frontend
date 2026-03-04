@@ -103,32 +103,62 @@ const SupportTicketChat: React.FC = () => {
   const handleSendMessage = async () => {
     if ((!newMessage.trim() && !selectedImage) || !ticketNumber) return;
 
+    const messageText = newMessage.trim();
+    const imageFile = selectedImage;
+
+    // Create optimistic message immediately
+    const tempMessage: SupportMessage = {
+      id: Date.now(), // Temporary ID
+      message: messageText || (imageFile ? 'Sending image...' : ''),
+      is_internal: false,
+      is_from_customer: true,
+      created_by_name: 'You',
+      created_at: new Date().toISOString(),
+    };
+
+    // Clear input fields immediately
+    const currentMessage = messageText;
+    const currentImage = imageFile;
+    setNewMessage('');
+    setSelectedImage(null);
+    setImagePreview(null);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    // Add optimistic message immediately
+    setMessages(prev => [...prev, tempMessage]);
+
+    // Scroll to bottom immediately
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 50);
+
     try {
       setSending(true);
 
       const message = await supportService.addMessage(
         ticketNumber,
-        newMessage.trim() || undefined,
-        selectedImage || undefined
+        currentMessage || undefined,
+        currentImage || undefined
       );
 
       if (message) {
-        setMessages(prev => [...prev, message]);
-        setNewMessage('');
-        setSelectedImage(null);
-        setImagePreview(null);
-
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-
-        // ✅ Scroll ONLY after sending
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
+        // Replace temporary message with real one
+        setMessages(prev => 
+          prev.map(msg => msg.id === tempMessage.id ? message : msg)
+        );
+      } else {
+        // If API call failed, remove the optimistic message
+        setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
+        toast.error('Failed to send message. Please try again.');
       }
     } catch (error) {
       console.error('Error sending message:', error);
+      // Remove the optimistic message on error
+      setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
+      toast.error('Failed to send message. Please try again.');
     } finally {
       setSending(false);
     }
@@ -340,29 +370,29 @@ const SupportTicketChat: React.FC = () => {
             </div>
           )}
 
-          <div className="space-y-4">
+          <div className="space-y-2">
             {messages
               .filter((message) => message.message !== ticket.description)
               .map((message) => {
-                const isInternal = message.is_internal;
                 const dateTime = formatDateTime(message.created_at);
+                // User messages (is_from_customer = true) should be on right, Agent messages (is_from_customer = false) should be on left
+                const isUserMessage = message.is_from_customer === true;
 
                 return (
                   <div
                     key={message.id}
-                    className={`flex ${isInternal ? 'justify-start' : 'justify-end'}`}
+                    className={`flex ${isUserMessage ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div className={`max-w-[75%] rounded-2xl p-3 ${isInternal
-                      ? 'bg-gray-200 text-gray-900'
-                      : 'bg-[#166534] text-white'
+                    <div className={`max-w-[75%] rounded-2xl px-3 py-2 shadow-sm transition-all ${isUserMessage
+                      ? 'bg-gradient-to-br from-[#166534] to-[#145028] text-white shadow-md'
+                      : 'bg-white text-gray-800 border border-gray-100 shadow-sm'
                       }`}>
-                      <p className="text-sm whitespace-pre-wrap">{message.message}</p>
-                      <div className={`flex items-center gap-2 mt-2 ${isInternal ? 'text-gray-600' : 'text-white/80'
-                        }`}>
-                        <span className="text-xs">
-                          {message.created_by_name}
-                        </span>
-                        <span className="text-xs">
+                      <div className="flex items-end gap-2">
+                        <p className={`text-sm whitespace-pre-wrap flex-1 leading-relaxed ${isUserMessage ? 'text-white' : 'text-gray-800'}`}>
+                          {message.message}
+                        </p>
+                        <span className={`text-[10px] whitespace-nowrap flex-shrink-0 font-medium ${isUserMessage ? 'text-white/80' : 'text-gray-500'
+                          }`}>
                           {dateTime.time}
                         </span>
                       </div>

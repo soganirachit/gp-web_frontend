@@ -15,6 +15,8 @@ import { storeService, Store } from '../../services/store.service';
 import { addressService } from '../../services/address.service';
 import Spinner from '../../components/common/Spinner';
 import { useAuth } from '../../context/AuthContext';
+import { toast } from 'react-hot-toast';
+import { editCustomerService } from '../../services/editcustomer.service';
 
 // Import SVG icons
 import subscriptionIcon from '../../assets/icon/subscription.svg';
@@ -44,6 +46,7 @@ const Settings: React.FC = () => {
   const [hasEmail, setHasEmail] = useState(true);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -318,12 +321,33 @@ const Settings: React.FC = () => {
     setShowDeleteAccountDialog(true);
   };
 
-  const handleDeleteAccountConfirm = () => {
-    // Add delete account functionality here
-    console.log('Delete account confirmed');
-    // localStorage.clear();
-    // navigate('/login');
-    setShowDeleteAccountDialog(false);
+  const handleDeleteAccountConfirm = async () => {
+    try {
+      setIsDeletingAccount(true);
+      
+      await editCustomerService.deleteAccount();
+      
+      toast.success('Account deleted successfully');
+      
+      // Clear all local storage
+      localStorage.clear();
+      
+      // Logout user
+      await logout();
+      
+      // Close dialog
+      setShowDeleteAccountDialog(false);
+      
+      // Navigate to login page
+      navigate(`${basePath}/login`);
+    } catch (error: any) {
+      console.error('Error deleting account:', error);
+      const errorMessage = error.message || 'Failed to delete account. Please try again.';
+      toast.error(errorMessage);
+      setShowDeleteAccountDialog(false);
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   const handleDeleteAccountCancel = () => {
@@ -671,19 +695,25 @@ const Settings: React.FC = () => {
       {showDeleteAccountDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-6 mx-4 max-w-sm w-full shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900 mb-6 text-center">
-              Are you Sure?
+            <h3 className="text-lg font-semibold text-gray-900 mb-2 text-center">
+              Delete Account?
             </h3>
+            <p className="text-sm text-gray-600 mb-6 text-center">
+              This action cannot be undone. All your data will be permanently deleted.
+            </p>
             <div className="space-y-3">
               <button
                 onClick={handleDeleteAccountConfirm}
-                className="w-full py-3 text-gray-700 font-medium text-base rounded-lg hover:bg-gray-100 transition-colors"
+                disabled={isDeletingAccount}
+                className="w-full py-3 text-white font-medium text-base rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: '#DC2626' }}
               >
-                Delete
+                {isDeletingAccount ? 'Deleting...' : 'Delete Account'}
               </button>
               <button
                 onClick={handleDeleteAccountCancel}
-                className="w-full py-3 text-red-500 font-medium text-base rounded-lg hover:bg-red-50 transition-colors"
+                disabled={isDeletingAccount}
+                className="w-full py-3 text-gray-700 font-medium text-base rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>

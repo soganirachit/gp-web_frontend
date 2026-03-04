@@ -70,4 +70,53 @@ export const editCustomerService = {
       throw error instanceof Error ? error : new Error("An unknown error occurred");
     }
   },
+
+  /**
+   * Delete user account
+   * @returns Response data from the server
+   * @throws Error if request fails
+   */
+  async deleteAccount(): Promise<{ success: boolean; message?: string }> {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("Authentication token not found");
+
+    try {
+      const apiUrl = getApiUrl();
+      
+      // Construct the full API URL
+      let deleteAccountUrl = `${apiUrl}/api/v1/users/me/delete-account/`;
+      // If base URL already includes /api/v1, don't add it again
+      if (apiUrl.includes('/api/v1')) {
+        deleteAccountUrl = `${apiUrl}/users/me/delete-account/`;
+      }
+
+      const response = await axios.post(
+        deleteAccountUrl,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.data.success || response.status === 200) {
+        return {
+          success: true,
+          message: response.data.message || "Account deleted successfully",
+        };
+      }
+
+      throw new Error(response.data.message || "Failed to delete account");
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      if (error instanceof AxiosError) {
+        throw new Error(
+          error.response?.data?.message || error.message || "Failed to delete account"
+        );
+      }
+      throw error instanceof Error ? error : new Error("An unknown error occurred");
+    }
+  },
 };
