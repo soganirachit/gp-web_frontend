@@ -688,14 +688,14 @@ const StorePage: React.FC = () => {
                           {item.short_description}
                         </p>
                       )}
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <p className="text-base font-bold text-gray-900">
                           {showStrikeBase(item) && (
                             <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(item)}</span>
                           )}
                           ₹{getEffectivePrice(item)}/
                         </p>
-                        <FaChevronRight className="text-gray-400 text-sm" />
+                        <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
                       </div>
                     </div>
                   </div>

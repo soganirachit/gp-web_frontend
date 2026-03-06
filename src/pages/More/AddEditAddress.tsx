@@ -21,6 +21,9 @@ const AddEditAddress: React.FC = () => {
   const { isLoaded, loadError } = useGoogleMaps();
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const isLocationRequestInProgress = useRef(false);
+  const lastToastMessage = useRef<string | null>(null);
+  const hasInitialized = useRef(false);
 
   const [selectedPosition, setSelectedPosition] = useState<{ lat: number, lng: number }>({
     lat: 20.5937,
@@ -37,6 +40,7 @@ const AddEditAddress: React.FC = () => {
   const [deliveryAddress, setDeliveryAddress] = useState('');
 
   const [selectedType, setSelectedType] = useState<'Home' | 'Work' | 'Others'>('Home');
+  const [customTypeName, setCustomTypeName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isValidatingLocation, setIsValidatingLocation] = useState(false);
   const [name, setName] = useState('');
@@ -49,6 +53,10 @@ const AddEditAddress: React.FC = () => {
   } | null>(null);
 
   useEffect(() => {
+    // Prevent double execution in StrictMode
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
     if (isEdit && existingAddress) {
       const fullAddress = [
         existingAddress.houseNo,
@@ -56,13 +64,20 @@ const AddEditAddress: React.FC = () => {
         existingAddress.area
       ].filter(Boolean).join(', ');
 
+      const addressType = existingAddress.type || 'Home';
       setFormData({
         completeAddress: fullAddress || '',
         floor: '',
         landmark: existingAddress.area || '',
-        type: existingAddress.type || 'Home',
+        type: addressType,
       });
-      setSelectedType(existingAddress.type || 'Home');
+      // If type is "Others" or a custom type (not Home/Work), set it to Others and store custom name
+      if (addressType === 'Others' || (addressType !== 'Home' && addressType !== 'Work')) {
+        setSelectedType('Others');
+        setCustomTypeName(addressType === 'Others' ? '' : addressType);
+      } else {
+        setSelectedType(addressType as 'Home' | 'Work');
+      }
       setDeliveryAddress(fullAddress || '');
       setPincode(existingAddress.pincode || '');
       // If editing, use the name/phone from the address record if available
@@ -71,6 +86,22 @@ const AddEditAddress: React.FC = () => {
       }
       if (existingAddress.associatedPhoneNumber) {
         setPhone(existingAddress.associatedPhoneNumber);
+      }
+      
+      // Parse and set coordinates from existing address
+      if (existingAddress.coordinates) {
+        try {
+          const [lat, lng] = existingAddress.coordinates.split(',').map(Number);
+          if (!isNaN(lat) && !isNaN(lng)) {
+            setSelectedPosition({ lat, lng });
+            // Update map center when map is loaded
+            if (mapRef.current) {
+              mapRef.current.panTo({ lat, lng });
+            }
+          }
+        } catch (error) {
+          console.error('Error parsing coordinates:', error);
+        }
       }
     } else {
       getCurrentLocation();
@@ -104,7 +135,19 @@ const AddEditAddress: React.FC = () => {
 
   const onLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
-  }, []);
+    // If editing and we have coordinates, center the map on them
+    if (isEdit && existingAddress?.coordinates) {
+      try {
+        const [lat, lng] = existingAddress.coordinates.split(',').map(Number);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          map.panTo({ lat, lng });
+          map.setZoom(15);
+        }
+      } catch (error) {
+        console.error('Error centering map on coordinates:', error);
+      }
+    }
+  }, [isEdit, existingAddress]);
 
   const onUnmount = useCallback(() => {
     mapRef.current = null;
@@ -179,6 +222,13 @@ const AddEditAddress: React.FC = () => {
       const houseNo = addressParts[0] || 'unknown';
       const streetName = addressParts.slice(1).join(', ') || 'unknown';
 
+      // Determine the final type: use custom name if provided, otherwise use selected type
+      // If Others is selected and custom name is provided, use the custom name
+      // Otherwise, use the selected type (Home, Work, or Others)
+      const finalType = selectedType === 'Others' && customTypeName.trim() 
+        ? customTypeName.trim() 
+        : (selectedType === 'Others' ? 'Others' : selectedType);
+
       const addressData = {
         name: name, // Include name in payload
         associatedPhoneNumber: phone, // Use the state variable
@@ -190,6 +240,7 @@ const AddEditAddress: React.FC = () => {
         state: 'Unknown',
         pincode: pincode, // Use the state variable
         streetName: streetName,
+        type: finalType as any, // Allow custom type names (e.g., "friends")
         setAsDefault: false // explicitly initialize as false
       };
 
@@ -212,6 +263,10 @@ const AddEditAddress: React.FC = () => {
   };
 
   const getCurrentLocation = () => {
+    // Prevent duplicate calls
+    if (isLocationRequestInProgress.current) return;
+    isLocationRequestInProgress.current = true;
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -278,20 +333,40 @@ const AddEditAddress: React.FC = () => {
                   if (pin) setPincode(pin);
                 }
               }
-              toast.success('Location detected successfully');
+              const successMsg = 'Location detected successfully';
+              if (lastToastMessage.current !== successMsg) {
+                lastToastMessage.current = successMsg;
+                toast.success(successMsg);
+              }
             }
           } catch (error) {
             console.error('Error fetching address:', error);
-            toast.error('Failed to fetch location details');
+            const errorMsg = 'Failed to fetch location details';
+            if (lastToastMessage.current !== errorMsg) {
+              lastToastMessage.current = errorMsg;
+              toast.error(errorMsg);
+            }
+          } finally {
+            isLocationRequestInProgress.current = false;
           }
         },
         (error) => {
           console.error('Error accessing location:', error);
-          toast.error('Failed to access location');
+          const errorMsg = 'Failed to access location';
+          if (lastToastMessage.current !== errorMsg) {
+            lastToastMessage.current = errorMsg;
+            toast.error(errorMsg);
+          }
+          isLocationRequestInProgress.current = false;
         }
       );
     } else {
-      toast.error('Geolocation is not supported by your browser');
+      const errorMsg = 'Geolocation is not supported by your browser';
+      if (lastToastMessage.current !== errorMsg) {
+        lastToastMessage.current = errorMsg;
+        toast.error(errorMsg);
+      }
+      isLocationRequestInProgress.current = false;
     }
   };
 
@@ -695,27 +770,64 @@ const AddEditAddress: React.FC = () => {
             <label className="block text-gray-700 mb-3 text-sm font-bold">
               Tag this location Type
             </label>
-            <div className="flex gap-3 w-2/3">
+            <div className="flex gap-3 w-2/3 items-center flex-wrap">
               {['Home', 'Work', 'Others'].map((type) => (
                 <button
                   key={type}
                   onClick={() => {
                     setSelectedType(type as 'Home' | 'Work' | 'Others');
-                    setFormData(prev => ({ ...prev, type: type as 'Home' | 'Work' | 'Others' }));
+                    if (type !== 'Others') {
+                      setFormData(prev => ({ ...prev, type: type as 'Home' | 'Work' }));
+                      setCustomTypeName(''); // Clear custom name when switching away from Others
+                    } else {
+                      setFormData(prev => ({ ...prev, type: 'Others' }));
+                    }
                   }}
-                  className={`flex-1 py-2.5 px-2 rounded-2xl border-2 transition-colors text-sm font-semibold whitespace-nowrap ${selectedType === type
+                  className={`py-2.5 px-2 rounded-2xl border-2 transition-colors text-sm font-semibold whitespace-nowrap ${selectedType === type
                     ? ''
                     : 'border-gray-200 bg-[#F3F4F6] text-gray-500'
                     }`}
                   style={selectedType === type ? {
                     borderColor: theme.colors.primary,
                     backgroundColor: theme.colors.primary,
-                    color: feature === 'gpStore' ? 'white' : 'black'
-                  } : {}}
+                    color: feature === 'gpStore' ? 'white' : 'black',
+                    flex: type === 'Others' ? '0 0 auto' : '1'
+                  } : {
+                    flex: type === 'Others' ? '0 0 auto' : '1'
+                  }}
                 >
                   {type}
                 </button>
               ))}
+              {/* Show custom name input inline when "Others" is selected */}
+              {selectedType === 'Others' && (
+                <input
+                  type="text"
+                  placeholder="Save as"
+                  value={customTypeName}
+                  onChange={(e) => {
+                    setCustomTypeName(e.target.value);
+                    // Update formData type with custom name or "Others" if empty
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      type: e.target.value.trim() || 'Others' as 'Home' | 'Work' | 'Others'
+                    }));
+                  }}
+                  className="flex-1 min-w-[120px] py-2.5 px-3 rounded-2xl border-2 border-gray-200 bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:border-transparent"
+                  style={{ 
+                    '--tw-ring-color': theme.colors.primary,
+                    borderColor: customTypeName ? theme.colors.primary : '#e5e7eb'
+                  } as React.CSSProperties}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = theme.colors.primary;
+                    e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.primary}33`;
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = customTypeName ? theme.colors.primary : '#e5e7eb';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -735,7 +847,7 @@ const AddEditAddress: React.FC = () => {
             }}
           >
             {isValidatingLocation ? 'Validating Location...' :
-              isSubmitting ? 'Saving Address...' : 'Cofirm Location And Proceed'}
+              isSubmitting ? 'Saving Address...' : 'Confirm Location And Proceed'}
           </button>
         </div>
       </div>

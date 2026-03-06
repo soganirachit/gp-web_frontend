@@ -297,6 +297,35 @@ const Cart: React.FC = () => {
   const [selectedDateOption, setSelectedDateOption] = useState<'today' | 'tomorrow' | 'dayAfter' | 'pickDate'>('tomorrow');
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('8-11 AM');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  // Check authentication and redirect if session expired
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const phoneNumber = localStorage.getItem('phoneNumber');
+    if (!isLoggedIn || !token || !phoneNumber) {
+      const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+      navigate(`${basePath}/login`, { 
+        state: { returnUrl: location.pathname, fromCart: true },
+        replace: true 
+      });
+    }
+  }, [isLoggedIn, navigate, location.pathname, feature]);
+
+  // Listen for tokenRemoved event (session expiration)
+  useEffect(() => {
+    const handleTokenRemoved = () => {
+      const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+      navigate(`${basePath}/login`, { 
+        state: { returnUrl: location.pathname, fromCart: true },
+        replace: true 
+      });
+    };
+
+    window.addEventListener('tokenRemoved', handleTokenRemoved);
+    return () => {
+      window.removeEventListener('tokenRemoved', handleTokenRemoved);
+    };
+  }, [navigate, location.pathname, feature]);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editQuantity, setEditQuantity] = useState<number>(1);
   const [editMessage, setEditMessage] = useState<string>('');
@@ -576,8 +605,8 @@ const Cart: React.FC = () => {
 
   const handleSaveEdit = async (itemId: string) => {
     try {
-      await updateQuantity(itemId, editQuantity);
-      await updateCustomizedMessage(itemId, editMessage.trim());
+      // Update both quantity and special instructions together in a single API call
+      await updateQuantity(itemId, editQuantity, editMessage.trim());
       setEditingItemId(null);
       toast.success('Item updated successfully');
     } catch (error: any) {

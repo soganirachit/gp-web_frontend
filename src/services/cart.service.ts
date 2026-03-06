@@ -110,16 +110,21 @@ class CartService {
   }
 
   /**
-   * Update cart item quantity
+   * Update cart item quantity and special instructions
    * @param cartItemId - Cart item ID (cart_item_id from API response)
    * @param quantity - New quantity
+   * @param specialInstructions - Optional special instructions/customized message
    */
-  async updateCartItem(cartItemId: number, quantity: number): Promise<CartItemResponse> {
+  async updateCartItem(cartItemId: number, quantity: number, specialInstructions?: string): Promise<CartItemResponse> {
     try {
       const headers = headerService.getHeaders();
+      const payload: { quantity: number; special_instructions?: string } = { quantity };
+      if (specialInstructions !== undefined) {
+        payload.special_instructions = specialInstructions;
+      }
       const response = await axios.put<CartItemResponse>(
         `${API_URL}/items/${cartItemId}/`,
-        { quantity },
+        payload,
         { headers }
       );
       return response.data;

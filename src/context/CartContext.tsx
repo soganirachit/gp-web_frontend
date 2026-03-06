@@ -361,7 +361,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     setItems(items.filter((item) => item.id !== id));
   };
 
-  const updateQuantity = async (id: string, quantity: number) => {
+  const updateQuantity = async (id: string, quantity: number, specialInstructions?: string) => {
     const token = localStorage.getItem('token');
     
     if (quantity <= 0) {
@@ -373,9 +373,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     const item = items.find(item => item.id === id);
     if (!item) return;
     
+    // Use provided specialInstructions or keep existing customizedMessage
+    const instructionsToUse = specialInstructions !== undefined ? specialInstructions : item.customizedMessage;
+    
     // Update UI cart
     const updatedItems = items.map((item) => 
-      item.id === id ? { ...item, quantity } : item
+      item.id === id ? { ...item, quantity, customizedMessage: instructionsToUse } : item
     );
     setItems(updatedItems);
     
@@ -383,16 +386,16 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     if (token) {
       if (item.apiCartItemId) {
         // Item already exists in API - update it
-        console.log('Updating cart item in API:', { cartItemId: item.apiCartItemId, quantity, itemId: id });
+        console.log('Updating cart item in API:', { cartItemId: item.apiCartItemId, quantity, specialInstructions: instructionsToUse, itemId: id });
         try {
-          await cartService.updateCartItem(item.apiCartItemId, quantity);
+          await cartService.updateCartItem(item.apiCartItemId, quantity, instructionsToUse);
           console.log('Successfully updated cart item in API');
           // Update the specific item in state instead of reloading entire cart
           // This preserves the item ID and ensures UI updates immediately
           setItems(prevItems => 
             prevItems.map(prevItem => 
               prevItem.id === id 
-                ? { ...prevItem, quantity } 
+                ? { ...prevItem, quantity, customizedMessage: instructionsToUse } 
                 : prevItem
             )
           );
@@ -427,7 +430,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             item.productId,
             storeId,
             quantity,
-            item.customizedMessage
+            instructionsToUse
           );
           // Reload cart from API to get all items with correct cart_item_id
           // Add a small delay to ensure API has processed the add
@@ -443,6 +446,10 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const updateCustomizedMessage = async (id: string, message: string) => {
     const token = localStorage.getItem('token');
     
+    // Find the item before updating
+    const item = items.find(item => item.id === id);
+    if (!item) return;
+    
     // Update UI cart
     setItems(
       items.map((item) =>
@@ -450,9 +457,27 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       )
     );
     
-    // Note: API doesn't have a direct endpoint to update special_instructions
-    // We would need to update the entire cart item, but for now we'll just update UI
-    // If needed, we can implement a full update by removing and re-adding the item
+    // Sync to API if logged in
+    if (token && item.apiCartItemId) {
+      try {
+        // Update the cart item with current quantity and new special instructions
+        await cartService.updateCartItem(item.apiCartItemId, item.quantity, message);
+        console.log('Successfully updated special instructions in API');
+        // Reload cart to ensure sync
+        setTimeout(async () => {
+          try {
+            await loadCartFromAPI();
+          } catch (reloadError) {
+            console.error('Error reloading cart after update:', reloadError);
+          }
+        }, 500);
+      } catch (error) {
+        console.error('Error updating special instructions in API:', error);
+        // Revert UI update on error
+        setItems(items);
+        throw error;
+      }
+    }
   };
 
   const updateDeliveryInfo = (info: CartDeliveryInfo) => {

@@ -467,16 +467,20 @@ const StoreProductsPages: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      
+                      {item.short_description && (
+                        <p className="text-xs text-gray-500 mb-1 truncate">
+                          {item.short_description}
+                        </p>
+                      )}
                       {/* Price and Arrow — effective_price only; show struck base when effective < base */}
-                      <div className="flex items-center justify-between mt-2">
+                      <div className="flex items-center justify-between gap-2 mt-2">
                         <p className="text-gray-900 text-base font-bold">
                           {showStrikeBase(item) && (
                             <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(item)}</span>
                           )}
                           ₹{getItemPrice(item)}/
                         </p>
-                        <FaChevronRight className="text-gray-400 text-sm" />
+                        <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
                       </div>
                     </div>
                   </div>

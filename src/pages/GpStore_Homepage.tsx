@@ -552,11 +552,11 @@ const GpStore_Homepage: React.FC = () => {
                                     ))}
                                 </div>
                             ) : (
-                                <div className="text-center py-12">
-                                    <p className="text-gray-500 text-lg">No products found matching "{searchQuery}"</p>
+                                <div className="text-center py-8 sm:py-12">
+                                    <p className="text-gray-500 text-sm sm:text-base md:text-lg">No products found matching "{searchQuery}"</p>
                                     <button
                                         onClick={() => setSearchQuery('')}
-                                        className="mt-4 text-[#19411F] text-sm font-medium hover:underline"
+                                        className="mt-3 sm:mt-4 text-[#19411F] text-xs sm:text-sm font-medium hover:underline touch-target"
                                     >
                                         Clear search
                                     </button>
@@ -595,12 +595,20 @@ const GpStore_Homepage: React.FC = () => {
                                         <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
                                             {product.name}
                                         </h3>
-                                        <p className="text-[#19411F] text-base font-bold">
-                                            {showStrikeBase(product) && (
-                                                <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(product)}</span>
-                                            )}
-                                            ₹{getEffectivePrice(product)}/{product.unit || "box"}
-                                        </p>
+                                        {product.short_description && (
+                                            <p className="text-xs text-gray-500 mb-1 truncate">
+                                                {product.short_description}
+                                            </p>
+                                        )}
+                                        <div className="flex items-center justify-between gap-2">
+                                            <p className="text-gray-900 text-base font-bold">
+                                                {showStrikeBase(product) && (
+                                                    <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(product)}</span>
+                                                )}
+                                                ₹{getEffectivePrice(product)}/{product.unit || "box"}
+                                            </p>
+                                            <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -710,12 +718,20 @@ const GpStore_Homepage: React.FC = () => {
                                         <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
                                             {product.name}
                                         </h3>
-                                        <p className="text-[#19411F] text-base font-bold">
-                                            {showStrikeBase(product) && (
-                                                <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(product)}</span>
-                                            )}
-                                            ₹{getEffectivePrice(product)}/{product.unit || "box"}
-                                        </p>
+                                        {product.short_description && (
+                                            <p className="text-xs text-gray-500 mb-1 truncate">
+                                                {product.short_description}
+                                            </p>
+                                        )}
+                                        <div className="flex items-center justify-between gap-2">
+                                            <p className="text-gray-900 text-base font-bold">
+                                                {showStrikeBase(product) && (
+                                                    <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(product)}</span>
+                                                )}
+                                                ₹{getEffectivePrice(product)}/{product.unit || "box"}
+                                            </p>
+                                            <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
+                                        </div>
                                     </div>
                                 </div>
                                 ))

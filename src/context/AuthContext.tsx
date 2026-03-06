@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { storeService } from '../services/store.service';
 
 interface AuthContextType {
@@ -23,28 +23,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return localStorage.getItem('phoneNumber');
   });
 
-  const checkLoginStatus = useCallback(() => {
-    const token = localStorage.getItem('token');
-    const phone = localStorage.getItem('phoneNumber');
-    const isValid = !!(token && phone);
-    setIsLoggedIn(isValid);
-    setPhoneNumber(phone);
-    return isValid;
-  }, []);
-
   useEffect(() => {
     // Check login status whenever the component mounts or localStorage changes
     const handleStorageChange = () => {
       checkLoginStatus();
     };
 
+    // Listen for tokenRemoved event (fired when session expires)
+    const handleTokenRemoved = () => {
+      checkLoginStatus();
+    };
+
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('tokenRemoved', handleTokenRemoved);
     checkLoginStatus(); // Initial check
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('tokenRemoved', handleTokenRemoved);
     };
-  }, [checkLoginStatus]);
+  }, []);
+
+  const checkLoginStatus = () => {
+    const token = localStorage.getItem('token');
+    const phone = localStorage.getItem('phoneNumber');
+    const isValid = !!(token && phone);
+    setIsLoggedIn(isValid);
+    setPhoneNumber(phone);
+    return isValid;
+  };
 
   const login = (token: string, phone: string, refreshToken?: string) => {
     localStorage.setItem('token', token);

@@ -11,7 +11,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isLoggedIn } = useAuth();
   const location = useLocation();
 
-  if (!isLoggedIn) {
+  // Double-check: verify token exists in localStorage (in case context state is stale)
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const phoneNumber = typeof window !== 'undefined' ? localStorage.getItem('phoneNumber') : null;
+  const isAuthenticated = isLoggedIn && token && phoneNumber;
+
+  if (!isAuthenticated) {
     // Detect feature from the attempted URL path
     const feature = getFeatureFromPath(location.pathname);
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';

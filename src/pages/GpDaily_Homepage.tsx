@@ -648,7 +648,7 @@ const Home2: React.FC = () => {
               </div>
 
               <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                {products
+                  {products
                   .filter((item) => item.category === "EXOTIC" && item.isAvailable)
                   .slice(0, 6)
                   .map((item, index) => (

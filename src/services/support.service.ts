@@ -28,6 +28,7 @@ export interface SupportMessage {
   is_from_customer?: boolean;
   created_by_name: string;
   created_at: string;
+  image_url?: string | null;
 }
 
 export interface SupportTicketDetail {

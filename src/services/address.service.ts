@@ -56,7 +56,7 @@ export interface AddressInput {
   societyName?: string;
   district?: string;
   coordinates?: string;
-  type?: "Home" | "Work" | "Others";
+  type?: "Home" | "Work" | "Others" | string; // Allow custom type names (e.g., "friends")
   setAsDefault?: boolean;
 }
 
@@ -114,7 +114,12 @@ const mapFrontendToApi = (input: AddressInput): Record<string, any> => {
     "Work": "work",
     "Others": "other"  // API expects "other" (singular), not "others"
   };
-  const apiType = input.type ? typeMap[input.type] || "home" : "home";
+  // If type is one of the predefined ones, use the mapped value
+  // If it's a custom name (not in typeMap), use the custom name directly
+  // Otherwise default to "home"
+  const apiType = input.type 
+    ? (typeMap[input.type] || input.type.toLowerCase()) 
+    : "home";
 
   const apiData: Record<string, any> = {
     address_line1: input.houseNo || "",

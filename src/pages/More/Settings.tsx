@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FaChevronRight,
 } from 'react-icons/fa';
@@ -34,6 +34,7 @@ import { useFeatureTheme } from '../../context/FeatureThemeContext';
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, feature } = useFeatureTheme();
   const { isLoggedIn, logout } = useAuth();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
@@ -59,6 +60,34 @@ const Settings: React.FC = () => {
   const [pendingStoreId, setPendingStoreId] = useState<number | null>(null);
   const [pendingStoreName, setPendingStoreName] = useState<string>('');
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Check authentication and redirect if session expired
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const phoneNumber = localStorage.getItem('phoneNumber');
+    if (!isLoggedIn || !token || !phoneNumber) {
+      navigate(`${basePath}/login`, { 
+        state: { returnUrl: location.pathname },
+        replace: true 
+      });
+      return;
+    }
+  }, [isLoggedIn, navigate, basePath, location.pathname]);
+
+  // Listen for tokenRemoved event (session expiration)
+  useEffect(() => {
+    const handleTokenRemoved = () => {
+      navigate(`${basePath}/login`, { 
+        state: { returnUrl: location.pathname },
+        replace: true 
+      });
+    };
+
+    window.addEventListener('tokenRemoved', handleTokenRemoved);
+    return () => {
+      window.removeEventListener('tokenRemoved', handleTokenRemoved);
+    };
+  }, [navigate, basePath, location.pathname]);
 
   useEffect(() => {
     if (!isLoggedIn) {

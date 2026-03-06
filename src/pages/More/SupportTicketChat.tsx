@@ -5,7 +5,6 @@ import { FaPaperPlane, FaImage, FaPhone, FaUser } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import BottomNavigation from '../../components/layout/BottomNav';
 import { supportService, SupportTicketDetail, SupportMessage } from '../../services/support.service';
-import { orderService } from '../../services/order.service';
 import { format } from 'date-fns';
 import Spinner from '../../components/common/Spinner';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
@@ -24,7 +23,6 @@ const SupportTicketChat: React.FC = () => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [orderDetails, setOrderDetails] = useState<any>(null);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [requestingAgent, setRequestingAgent] = useState(false);
@@ -43,36 +41,38 @@ const SupportTicketChat: React.FC = () => {
     }
   }, [ticketNumber]);
 
-
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Use setTimeout to ensure DOM is updated
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
+    }
+  }, [messages]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const fetchTicketDetails = async () => {
+  const fetchTicketDetails = async (showLoading: boolean = true) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       if (ticketNumber) {
         const ticketData = await supportService.getTicketDetails(ticketNumber);
         if (ticketData) {
           setTicket(ticketData);
           setMessages(ticketData.messages || []);
-
-          // Fetch order details if order_number exists
-          if (ticketData.order_number) {
-            try {
-              const order = await orderService.getOrderByOrderNumber(ticketData.order_number);
-              setOrderDetails(order);
-            } catch (error) {
-              console.error('Error fetching order details:', error);
-            }
-          }
         }
       }
     } catch (error) {
       console.error('Error fetching ticket details:', error);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -145,10 +145,11 @@ const SupportTicketChat: React.FC = () => {
       );
 
       if (message) {
-        // Replace temporary message with real one
-        setMessages(prev => 
-          prev.map(msg => msg.id === tempMessage.id ? message : msg)
-        );
+        // Refresh ticket details to get all messages including the new one
+        // This ensures we have the latest state from the server
+        // Don't show loading spinner when refreshing after sending message
+        await fetchTicketDetails(false);
+        toast.success('Message sent successfully');
       } else {
         // If API call failed, remove the optimistic message
         setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
@@ -267,72 +268,91 @@ const SupportTicketChat: React.FC = () => {
 
   return (
     <div className="h-screen bg-[#f8f6f1] flex flex-col overflow-hidden">
-      <div className="max-w-[800px] mx-auto w-full flex flex-col flex-1">
-        {/* Header */}
-        <div className="p-0 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
-          <div className="flex items-center gap-3 mb-4">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
-            >
-              <IoArrowBack size={24} />
-            </button>
-            <div className="flex-1">
-              <h1 className="text-xl font-bold text-gray-900">
-                {ticket?.subject || 'Support Ticket'}
-              </h1>
-              {ticket?.order_number && (
-                <p className="text-sm text-gray-600">Order: {ticket.order_number}</p>
-              )}
+      <div className="max-w-[800px] mx-auto w-full flex flex-col h-full">
+        {/* Fixed Header */}
+        <div className="fixed top-0 left-0 right-0 bg-white shadow-sm z-20 max-w-[800px] mx-auto">
+          <div className="px-4 pt-4 pb-3">
+            <div className="flex items-start gap-3 mb-3">
+              <button
+                onClick={() => navigate(-1)}
+                className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0 mt-1"
+              >
+                <IoArrowBack size={22} className="text-gray-700" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl font-bold text-gray-900 leading-tight mb-1 break-words">
+                  {ticket?.subject 
+                    ? ticket.subject.split('—')[0].split('Order')[0].trim() 
+                    : 'Support Ticket'}
+                </h1>
+                {ticket?.order_number && (
+                  <p className="text-xs text-gray-500 font-medium mt-0.5">Order: {ticket.order_number}</p>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
-
-        {/* Action Buttons - Request Agent/Callback */}
-        {ticket && ticket.status !== 'closed' && (
-          <div className="px-4 py-3  mb-2">
-            <div className="flex gap-2">
-              {/* {!ticket.agent_requested && (
-                <button
-                  onClick={handleRequestAgent}
-                  disabled={requestingAgent}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-[#166534] text-white rounded-xl font-semibold hover:bg-[#145028] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  <FaUser size={16} />
-                  {requestingAgent ? 'Requesting...' : 'Request Agent'}
-                </button>
-              )} */}
-              {!ticket.callback_requested && (
-                <button
-                  onClick={handleRequestCallback}         // ← was missing
-                  disabled={requestingCallback}           // ← was missing
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-[#FCFBF8] border border-gray-200 text-gray-800 rounded-xl font-semibold hover:bg-[#F5F5F5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm leading-none"
-                >
-                  <FaPhone size={14} className="rotate-90 align-middle" />
-                  {requestingCallback ? 'Requesting...' : 'Request Callback'}
-                </button>
-              )}
-              {ticket.status !== 'closed' && (
-                <button
-                  onClick={handleCloseTicketClick}
-                  disabled={closingTicket}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5  bg-[#FCFBF8] text-gray-800 rounded-xl font-semibold hover:bg-gray-300 transition-colors border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  {closingTicket ? 'Closing...' : 'Close'}
-                </button>
-              )}
-            </div>
-            {(ticket.agent_requested || ticket.callback_requested) && (
-              <div className="mt-2 text-xs text-gray-600">
-                {ticket.agent_requested && <p>✓ Agent requested</p>}
-                {ticket.callback_requested && <p>✓ Callback requested</p>}
+            
+            {/* Action Buttons - Request Agent/Callback */}
+            {ticket && ticket.status !== 'closed' && ticket.status !== 'resolved' && (
+              <div className="flex gap-2 mb-2">
+                {!ticket.callback_requested && (
+                  <button
+                    onClick={handleRequestCallback}
+                    disabled={requestingCallback}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-[#FCFBF8] border border-gray-200 text-gray-800 rounded-xl font-semibold hover:bg-[#F5F5F5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm leading-none"
+                  >
+                    <FaPhone size={14} className="rotate-90 align-middle" />
+                    {requestingCallback ? 'Requesting...' : 'Request Callback'}
+                  </button>
+                )}
+                {ticket.status !== 'closed' && ticket.status !== 'resolved' && (
+                  <button
+                    onClick={handleCloseTicketClick}
+                    disabled={closingTicket}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#FCFBF8] text-gray-800 rounded-xl font-semibold hover:bg-gray-300 transition-colors border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    {closingTicket ? 'Closing...' : 'Close'}
+                  </button>
+                )}
+              </div>
+            )}
+            
+            {/* Status Indicators */}
+            {(ticket?.agent_requested || ticket?.callback_requested) && (
+              <div className="flex flex-wrap gap-3 mt-2 text-xs">
+                {ticket.agent_requested && (
+                  <div className="flex items-center gap-1.5 text-green-600 font-medium">
+                    <span className="text-green-500">✓</span>
+                    <span>Agent requested</span>
+                  </div>
+                )}
+                {ticket.callback_requested && (
+                  <div className="flex items-center gap-1.5 text-green-600 font-medium">
+                    <span className="text-green-500">✓</span>
+                    <span>Callback requested</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
+        </div>
 
-        {/* Messages */}
-        <div className="flex-1 px-4 overflow-y-auto pb-[140px]">
+        {/* Spacer for fixed header - dynamically calculate height */}
+        <div 
+          className="flex-shrink-0" 
+          style={{ 
+            height: ticket 
+              ? (ticket.status !== 'closed' && ticket.status !== 'resolved'
+                  ? ((ticket.agent_requested || ticket.callback_requested) ? '160px' : '130px')
+                  : '110px')
+              : '100px'
+          }}
+        ></div>
+
+        {/* Messages - Scrollable area */}
+        <div className="flex-1 px-4 overflow-y-auto min-h-0" style={{ 
+          paddingBottom: ticket && ticket.status !== 'closed' && ticket.status !== 'resolved' ? '200px' : '90px',
+          paddingTop: '16px'
+        }}>
           {ticket && (
             <div className="mb-4">
               <div className="bg-white rounded-xl p-4 shadow-sm">
@@ -372,7 +392,22 @@ const SupportTicketChat: React.FC = () => {
 
           <div className="space-y-2">
             {messages
-              .filter((message) => message.message !== ticket.description)
+              .filter((message) => {
+                // Filter out internal messages (is_internal = true)
+                if (message.is_internal === true) {
+                  return false;
+                }
+                // Filter out messages that exactly match the ticket description (to avoid duplication)
+                if (ticket.description && message.message === ticket.description) {
+                  return false;
+                }
+                // Include all other messages (even if message is empty, as it might have an image)
+                return true;
+              })
+              .sort((a, b) => {
+                // Sort messages by creation date (oldest first)
+                return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+              })
               .map((message) => {
                 const dateTime = formatDateTime(message.created_at);
                 // User messages (is_from_customer = true) should be on right, Agent messages (is_from_customer = false) should be on left
@@ -387,14 +422,30 @@ const SupportTicketChat: React.FC = () => {
                       ? 'bg-gradient-to-br from-[#166534] to-[#145028] text-white shadow-md'
                       : 'bg-white text-gray-800 border border-gray-100 shadow-sm'
                       }`}>
-                      <div className="flex items-end gap-2">
-                        <p className={`text-sm whitespace-pre-wrap flex-1 leading-relaxed ${isUserMessage ? 'text-white' : 'text-gray-800'}`}>
-                          {message.message}
-                        </p>
-                        <span className={`text-[10px] whitespace-nowrap flex-shrink-0 font-medium ${isUserMessage ? 'text-white/80' : 'text-gray-500'
-                          }`}>
-                          {dateTime.time}
-                        </span>
+                      <div className="flex flex-col gap-2">
+                        {/* Show image if available */}
+                        {message.image_url && (
+                          <img 
+                            src={message.image_url} 
+                            alt="Message attachment" 
+                            className="max-w-full h-auto rounded-lg object-cover"
+                            style={{ maxHeight: '300px' }}
+                          />
+                        )}
+                        {/* Show message text if available */}
+                        {(message.message || message.image_url) && (
+                          <div className="flex items-end gap-2">
+                            {message.message && (
+                              <p className={`text-sm whitespace-pre-wrap flex-1 leading-relaxed ${isUserMessage ? 'text-white' : 'text-gray-800'}`}>
+                                {message.message}
+                              </p>
+                            )}
+                            <span className={`text-[10px] whitespace-nowrap flex-shrink-0 font-medium ${isUserMessage ? 'text-white/80' : 'text-gray-500'
+                              }`}>
+                              {dateTime.time}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -405,8 +456,8 @@ const SupportTicketChat: React.FC = () => {
         </div>
 
         {/* Message Input */}
-        {ticket && ticket.status !== 'closed' && (
-          <div className="fixed bottom-[70px] left-0 right-0 bg-white border-t border-gray-200 p-4 z-30">
+        {ticket && ticket.status !== 'closed' && ticket.status !== 'resolved' && (
+          <div className="fixed bottom-[70px] left-0 right-0 bg-white border-t border-gray-200 p-4 z-30 max-w-[800px] mx-auto">
             {/* Image Preview */}
             {imagePreview && (
               <div className="mb-3 relative">
@@ -464,9 +515,13 @@ const SupportTicketChat: React.FC = () => {
           </div>
         )}
 
-        {ticket && ticket.status === 'closed' && (
+        {(ticket && (ticket.status === 'closed' || ticket.status === 'resolved')) && (
           <div className="sticky bottom-0 bg-gray-100 border-t border-gray-200 p-4 text-center">
-            <p className="text-gray-600 text-sm">This ticket is closed. You cannot send new messages.</p>
+            <p className="text-gray-600 text-sm">
+              {ticket.status === 'closed' 
+                ? 'This ticket is closed. You cannot send new messages.'
+                : 'This ticket is resolved. You cannot send new messages.'}
+            </p>
           </div>
         )}
 

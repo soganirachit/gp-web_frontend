@@ -119,7 +119,7 @@ const Addresses: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
+      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
         <Spinner size={400} />
       </div>
     );
@@ -166,7 +166,7 @@ const Addresses: React.FC = () => {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-4 mb-24">
+                <div className="space-y-4 mb-4">
                   {addresses.map((address) => {
                     const icon = getTypeIcon(address.type);
                     const isGreenBg = ['home', 'others'].includes(address.type?.toLowerCase());
@@ -271,8 +271,9 @@ const Addresses: React.FC = () => {
                   color: feature === 'gpStore' ? 'white' : 'black'
                 }}
               >
-                <span className="text-xl font-light">+</span>
-                Add New Address
+                <span className="text-lg sm:text-xl font-light">+</span>
+                <span className="hidden xs:inline">Add New Address</span>
+                <span className="xs:hidden">Add Address</span>
               </button>
             </>
           )}

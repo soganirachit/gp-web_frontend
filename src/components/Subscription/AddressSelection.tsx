@@ -34,6 +34,9 @@ const AddressSelection: React.FC = () => {
   // Map related states
   const mapRef = useRef<google.maps.Map | null>(null);
   const { isLoaded, loadError } = useGoogleMaps();
+  const isLocationRequestInProgress = useRef(false);
+  const lastToastMessage = useRef<string | null>(null);
+  const hasInitialized = useRef(false);
   const [selectedPosition, setSelectedPosition] = useState<{ lat: number, lng: number }>({
     lat: 20.5937,
     lng: 78.9629
@@ -61,6 +64,10 @@ const AddressSelection: React.FC = () => {
   const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
+    // Prevent double execution in StrictMode
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
     const token = localStorage.getItem("token");
     if (!token) {
       handleAuthError(
@@ -100,7 +107,11 @@ const AddressSelection: React.FC = () => {
         },
       });
     } else {
-      toast.error(error.message);
+      // Prevent duplicate toast messages
+      if (lastToastMessage.current !== error.message) {
+        lastToastMessage.current = error.message;
+        toast.error(error.message);
+      }
     }
   };
 
@@ -748,6 +759,10 @@ const AddressSelection: React.FC = () => {
   }, []);
 
   const getCurrentLocation = () => {
+    // Prevent duplicate calls
+    if (isLocationRequestInProgress.current) return;
+    isLocationRequestInProgress.current = true;
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -803,20 +818,40 @@ const AddressSelection: React.FC = () => {
                 coordinates: `${latitude},${longitude}`
               }));
 
-              toast.success('Location detected successfully');
+              const successMsg = 'Location detected successfully';
+              if (lastToastMessage.current !== successMsg) {
+                lastToastMessage.current = successMsg;
+                toast.success(successMsg);
+              }
             }
           } catch (error) {
             console.error('Error fetching address:', error);
-            toast.error('Failed to fetch location details');
+            const errorMsg = 'Failed to fetch location details';
+            if (lastToastMessage.current !== errorMsg) {
+              lastToastMessage.current = errorMsg;
+              toast.error(errorMsg);
+            }
+          } finally {
+            isLocationRequestInProgress.current = false;
           }
         },
         (error) => {
           console.error('Error accessing location:', error);
-          toast.error('Failed to access location');
+          const errorMsg = 'Failed to access location';
+          if (lastToastMessage.current !== errorMsg) {
+            lastToastMessage.current = errorMsg;
+            toast.error(errorMsg);
+          }
+          isLocationRequestInProgress.current = false;
         }
       );
     } else {
-      toast.error('Geolocation is not supported by your browser');
+      const errorMsg = 'Geolocation is not supported by your browser';
+      if (lastToastMessage.current !== errorMsg) {
+        lastToastMessage.current = errorMsg;
+        toast.error(errorMsg);
+      }
+      isLocationRequestInProgress.current = false;
     }
   };
 
@@ -1027,7 +1062,7 @@ const AddressSelection: React.FC = () => {
             </div>
 
             {/* Address List */}
-            <div className="space-y-4 mb-24">
+            <div className="space-y-4 mb-4">
               {addresses.map((address) => (
                 <div
                   key={address.id}
@@ -1126,11 +1161,11 @@ const AddressSelection: React.FC = () => {
             )}
 
             {/* Bottom Buttons */}
-            <div className="mt-auto pt-4 md:relative md:bg-transparent md:p-0">
+            <div className="mt-auto pt-2 md:relative md:bg-transparent md:p-0">
               <div className="max-w-[800px] mx-auto space-y-3">
                 <button
                   onClick={() => navigate(`${basePath}/addresses/add`)}
-                  className={`w-full flex items-center justify-center gap-2 py-4 rounded-xl text-base font-semibold hover:opacity-90 shadow-sm ${
+                  className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-base font-semibold hover:opacity-90 shadow-sm ${
                     feature === 'gpStore' ? 'text-white' : 'text-gray-900'
                   }`}
                   style={{ backgroundColor: theme.colors.primary }}
@@ -1142,7 +1177,7 @@ const AddressSelection: React.FC = () => {
                 <button
                   onClick={handleContinue}
                   disabled={!selectedAddress || loading}
-                  className={`w-full py-4 rounded-xl text-base font-semibold shadow-sm flex items-center justify-center ${
+                  className={`w-full py-3 rounded-xl text-base font-semibold shadow-sm flex items-center justify-center ${
                     selectedAddress && !loading
                       ? `hover:opacity-90 ${feature === 'gpStore' ? 'text-white' : 'text-gray-900'}`
                       : 'bg-gray-300 cursor-not-allowed text-gray-500'
