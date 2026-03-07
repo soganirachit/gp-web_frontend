@@ -907,12 +907,12 @@ const Cart: React.FC = () => {
                     <button
                       key={opt}
                       onClick={() => handleDateOptionSelect(opt)}
-                      className={`px-1.5 py-1.5 rounded-xl text-[12px] font-medium transition-colors flex items-center justify-center gap-1 ${
+                      className={`px-2.5 py-2 min-h-[36px] rounded-xl text-[10px] font-medium transition-colors flex items-center justify-center gap-1.5 ${
                         selectedDateOption === opt ? 'bg-[#19411F] text-white' : 'bg-white text-gray-700 border border-gray-200'
                       }`}
                     >
-                      {opt === 'pickDate' && <BsCalendar4 className="text-xs" />}
-                      {opt === 'today' ? 'Today' : opt === 'tomorrow' ? 'Tomorrow' : opt === 'dayAfter' ? 'Day After' : 'Pick Date'}
+                      {opt === 'pickDate' && <BsCalendar4 className="text-[10px] flex-shrink-0" />}
+                      <span className="whitespace-nowrap">{opt === 'today' ? 'Today' : opt === 'tomorrow' ? 'Tomorrow' : opt === 'dayAfter' ? 'Day After' : 'Pick Date'}</span>
                     </button>
                   ))}
                 </div>
@@ -959,7 +959,7 @@ const Cart: React.FC = () => {
                     <button
                       key={slot}
                       onClick={() => handleTimeSlotSelect(slot)}
-                      className={`px-1.5 py-1.5 rounded-xl text-[12px] font-medium transition-colors ${
+                      className={`px-2.5 py-2 min-h-[36px] rounded-xl text-[10px] font-medium transition-colors flex items-center justify-center ${
                         selectedTimeSlot === slot ? 'bg-[#19411F] text-white' : 'bg-white text-gray-700 border border-gray-200'
                       }`}
                     >

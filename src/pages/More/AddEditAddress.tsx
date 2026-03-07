@@ -30,11 +30,16 @@ const AddEditAddress: React.FC = () => {
     lng: 78.9629
   });
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    completeAddress: string;
+    floor: string;
+    landmark: string;
+    type: 'Home' | 'Work' | 'Others' | string;
+  }>({
     completeAddress: '',
     floor: '',
     landmark: '',
-    type: 'Home' as 'Home' | 'Work' | 'Others',
+    type: 'Home',
   });
 
   const [deliveryAddress, setDeliveryAddress] = useState('');
@@ -58,17 +63,29 @@ const AddEditAddress: React.FC = () => {
     hasInitialized.current = true;
 
     if (isEdit && existingAddress) {
-      const fullAddress = [
+      // Construct fullAddress, avoiding duplication
+      // If area is the same as streetName, don't include it twice
+      const addressParts = [
         existingAddress.houseNo,
-        existingAddress.streetName,
-        existingAddress.area
-      ].filter(Boolean).join(', ');
+        existingAddress.streetName
+      ].filter(Boolean);
+      
+      // Only add area if it's different from streetName and not empty
+      if (existingAddress.area && 
+          existingAddress.area.trim() !== existingAddress.streetName?.trim() &&
+          existingAddress.area.trim() !== 'unknown') {
+        addressParts.push(existingAddress.area);
+      }
+      
+      const fullAddress = addressParts.join(', ');
 
       const addressType = existingAddress.type || 'Home';
       setFormData({
         completeAddress: fullAddress || '',
         floor: '',
-        landmark: existingAddress.area || '',
+        landmark: existingAddress.area && existingAddress.area !== existingAddress.streetName 
+          ? existingAddress.area 
+          : '',
         type: addressType,
       });
       // If type is "Others" or a custom type (not Home/Work), set it to Others and store custom name
@@ -224,10 +241,11 @@ const AddEditAddress: React.FC = () => {
 
       // Determine the final type: use custom name if provided, otherwise use selected type
       // If Others is selected and custom name is provided, use the custom name
-      // Otherwise, use the selected type (Home, Work, or Others)
-      const finalType = selectedType === 'Others' && customTypeName.trim() 
-        ? customTypeName.trim() 
-        : (selectedType === 'Others' ? 'Others' : selectedType);
+      // If Others is selected but no custom name, still use "Others"
+      // Otherwise, use the selected type (Home or Work)
+      const finalType = selectedType === 'Others' 
+        ? (customTypeName.trim() || 'Others')
+        : selectedType;
 
       const addressData = {
         name: name, // Include name in payload
@@ -810,7 +828,7 @@ const AddEditAddress: React.FC = () => {
                     // Update formData type with custom name or "Others" if empty
                     setFormData(prev => ({ 
                       ...prev, 
-                      type: e.target.value.trim() || 'Others' as 'Home' | 'Work' | 'Others'
+                      type: e.target.value.trim() || 'Others'
                     }));
                   }}
                   className="flex-1 min-w-[120px] py-2.5 px-3 rounded-2xl border-2 border-gray-200 bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:border-transparent"

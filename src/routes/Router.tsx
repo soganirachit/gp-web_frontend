@@ -125,7 +125,7 @@ const router = createBrowserRouter([
       },
       { 
         path: '/gp-daily/account', 
-        element: FEATURE_FLAGS.gpDailyEnabled ? <MorePage /> : <Navigate to="/gp-store/account" replace />
+        element: FEATURE_FLAGS.gpDailyEnabled ? <ProtectedRoute><MorePage /></ProtectedRoute> : <Navigate to="/gp-store/account" replace />
       },
       { 
         path: '/gp-daily/profile', 
@@ -187,7 +187,7 @@ const router = createBrowserRouter([
       { path: '/gp-store/otp-verification', element: <OTPVerification /> },
       { path: '/gp-store/name-input', element: <NameInput /> },
       { path: '/gp-store/allset', element: <Allset /> },
-      { path: '/gp-store/account', element: <MorePage /> },
+      { path: '/gp-store/account', element: <ProtectedRoute><MorePage /></ProtectedRoute> },
       { path: '/gp-store/profile', element: <ProtectedRoute><Profile /></ProtectedRoute> },
       { path: '/gp-store/addresses', element: <ProtectedRoute><Addresses /></ProtectedRoute> },
       { path: '/gp-store/addresses/add', element: <ProtectedRoute><AddAddress /></ProtectedRoute> },

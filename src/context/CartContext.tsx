@@ -19,6 +19,7 @@ export interface CartItem {
   } | null;
   inventoryId?: number; // Direct inventory ID (can be variant.id or product inventory_id)
   customizedMessage?: string;
+  categorySlug?: string; // Category slug for conditional features like customized message
   // Note: deliveryDate and timeSlot are stored at cart level, not per item
 }
 
@@ -33,7 +34,7 @@ interface CartContextType {
   deliveryInfo: CartDeliveryInfo | null;
   addToCart: (item: Omit<CartItem, 'id'>) => Promise<void>;
   removeFromCart: (id: string) => Promise<void>;
-  updateQuantity: (id: string, quantity: number) => Promise<void>;
+  updateQuantity: (id: string, quantity: number, specialInstructions?: string) => Promise<void>;
   updateCustomizedMessage: (id: string, message: string) => Promise<void>;
   updateDeliveryInfo: (info: CartDeliveryInfo) => void;
   clearCart: () => void;
@@ -567,6 +568,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             inventoryId: product?.id, // Using product.id as fallback - might need to be updated
             customizedMessage: apiItem.special_instructions || undefined,
             variant: null, // API doesn't provide variant details in cart response
+            categorySlug: existingItem?.categorySlug, // Preserve categorySlug from existing item if available
           };
           
           console.log('Mapped cart item:', { 

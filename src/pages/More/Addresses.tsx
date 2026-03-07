@@ -169,7 +169,9 @@ const Addresses: React.FC = () => {
                 <div className="space-y-4 mb-4">
                   {addresses.map((address) => {
                     const icon = getTypeIcon(address.type);
-                    const isGreenBg = ['home', 'others'].includes(address.type?.toLowerCase());
+                    // Use green background for Home, Others, and all custom types (anything that's not Work)
+                    const addressTypeLower = address.type?.toLowerCase() || '';
+                    const isGreenBg = addressTypeLower !== 'work' && addressTypeLower !== 'office';
                     const iconBgClass = isGreenBg ? 'bg-[#ECFDF5]' : 'bg-[#EEF2FF]';
 
                     return (

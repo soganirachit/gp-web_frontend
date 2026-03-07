@@ -36,7 +36,7 @@ export interface Address {
   pincode: string;
   associatedPhoneNumber: string;
   isDefault: boolean;
-  type: "Home" | "Work" | "Others";
+  type: "Home" | "Work" | "Others" | string; // Allow custom type names (e.g., "College", "Friend")
   societyName?: string;
   district?: string;
   coordinates?: string;
@@ -87,6 +87,21 @@ const mapApiToFrontend = (apiAddr: ApiAddress): Address => {
   const city = apiAddr.city && apiAddr.city.toLowerCase() !== 'unknown' ? apiAddr.city : "";
   const state = apiAddr.state && apiAddr.state.toLowerCase() !== 'unknown' ? apiAddr.state : "";
 
+  // Determine the type: if it's in the typeMap, use the mapped value
+  // Otherwise, preserve the custom value from the API (capitalize first letter for display)
+  let addressType: string;
+  if (apiAddr.address_type) {
+    const lowerType = apiAddr.address_type.toLowerCase();
+    if (typeMap[lowerType]) {
+      addressType = typeMap[lowerType];
+    } else {
+      // Preserve custom type, capitalize first letter for display
+      addressType = apiAddr.address_type.charAt(0).toUpperCase() + apiAddr.address_type.slice(1).toLowerCase();
+    }
+  } else {
+    addressType = "Home";
+  }
+
   return {
     id: (apiAddr.id !== undefined && apiAddr.id !== null) ? apiAddr.id.toString() : "",
     userId: (apiAddr.user_id !== undefined && apiAddr.user_id !== null) ? apiAddr.user_id.toString() : "",
@@ -98,7 +113,7 @@ const mapApiToFrontend = (apiAddr: ApiAddress): Address => {
     state: state,
     pincode: pincode,
     isDefault: apiAddr.is_default || false,
-    type: (apiAddr.address_type && typeMap[apiAddr.address_type]) ? typeMap[apiAddr.address_type] : "Home",
+    type: addressType,
     coordinates: lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng) ? `${lat},${lng}` : undefined,
     createdAt: apiAddr.created_at || "",
     updatedAt: apiAddr.updated_at || "",
@@ -114,12 +129,23 @@ const mapFrontendToApi = (input: AddressInput): Record<string, any> => {
     "Work": "work",
     "Others": "other"  // API expects "other" (singular), not "others"
   };
+  
+  // Normalize the type: trim whitespace and handle case
+  const normalizedType = input.type ? input.type.trim() : "";
+  
   // If type is one of the predefined ones, use the mapped value
-  // If it's a custom name (not in typeMap), use the custom name directly
-  // Otherwise default to "home"
-  const apiType = input.type 
-    ? (typeMap[input.type] || input.type.toLowerCase()) 
-    : "home";
+  // Otherwise, send the custom value directly (backend accepts custom values but validation may be inconsistent)
+  // Normalize custom values: capitalize first letter, lowercase rest for consistency
+  let apiType: string;
+  if (typeMap[normalizedType]) {
+    apiType = typeMap[normalizedType];
+  } else if (normalizedType) {
+    // For custom types, send as-is (backend accepts them, though validation may be inconsistent)
+    // Keep the original casing as the backend might be case-sensitive
+    apiType = normalizedType;
+  } else {
+    apiType = "home";
+  }
 
   const apiData: Record<string, any> = {
     address_line1: input.houseNo || "",
