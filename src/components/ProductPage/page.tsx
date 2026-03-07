@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { MdLocationOn, MdKeyboardArrowDown } from "react-icons/md";
-import { FaChevronRight } from "react-icons/fa";
+import { FaChevronRight, FaSearch } from "react-icons/fa";
 import { addressService } from "../../services/address.service";
 import { productService } from "../../services/product.service";
 import type { Product } from "../../services/product.service";
@@ -231,11 +231,11 @@ const ProductPage: React.FC = () => {
           {/* Search Bar */}
           <div className="mt-2 sm:mt-3">
             <div
-              className="rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 cursor-pointer shadow-sm border border-gray-200"
+              className="rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 cursor-pointer shadow-sm border border-[#808080]"
               onClick={() => navigate('/search')}
             >
-              <img src={SearchIcon} alt="Search" className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="text-gray-400 text-sm sm:text-base font-medium">Search anything.....</span>
+              <FaSearch className="text-gray-400 w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
             </div>
           </div>
         </div>

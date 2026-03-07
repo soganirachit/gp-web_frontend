@@ -586,10 +586,23 @@ const Cart: React.FC = () => {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) setShowDatePicker(false);
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setShowDatePicker(false);
+      }
     };
-    if (showDatePicker) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+
+    if (showDatePicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+      // Prevent background scroll while date picker is open
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.body.style.overflow = '';
+    };
   }, [showDatePicker]);
 
   const handleTimeSlotSelect = (slot: string) => {
@@ -908,8 +921,15 @@ const Cart: React.FC = () => {
                 
                 {showDatePicker && (
                   <>
-                    <div className="fixed inset-0 bg-black bg-opacity-20 z-40" onClick={() => setShowDatePicker(false)} />
-                    <div ref={datePickerRef} className="absolute left-4 right-4 top-[calc(1rem+1.5rem+0.75rem+2.5rem+1rem+1rem)] bg-white rounded-xl shadow-2xl z-50 p-4 border border-gray-200">
+                    <div
+                      className="fixed inset-0 bg-black bg-opacity-20 z-40"
+                      onClick={() => setShowDatePicker(false)}
+                    />
+                    {/* Centered date picker modal; stays within viewport on all screen sizes */}
+                    <div
+                      ref={datePickerRef}
+                      className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1.2rem)] max-w-sm bg-white rounded-xl shadow-2xl z-50 p-4 border border-gray-200"
+                    >
                       <style>{`
                         .react-datepicker { border: none !important; font-family: inherit; }
                         .react-datepicker__header { background-color: white !important; border-bottom: 1px solid #e5e7eb !important; padding-top: 0.75rem; }
@@ -922,7 +942,14 @@ const Cart: React.FC = () => {
                         .react-datepicker__navigation { top: 1rem; }
                         .react-datepicker__navigation-icon::before { border-color: #6b7280; }
                       `}</style>
-                      <DatePicker selected={deliveryInfo?.selectedDate || null} onChange={handleDatePickerChange} minDate={new Date()} inline calendarClassName="!border-0 !shadow-none" className="w-full" />
+                      <DatePicker
+                        selected={deliveryInfo?.selectedDate || null}
+                        onChange={handleDatePickerChange}
+                        minDate={new Date()}
+                        inline
+                        calendarClassName="!border-0 !shadow-none"
+                        className="w-full"
+                      />
                     </div>
                   </>
                 )}

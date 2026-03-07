@@ -134,16 +134,15 @@ const MyOrders: React.FC = () => {
 
           {/* Search Bar */}
           <div className="flex gap-3">
-            <div className="flex-1 relative">
-
-              <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+          <div className="flex-1 relative">
               <input
                 type="text"
                 placeholder="Search your order here"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#f8f6f1] border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-gray-300"
+                className="w-full bg-[#f8f6f1] border border-[#808080] rounded-xl py-3 pl-4 pr-10 text-sm text-gray-900 placeholder:text-[#808080] focus:outline-none focus:border-gray-300"
               />
+              <FaSearch className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#808080]" size={16} />
             </div>
             <button className="w-12 h-[46px] flex items-center justify-center bg-white border border-gray-200 rounded-xl hover:bg-gray-50">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

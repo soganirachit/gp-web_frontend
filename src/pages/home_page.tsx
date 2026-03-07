@@ -8,7 +8,7 @@ import { FaLeaf, FaUsers, FaBox } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { addressService, Address } from '../services/address.service';
 import ProfileIcon from '../assets/icon/Profile.png';
-import SearchIcon from '../assets/icon/Search.png';
+import { FaSearch } from 'react-icons/fa';
 import storyImage from '../assets/Banner/Story.png';
 // SVG Imports
 import namasteSvg from '../assets/svg/namaste.svg';
@@ -142,7 +142,7 @@ const HomePage: React.FC = () => {
               onClick={() => navigate('/search')}
             >
               <span className="text-[#808080] text-sm sm:text-base font-medium">Search anything.....</span>
-              <img src={SearchIcon} alt="Search" className="w-4 h-4 sm:w-5 sm:h-5" />
+              <FaSearch className="text-[#808080] w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
 
             </div>
           </div>

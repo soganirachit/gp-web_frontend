@@ -498,7 +498,7 @@ const Home2: React.FC = () => {
               {/* Search Bar */}
               <div className="mt-4 sm:mt-5">
                 <div
-                  className="bg-white rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 cursor-pointer shadow-sm border border-gray-200"
+                  className="bg-white rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 cursor-pointer shadow-sm border border-[#808080]"
                   onClick={() => navigate('/search')}
                 >
                   <img src={SearchIcon} alt="Search" className="w-4 h-4 sm:w-5 sm:h-5" />

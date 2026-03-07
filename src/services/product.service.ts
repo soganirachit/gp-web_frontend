@@ -270,6 +270,87 @@ export const productService = {
       throw new Error("An unknown error occurred");
     }
   },
+
+  // Normalize API product object to BestSeller-like shape for consistent UI
+  normalizeToBestSeller(p: any): BestSeller {
+    const id = p.id != null ? Number(p.id) : 0;
+    const name = p.name || '';
+    const slug = p.slug || String(id) || '';
+    const primary_image =
+      p.primary_image ?? (Array.isArray(p.imagesUrl) ? p.imagesUrl[0] : p.imagesUrl) ?? p.image ?? null;
+    const base_price =
+      p.base_price != null ? String(p.base_price) : p.mrp != null ? String(p.mrp) : '0';
+    const current_price =
+      p.current_price != null ? Number(p.current_price) : p.sellingPrice != null ? Number(p.sellingPrice) : 0;
+    const effective_price =
+      p.effective_price != null ? String(p.effective_price) : String(current_price);
+    return {
+      id,
+      name,
+      slug,
+      sku: p.sku || '',
+      short_description: p.short_description ?? p.description ?? undefined,
+      description: p.description,
+      category_name: p.category_name ?? p.category ?? '',
+      availability_type: p.availability_type ?? 'store',
+      base_price,
+      sale_price: p.sale_price ?? null,
+      current_price,
+      effective_price,
+      discount_percentage: p.discount_percentage ?? 0,
+      primary_image,
+      is_featured: p.is_featured ?? false,
+      is_best_seller: p.is_best_seller ?? false,
+      is_perishable: p.is_perishable ?? false,
+      unit: p.unit ?? 'pack',
+      labels: Array.isArray(p.labels) ? p.labels : [],
+      in_stock: p.in_stock ?? true,
+    };
+  },
+
+  // Search products using GET /products/ with ?search= query (and optional store_id)
+  async searchProducts(search: string, storeId?: number, signal?: AbortSignal): Promise<BestSeller[]> {
+    try {
+      const params: Record<string, any> = { search };
+      if (storeId) params.store_id = storeId;
+
+      const response = await api.get(`${PRODUCTS_BASE}/`, { params, signal });
+      const data = response.data;
+
+      let list: any[] = [];
+      if (data && Array.isArray(data.results)) {
+        list = data.results;
+      } else if (data && data.success && Array.isArray(data.data)) {
+        list = data.data;
+      } else if (data && Array.isArray(data.data)) {
+        list = data.data;
+      } else if (Array.isArray(data)) {
+        list = data;
+      } else if (data && data.data && Array.isArray(data.data.products)) {
+        list = data.data.products;
+      } else if (data && Array.isArray(data.products)) {
+        list = data.products;
+      } else if (data?.data && Array.isArray(data.data)) {
+        list = data.data;
+      } else if (data && Array.isArray(data.items)) {
+        list = data.items;
+      } else {
+        console.warn("Search products: unexpected response shape", data);
+        return [];
+      }
+
+      return list.map((p) => productService.normalizeToBestSeller(p));
+    } catch (error: unknown) {
+      console.error("Error searching products:", error);
+      if (error instanceof AxiosError && (error.code === 'ERR_CANCELED' || error.name === 'AbortError')) {
+        return [];
+      }
+      if (error instanceof Error || error instanceof AxiosError) {
+        throw error;
+      }
+      throw new Error("An unknown error occurred");
+    }
+  },
 };
 
 /**
