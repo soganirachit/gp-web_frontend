@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { SEO } from "../components/SEO";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaChevronRight, FaSearch } from "react-icons/fa";
 import { MdKeyboardArrowDown } from "react-icons/md";
@@ -10,6 +11,7 @@ import { productService, Category, BestSeller, getEffectivePrice, getBasePrice, 
 import { storeService } from "../services/store.service";
 import { toast } from "react-hot-toast";
 import Spinner from "../components/common/Spinner";
+import { SearchBar } from "../components/common/SearchBar";
 import ErrorBoundary from "../components/ErrorBoundary";
 import SearchIcon from "../assets/icon/Search.png";
 // Note: If truckstore.svg doesn't exist, rename truckhome.svg to truckstore.svg
@@ -20,7 +22,8 @@ import locationhomeIcon from "../assets/svg/gp_daily svg/locationhome.svg";
 import profilehomeIcon from "../assets/svg/gp_daily svg/profilehome.svg";
 import profilelogoIcon from "../assets/svg/gp_daily svg/profilelogo.svg";
 import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
-import bannerSvg from "../assets/svg/gp_store_svg/banner.svg";
+// Large banner served from public/ for better caching
+const bannerSvg = '/gp_store_banner.svg';
 import BottomNavigation from "../components/layout/BottomNav";
 import namasteSvg from '../assets/svg/namaste.svg';
 
@@ -42,11 +45,7 @@ const GpStore_Homepage: React.FC = () => {
     const [isLoadingCategories, setIsLoadingCategories] = useState(true);
     const [bestSellers, setBestSellers] = useState<BestSeller[]>([]);
     const [isLoadingBestSellers, setIsLoadingBestSellers] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [submittedSearchQuery, setSubmittedSearchQuery] = useState(''); // only set on Enter or search icon click
-    const [allProductsForSearch, setAllProductsForSearch] = useState<BestSeller[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
-    const searchResultsRef = useRef<HTMLDivElement>(null);
+    const [storeId, setStoreId] = useState<number | null>(null);
 
     const fetchCustomerName = async () => {
         try {
@@ -200,9 +199,7 @@ const GpStore_Homepage: React.FC = () => {
         const abortController = new AbortController();
         
         const initializeStore = async () => {
-            const token = localStorage.getItem("token");
-            
-            if (token) {
+            if (localStorage.getItem("phoneNumber")) {
                 // User is logged in
                 if (isMounted) {
                     fetchCustomerName();
@@ -238,23 +235,10 @@ const GpStore_Homepage: React.FC = () => {
                         fetchCategories(abortController.signal);
                         fetchBestSellers(abortController.signal);
                         
-                        // Fetch all products for search
-                        const fetchAllProductsForSearch = async () => {
-                            try {
-                                const storeId = storeService.getStoreIdForProducts();
-                                const allProducts = await productService.getProductsByOrdering(undefined, storeId || undefined, abortController.signal);
-                                if (isMounted) {
-                                    setAllProductsForSearch(allProducts || []);
-                                }
-                            } catch (error: any) {
-                                if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED' && isMounted) {
-                                    console.error("Error fetching all products for search:", error);
-                                }
-                            }
-                        };
-                        fetchAllProductsForSearch();
+                        const sid = storeService.getStoreIdForProducts();
+                        if (isMounted) setStoreId(sid ?? null);
                     }
-                }, token ? 0 : 200); // Small delay for non-logged-in users to ensure store ID is set
+                }, localStorage.getItem("phoneNumber") ? 0 : 200); // Small delay for non-logged-in users to ensure store ID is set
             }
         };
 
@@ -283,41 +267,11 @@ const GpStore_Homepage: React.FC = () => {
     };
 
     const getImageUrl = (image?: string | string[] | null): string => {
-        if (!image) return "https://via.placeholder.com/160";
+        if (!image) return "/placeholder.svg";
         if (Array.isArray(image)) {
-            return image[0] || "https://via.placeholder.com/160";
+            return image[0] || "/placeholder.svg";
         }
         return image;
-    };
-
-    // Scroll search results into view only after user has submitted search (Enter or icon)
-    useEffect(() => {
-        if (submittedSearchQuery && !isSearching && searchResultsRef.current) {
-            searchResultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    }, [submittedSearchQuery, isSearching]);
-
-    // Run search via API only (called on Enter or search icon click)
-    const runSearch = useCallback(async () => {
-        const query = searchQuery.trim();
-        if (!query) return;
-
-        setSubmittedSearchQuery(query);
-        try {
-            setIsSearching(true);
-            const storeId = storeService.getStoreIdForProducts();
-            const results = await productService.searchProducts(query, storeId || undefined);
-            setAllProductsForSearch(results || []);
-        } catch (error) {
-            console.error("Error searching products:", error);
-            toast.error("Failed to search products. Please try again.");
-        } finally {
-            setIsSearching(false);
-        }
-    }, [searchQuery]);
-
-    const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') runSearch();
     };
 
     const isPageLoading = isLoadingAddress || isLoadingProducts || isLoadingCategories || isLoadingBestSellers;
@@ -333,15 +287,17 @@ const GpStore_Homepage: React.FC = () => {
     // Get premium products (fallback to products if best sellers not available)
     const premiumProducts = products.slice(3, 6);
 
-    // Search results only after user has submitted (Enter or search icon)
-    const filteredAllProducts = submittedSearchQuery ? allProductsForSearch : [];
-
     const filteredBestSellers = bestSellers;
     const filteredPremiumProducts = premiumProducts;
 
     return (
         <ErrorBoundary>
-            <div className="min-h-screen bg-[#f8f6f1] ">
+            <SEO
+              title="Genda Phool Store — Flowers, Bouquets & Pooja Items in Jaipur"
+              description="Shop fresh loose flowers, bouquets, garlands, pooja kits, diyas and incense online. Same-day delivery in Jaipur."
+              canonical="https://customerapp.mygendaphool.com/gp-store"
+            />
+            <div className="min-h-screen bg-[#f8f6f1] pb-24">
                 <div className="max-w-[800px] mx-auto">
                     {/* Top Header with Green Background */}
                     <div className="relative px-3 sm:px-4 pt-0 pb-8 sm:pb-12" style={{
@@ -389,29 +345,14 @@ const GpStore_Homepage: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Search Bar - search only on Enter or search icon click */}
+                            {/* Search Bar — unified styling, product suggestions as you type */}
                             <div className="mt-4 sm:mt-5">
-                                <div className="bg-white rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 shadow-sm border-none">
-                                    <input
-                                        type="text"
-                                        placeholder="Search anything...."
-                                        value={searchQuery}
-                                        onChange={(e) => {
-                                            setSearchQuery(e.target.value);
-                                            if (e.target.value.trim() === '') setSubmittedSearchQuery('');
-                                        }}
-                                        onKeyDown={handleSearchKeyDown}
-                                        className="flex-1 bg-transparent text-gray-900 text-sm sm:text-base font-medium focus:outline-none placeholder:text-gray-400"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={runSearch}
-                                        className="p-1 -mr-1 rounded-md hover:bg-gray-100 transition-colors"
-                                        aria-label="Search"
-                                    >
-                                        <FaSearch className="text-gray-400 w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                                    </button>
-                                </div>
+                                <SearchBar
+                                    mode="product"
+                                    storeId={storeId}
+                                    productBasePath="/gp-store"
+                                    searchPagePath="/search"
+                                />
                             </div>
 
                             {/* Delivery Banner - Inside the green header */}
@@ -432,88 +373,7 @@ const GpStore_Homepage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Search Results Section - only after Enter or search icon */}
-                    {submittedSearchQuery && (
-                        <div ref={searchResultsRef} className="px-4 py-4 bg-[#f8f6f1]">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">
-                                    Search Results
-                                </h2>
-                                <span className="text-sm text-gray-500">
-                                    {isSearching
-                                        ? 'Searching...'
-                                        : `${filteredAllProducts.length} ${filteredAllProducts.length === 1 ? 'result' : 'results'}`}
-                                </span>
-                            </div>
-                            {isSearching ? (
-                                <div className="min-h-[120px] flex items-center justify-center">
-                                    <Spinner size={80} />
-                                </div>
-                            ) : filteredAllProducts.length > 0 ? (
-                                <div className="grid grid-cols-2 gap-4">
-                                    {filteredAllProducts.map((product) => (
-                                        <div
-                                            key={product.id}
-                                            className="bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                                            onClick={() => handleProductClick(product)}
-                                        >
-                                            <div className="aspect-square bg-[#f8f6f1] overflow-hidden relative">
-                                                {product.labels && product.labels.length > 0 && (
-                                                    <div className="absolute top-2 left-0 z-10">
-                                                        <span
-                                                            className="inline-block text-white text-[10px] font-semibold px-2 py-1 rounded-r bg-[#19411F]"
-                                                        >
-                                                            {product.labels[0].name.toUpperCase()}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                                <img
-                                                    src={getImageUrl(product.primary_image)}
-                                                    alt={product.name}
-                                                    className="w-full h-full object-cover"
-                                                    onError={(e) => {
-                                                        (e.target as HTMLImageElement).src = "https://via.placeholder.com/160";
-                                                    }}
-                                                />
-                                            </div>
-                                            <div className="p-3">
-                                                <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
-                                                    {product.name}
-                                                </h3>
-                                                {product.short_description && (
-                                                    <p className="text-xs text-gray-500 mb-1 truncate">
-                                                        {product.short_description}
-                                                    </p>
-                                                )}
-                                                <div className="flex items-center justify-between gap-2 mt-2">
-                                                    <p className="text-gray-900 text-base font-bold">
-                                                        {showStrikeBase(product) && (
-                                                            <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(product)}</span>
-                                                        )}
-                                                        ₹{getEffectivePrice(product)}
-                                                    </p>
-                                                    <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="text-center py-8 sm:py-12">
-                                    <p className="text-gray-500 text-sm sm:text-base md:text-lg">No products found matching &quot;{submittedSearchQuery}&quot;</p>
-                                    <button
-                                        onClick={() => { setSearchQuery(''); setSubmittedSearchQuery(''); }}
-                                        className="mt-3 sm:mt-4 text-[#19411F] text-xs sm:text-sm font-medium hover:underline touch-target"
-                                    >
-                                        Clear search
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Welcome Section - hide when showing search results */}
-                    {!submittedSearchQuery && (
+                    {/* Welcome Section */}
                     <div className="px-4 pb-4">
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
@@ -533,10 +393,8 @@ const GpStore_Homepage: React.FC = () => {
                             </div>
                         </motion.div>
                     </div>
-                    )}
 
-                    {/* Pick your Blooms Section - hide when showing search results */}
-                    {!submittedSearchQuery && (
+                    {/* Pick your Blooms Section */}
                     <div className="px-4 py-4">
                         <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800 mb-6">Pick your Blooms</h2>
                         <div className="grid grid-cols-4 gap-3">
@@ -554,10 +412,10 @@ const GpStore_Homepage: React.FC = () => {
                                             <img
                                                 src={category.icon}
                                                 alt={category.name}
+                                                loading="lazy"
                                                 className="w-full h-full object-cover"
                                                 onError={(e) => {
-                                                    // Fallback to placeholder if image fails to load
-                                                    (e.target as HTMLImageElement).src = "https://via.placeholder.com/160";
+                                                    (e.target as HTMLImageElement).src = "/placeholder.svg";
                                                 }}
                                             />
                                         ) : (
@@ -573,19 +431,17 @@ const GpStore_Homepage: React.FC = () => {
                             ))}
                         </div>
                     </div>
-                    )}
 
-                    {!submittedSearchQuery && (
                     <div className="px-4 py-4">
                         <div className="relative w-full rounded-2xl overflow-hidden bg-[#F1FCF0]">
                             <div className="absolute inset-0 flex flex-col justify-center pl-6 sm:pl-10 z-10 w-3/4 sm:w-2/3">
                                 <h2 className="font-ibm-plex-serif text-xl sm:text-3xl font-semibold text-[#1A1A1A] leading-tight mb-4 sm:mb-6">
-                                    Wedding Bliss,
+                                    Wedding Bliss,{' '}
                                     <br />
                                     Wrapped in Gifts
                                 </h2>
                                 <button
-                                    onClick={() => navigate(`${basePath}/Products`)}
+                                    onClick={() => navigate(`${basePath}/products`)}
                                     className="w-fit bg-[#19411F] text-white px-6 py-2.5 sm:px-8 sm:py-3 rounded-lg font-medium text-sm sm:text-base tracking-wide hover:bg-[#1e4d1c] transition-colors shadow-sm flex items-center justify-center"
                                 >
                                     SHOP NOW
@@ -598,15 +454,13 @@ const GpStore_Homepage: React.FC = () => {
                             />
                         </div>
                     </div>
-                    )}
 
-                    {/* all Packs Section - Hide when showing search results */}
-                      {!submittedSearchQuery && (
+                    {/* all Packs Section */}
                     <div className="px-4 py-4">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">All Packs</h2>
                             <button
-                                onClick={() => navigate(`${basePath}/explore-more?category=All&section=All Packs`)}
+                                onClick={() => navigate(`${basePath}/products`)}
                                 className="flex items-center gap-1 text-gray-500 text-sm font-medium"
                             >
                                 <span>Explore More</span>
@@ -650,14 +504,13 @@ const GpStore_Homepage: React.FC = () => {
                             ))}
                         </div>
                     </div>
-                    )}
-                    {/* Best Section - Hide when showing search results */}
-                    {!submittedSearchQuery && (
+
+                    {/* Best Section */}
                     <div className="px-4 py-4">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">Best Sellers</h2>
                             <button
-                               onClick={() => navigate(`${basePath}/explore-more?category=Best&section=Best Sellers`)}
+                               onClick={() => navigate(`${basePath}/products`)}
                                 className="flex items-center gap-1 text-gray-500 text-sm font-medium"
                             >
                                 <span>Explore More</span>
@@ -684,11 +537,12 @@ const GpStore_Homepage: React.FC = () => {
                                                 </div>
                                             )}
                                             <img
-                                                src={bestSeller.primary_image || "https://via.placeholder.com/160"}
+                                                src={bestSeller.primary_image || "/placeholder.svg"}
                                                 alt={bestSeller.name}
+                                                loading="lazy"
                                                 className="w-full h-full object-cover"
                                                 onError={(e) => {
-                                                    (e.target as HTMLImageElement).src = "https://via.placeholder.com/160";
+                                                    (e.target as HTMLImageElement).src = "/placeholder.svg";
                                                 }}
                                             />
                                         </div>
@@ -720,15 +574,13 @@ const GpStore_Homepage: React.FC = () => {
                             )}
                         </div>
                     </div>
-                    )}
 
-                    {/* Premium Packs Section - Hide when showing search results */}
-                    {!submittedSearchQuery && (
+                    {/* Premium Packs Section */}
                     <div className="px-4 py-4">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">Premium Packs</h2>
                             <button
-                                onClick={() => navigate("/gp-store/explore-more?category=Premium&section=Premium Packs")}
+                                onClick={() => navigate(`${basePath}/products`)}
                                 className="flex items-center gap-1 text-gray-500 text-sm font-medium"
                             >
                                 <span>Explore More</span>
@@ -778,10 +630,8 @@ const GpStore_Homepage: React.FC = () => {
                             )}
                         </div>
                     </div>
-                    )}
 
-                    {/* Quote of the Day Section - hide when showing search results */}
-                    {!submittedSearchQuery && (
+                    {/* Quote of the Day Section */}
                     <div>
                         <img
                             src={bottomBannerSvg}
@@ -789,7 +639,6 @@ const GpStore_Homepage: React.FC = () => {
                             className="w-full h-auto"
                         />
                     </div>
-                    )}
                 </div>
 
                 {/* Bottom Navigation */}

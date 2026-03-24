@@ -88,21 +88,6 @@ export interface SubscriptionConfirmRequest {
 
 class SubscriptionService {
   /**
-   * Get authorization headers for API requests
-   */
-  private getHeaders() {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      throw new Error("Authentication required");
-    }
-
-    return {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    };
-  }
-
-  /**
    * Normalize subscription type to uppercase
    */
   private normalizeType(type: string): "DAILY" | "CUSTOM" {
@@ -146,13 +131,11 @@ class SubscriptionService {
       // Validate input data
       this.validateSubscriptionData(data);
 
-      const headers = this.getHeaders();
       const normalizedType = this.normalizeType(data.type);
 
       console.log("Processing subscription initiation:", {
         inputData: data,
         normalizedType,
-        headers,
       });
 
       // Define a type for the payload
@@ -186,10 +169,8 @@ class SubscriptionService {
 
       const response = await fetch(`${SUBSCRIPTION_API_URL}/initiate`, {
         method: "POST",
-        headers: {
-          ...headers,
-          "Content-Type": "application/json",
-        },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -232,7 +213,6 @@ class SubscriptionService {
     data: SubscriptionConfirmRequest
   ): Promise<SubscriptionConfirmResponse> {
     try {
-      const headers = this.getHeaders();
       const normalizedType = this.normalizeType(data.type);
 
       const payload = {
@@ -245,7 +225,8 @@ class SubscriptionService {
 
       const response = await fetch(`${SUBSCRIPTION_API_URL}/confirm`, {
         method: "POST",
-        headers: headers,
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -279,10 +260,10 @@ class SubscriptionService {
    */
   async getCustomerSubscriptions(): Promise<Subscription[]> {
     try {
-      const headers = this.getHeaders();
       const response = await fetch(`${SUBSCRIPTION_API_URL}`, {
         method: "GET",
-        headers,
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
       });
 
       if (!response.ok) {
@@ -302,16 +283,14 @@ class SubscriptionService {
    */
   async toggleSubscriptionStatus(subscriptionId: string, resumeDate?: Date) {
     try {
-      const headers = this.getHeaders();
-      const payload = resumeDate
-        ? { resumeDate: resumeDate.toISOString() }
-        : {};
+      const payload = resumeDate ? { resumeDate: resumeDate.toISOString() } : {};
 
       const response = await fetch(
         `${SUBSCRIPTION_API_URL}/${subscriptionId}/toggle-status`,
         {
           method: "PATCH",
-          headers,
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         }
       );
@@ -333,13 +312,13 @@ class SubscriptionService {
    */
   async cancelSubscription(subscriptionId: string, cancellationReason: string) {
     try {
-      const headers = this.getHeaders();
       const response = await fetch(
         `${SUBSCRIPTION_API_URL}/${subscriptionId}/cancel`,
         {
           method: "PATCH",
-          headers,
-          body: JSON.stringify({ cancellationReason }), // Send reason in body
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cancellationReason }),
         }
       );
       const data = await response.json();
@@ -392,10 +371,10 @@ class SubscriptionService {
     }
   ): Promise<Subscription> {
     try {
-      const headers = this.getHeaders();
       const response = await fetch(`${SUBSCRIPTION_API_URL}/${subscriptionId}`, {
         method: "PUT",
-        headers,
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: updates.type,
           selectedDays: updates.selectedDays,

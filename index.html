@@ -3,19 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
-    <!-- Add this in the head section -->
-<link rel="preconnect" href="https://maps.googleapis.com" />
-<link rel="preconnect" href="https://maps.gstatic.com" />
+    <link rel="preconnect" href="https://maps.googleapis.com" />
+    <link rel="preconnect" href="https://maps.gstatic.com" />
     <!-- Google Fonts - IBM Plex Serif -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Genda Phool</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Title managed dynamically by react-helmet-async per page -->
+    <!-- Google Search Console verification — replace with actual code from Search Console -->
+    <meta name="google-site-verification" content="REPLACE_WITH_GOOGLE_VERIFICATION_CODE" />
   </head>
   <body>
+    <!-- Meta Pixel noscript fallback — replace REPLACE_WITH_YOUR_PIXEL_ID -->
+    <noscript>
+      <img
+        height="1"
+        width="1"
+        style="display:none"
+        src="https://www.facebook.com/tr?id=REPLACE_WITH_YOUR_PIXEL_ID&ev=PageView&noscript=1"
+        alt=""
+      />
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-
   </body>
 </html>

@@ -9,6 +9,7 @@ import { toast } from 'react-hot-toast';
 import { FaWhatsapp } from 'react-icons/fa';
 import { MdEdit } from 'react-icons/md';
 import { useFeatureTheme } from '../../../../context/FeatureThemeContext';
+import Spinner from '../../../common/Spinner';
 
 interface LocationState {
   phoneNumber: string;
@@ -28,7 +29,7 @@ const OTPVerification: React.FC = () => {
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
 
   const [otp, setOtp] = useState<string[]>(new Array(6).fill(""));
-  const [countdown, setCountdown] = useState<number>(29);
+  const [countdown, setCountdown] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState('');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -50,12 +51,16 @@ const OTPVerification: React.FC = () => {
       navigate(`${basePath}/login`);
       return;
     }
+  }, [phoneNumber, navigate]);
 
+  // Countdown timer — only runs when countdown > 0 (after resend is clicked)
+  useEffect(() => {
+    if (countdown <= 0) return;
     const timer = setInterval(() => {
       setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(timer);
-  }, [phoneNumber, navigate]);
+  }, [countdown]);
 
   const handleChange = (element: HTMLInputElement, index: number) => {
     if (isSubmitting) return;
@@ -129,10 +134,8 @@ const OTPVerification: React.FC = () => {
       if (response.success && response.message) {
         toast.success(response.message || 'OTP verified successfully!');
 
-        // Login with tokens
-        if (response.access_token) {
-          login(response.access_token, phoneNumber, response.refresh_token);
-        }
+        // Login — tokens are in HttpOnly cookies set by server
+        login(phoneNumber);
 
         // Store user info if available
         if (response.user) {
@@ -206,7 +209,7 @@ const OTPVerification: React.FC = () => {
 
     try {
       await authService.sendOTP(phoneNumber);
-      setCountdown(29);
+      setCountdown(30);
       setError('');
     } catch (err: any) {
       let errorMessage = err?.response?.data?.message || err?.message || 'Failed to resend OTP';
@@ -330,7 +333,7 @@ const OTPVerification: React.FC = () => {
               className={`w-full py-3 sm:py-3.5 md:py-4 px-4 rounded-lg sm:rounded-xl font-semibold transition-colors duration-200 text-base sm:text-lg flex items-center justify-center ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
             >
               {isSubmitting ? (
-                <div className={`w-5 h-5 sm:w-6 sm:h-6 border-2 border-t-transparent rounded-full animate-spin ${feature === 'gpDaily' ? 'border-black' : 'border-white'}`} />
+                <Spinner size={24} variant="light" className="flex-shrink-0" />
               ) : (
                 'Continue'
               )}

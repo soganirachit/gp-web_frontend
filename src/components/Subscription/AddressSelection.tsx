@@ -15,6 +15,7 @@ import { customerService } from "../../services/getcustomer.service";
 import { FaPen } from "react-icons/fa";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import Spinner from "../common/Spinner";
+import { formatPhoneForDisplay } from "../../utils/phoneDisplay";
 
 const AddressSelection: React.FC = () => {
   const navigate = useNavigate();
@@ -68,8 +69,7 @@ const AddressSelection: React.FC = () => {
     if (hasInitialized.current) return;
     hasInitialized.current = true;
 
-    const token = localStorage.getItem("token");
-    if (!token) {
+    if (!localStorage.getItem("phoneNumber")) {
       handleAuthError(
         new Error("Authentication required. Please login to continue.")
       );
@@ -469,7 +469,7 @@ const AddressSelection: React.FC = () => {
           const resolvedDeliveryTime = metaDataToUse.deliveryTime || new Date().toISOString();
 
           const missingFields = {
-            customerId: !resolvedCustomerId && !localStorage.getItem("token"),
+            customerId: !resolvedCustomerId && !localStorage.getItem("phoneNumber"),
             productId: !resolvedProductId,
             quantity: !resolvedQuantity || Number.isNaN(resolvedQuantity),
             addressId: !addressToUse.id,
@@ -1136,7 +1136,7 @@ const AddressSelection: React.FC = () => {
                     </span>
                     <span className="ml-3 font-medium text-gray-800">
                       {address.associatedPhoneNumber ? (
-                        `+91 ${address.associatedPhoneNumber}`
+                        `+91 ${formatPhoneForDisplay(address.associatedPhoneNumber)}`
                       ) : (
                         <span className="italic">NA</span>
                       )}

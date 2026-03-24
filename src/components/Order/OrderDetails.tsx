@@ -14,6 +14,7 @@ import orderDeliveredIcon from '../../assets/svg/gp_store_svg/orderdelivered.svg
 import deliveryIcon from '../../assets/svg/gp_store_svg/delivery.svg';
 import detailshomeIcon from '../../assets/svg/gp_store_svg/detailshome.svg';
 import detailsuserIcon from '../../assets/svg/gp_store_svg/detailsuser.svg';
+import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
 
 interface OrderItem {
   id: number;
@@ -295,8 +296,9 @@ const OrderDetails: React.FC = () => {
                   <div key={item.id || index} className="flex gap-3">
                     <div className="w-16 h-16 flex-shrink-0">
                       <img
-                        src={item.product.primary_image || 'https://via.placeholder.com/100'}
+                        src={item.product.primary_image || '/placeholder.svg'}
                         alt={item.product.name}
+                        loading="lazy"
                         className="w-full h-full object-cover rounded-xl"
                       />
                     </div>
@@ -382,7 +384,9 @@ const OrderDetails: React.FC = () => {
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-900">
                         {order.delivery_address.receiver_name}{' '}
-                        <span className="text-sm font-normal text-gray-600">{order.delivery_address.receiver_phone}</span>
+                        <span className="text-sm font-normal text-gray-600">
+                          {formatPhoneForDisplay(order.delivery_address.receiver_phone) || order.delivery_address.receiver_phone}
+                        </span>
                       </p>
                     </div>
                   </div>

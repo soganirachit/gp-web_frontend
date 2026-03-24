@@ -4,7 +4,6 @@ import { FaPen, FaTrash } from 'react-icons/fa';
 import { IoArrowBack } from 'react-icons/io5';
 import { BsCheckSquareFill } from 'react-icons/bs';
 import { addressService, type Address } from '../../services/address.service';
-import BottomNav from '../../components/layout/BottomNav';
 import Spinner from '../../components/common/Spinner';
 import { GoogleMap, useJsApiLoader } from '@react-google-maps/api';
 
@@ -14,6 +13,7 @@ import workIcon from '../../assets/svg/adressbook/office.svg';
 import othersIcon from '../../assets/svg/adressbook/others.svg';
 import defaultIcon from '../../assets/svg/adressbook/default.svg';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
+import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
 
 const Addresses: React.FC = () => {
   const navigate = useNavigate();
@@ -126,17 +126,17 @@ const Addresses: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f6f1] px-4">
-      <div className="max-w-[800px] mx-auto">
+    <div className="min-h-screen bg-[#f8f6f1] pb-24">
+      <div className="max-w-[800px] mx-auto px-4">
         {/* Header */}
-        <div className="py-4 flex items-center mb-2">
+        <div className="p-4 pt-6 -mx-4 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200 mb-2 flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
-            className="hover:bg-gray-100 rounded-full p-2 transition-colors mr-3"
+            className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
           >
-            <IoArrowBack className="text-xl" />
+            <IoArrowBack size={24} />
           </button>
-          <h1 className="text-2xl font-semibold text-gray-800">My Address</h1>
+          <h1 className="text-2xl font-bold font-serif text-gray-900">My Addresses</h1>
         </div>
 
         {/* Main Content */}
@@ -214,7 +214,7 @@ const Addresses: React.FC = () => {
 
                             {/* Phone Text */}
                             <p className="text-gray-800 font-base text-sm mb-4">
-                              +91 {address.associatedPhoneNumber}
+                              +91 {formatPhoneForDisplay(address.associatedPhoneNumber)}
                             </p>
                           </div>
 
@@ -279,11 +279,6 @@ const Addresses: React.FC = () => {
               </button>
             </>
           )}
-        </div>
-
-        {/* Bottom Navigation */}
-        <div>
-          <BottomNav />
         </div>
 
         {/* Delete Confirmation Modal */}

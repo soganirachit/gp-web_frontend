@@ -1,5 +1,7 @@
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
+import api from "./api";
 import { getApiUrl } from "../config/api.config";
+import { toIndianE164 } from "../utils/phoneDisplay";
 
 // API Address structure (from Django backend)
 interface ApiAddress {
@@ -162,7 +164,7 @@ const mapFrontendToApi = (input: AddressInput): Record<string, any> => {
     apiData.receiver_name = input.name;
   }
   if (input.associatedPhoneNumber) {
-    apiData.receiver_phone = input.associatedPhoneNumber;
+    apiData.receiver_phone = toIndianE164(String(input.associatedPhoneNumber));
   }
 
   // Add landmark if provided
@@ -184,20 +186,11 @@ const mapFrontendToApi = (input: AddressInput): Record<string, any> => {
   return apiData;
 };
 
-const getHeaders = () => {
-  const token = localStorage.getItem("token");
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
-};
 
 class AddressService {
   async getAllAddresses(): Promise<Address[]> {
     try {
-      const response = await axios.get(`${API_URL}/`, {
-        headers: getHeaders(),
-      });
+      const response = await api.get(`${API_URL}/`);
 
       // Handle API response: { success, message, data: [addresses] }
       if (response.data.success && Array.isArray(response.data.data)) {
@@ -215,9 +208,7 @@ class AddressService {
 
   async getAddressById(id: string): Promise<Address> {
     try {
-      const response = await axios.get(`${API_URL}/${id}/`, {
-        headers: getHeaders(),
-      });
+      const response = await api.get(`${API_URL}/${id}/`);
 
       if (response.data.success && response.data.data) {
         return mapApiToFrontend(response.data.data);
@@ -235,9 +226,7 @@ class AddressService {
   async createAddress(addressInput: AddressInput): Promise<Address> {
     try {
       const apiData = mapFrontendToApi(addressInput);
-      const response = await axios.post(`${API_URL}/`, apiData, {
-        headers: getHeaders(),
-      });
+      const response = await api.post(`${API_URL}/`, apiData);
 
       if (response.data.success && response.data.data) {
         return mapApiToFrontend(response.data.data);
@@ -254,10 +243,16 @@ class AddressService {
 
   async updateAddress(id: string, addressInput: Partial<AddressInput>): Promise<Address> {
     try {
-      const apiData = mapFrontendToApi(addressInput as AddressInput);
-      const response = await axios.put(`${API_URL}/${id}/`, apiData, {
-        headers: getHeaders(),
+      // Build the full API payload then strip keys that were not provided.
+      // Sending only the changed fields via PATCH (partial update).
+      const fullApiData = mapFrontendToApi(addressInput as AddressInput);
+      const apiData: Record<string, any> = {};
+      Object.entries(fullApiData).forEach(([key, value]) => {
+        if (value !== "" && value !== null && value !== undefined) {
+          apiData[key] = value;
+        }
       });
+      const response = await api.patch(`${API_URL}/${id}/`, apiData);
 
       if (response.data.success && response.data.data) {
         return mapApiToFrontend(response.data.data);
@@ -274,9 +269,7 @@ class AddressService {
 
   async deleteAddress(id: string): Promise<void> {
     try {
-      const response = await axios.delete(`${API_URL}/${id}/`, {
-        headers: getHeaders(),
-      });
+      const response = await api.delete(`${API_URL}/${id}/`);
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to delete address");
@@ -292,9 +285,7 @@ class AddressService {
 
   async setDefaultAddress(id: string): Promise<Address> {
     try {
-      const response = await axios.post(`${API_URL}/${id}/set-default/`, {}, {
-        headers: getHeaders(),
-      });
+      const response = await api.post(`${API_URL}/${id}/set-default/`, {});
 
       if (response.data.success && response.data.data) {
         return mapApiToFrontend(response.data.data);
@@ -318,10 +309,9 @@ class AddressService {
         return { isValid: false, message: 'Invalid coordinates format' };
       }
 
-      const response = await axios.post(
+      const response = await api.post(
         `${getApiUrl()}/stores/validate-coverage/`,
-        { latitude: lat, longitude: lng },
-        { headers: getHeaders() }
+        { latitude: lat, longitude: lng }
       );
 
       // Handle API response structure: { success, message, data: { serviceable, reason, nearest_store, distance_km, store, zone } }

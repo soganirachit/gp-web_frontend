@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import { addressService } from "../../services/address.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import Spinner from "../../components/common/Spinner";
 
 // List of cities where delivery is available
 const SERVICED_CITIES = [
@@ -441,7 +442,7 @@ const HomePageLocation: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <Spinner size={400} className="mb-4" />
           <p className="text-gray-600">Loading map...</p>
         </div>
       </div>
@@ -600,12 +601,12 @@ const HomePageLocation: React.FC = () => {
                     placeholder="Search for a location..."
                     value={locationSearchQuery}
                     onChange={(e) => setLocationSearchQuery(e.target.value)}
-                    className="w-full p-3 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent"
+                    className="w-full p-3 pl-4 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent text-left"
                     style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
                     onFocus={(e) => e.target.style.borderColor = theme.colors.primary}
                     onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
                   />
-                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       className="h-5 w-5"
@@ -629,9 +630,9 @@ const HomePageLocation: React.FC = () => {
                   type="text"
                   placeholder="Loading map..."
                   disabled
-                  className="w-full p-3 pl-10 pr-4 border border-gray-300 rounded-lg bg-gray-100"
+                  className="w-full p-3 pl-4 pr-10 border border-gray-300 rounded-lg bg-gray-100 text-left"
                 />
-                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-5 w-5"
@@ -699,7 +700,7 @@ const HomePageLocation: React.FC = () => {
             </GoogleMap>
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+              <Spinner size={400} />
             </div>
           )}
         </div>
@@ -712,7 +713,7 @@ const HomePageLocation: React.FC = () => {
             <h2 className="font-medium">Complete Address</h2>
             {isValidatingDeliveryZone ? (
               <div className="flex items-center gap-2 text-sm text-gray-600">
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-[#F15A22]"></div>
+                <Spinner size={16} />
                 <span>Checking delivery zone...</span>
               </div>
             ) : (

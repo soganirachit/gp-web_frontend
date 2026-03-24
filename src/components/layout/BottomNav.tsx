@@ -67,7 +67,7 @@ const BottomNav: React.FC = () => {
     return (
       <nav className="fixed bottom-0 left-0 right-0 flex justify-center pointer-events-none z-50">
         <div className="max-w-[800px] w-full mx-0 sm:mx-4 bg-white shadow-lg rounded-t-none sm:rounded-t-lg pointer-events-auto overflow-visible">
-          <div className="flex justify-between items-center px-4 py-3 pt-4">
+          <div className="flex justify-between items-center px-3 py-2 pt-2">
             <Link
               to="/"
               className={`flex flex-col items-center justify-center flex-1 relative ${isActive("/")
@@ -79,16 +79,16 @@ const BottomNav: React.FC = () => {
                 <img
                   src={storeGreenBanner}
                   alt=""
-                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 object-contain pointer-events-none"
+                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
                 />
               )}
               <img
                 src={homeIcon}
                 alt="Home"
-                className={`w-7 h-7 mb-1 relative z-10 ${isActive("/") ? "brightness-0 invert" : "opacity-90"
+                className={`w-5 h-5 mb-0.5 relative z-10 ${isActive("/") ? "brightness-0 invert" : "opacity-90"
                   }`}
               />
-              <span className={`text-xs font-medium relative z-10 ${isActive("/") ? "text-white" : "text-[#19411f]"}`}>Home</span>
+              <span className={`text-[10px] font-medium relative z-10 ${isActive("/") ? "text-white" : "text-[#19411f]"}`}>Home</span>
             </Link>
 
             <Link
@@ -102,13 +102,13 @@ const BottomNav: React.FC = () => {
                 <img
                   src={storeGreenBanner}
                   alt=""
-                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 object-contain pointer-events-none"
+                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
                 />
               )}
               <img
                 src={storeLogo}
                 alt="Store"
-                className={`w-12 h-12 relative z-10 ${isActive("/gp-store") ? "brightness-0 invert" : "opacity-90"
+                className={`w-9 h-9 relative z-10 ${isActive("/gp-store") ? "brightness-0 invert" : "opacity-90"
                   }`}
               />
             </Link>
@@ -125,23 +125,23 @@ const BottomNav: React.FC = () => {
                 <img
                   src={storeGreenBanner}
                   alt=""
-                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 object-contain pointer-events-none"
+                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
                 />
               )}
               <div className="relative">
                 <img
                   src={basketIcon}
                   alt="Basket"
-                  className={`w-7 h-7 mb-1 relative z-10 ${isActive("/gp-store/basket") ? "brightness-0 invert" : "opacity-90"
+                  className={`w-5 h-5 mb-0.5 relative z-10 ${isActive("/gp-store/basket") ? "brightness-0 invert" : "opacity-90"
                     }`}
                 />
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-white text-[#2A6B28] text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5 z-20 border-2 border-[#2A6B28] shadow-md">
+                  <span className="absolute -top-0.5 -right-0.5 bg-white text-[#2A6B28] text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 z-20 border border-[#2A6B28]">
                     {cartItemCount > 99 ? '99+' : cartItemCount}
                   </span>
                 )}
               </div>
-              <span className={`text-xs font-medium relative z-10 ${isActive("/gp-store/basket") ? "text-white" : "text-[#19411f]"}`}>Basket</span>
+              <span className={`text-[10px] font-medium relative z-10 ${isActive("/gp-store/basket") ? "text-white" : "text-[#19411f]"}`}>Basket</span>
             </Link>
 
             <Link
@@ -155,16 +155,16 @@ const BottomNav: React.FC = () => {
                 <img
                   src={storeGreenBanner}
                   alt=""
-                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 object-contain pointer-events-none"
+                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
                 />
               )}
               <img
                 src={orderStoreIcon}
                 alt="Order"
-                className={`w-7 h-7 mb-1 relative z-10 ${isActive(`${basePath}/orders`) ? "brightness-0 invert" : "opacity-90"
+                className={`w-5 h-5 mb-0.5 relative z-10 ${isActive(`${basePath}/orders`) ? "brightness-0 invert" : "opacity-90"
                   }`}
               />
-              <span className={`text-xs font-medium relative z-10 ${isActive(`${basePath}/orders`) ? "text-white" : "text-[#19411f]"}`}>Order</span>
+              <span className={`text-[10px] font-medium relative z-10 ${isActive(`${basePath}/orders`) ? "text-white" : "text-[#19411f]"}`}>Order</span>
             </Link>
 
             <Link
@@ -178,18 +178,18 @@ const BottomNav: React.FC = () => {
                 <img
                   src={storeGreenBanner}
                   alt=""
-                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 object-contain pointer-events-none"
+                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
                 />
               )}
               <img
                 src={accountIcon}
                 alt="Account"
-                className={`w-7 h-7 mb-1 relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`])
+                className={`w-5 h-5 mb-0.5 relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`])
                   ? "brightness-0 invert"
                   : "opacity-90"
                   }`}
               />
-              <span className={`text-xs font-medium relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`]) ? "text-white" : "text-[#19411f]"}`}>Account</span>
+              <span className={`text-[10px] font-medium relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`]) ? "text-white" : "text-[#19411f]"}`}>Account</span>
             </Link>
           </div>
         </div>
@@ -201,7 +201,7 @@ const BottomNav: React.FC = () => {
   return (
     <nav className="fixed bottom-0 left-0 right-0 flex justify-center pointer-events-none z-50">
       <div className="max-w-[800px] w-full mx-0 sm:mx-4 bg-white shadow-lg rounded-t-none sm:rounded-t-lg pointer-events-auto overflow-visible">
-        <div className="flex justify-between items-center px-4 py-3 pt-4">
+        <div className="flex justify-between items-center px-3 py-2 pt-2">
           <Link
             to="/"
             className={`flex flex-col items-center justify-center flex-1 relative ${isActive("/")
@@ -213,16 +213,16 @@ const BottomNav: React.FC = () => {
               <img
                 src={activeBg}
                 alt=""
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 object-contain pointer-events-none"
+                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
               />
             )}
             <img
               src={homeIcon}
               alt="Home"
-              className={`w-7 h-7 mb-1 relative z-10 ${isActive("/") ? "" : "opacity-90"
+              className={`w-5 h-5 mb-0.5 relative z-10 ${isActive("/") ? "" : "opacity-90"
                 }`}
             />
-            <span className={`text-xs font-medium relative z-10 ${isActive("/") ? "text-gray-700" : ""}`}>Home</span>
+            <span className={`text-[10px] font-medium relative z-10 ${isActive("/") ? "text-gray-700" : ""}`}>Home</span>
           </Link>
 
           <Link
@@ -236,13 +236,13 @@ const BottomNav: React.FC = () => {
               <img
                 src={activeBg}
                 alt=""
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 object-contain pointer-events-none"
+                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
               />
             )}
             <img
               src={dailyIcon}
               alt="Daily"
-              className={`w-11 h-11 relative z-10 ${isActive("/gp-daily") ? "" : "opacity-90"
+              className={`w-9 h-9 relative z-10 ${isActive("/gp-daily") ? "" : "opacity-90"
                 }`}
             />
           </Link>
@@ -258,16 +258,16 @@ const BottomNav: React.FC = () => {
               <img
                 src={activeBg}
                 alt=""
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 object-contain pointer-events-none"
+                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
               />
             )}
             <img
               src={walletIcon}
               alt="Wallet"
-              className={`w-7 h-7 mb-1 relative z-10 ${isActive(`${basePath}/wallet`) ? "" : "opacity-90"
+              className={`w-5 h-5 mb-0.5 relative z-10 ${isActive(`${basePath}/wallet`) ? "" : "opacity-90"
                 }`}
             />
-            <span className={`text-xs font-medium relative z-10 ${isActive(`${basePath}/wallet`) ? "text-gray-700" : ""}`}>Wallet</span>
+            <span className={`text-[10px] font-medium relative z-10 ${isActive(`${basePath}/wallet`) ? "text-gray-700" : ""}`}>Wallet</span>
           </Link>
 
           <Link
@@ -282,25 +282,25 @@ const BottomNav: React.FC = () => {
               <img
                 src={activeBg}
                 alt=""
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 object-contain pointer-events-none"
+                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
               />
             )}
             <div className="relative">
               <img
                 src={basketIcon}
                 alt="Basket"
-                className={`w-7 h-7 mb-1 relative z-10 ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts", `${basePath}/basket`])
+                className={`w-5 h-5 mb-0.5 relative z-10 ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts", `${basePath}/basket`])
                   ? ""
                   : "opacity-90"
                   }`}
               />
               {cartItemCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-[#2A6B28] text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 z-20">
+                <span className="absolute -top-0.5 -right-0.5 bg-[#2A6B28] text-white text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 z-20">
                   {cartItemCount > 99 ? '99+' : cartItemCount}
                 </span>
               )}
             </div>
-            <span className={`text-xs font-medium relative z-10 ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts", `${basePath}/basket`]) ? "text-gray-700" : ""}`}>Basket</span>
+            <span className={`text-[10px] font-medium relative z-10 ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts", `${basePath}/basket`]) ? "text-gray-700" : ""}`}>Basket</span>
           </Link>
 
           <Link
@@ -314,18 +314,18 @@ const BottomNav: React.FC = () => {
               <img
                 src={activeBg}
                 alt=""
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 object-contain pointer-events-none"
+                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
               />
             )}
             <img
               src={accountIcon}
               alt="Account"
-              className={`w-7 h-7 mb-1 relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`])
+              className={`w-5 h-5 mb-0.5 relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`])
                 ? ""
                 : "opacity-90"
                 }`}
             />
-            <span className={`text-xs font-medium relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`]) ? "text-gray-700" : ""}`}>Account</span>
+            <span className={`text-[10px] font-medium relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`]) ? "text-gray-700" : ""}`}>Account</span>
           </Link>
         </div>
       </div>

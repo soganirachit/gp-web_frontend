@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import BottomNav from "../../components/layout/BottomNav";
 import { IoArrowBack } from "react-icons/io5";
 import { FaChevronRight } from "react-icons/fa";
 import { orderService } from "@/services/order.service";
@@ -264,10 +263,6 @@ const CustomerSupport: React.FC = () => {
           </div>
         </div>
 
-        {/* Bottom Navigation */}
-        <div className="sticky bottom-0 z-20">
-          <BottomNav />
-        </div>
       </div>
     </div>
   );

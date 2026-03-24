@@ -109,9 +109,9 @@ const ProductPage: React.FC = () => {
 
   // Helper function to get image URL
   const getImageUrl = (imagesUrl?: string | string[]): string => {
-    if (!imagesUrl) return "https://via.placeholder.com/160";
+    if (!imagesUrl) return "/placeholder.svg";
     if (Array.isArray(imagesUrl)) {
-      return imagesUrl[0] || "https://via.placeholder.com/160";
+      return imagesUrl[0] || "/placeholder.svg";
     }
     return imagesUrl;
   };
@@ -234,7 +234,7 @@ const ProductPage: React.FC = () => {
               className="rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 cursor-pointer shadow-sm border border-[#808080]"
               onClick={() => navigate('/search')}
             >
-              <span className="text-gray-400 text-sm sm:text-base font-medium">Search anything.....</span>
+              <span className="flex-1 text-left text-gray-400 text-sm sm:text-base font-medium">Search anything.....</span>
               <FaSearch className="text-gray-400 w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
             </div>
           </div>

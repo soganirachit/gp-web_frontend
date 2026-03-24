@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "./api";
 import { getApiUrl } from "../config/api.config";
 import { headerService } from "./headers.service";
 
@@ -18,6 +18,12 @@ export interface CartItemResponse {
     unit?: string;
     unit_value?: string;
   };
+  variant?: {
+    id: number;
+    name: string;
+    variant_type: string;
+    sku: string;
+  } | null;
 }
 
 export interface CartData {
@@ -48,7 +54,7 @@ class CartService {
   async getCart(): Promise<CartResponse> {
     try {
       const headers = headerService.getHeaders();
-      const response = await axios.get<CartResponse>(`${API_URL}/`, { headers });
+      const response = await api.get<CartResponse>(`${API_URL}/`, { headers });
       return response.data;
     } catch (error: any) {
       headerService.handleError(error);
@@ -70,40 +76,31 @@ class CartService {
    * @param storeId - Store ID
    * @param quantity - Quantity to add
    * @param specialInstructions - Optional special instructions/customized message
+   * @param variantId - Optional variant ID (for products with size/type variants); sent when backend supports it
    */
   async addToCart(
     productId: number,
     storeId: number,
     quantity: number,
-    specialInstructions?: string
+    specialInstructions?: string,
+    variantId?: number
   ): Promise<CartResponse> {
     try {
-      console.log('CartService.addToCart called with:', { productId, storeId, quantity, specialInstructions });
-      console.log('API_URL:', `${API_URL}/add/`);
       const headers = headerService.getHeaders();
-      console.log('Headers retrieved, making POST request...');
-      const payload = {
+      const payload: Record<string, unknown> = {
         product_id: productId,
         store_id: storeId,
         quantity,
         special_instructions: specialInstructions || undefined,
       };
-      console.log('Request payload:', payload);
-      const response = await axios.post<CartResponse>(
+      if (variantId != null) payload.variant_id = variantId;
+      const response = await api.post<CartResponse>(
         `${API_URL}/add/`,
         payload,
         { headers }
       );
-      console.log('addToCart API response:', response.data);
       return response.data;
     } catch (error: any) {
-      console.error('CartService.addToCart error:', error);
-      console.error('Error details:', {
-        message: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status,
-        url: error?.config?.url
-      });
       headerService.handleError(error);
       throw error;
     }
@@ -122,7 +119,7 @@ class CartService {
       if (specialInstructions !== undefined) {
         payload.special_instructions = specialInstructions;
       }
-      const response = await axios.put<CartItemResponse>(
+      const response = await api.put<CartItemResponse>(
         `${API_URL}/items/${cartItemId}/`,
         payload,
         { headers }
@@ -141,7 +138,7 @@ class CartService {
   async removeCartItem(cartItemId: number): Promise<void> {
     try {
       const headers = headerService.getHeaders();
-      await axios.delete(`${API_URL}/items/${cartItemId}/remove/`, { headers });
+      await api.delete(`${API_URL}/items/${cartItemId}/remove/`, { headers });
     } catch (error: any) {
       headerService.handleError(error);
       throw error;
@@ -154,7 +151,7 @@ class CartService {
   async clearCart(): Promise<void> {
     try {
       const headers = headerService.getHeaders();
-      await axios.post(`${API_URL}/clear/`, {}, { headers });
+      await api.post(`${API_URL}/clear/`, {}, { headers });
     } catch (error: any) {
       headerService.handleError(error);
       throw error;
@@ -162,24 +159,28 @@ class CartService {
   }
 
   /**
-   * Sync local cart items to API
-   * This will add all items from local cart to API cart
-   * @param items - Array of cart items with product_id and inventory_id
+   * Sync local cart items to API.
+   * Adds each item to the API cart. Uses storeId for all items (single-store cart).
+   * @param items - Array of cart items with product_id, quantity; optionally variant_id when backend supports it
+   * @param storeId - Store ID (required for cart add)
    */
-  async syncCart(items: Array<{
-    product_id: number;
-    inventory_id: number;
-    quantity: number;
-    special_instructions?: string;
-  }>): Promise<void> {
+  async syncCart(
+    items: Array<{
+      product_id: number;
+      variant_id?: number;
+      quantity: number;
+      special_instructions?: string;
+    }>,
+    storeId: number
+  ): Promise<void> {
     try {
-      // Add each item to the API cart
       for (const item of items) {
         await this.addToCart(
           item.product_id,
-          item.inventory_id,
+          storeId,
           item.quantity,
-          item.special_instructions
+          item.special_instructions,
+          item.variant_id
         );
       }
     } catch (error: any) {

@@ -35,6 +35,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
         <img
           src={imageUrl}
           alt={packName}
+          loading="lazy"
           className="w-full h-full object-cover"
         />
 

@@ -8,7 +8,7 @@ import { useCart } from '../../../context/CartContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useFeatureTheme } from '../../../context/FeatureThemeContext';
 import { addressService, Address } from '../../../services/address.service';
-import BottomNav from '../../../components/layout/BottomNav';
+import { storeService } from '../../../services/store.service';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format, addDays, isToday, isTomorrow } from 'date-fns';
@@ -19,8 +19,35 @@ import { orderService } from '../../../services/order.service';
 import { customerService } from '../../../services/getcustomer.service';
 import { cartService } from '../../../services/cart.service';
 import Spinner from '../../../components/common/Spinner';
+import api from '../../../services/api';
+import { getApiUrl } from '../../../config/api.config';
+import { useNetworkRecovery } from '../../../hooks/useNetworkRecovery';
+import { SEO } from '../../../components/SEO';
+import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface DeliverySlot {
+  id: number;
+  slot_name: string;
+  start_time: string;
+  end_time: string;
+}
+
+// Format "07:00:00"–"11:00:00" as "7-11am", "12:00:00"–"16:00:00" as "12-4pm"
+const formatSlotTimeRange = (start: string, end: string): string => {
+  const parse = (t: string) => {
+    const [h, m] = t.slice(0, 5).split(':').map(Number);
+    const period = h < 12 ? 'am' : 'pm';
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return { h: h12, m: m || 0, period };
+  };
+  const s = parse(start);
+  const e = parse(end);
+  const startStr = s.m > 0 ? `${s.h}:${String(s.m).padStart(2, '0')}` : `${s.h}`;
+  const endStr = e.m > 0 ? `${e.h}:${String(e.m).padStart(2, '0')}` : `${e.h}`;
+  return `${startStr}-${endStr}${e.period}`;
+};
 
 interface ApplyCouponResponse {
   message?: string;
@@ -52,49 +79,27 @@ interface Coupon {
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
 const fetchCoupons = async (): Promise<Coupon[]> => {
-  const token = localStorage.getItem('token');
-  const res = await fetch('http://185.137.122.250:8083/api/v1/cart/coupons/', {
-    method: 'GET',
-    headers: {
-      accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-  if (!res.ok) throw new Error('Failed to fetch coupons');
-  const json = await res.json();
-  // Response shape: { success: true, message: "...", data: [...] }
+  const storeId = storeService.getStoreIdForProducts() ?? 4;
+  const res = await api.get(`${getApiUrl()}/cart/coupons/?store_id=${storeId}`);
+  const json = res.data;
   return Array.isArray(json) ? json : (json.data ?? json.results ?? json.coupons ?? []);
 };
 
 const applyCouponAPI = async (couponCode: string): Promise<ApplyCouponResponse> => {
-  const token = localStorage.getItem('token');
-  const res = await fetch('http://185.137.122.250:8083/api/v1/cart/apply-coupon/', {
-    method: 'POST',
-    headers: {
-      accept: '*/*',
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ coupon_code: couponCode }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
+  try {
+    const res = await api.post(`${getApiUrl()}/cart/apply-coupon/`, { coupon_code: couponCode });
+    return res.data;
+  } catch (error: any) {
+    const err = error?.response?.data || {};
     throw new Error(err?.message || err?.detail || 'Invalid or expired promo code');
   }
-  return res.json();
 };
 
 const removeCouponAPI = async (): Promise<void> => {
-  const token = localStorage.getItem('token');
-  const res = await fetch('http://185.137.122.250:8083/api/v1/cart/remove-coupon/', {
-    method: 'POST',
-    headers: {
-      accept: '*/*',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
+  try {
+    await api.post(`${getApiUrl()}/cart/remove-coupon/`, {});
+  } catch (error: any) {
+    const err = error?.response?.data || {};
     throw new Error(err?.message || err?.detail || 'Failed to remove promo code');
   }
 };
@@ -277,6 +282,7 @@ const Cart: React.FC = () => {
   const location = useLocation();
   const { isLoggedIn } = useAuth();
   const { feature } = useFeatureTheme();
+  const { storePendingPayment, getPendingPayments, removePendingPayment, retryWithBackoff } = useNetworkRecovery();
   const {
     items,
     deliveryInfo,
@@ -295,18 +301,19 @@ const Cart: React.FC = () => {
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDateOption, setSelectedDateOption] = useState<'today' | 'tomorrow' | 'dayAfter' | 'pickDate'>('tomorrow');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('8-11 AM');
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
+  const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<DeliverySlot[]>([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Check authentication and redirect if session expired
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const phoneNumber = localStorage.getItem('phoneNumber');
-    if (!isLoggedIn || !token || !phoneNumber) {
+    if (!isLoggedIn || !localStorage.getItem('access_token')) {
       const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
-      navigate(`${basePath}/login`, { 
+      navigate(`${basePath}/login`, {
         state: { returnUrl: location.pathname, fromCart: true },
-        replace: true 
+        replace: true
       });
     }
   }, [isLoggedIn, navigate, location.pathname, feature]);
@@ -439,7 +446,49 @@ const Cart: React.FC = () => {
     return () => clearTimeout(timer);
   }, [shouldTriggerPayment]);
 
-  const timeSlots = ['8-11 AM', '11-2 PM', '2-6 PM', '6-9 PM'];
+  // Fetch available delivery slots for a given date from the backend.
+  // Falls back to empty array on error — checkout button will show a message.
+  const fetchSlotsForDate = async (date: Date) => {
+    setIsLoadingSlots(true);
+    try {
+      const storeId = storeService.getStoreIdForProducts() ?? 4;
+      const params = new URLSearchParams();
+      params.set('store_id', String(storeId));
+      const response = await api.get(`/delivery/slots/available/?${params.toString()}`);
+      const raw = Array.isArray(response.data) ? response.data : (response.data?.data ?? response.data?.results ?? []);
+      // API returns [{ slot: { id, slot_name, start_time, end_time }, is_available }, ...] — flatten and filter
+      const slots: DeliverySlot[] = raw
+        .filter((item: any) => item?.is_available !== false && item?.slot)
+        .map((item: any) => {
+          const s = item.slot;
+          return { id: s.id, slot_name: s.slot_name, start_time: s.start_time, end_time: s.end_time };
+        });
+      setAvailableSlots(slots);
+      // Auto-select first slot, or restore previously selected slot if still available
+      if (slots.length > 0) {
+        const restored = deliveryInfo?.slotId
+          ? slots.find(s => s.id === deliveryInfo.slotId)
+          : null;
+        const toSelect = restored ?? slots[0];
+        setSelectedSlotId(toSelect.id);
+        setSelectedTimeSlot(toSelect.slot_name);
+        updateDeliveryInfo({
+          ...(deliveryInfo ?? { deliveryDate: format(date, 'dd MMM yyyy'), selectedDate: date }),
+          timeSlot: toSelect.slot_name,
+          slotId: toSelect.id,
+        });
+      } else {
+        setSelectedSlotId(null);
+        setSelectedTimeSlot('');
+      }
+    } catch {
+      setAvailableSlots([]);
+      setSelectedSlotId(null);
+      setSelectedTimeSlot('');
+    } finally {
+      setIsLoadingSlots(false);
+    }
+  };
 
   // Load cart from API on mount
   useEffect(() => {
@@ -493,6 +542,7 @@ const Cart: React.FC = () => {
   }, [isLoggedIn, isLoadingAddress, isLoadingCartTotals, isSyncing]);
 
   // Fetch cart totals
+  // Depend on `items` so the summary auto-refreshes when quantities or items change
   useEffect(() => {
     const fetchCartTotals = async () => {
       if (!isLoggedIn) return;
@@ -513,7 +563,7 @@ const Cart: React.FC = () => {
       }
     };
     fetchCartTotals();
-  }, [isLoggedIn]);
+  }, [isLoggedIn, items]);
 
   // Fetch address
   useEffect(() => {
@@ -548,39 +598,47 @@ const Cart: React.FC = () => {
     fetchAddress();
   }, [isLoggedIn, location.state]);
 
-  // Init delivery info
+  // Init delivery info and fetch slots for the current/default date
   useEffect(() => {
+    const tomorrow = addDays(new Date(), 1);
     if (!deliveryInfo) {
-      const tomorrow = addDays(new Date(), 1);
-      updateDeliveryInfo({ deliveryDate: format(tomorrow, 'dd MMM yyyy'), timeSlot: '8-11 AM', selectedDate: tomorrow });
+      updateDeliveryInfo({ deliveryDate: format(tomorrow, 'dd MMM yyyy'), timeSlot: '', selectedDate: tomorrow });
       setSelectedDateOption('tomorrow');
-      setSelectedTimeSlot('8-11 AM');
+      fetchSlotsForDate(tomorrow);
     } else {
-      if (deliveryInfo.selectedDate) {
-        const dateObj = deliveryInfo.selectedDate instanceof Date ? deliveryInfo.selectedDate : new Date(deliveryInfo.selectedDate);
-        if (isToday(dateObj)) setSelectedDateOption('today');
-        else if (isTomorrow(dateObj)) setSelectedDateOption('tomorrow');
-        else {
-          const dayAfter = addDays(new Date(), 2);
-          setSelectedDateOption(format(dateObj, 'yyyy-MM-dd') === format(dayAfter, 'yyyy-MM-dd') ? 'dayAfter' : 'pickDate');
-        }
+      const dateObj = deliveryInfo.selectedDate instanceof Date
+        ? deliveryInfo.selectedDate
+        : deliveryInfo.selectedDate
+          ? new Date(deliveryInfo.selectedDate)
+          : tomorrow;
+      if (isToday(dateObj)) setSelectedDateOption('today');
+      else if (isTomorrow(dateObj)) setSelectedDateOption('tomorrow');
+      else {
+        const dayAfter = addDays(new Date(), 2);
+        setSelectedDateOption(format(dateObj, 'yyyy-MM-dd') === format(dayAfter, 'yyyy-MM-dd') ? 'dayAfter' : 'pickDate');
       }
-      setSelectedTimeSlot(deliveryInfo.timeSlot);
+      // Restore display label from stored slot, then fetch fresh slots
+      if (deliveryInfo.timeSlot) setSelectedTimeSlot(deliveryInfo.timeSlot);
+      if (deliveryInfo.slotId) setSelectedSlotId(deliveryInfo.slotId);
+      fetchSlotsForDate(dateObj);
     }
-  }, [deliveryInfo, updateDeliveryInfo]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDateOptionSelect = (option: 'today' | 'tomorrow' | 'dayAfter' | 'pickDate') => {
     setSelectedDateOption(option);
     if (option === 'pickDate') { setShowDatePicker(true); return; }
     const dateMap = { today: new Date(), tomorrow: addDays(new Date(), 1), dayAfter: addDays(new Date(), 2) };
     const selectedDate = dateMap[option];
-    updateDeliveryInfo({ deliveryDate: format(selectedDate, 'dd MMM yyyy'), timeSlot: selectedTimeSlot, selectedDate });
+    updateDeliveryInfo({ deliveryDate: format(selectedDate, 'dd MMM yyyy'), timeSlot: '', slotId: undefined, selectedDate });
+    fetchSlotsForDate(selectedDate);
   };
 
   const handleDatePickerChange = (date: Date | null) => {
     if (date) {
       setShowDatePicker(false);
-      updateDeliveryInfo({ deliveryDate: format(date, 'dd MMM yyyy'), timeSlot: selectedTimeSlot, selectedDate: date });
+      updateDeliveryInfo({ deliveryDate: format(date, 'dd MMM yyyy'), timeSlot: '', slotId: undefined, selectedDate: date });
+      fetchSlotsForDate(date);
     }
   };
 
@@ -605,9 +663,10 @@ const Cart: React.FC = () => {
     };
   }, [showDatePicker]);
 
-  const handleTimeSlotSelect = (slot: string) => {
-    setSelectedTimeSlot(slot);
-    if (deliveryInfo) updateDeliveryInfo({ ...deliveryInfo, timeSlot: slot });
+  const handleTimeSlotSelect = (slot: DeliverySlot) => {
+    setSelectedSlotId(slot.id);
+    setSelectedTimeSlot(slot.slot_name);
+    if (deliveryInfo) updateDeliveryInfo({ ...deliveryInfo, timeSlot: slot.slot_name, slotId: slot.id });
   };
 
   const handleEditItem = (itemId: string) => {
@@ -689,14 +748,18 @@ const Cart: React.FC = () => {
         try { deliveryDateFormatted = format(new Date(deliveryInfo.deliveryDate), 'yyyy-MM-dd'); }
         catch { deliveryDateFormatted = format(addDays(new Date(), 1), 'yyyy-MM-dd'); }
       }
+      if (!selectedSlotId) {
+        toast.error('Please select a delivery time slot');
+        setIsProcessingPayment(false);
+        return;
+      }
       const checkoutData = {
         delivery_address_id: Number(defaultAddress.id),
+        delivery_slot_id: selectedSlotId,
         delivery_date: deliveryDateFormatted,
-        delivery_instructions: deliveryInfo.deliveryDate ? `${deliveryInfo.deliveryDate} - ${deliveryInfo.timeSlot}` : deliveryInfo.timeSlot,
+        delivery_instructions: '',
         customer_notes: '',
       };
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('Authentication required. Please login again.');
       const checkoutResponse = await paymentService.createCheckoutOrder(checkoutData);
       const normalizedRazorpayOrderId = checkoutResponse.razorpay_order_id || (checkoutResponse as any).order?.id || checkoutResponse.order_id;
       const normalizedAmount = checkoutResponse.amount ?? (checkoutResponse as any).order?.amount;
@@ -708,10 +771,49 @@ const Cart: React.FC = () => {
       setRazorpayAmount(typeof normalizedAmount === 'number' ? normalizedAmount : Math.round(total * 100));
       setShouldTriggerPayment(true);
       setIsProcessingPayment(false);
+      // Pixel: InitiateCheckout — fire when Razorpay checkout is triggered
+      trackInitiateCheckout(
+        items.map(item => ({ id: item.productId, price: item.price, quantity: item.quantity })),
+        total
+      );
     } catch (error: any) {
       toast.error(error.message || 'Failed to initiate payment. Please try again.');
       setIsProcessingPayment(false);
     }
+  };
+
+  // Shared logic: given verified order/payment data, clear cart and navigate to success
+  const finalizeOrder = (orderNumber: string, amount: number) => {
+    // Pixel: Purchase — fired once per successful order
+    trackPurchase(
+      orderNumber,
+      items.map(item => ({ id: item.productId, price: item.price, quantity: item.quantity })),
+      amount
+    );
+    clearCart();
+    removePendingPayment(orderNumber); // clean up any stored pending payment
+    toast.success('Order placed successfully!');
+    const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+    navigate(`${basePath}/payment-success`, {
+      state: { orderId: orderNumber, orderNumber, amount },
+    });
+  };
+
+  // Poll status endpoint until the order appears or we give up
+  const pollPaymentStatus = async (razorpayOrderId: string, amountPaise: number): Promise<boolean> => {
+    const MAX_POLLS = 5;
+    for (let i = 0; i < MAX_POLLS; i++) {
+      try {
+        const status = await paymentService.getPaymentStatus(razorpayOrderId);
+        if (status.status === 'completed' && status.order_number) {
+          finalizeOrder(status.order_number, parseFloat(status.amount) || amountPaise / 100);
+          return true;
+        }
+      } catch (_) {}
+      // Wait 2s between polls (skip wait after last attempt)
+      if (i < MAX_POLLS - 1) await new Promise(r => setTimeout(r, 2000));
+    }
+    return false;
   };
 
   const handlePaymentSuccess = async (paymentData: {
@@ -722,42 +824,86 @@ const Cart: React.FC = () => {
   }) => {
     setIsProcessingPayment(true);
     setShouldTriggerPayment(false);
-    try {
-      const verifyResponse = await paymentService.verifyPayment({
-        razorpay_order_id: paymentData.razorpay_order_id,
-        razorpay_payment_id: paymentData.razorpay_payment_id,
-        razorpay_signature: paymentData.razorpay_signature,
-      });
-      if (verifyResponse.order && verifyResponse.payment) {
-        clearCart();
-        toast.success('Order placed successfully!');
-        const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
-        navigate(`${basePath}/payment-success`, {
-          state: { orderId: verifyResponse.order.order_number, orderNumber: verifyResponse.order.order_number, amount: razorpayAmount / 100 },
-        });
-      } else {
-        throw new Error('Order creation failed');
+
+    // Persist to localStorage immediately — so a crash/background here doesn't lose the payment
+    const pendingId = storePendingPayment({
+      razorpay_payment_id: paymentData.razorpay_payment_id,
+      razorpay_order_id: paymentData.razorpay_order_id,
+      razorpay_signature: paymentData.razorpay_signature,
+      amount: razorpayAmount,
+    });
+
+    const verifyPayload = {
+      razorpay_order_id: paymentData.razorpay_order_id,
+      razorpay_payment_id: paymentData.razorpay_payment_id,
+      razorpay_signature: paymentData.razorpay_signature,
+    };
+
+    // Retry verify up to 3 times — it's fully idempotent on the backend
+    const verified = await retryWithBackoff(async () => {
+      try {
+        const res = await paymentService.verifyPayment(verifyPayload);
+        if (res.order && res.payment) {
+          finalizeOrder(res.order.order_number, razorpayAmount / 100);
+          removePendingPayment(pendingId);
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to verify payment. Please contact support.');
-      if (paymentData.razorpay_order_id) {
+    }, 3);
+
+    if (!verified) {
+      // Verify retries exhausted — fall back to polling the status endpoint
+      const recovered = await pollPaymentStatus(paymentData.razorpay_order_id, razorpayAmount);
+      if (!recovered) {
+        // Payment was taken by Razorpay but we couldn't confirm the order.
+        // Keep the pending payment in localStorage so it can be retried on next app load.
+        toast.error('We received your payment but could not confirm your order. Please check your orders or contact support.');
+      }
+    }
+
+    setIsProcessingPayment(false);
+  };
+
+  // On mount: recover any pending payments from a previous session that crashed after Razorpay SDK
+  // success but before /verify/ completed (e.g. app went background, network dropped)
+  useEffect(() => {
+    const pending = getPendingPayments();
+    if (!pending.length) return;
+
+    const recover = async () => {
+      for (const payment of pending) {
+        const verifyPayload = {
+          razorpay_order_id: payment.razorpay_order_id,
+          razorpay_payment_id: payment.razorpay_payment_id,
+          razorpay_signature: payment.razorpay_signature,
+        };
+
+        // Try verify first (idempotent)
+        let done = false;
         try {
-          const statusResponse = await paymentService.getPaymentStatus(paymentData.razorpay_order_id);
-          if (statusResponse.status === 'completed' && statusResponse.order_number) {
-            clearCart();
-            toast.success('Order placed successfully!');
-            const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
-            navigate(`${basePath}/payment-success`, {
-              state: { orderId: statusResponse.order_number, orderNumber: statusResponse.order_number, amount: parseFloat(statusResponse.amount) },
-            });
-            return;
+          const res = await paymentService.verifyPayment(verifyPayload);
+          if (res.order && res.payment) {
+            finalizeOrder(res.order.order_number, payment.amount / 100);
+            removePendingPayment(payment.id);
+            done = true;
           }
         } catch (_) {}
+
+        // If verify failed, try status poll
+        if (!done) {
+          const recovered = await pollPaymentStatus(payment.razorpay_order_id, payment.amount);
+          if (recovered) removePendingPayment(payment.id);
+        }
       }
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  };
+    };
+
+    recover();
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handlePaymentError = (error: Error) => {
     toast.error(error.message || 'Payment failed. Please try again.');
@@ -779,9 +925,7 @@ const Cart: React.FC = () => {
   };
 
   // Auth guard
-  const token = localStorage.getItem('token');
-  const phoneNumber = localStorage.getItem('phoneNumber');
-  if (!isLoggedIn || !(token && phoneNumber)) {
+  if (!isLoggedIn || !localStorage.getItem('access_token')) {
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
     return <Navigate to={`${basePath}/login`} state={{ returnUrl: location.pathname, fromCart: true }} replace />;
   }
@@ -799,6 +943,12 @@ const Cart: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
+      <SEO
+        title="My Basket — Genda Phool"
+        description="Your Genda Phool basket"
+        canonical="https://customerapp.mygendaphool.com/gp-store/basket"
+        noIndex={true}
+      />
       <div className="max-w-[800px] mx-auto pb-20">
         {/* Header */}
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
@@ -830,12 +980,17 @@ const Cart: React.FC = () => {
                     <img
                       src={item.image}
                       alt={item.name}
+                      loading="lazy"
                       className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
-                      onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/80'; }}
+                      onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between mb-1">
-                        <h3 className="font-semibold text-gray-900 text-base">{item.name} x{item.quantity}</h3>
+                        <h3 className="font-semibold text-gray-900 text-base">
+                          {item.name}
+                          {item.variant?.name && <span className="text-gray-600 font-normal"> ({item.variant.name})</span>}
+                          {' '}x{item.quantity}
+                        </h3>
                         <div className="relative">
                           <button onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
                             <FaEllipsisV className="text-gray-600" />
@@ -858,8 +1013,8 @@ const Cart: React.FC = () => {
                         </div>
                       )}
                       <div className="text-lg font-bold text-gray-900 mb-2">₹{item.price} each</div>
-                      {item.customizedMessage && !editingItemId && (
-                        <div className="text-sm text-gray-600">Customized Message: {item.customizedMessage}</div>
+                      {item.categorySlug?.toLowerCase().includes('bouquet') && item.customizedMessage && !editingItemId && (
+                        <div className="text-sm text-gray-600">Message: {item.customizedMessage}</div>
                       )}
                     </div>
                   </div>
@@ -878,18 +1033,20 @@ const Cart: React.FC = () => {
                           </button>
                         </div>
                       </div>
+                      {item.categorySlug?.toLowerCase().includes('bouquet') && (
                       <div>
                         <label className="text-sm font-medium text-gray-700 mb-2 block">Customized Message (optional)</label>
                         <textarea
                           value={editMessage}
                           onChange={(e) => { if (e.target.value.length <= 500) setEditMessage(e.target.value); }}
-                          placeholder="Add a personalized message..."
+                          placeholder="Add a personalized message for the bouquet..."
                           className="w-full p-3 rounded-lg border-2 border-gray-200 focus:border-[#19411F] focus:outline-none resize-none text-sm"
                           rows={3}
                           maxLength={500}
                         />
                         <div className="text-xs text-gray-500 mt-1 text-right">{editMessage.length}/500</div>
                       </div>
+                      )}
                       <div className="flex gap-3 pt-2">
                         <button onClick={handleCancelEdit} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center justify-center">Cancel</button>
                         <button onClick={() => handleSaveEdit(item.id)} className="flex-1 px-4 py-2 bg-[#19411F] text-white rounded-lg hover:bg-[#1e5a1c] transition-colors text-sm font-medium flex items-center justify-center">Save</button>
@@ -917,7 +1074,10 @@ const Cart: React.FC = () => {
                   ))}
                 </div>
 
-                <h3 className="text-base font-semibold text-gray-900 mb-3 mt-4">Time Slot</h3>
+                <h3 className="text-base font-semibold text-gray-900 mb-3 mt-4">
+                  Time Slot
+                  {isLoadingSlots && <span className="ml-2 text-xs font-normal text-gray-400">Loading...</span>}
+                </h3>
                 
                 {showDatePicker && (
                   <>
@@ -954,18 +1114,26 @@ const Cart: React.FC = () => {
                   </>
                 )}
 
-                <div className="grid grid-cols-4 gap-2">
-                  {timeSlots.map((slot) => (
-                    <button
-                      key={slot}
-                      onClick={() => handleTimeSlotSelect(slot)}
-                      className={`px-2.5 py-2 min-h-[36px] rounded-xl text-[10px] font-medium transition-colors flex items-center justify-center ${
-                        selectedTimeSlot === slot ? 'bg-[#19411F] text-white' : 'bg-white text-gray-700 border border-gray-200'
-                      }`}
-                    >
-                      {slot}
-                    </button>
-                  ))}
+                <div className="w-full">
+                  {isLoadingSlots ? (
+                    <div className="text-xs text-gray-400 py-2 text-center">Checking availability...</div>
+                  ) : availableSlots.length === 0 ? (
+                    <div className="text-xs text-red-500 py-2 text-center">No slots available for this date</div>
+                  ) : (
+                    <div className="grid gap-2 w-full" style={{ gridTemplateColumns: `repeat(${availableSlots.length}, 1fr)` }}>
+                      {availableSlots.map((slot) => (
+                        <button
+                          key={slot.id}
+                          onClick={() => handleTimeSlotSelect(slot)}
+                          className={`w-full min-w-0 px-2.5 py-2 min-h-[36px] rounded-xl text-[10px] font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                            selectedSlotId === slot.id ? 'bg-[#19411F] text-white' : 'bg-white text-gray-700 border border-gray-200'
+                          }`}
+                        >
+                          {slot.start_time && slot.end_time ? formatSlotTimeRange(slot.start_time, slot.end_time) : (slot.slot_name || 'Slot')}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1102,7 +1270,6 @@ const Cart: React.FC = () => {
         />
       )}
 
-      <BottomNav />
     </div>
   );
 };

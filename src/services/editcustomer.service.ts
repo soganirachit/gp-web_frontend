@@ -1,6 +1,8 @@
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
+import api from "./api";
 import { getApiUrl } from "../config/api.config";
 import { DjangoUser } from "./getcustomer.service";
+import { phoneDigitsAsNumber } from "../utils/phoneDisplay";
 
 export interface CustomerDetails {
   id: string;
@@ -24,11 +26,7 @@ export interface UpdateProfileData {
 
 export const editCustomerService = {
   async editCustomer(data: UpdateProfileData): Promise<CustomerDetails> {
-    const token = localStorage.getItem("token");
-    if (!token) throw new Error("Authentication token not found");
-
     try {
-      // Map frontend format to API format (phoneNumber not updatable)
       const apiData: Record<string, any> = {};
       if (data.firstName !== undefined) apiData.first_name = data.firstName;
       if (data.lastName !== undefined) apiData.last_name = data.lastName;
@@ -36,16 +34,7 @@ export const editCustomerService = {
       if (data.gender !== undefined) apiData.gender = data.gender.toLowerCase();
       if (data.date_of_birth !== undefined) apiData.date_of_birth = data.date_of_birth;
 
-      const response = await axios.put(
-        `${getApiUrl()}/users/me/update/`,
-        apiData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await api.put(`${getApiUrl()}/users/me/update/`, apiData);
 
       if (!response.data.success || !response.data.data) {
         throw new Error(response.data.message || "Failed to update profile");
@@ -58,7 +47,7 @@ export const editCustomerService = {
         firstName: user.first_name || "",
         lastName: user.last_name || "",
         emailAddress: user.email || "",
-        phoneNumber: parseInt(user.phone?.replace(/\D/g, '') || '0') || 0,
+        phoneNumber: phoneDigitsAsNumber(user.phone),
         gender: user.gender || "",
         isPhoneNumberVerified: user.is_phone_verified ? 1 : 0,
       };
@@ -77,29 +66,11 @@ export const editCustomerService = {
    * @throws Error if request fails
    */
   async deleteAccount(): Promise<{ success: boolean; message?: string }> {
-    const token = localStorage.getItem("token");
-    if (!token) throw new Error("Authentication token not found");
-
     try {
       const apiUrl = getApiUrl();
-      
-      // Construct the full API URL
-      let deleteAccountUrl = `${apiUrl}/api/v1/users/me/delete-account/`;
-      // If base URL already includes /api/v1, don't add it again
-      if (apiUrl.includes('/api/v1')) {
-        deleteAccountUrl = `${apiUrl}/users/me/delete-account/`;
-      }
+      const deleteAccountUrl = `${apiUrl}/users/me/delete-account/`;
 
-      const response = await axios.post(
-        deleteAccountUrl,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await api.post(deleteAccountUrl, {});
 
       if (response.data.success || response.status === 200) {
         return {

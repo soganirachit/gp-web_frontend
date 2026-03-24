@@ -1,0 +1,32 @@
+User-agent: *
+Allow: /home
+Allow: /gp-store
+Allow: /gp-store/products
+Allow: /gp-store/product/
+Disallow: /gp-store/basket
+Disallow: /gp-store/orders
+Disallow: /gp-store/account
+Disallow: /gp-store/addresses
+Disallow: /gp-store/wallet
+Disallow: /gp-daily/
+
+# Allow known AI crawlers to index public content
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+Sitemap: https://customerapp.mygendaphool.com/sitemap.xml

@@ -2,48 +2,105 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom base styles */
+/* ── Responsive globals ──────────────────────────────────────────────────── */
 @layer base {
+  /* Prevent horizontal overflow on all Indian phone widths (360px+) */
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+    width: 100%;
+  }
+
+  /* Ensure box-sizing is consistent across all elements */
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
   body {
     @apply bg-[#f8f6f1];
+    /* Minimum supported width (360px budget Android) */
+    min-width: 320px;
+    /* Respect safe areas for punch-hole / notch / Dynamic Island phones */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
-  
+
+  /* Better touch targets on mobile — minimum 44×44 px per Apple HIG / Google MDC */
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent text from overflowing narrow containers on small phones */
+  p, span, h1, h2, h3, h4, h5, h6, label {
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Smooth scrolling on iOS (prevents the "stutter" on older iPhones) */
+  .overflow-y-auto, .overflow-y-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+
   /* IBM Plex Serif font family */
   .font-ibm-plex-serif {
     font-family: 'IBM Plex Serif', serif;
   }
 }
 
-/* Custom components */
+/* ── Custom components ────────────────────────────────────────────────────── */
 @layer components {
   .card-background {
     @apply bg-[#f8f6f1];
   }
+
+  /* Full-width safe container — centred, max 480px, respects safe areas */
+  .app-container {
+    width: 100%;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
 }
 
-/* Custom utilities */
+/* ── Custom utilities ─────────────────────────────────────────────────────── */
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
-  
+
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  
+
   .line-clamp-1 {
     display: -webkit-box;
     -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  
+
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  /* Padding that accounts for the bottom safe area (for phones with home indicator) */
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .mb-safe {
+    margin-bottom: max(0px, env(safe-area-inset-bottom));
+  }
 }
-  
+
+@keyframes bannerFadeIn {
+  from { opacity: 0; transform: scale(1.02); }
+  to   { opacity: 1; transform: scale(1); }
+}

@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "./api";
 import { getApiUrl } from "../config/api.config";
 import { headerService } from "./headers.service";
 
@@ -76,18 +76,9 @@ class PaymentService {
     data: CreateCheckoutOrderRequest
   ): Promise<CreateCheckoutOrderResponse> {
     try {
-      const headers = headerService.getHeaders();
-      console.log('Payment Service - Headers:', {
-        hasAuth: !!headers.Authorization,
-        authPrefix: headers.Authorization?.substring(0, 10),
-        url: `${API_URL}/create-order/`,
-        data
-      });
-
-      const response = await axios.post(
+      const response = await api.post(
         `${API_URL}/create-order/`,
-        data,
-        { headers }
+        data
       );
 
       console.log('Payment Service - Raw Response:', response.data);
@@ -194,11 +185,9 @@ class PaymentService {
     data: VerifyPaymentRequest
   ): Promise<VerifyPaymentResponse> {
     try {
-      const headers = headerService.getHeaders();
-      const response = await axios.post(
+      const response = await api.post(
         `${API_URL}/verify/`,
-        data,
-        { headers }
+        data
       );
 
       if (response.data && response.data.success === false) {
@@ -228,10 +217,8 @@ class PaymentService {
     razorpayOrderId: string
   ): Promise<PaymentStatusResponse> {
     try {
-      const headers = headerService.getHeaders();
-      const response = await axios.get(
-        `${API_URL}/status/${razorpayOrderId}/`,
-        { headers }
+      const response = await api.get(
+        `${API_URL}/status/${razorpayOrderId}/`
       );
 
       return response.data;

@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { SEO } from "../SEO";
+import { trackViewContent, trackAddToCart } from "../../lib/metaPixel";
 import "react-datepicker/dist/react-datepicker.css";
 import { walletService } from "../../services/wallet.service";
 import toast from "react-hot-toast";
@@ -10,7 +12,6 @@ import logo from "../../assets/All/logo.png";
 import Spinner from "../common/Spinner";
 import { IoArrowBack } from "react-icons/io5";
 import { FaChevronRight } from "react-icons/fa";
-import BottomNav from "../layout/BottomNav";
 import { productService, getEffectivePrice, getBasePrice, showStrikeBase } from "../../services/product.service";
 import DatePicker from "react-datepicker";
 import clockIcon from "../../assets/svg/gp_store_svg/clock.svg";
@@ -43,7 +44,7 @@ interface ProductDetail {
   category: number;
   category_name: string;
   category_slug: string;
-  product_type: string;
+  product_type?: string;  // Optional: removed from backend Product model
   availability_type: string;
   base_price: string;
   sale_price: string | null;
@@ -54,7 +55,7 @@ interface ProductDetail {
   unit_value: string;
   primary_image: string | null;
   images: ProductImage[];
-  sub_products: any[];
+  sub_products?: any[];  // Optional: replaced by BOM in backend refactor
   labels: any[];
   variants: any[];
   is_perishable: boolean;
@@ -65,6 +66,7 @@ interface ProductDetail {
   average_rating: number;
   review_count: number;
   in_stock: boolean;
+  is_available?: boolean;  // Auto-managed from BOM (backend refactor)
   available_quantity: number;
   store_info: StoreInfo;
   view_count: number;
@@ -102,6 +104,7 @@ const StorePage: React.FC = () => {
   const [customMessage, setCustomMessage] = useState<string>("");
 
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   const fetchProductBySlug = async () => {
     try {
@@ -113,8 +116,8 @@ const StorePage: React.FC = () => {
       }
       
       // Initialize temporary store ID if user is not logged in
-      const token = localStorage.getItem("token");
-      if (!token) {
+      const isLoggedIn = !!localStorage.getItem("phoneNumber");
+      if (!isLoggedIn) {
         const { storeService } = await import("../../services/store.service");
         const existingTempStoreId = storeService.getTemporaryStoreId();
         if (!existingTempStoreId) {
@@ -174,18 +177,37 @@ const StorePage: React.FC = () => {
 
   useEffect(() => {
     fetchProductBySlug();
+    setSelectedImageIndex(0); // reset gallery when slug changes
   }, [slug, navigate]);
+
+  // Fire ViewContent pixel when product data loads (any product, any category)
+  useEffect(() => {
+    if (product) {
+      trackViewContent({
+        id: product.id,
+        name: product.name,
+        category: product.category_name,
+        price: product.current_price,
+      });
+    }
+  }, [product?.id]);
 
   const getPriceDisplay = () => {
     if (!product) return { price: 0, originalPrice: 0, savings: 0, discountPercentage: 0, showStrike: false };
-    // Actual amount customer pays: effective_price (store-level); variant overrides with final_price
+    // Use current_price / effective_price from API — never compute price on frontend
     const price = selectedVariant
       ? (selectedVariant.final_price ?? (parseFloat(product.effective_price) || product.current_price))
       : (parseFloat(product.effective_price) || product.current_price);
     const originalPrice = parseFloat(product.base_price) || 0;
+    // Prefer API discount_percentage when available (covers offers + sale)
+    const discountPercentage =
+      product.discount_percentage != null && product.discount_percentage >= 0
+        ? product.discount_percentage
+        : originalPrice > 0 && price < originalPrice
+          ? Math.round(((originalPrice - price) / originalPrice) * 100)
+          : 0;
+    const showStrike = discountPercentage > 0;
     const savings = originalPrice - price;
-    const discountPercentage = originalPrice > 0 ? Math.round((savings / originalPrice) * 100) : 0;
-    const showStrike = originalPrice > 0 && price < originalPrice;
     return { price, originalPrice, savings, discountPercentage, showStrike };
   };
   
@@ -209,14 +231,14 @@ const StorePage: React.FC = () => {
   };
 
   const getProductImage = () => {
-    if (!product) return "https://via.placeholder.com/400";
+    if (!product) return "/placeholder.svg";
     if (product.primary_image) return product.primary_image;
     if (product.images && product.images.length > 0) {
       // Sort by display_order and get the first one
       const sortedImages = [...product.images].sort((a, b) => a.display_order - b.display_order);
       return sortedImages[0].image;
     }
-    return "https://via.placeholder.com/400";
+    return "/placeholder.svg";
   };
   const createStoreOrder = async () => {
     try {
@@ -230,11 +252,8 @@ const StorePage: React.FC = () => {
       // Get product image
       const productImage = getProductImage();
       
-      // Determine inventory_id - use variant.id if available, otherwise use product.id
-      // Note: If variants have inventory_id field, use that instead
-      const inventoryId = selectedVariant?.id || product.id;
-      
       // Add to cart (works for both logged-in and logged-out users)
+      // variant.id is used for variant_id in cart add API
       try {
         await addToCart({
           productId: product.id,
@@ -247,13 +266,13 @@ const StorePage: React.FC = () => {
             id: selectedVariant.id,
             name: selectedVariant.name,
             final_price: selectedVariant.final_price,
-            inventory_id: selectedVariant.inventory_id || selectedVariant.id, // Use inventory_id if available
           } : null,
-          inventoryId: inventoryId, // Store inventory_id for API sync
-          customizedMessage: customMessage || undefined,
+          categorySlug: product.category_slug,
+          customizedMessage: product.category_slug?.toLowerCase().includes('bouquet') ? (customMessage || undefined) : undefined,
         });
         
         toast.success("Product added to basket!");
+        trackAddToCart({ id: product.id, name: product.name, price, quantity });
       } catch (error) {
         console.error("Error adding to cart:", error);
         toast.error("Failed to add product to basket. Please try again.");
@@ -266,8 +285,7 @@ const StorePage: React.FC = () => {
 
   const handleSubscribe = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
+      if (!localStorage.getItem("phoneNumber")) {
         toast.error("Please login to continue");
         navigate("/login", { state: { returnUrl: `/gp-store/product/${slug}` } });
         return;
@@ -304,9 +322,6 @@ const StorePage: React.FC = () => {
         error.message?.includes("Session expired") ||
         error.message?.includes("Authentication required")
       ) {
-        if (error.message?.includes("Session expired")) {
-          localStorage.removeItem("token");
-        }
         toast.error(error.message || "Please login to continue");
         navigate("/login", { state: { returnUrl: `/gp-store/product/${slug}` } });
         return;
@@ -337,6 +352,60 @@ const StorePage: React.FC = () => {
     navigate(`/gp-store/product/${productSlug}`, { state: { product: productItem } });
   };
 
+  const categoryName = product?.category_name || "Products";
+
+  // Build the ordered image list for the gallery.
+  // Uses the images[] array (sorted by display_order) and falls back to primary_image.
+  // Works for any product regardless of how many images it has.
+  // Must be declared before any early return (Rules of Hooks).
+  const orderedImages = useMemo(() => {
+    if (!product) return [];
+    const list: { src: string; alt: string }[] = [];
+    if (product.images && product.images.length > 0) {
+      const sorted = [...product.images].sort((a, b) => a.display_order - b.display_order);
+      sorted.forEach(img => list.push({ src: img.image, alt: img.alt_text || product.name }));
+    } else if (product.primary_image) {
+      list.push({ src: product.primary_image, alt: product.name });
+    } else {
+      list.push({ src: '/placeholder.svg', alt: product.name });
+    }
+    return list;
+  }, [product]);
+
+  // Build Schema.org Product structured data from live product fields.
+  // Generic — works for all products and categories.
+  const productStructuredData = useMemo(() => {
+    if (!product) return null;
+    const { price } = getPriceDisplay();
+    return {
+      "@context": "https://schema.org/",
+      "@type": "Product",
+      "name": product.name,
+      "description": product.description || product.short_description,
+      "image": orderedImages.map(i => i.src),
+      "sku": product.sku,
+      "brand": { "@type": "Brand", "name": "Genda Phool" },
+      "offers": {
+        "@type": "Offer",
+        "url": `https://customerapp.mygendaphool.com/gp-store/product/${product.slug}`,
+        "priceCurrency": "INR",
+        "price": price,
+        "availability": product.in_stock
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+        "itemCondition": "https://schema.org/NewCondition",
+        "seller": { "@type": "Organization", "name": "Genda Phool" }
+      },
+      ...(product.average_rating > 0 && {
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": product.average_rating,
+          "reviewCount": product.review_count
+        }
+      })
+    };
+  }, [product, orderedImages]);
+
   if (loading || isCheckingBalance) {
     return (
       <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
@@ -361,10 +430,21 @@ const StorePage: React.FC = () => {
     );
   }
 
-  const categoryName = product?.category_name || "Products";
-
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
+      {/* SEO — dynamic per product, works for all current and future products */}
+      {product && (
+        <SEO
+          title={`${product.name} — ₹${getPriceDisplay().price}`}
+          description={product.short_description || product.description || `Buy ${product.name} online. Same-day delivery in Jaipur from Genda Phool.`}
+          canonical={`https://customerapp.mygendaphool.com/gp-store/product/${product.slug}`}
+          ogImage={orderedImages[0]?.src}
+          ogType="product"
+          price={getPriceDisplay().price}
+          availability={product.in_stock ? 'InStock' : 'OutOfStock'}
+          structuredData={productStructuredData ?? undefined}
+        />
+      )}
       <div className="max-w-[800px] mx-auto relative pb-20">
         {/* Header */}
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
@@ -381,18 +461,48 @@ const StorePage: React.FC = () => {
 
         {/* Main Content */}
         <div className="px-4">
-          {/* Product Image */}
+          {/* Product Image Gallery */}
           <div className="mt-4">
+            {/* Main image */}
             <div className="aspect-square w-full rounded-xl overflow-hidden border-2 border-blue-200">
               <img
-                src={getProductImage()}
-                alt={product.name || "Product"}
+                src={orderedImages[selectedImageIndex]?.src || '/placeholder.svg'}
+                alt={orderedImages[selectedImageIndex]?.alt || product.name}
+                loading="lazy"
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = "https://via.placeholder.com/400";
+                  (e.target as HTMLImageElement).src = "/placeholder.svg";
                 }}
               />
             </div>
+
+            {/* Thumbnail strip — only shown when there are 2+ images */}
+            {orderedImages.length > 1 && (
+              <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
+                {orderedImages.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedImageIndex(idx)}
+                    className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
+                      idx === selectedImageIndex
+                        ? 'border-[#2A6B28]'
+                        : 'border-gray-200'
+                    }`}
+                    aria-label={`View image ${idx + 1}`}
+                  >
+                    <img
+                      src={img.src}
+                      alt={img.alt}
+                      loading="lazy"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/placeholder.svg';
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Product Name and Badge */}
@@ -471,22 +581,18 @@ const StorePage: React.FC = () => {
               <div className="mb-3">
                 <span className="text-base font-medium text-gray-900">Select Size</span>
               </div>
-              <div className="flex justify-center gap-3">
+              <div className="overflow-x-auto pb-2 -mx-1 no-scrollbar">
+                <div className="flex gap-3 min-w-max">
                 {getActiveVariants().map((variant: any) => (
                   <button
                     key={variant.id}
                     onClick={() => setSelectedVariant(variant)}
-                    className={`flex flex-col items-center text-center p-3 rounded-2xl border-2 transition-all ${
+                    className={`flex flex-col items-center text-center p-3 rounded-2xl border-2 transition-all flex-shrink-0 ${
                       selectedVariant?.id === variant.id
                         ? 'bg-[#E6F4EA] border-[#19411F]'
                         : 'bg-white border-gray-200'
                     }`}
-                    style={{ 
-                      minWidth: getActiveVariants().length === 2 ? 'calc(50% - 6px)' : 
-                                getActiveVariants().length === 3 ? 'calc(33.333% - 8px)' :
-                                getActiveVariants().length >= 4 ? '120px' : '100px',
-                      flex: getActiveVariants().length <= 3 ? '1' : '0 0 auto'
-                    }}
+                    style={{ minWidth: '120px' }}
                   >
                     <span className={`text-sm font-semibold mb-1 ${
                       selectedVariant?.id === variant.id ? 'text-[#19411F]' : 'text-gray-900'
@@ -501,11 +607,13 @@ const StorePage: React.FC = () => {
                     </span>
                   </button>
                 ))}
+                </div>
               </div>
             </div>
           )}
 
-          {/* Customized Message Section */}
+          {/* Customized Message — only for bouquet categories */}
+          {product.category_slug?.toLowerCase().includes('bouquet') && (
           <div className="mt-6">
             <div className="mb-3">
               <span className="text-base font-medium text-gray-900">Customized Message (optional)</span>
@@ -518,7 +626,7 @@ const StorePage: React.FC = () => {
                     setCustomMessage(e.target.value);
                   }
                 }}
-                placeholder="Add a personalized message..."
+                placeholder="Add a personalized message for the bouquet..."
                 className="w-full p-3 rounded-lg border-2 border-gray-200 focus:border-[#19411F] focus:outline-none resize-none"
                 rows={4}
                 maxLength={500}
@@ -528,14 +636,15 @@ const StorePage: React.FC = () => {
               </div>
             </div>
           </div>
+          )}
 
           {/* Add to Basket Button */}
           <button
             onClick={createStoreOrder}
             className="w-full bg-[#19411F] text-white py-3.5 rounded-[25px] text-base font-semibold mt-6 mb-6 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-            disabled={!product || (isLoggedIn && product.in_stock === false)}
+            disabled={!product || (isLoggedIn && (product.in_stock === false || product.is_available === false))}
           >
-            {!isLoggedIn || product?.in_stock !== false ? "Add to Basket" : "Out of Stock"}
+            {!isLoggedIn || (product?.in_stock !== false && product?.is_available !== false) ? "Add to Basket" : "Out of Stock"}
           </button>
 
           {/* Tabs and Content Card */}
@@ -670,12 +779,13 @@ const StorePage: React.FC = () => {
                           item.primary_image ||
                           (item.images && item.images.length > 0
                             ? item.images[0].image
-                            : "https://via.placeholder.com/160")
+                            : "/placeholder.svg")
                         }
                         alt={item.name}
+                        loading="lazy"
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = "https://via.placeholder.com/160";
+                          (e.target as HTMLImageElement).src = "/placeholder.svg";
                         }}
                       />
                     </div>
@@ -704,7 +814,6 @@ const StorePage: React.FC = () => {
             </div>
           )}
         </div>
-        <BottomNav />
         <AnimatePresence>
           {showInsufficientBalanceModal && (
             <motion.div

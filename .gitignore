@@ -1,3 +1,17 @@
 node_modules
 .env
+.env.local
+.env.*.local
 dist
+
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
+# Debug/test files
+test-api.js
+token-check.html
+
+# Editor directories
+.vscode/
+.idea/

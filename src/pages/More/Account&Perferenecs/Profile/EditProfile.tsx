@@ -5,6 +5,7 @@ import { IoArrowBack } from 'react-icons/io5';
 import { customerService } from '@/services/getcustomer.service';
 import { editCustomerService } from '@/services/editcustomer.service';
 import { useFeatureTheme } from '../../../../context/FeatureThemeContext';
+import { formatPhoneForDisplay } from '@/utils/phoneDisplay';
 
 interface UserDetails {
   name: string;
@@ -38,7 +39,7 @@ const Profile: React.FC = () => {
           setUserDetails({
             name: `${customer.firstName} ${customer.lastName}`,
             email: customer.emailAddress || '',
-            phone: customer.phoneNumber.toString()
+            phone: formatPhoneForDisplay(customer.phoneNumber.toString())
           });
         }
       } catch (error) {
@@ -72,8 +73,9 @@ const Profile: React.FC = () => {
   };
 
   const formatPhoneNumber = (phone: string) => {
-    if (!phone || phone.length < 10) return phone;
-    return `+91 ${phone.slice(0, 5)} ${phone.slice(5)}`;
+    const local = formatPhoneForDisplay(phone);
+    if (!local || local.length < 10) return phone || local;
+    return `+91 ${local.slice(0, 5)} ${local.slice(5)}`;
   };
 
   return (

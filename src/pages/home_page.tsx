@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { SEO } from '../components/SEO';
+import { trackPageView } from '../lib/metaPixel';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureTheme } from '../context/FeatureThemeContext';
 import { FEATURE_FLAGS } from '../config/features';
@@ -7,19 +9,22 @@ import { MdLocationOn, MdKeyboardArrowDown, MdAccessTime } from 'react-icons/md'
 import { FaLeaf, FaUsers, FaBox } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { addressService, Address } from '../services/address.service';
+import { storeService } from '../services/store.service';
+import { OffersBannerCarousel } from '../components/OffersBannerCarousel';
 import ProfileIcon from '../assets/icon/Profile.png';
-import { FaSearch } from 'react-icons/fa';
-import storyImage from '../assets/Banner/Story.png';
+import { SearchBar } from '../components/common/SearchBar';
+// Large assets served from public/ — no bundle impact, long-cache headers apply
+const storyImage = '/story.png';
+const dailyScooterSvg = '/daily_scooter.svg';
+const bannerSvg = '/banner.svg';
+const bottomBannerSvg = '/bottom_banner.svg';
 // SVG Imports
 import namasteSvg from '../assets/svg/namaste.svg';
 import dailyLogoSvg from '../assets/svg/daily_logo.svg';
-import dailyScooterSvg from '../assets/svg/daily_scooter.svg';
 import storeLogoSvg from '../assets/svg/store_logo.svg';
 import truckSvg from '../assets/svg/truck.svg';
 import sajawatLogoSvg from '../assets/svg/sajawat_logo.svg';
 import garlandSvg from '../assets/svg/garland.svg';
-import bannerSvg from '../assets/svg/banner.svg';
-import bottomBannerSvg from '../assets/svg/bottom_banner.svg';
 import logoSvg from '../assets/svg/logo.svg';
 import profilehomeIcon from '../assets/svg/gp_daily svg/profilehome.svg';
 import profilelogoIcon from '../assets/svg/gp_daily svg/profilelogo.svg';
@@ -35,8 +40,14 @@ const HomePage: React.FC = () => {
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
   const [isStoryExpanded, setIsStoryExpanded] = useState(false);
 
-  // Function to fetch the latest address from API
+  // Function to fetch the latest address from API (only when logged in — avoids wrong JWT for guests)
   const fetchLatestAddress = useCallback(async () => {
+    if (!isLoggedIn) {
+      setDeliveryLocation(localStorage.getItem('userLocation') || '');
+      setAddressType('Home');
+      setIsLoadingAddress(false);
+      return;
+    }
     try {
       setIsLoadingAddress(true);
       const addresses = await addressService.getAllAddresses();
@@ -71,7 +82,7 @@ const HomePage: React.FC = () => {
     } finally {
       setIsLoadingAddress(false);
     }
-  }, []);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     fetchLatestAddress();
@@ -92,8 +103,38 @@ const HomePage: React.FC = () => {
     navigate(`${basePath}/addresses`);
   };
 
+  // Fire PageView for /home (this route is outside Layout so tracking is here)
+  useEffect(() => { trackPageView(); }, []);
+
   return (
     <div className="min-h-screen w-screen bg-white overflow-x-hidden">
+      <SEO
+        title="Genda Phool — Fresh Flowers & Pooja Items Delivered Daily in Jaipur"
+        description="Order fresh marigold, rose, tuberose, garlands and pooja items online in Jaipur. Same-day delivery before 12 PM. 100,000+ orders delivered."
+        canonical="https://customerapp.mygendaphool.com/home"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "LocalBusiness",
+          "name": "Genda Phool",
+          "description": "Fresh flower delivery and pooja items in Jaipur",
+          "url": "https://customerapp.mygendaphool.com",
+          "logo": "https://customerapp.mygendaphool.com/logo.png",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "17, Sodala",
+            "addressLocality": "Jaipur",
+            "addressRegion": "Rajasthan",
+            "postalCode": "302019",
+            "addressCountry": "IN"
+          },
+          "openingHours": "Mo-Su 06:00-20:00",
+          "priceRange": "₹₹",
+          "sameAs": [
+            "https://www.facebook.com/gendaphool",
+            "https://www.instagram.com/gendaphool"
+          ]
+        }}
+      />
       <div className="max-w-[800px] mx-auto bg-white min-h-screen">
         {/* Top Navigation Bar */}
         <div className="bg-white sticky top-0 z-20 px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200">
@@ -135,16 +176,13 @@ const HomePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Search Bar */}
+          {/* Search Bar — unified styling, product suggestions as you type */}
           <div className="mt-2 sm:mt-3">
-            <div
-              className=" rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between sm:gap-8 cursor-pointer shadow-sm border border-[#808080]"
-              onClick={() => navigate('/search')}
-            >
-              <span className="text-[#808080] text-sm sm:text-base font-medium">Search anything.....</span>
-              <FaSearch className="text-[#808080] w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-
-            </div>
+            <SearchBar
+              mode="product"
+              searchPagePath="/search"
+              productBasePath={feature === 'gpStore' ? '/gp-store' : '/gp-daily'}
+            />
           </div>
         </div>
 
@@ -309,29 +347,13 @@ const HomePage: React.FC = () => {
             </div>
           </motion.div>
 
-          {/* Offers Section */}
+          {/* Offers Section — dynamic banners from API */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.4 }}
-            className="mb-8 sm:mb-10"
           >
-            <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">OFFERS FOR YOU</h2>
-            <div className="relative rounded-2xl overflow-hidden shadow-lg">
-              <img
-                src={bannerSvg}
-                alt="Ganesh Utsav Offer"
-                className="w-full h-auto object-cover"
-              />
-              <div className="absolute bottom-3 sm:bottom-6 right-3 sm:right-6">
-                <button 
-                  onClick={() => setShowComingSoonModal(true)}
-                  className="bg-white/80 text-gray-800 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-sm sm:text-base font-medium border-2 border-gray-300/80 hover:bg-white transition-colors"
-                >
-                  Book Now ›
-                </button>
-              </div>
-            </div>
+            <OffersBannerCarousel storeId={storeService.getStoreIdForProducts() ?? 4} />
           </motion.div>
 
           {/* Why Choose Us Section */}

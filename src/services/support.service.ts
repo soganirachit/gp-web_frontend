@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "./api";
 import { getApiUrl } from "../config/api.config";
 import { headerService } from "./headers.service";
 
@@ -88,7 +88,7 @@ class SupportService {
       if (!headers) {
         return [];
       }
-      const response = await axios.get<{ success: boolean; message: string; data: EligibleOrder[] }>(`${SUPPORT_API_URL}/eligible-orders/`, { headers });
+      const response = await api.get<{ success: boolean; message: string; data: EligibleOrder[] }>(`${SUPPORT_API_URL}/eligible-orders/`);
       // Handle wrapped response structure
       if (response.data.success && response.data.data) {
         return response.data.data;
@@ -114,7 +114,7 @@ class SupportService {
       if (!headers) {
         return [];
       }
-      const response = await axios.get<{ success: boolean; message: string; data: TicketQuestion[] } | TicketQuestion[]>(`${SUPPORT_API_URL}/ticket-questions/`, { headers });
+      const response = await api.get<{ success: boolean; message: string; data: TicketQuestion[] } | TicketQuestion[]>(`${SUPPORT_API_URL}/ticket-questions/`);
       console.log('Ticket questions API response:', response.data);
       
       // Handle wrapped response structure
@@ -142,7 +142,7 @@ class SupportService {
       if (!headers) {
         return [];
       }
-      const response = await axios.get<{ count: number; next: string | null; previous: string | null; results: SupportTicket[] } | SupportTicket[]>(`${API_URL}/`, { headers });
+      const response = await api.get<{ count: number; next: string | null; previous: string | null; results: SupportTicket[] } | SupportTicket[]>(`${API_URL}/`);
       console.log('Tickets API response:', response.data);
       
       // Handle paginated response structure
@@ -171,11 +171,10 @@ class SupportService {
       if (!headers) {
         return null;
       }
-      const response = await axios.get<
+      const response = await api.get<
         { success: boolean; message: string; data: SupportTicketDetail } | SupportTicketDetail
       >(
-        `${API_URL}/${ticketNumber}/`,
-        { headers }
+        `${API_URL}/${ticketNumber}/`
       );
 
       const data = response.data;
@@ -210,14 +209,13 @@ class SupportService {
       if (!headers) {
         return null;
       }
-      const response = await axios.post<{ success: boolean; message: string; data: SupportTicket } | SupportTicket>(
+      const response = await api.post<{ success: boolean; message: string; data: SupportTicket } | SupportTicket>(
         `${API_URL}/create/`,
         {
           order_id: orderId,
           predefined_answers: predefinedAnswers,
           priority: priority,
-        },
-        { headers }
+        }
       );
       // Handle wrapped response structure
       if (response.data && typeof response.data === 'object' && 'data' in response.data) {
@@ -242,10 +240,9 @@ class SupportService {
       if (!headers) {
         return false;
       }
-      await axios.post(
+      await api.post(
         `${API_URL}/${ticketNumber}/request-agent/`,
-        {},
-        { headers }
+        {}
       );
       return true;
     } catch (error: any) {
@@ -265,10 +262,9 @@ class SupportService {
       if (!headers) {
         return false;
       }
-      await axios.post(
+      await api.post(
         `${API_URL}/${ticketNumber}/request-callback/`,
-        {},
-        { headers }
+        {}
       );
       return true;
     } catch (error: any) {
@@ -289,10 +285,9 @@ class SupportService {
       if (!headers) {
         return false;
       }
-      await axios.patch(
+      await api.patch(
         `${API_URL}/${ticketNumber}/update/`,
-        { status },
-        { headers }
+        { status }
       );
       return true;
     } catch (error: any) {
@@ -330,27 +325,21 @@ class SupportService {
         formData.append('image', imageFile);
         formData.append('is_internal', isInternal.toString());
 
-        // Remove Content-Type header to let browser set it with boundary for multipart
-        const { Authorization } = headers;
-        const formHeaders = {
-          Authorization,
-        };
-
-        const response = await axios.post<SupportMessage>(
+        // Omit Content-Type to let browser set it with multipart boundary
+        const response = await api.post<SupportMessage>(
           `${API_URL}/${ticketNumber}/messages/`,
           formData,
-          { headers: formHeaders }
+          { headers: { 'Content-Type': undefined } }
         );
         return response.data;
       } else {
         // Text-only message, use application/json
-        const response = await axios.post<SupportMessage>(
+        const response = await api.post<SupportMessage>(
           `${API_URL}/${ticketNumber}/messages/`,
           {
             message: message || '',
             is_internal: isInternal,
-          },
-          { headers }
+          }
         );
         return response.data;
       }

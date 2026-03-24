@@ -1,4 +1,5 @@
-import React, { useEffect, useState, forwardRef } from "react";
+import React, { useEffect, useRef, useState, forwardRef } from "react";
+import Spinner from "../../common/Spinner";
 
 // Type declaration for Razorpay
 interface RazorpayOptions {
@@ -69,6 +70,12 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
   disabled = false,
 }, ref) => {
   const [isLoading, setIsLoading] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   const handlePayment = () => {
     try {
@@ -108,7 +115,9 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
         modal: {
           ondismiss: function () {
             // Payment modal was closed by user
-            setIsLoading(false);
+            if (isMountedRef.current) {
+              setIsLoading(false);
+            }
             onError(new Error("Payment cancelled by user"));
           },
         },
@@ -156,9 +165,7 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
       disabled={isLoading || disabled}
     >
       {isLoading ? (
-        <div className="flex items-center justify-center">
-          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-        </div>
+        <Spinner size={24} variant="light" className="flex-shrink-0" />
       ) : (
         buttonText
       )}

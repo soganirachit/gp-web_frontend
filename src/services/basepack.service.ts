@@ -1,7 +1,9 @@
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
+import api from "./api";
 import { getApiUrl } from "../config/api.config";
 
 const API_URL = `${getApiUrl()}/basepacks`;
+
 export interface BasePack {
   id: string;
   name: string;
@@ -17,21 +19,9 @@ export interface BasePack {
 }
 
 class BasePackService {
-  // private getHeaders() {
-  //   const token = localStorage.getItem("token");
-  //   if (!token) {
-  //     throw new Error("Authentication required");
-  //   }
-  //   return {
-  //     Authorization: token,
-  //     "Content-Type": "application/json",
-  //   };
-  // }
-
   async getAllBasePacks(): Promise<BasePack[]> {
     try {
-      const response = await axios.get(API_URL);
-
+      const response = await api.get(API_URL);
       return response.data;
     } catch (error: unknown) {
       if (error instanceof Error || error instanceof AxiosError) {
@@ -43,8 +33,7 @@ class BasePackService {
 
   async getProductById(id: string): Promise<BasePack> {
     try {
-      const response = await axios.get(`${API_URL}/${id}`);
-
+      const response = await api.get(`${API_URL}/${id}`);
       return response.data;
     } catch (error: unknown) {
       if (error instanceof Error || error instanceof AxiosError) {

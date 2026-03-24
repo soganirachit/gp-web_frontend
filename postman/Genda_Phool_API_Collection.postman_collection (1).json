@@ -1198,7 +1198,7 @@
       "name": "07 - Orders",
       "item": [
         {
-          "name": "Checkout — Pay from Wallet",
+          "name": "Checkout \u2014 Pay from Wallet",
           "request": {
             "method": "POST",
             "header": [
@@ -1940,8 +1940,16 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/v1/support/faqs/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "support", "faqs", ""],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "support",
+                "faqs",
+                ""
+              ],
               "query": [
                 {
                   "key": "category",
@@ -1958,11 +1966,24 @@
           "name": "Step 1 - Get Eligible Orders for Support",
           "request": {
             "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{user_token}}"}],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/v1/support/eligible-orders/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "support", "eligible-orders", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "support",
+                "eligible-orders",
+                ""
+              ]
             },
             "description": "Returns orders delivered in the last 12 hours. User must pick one before creating a ticket."
           }
@@ -1971,11 +1992,24 @@
           "name": "Step 2 - Get Predefined Support Questions",
           "request": {
             "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{user_token}}"}],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/v1/support/ticket-questions/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "support", "ticket-questions", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "support",
+                "ticket-questions",
+                ""
+              ]
             },
             "description": "Returns hardcoded Q&A questions to display in the guided chat flow."
           }
@@ -1985,18 +2019,37 @@
           "request": {
             "method": "POST",
             "header": [
-              {"key": "Authorization", "value": "Bearer {{user_token}}"},
-              {"key": "Content-Type", "value": "application/json"}
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n    \"order_id\": 1,\n    \"predefined_answers\": {\n        \"issue_type\": \"damaged_flowers\",\n        \"affected_items\": \"Red Rose Bouquet\",\n        \"description\": \"The roses arrived wilted and brown at the tips\",\n        \"noticed_when\": \"At delivery\"\n    },\n    \"priority\": \"high\"\n}",
-              "options": {"raw": {"language": "json"}}
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/api/v1/support/tickets/create/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "support", "tickets", "create", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "support",
+                "tickets",
+                "create",
+                ""
+              ]
             },
             "description": "Creates a support ticket linked to an order. The subject is auto-generated from the issue type."
           }
@@ -2005,11 +2058,26 @@
           "name": "Step 4a - Request Agent (if not satisfied)",
           "request": {
             "method": "POST",
-            "header": [{"key": "Authorization", "value": "Bearer {{user_token}}"}],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/v1/support/tickets/{{ticket_number}}/request-agent/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "support", "tickets", "{{ticket_number}}", "request-agent", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "support",
+                "tickets",
+                "{{ticket_number}}",
+                "request-agent",
+                ""
+              ]
             },
             "description": "User requests a human agent. Sends WhatsApp + email notification to support admin."
           }
@@ -2018,11 +2086,26 @@
           "name": "Step 4b - Request Callback (if not satisfied)",
           "request": {
             "method": "POST",
-            "header": [{"key": "Authorization", "value": "Bearer {{user_token}}"}],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/v1/support/tickets/{{ticket_number}}/request-callback/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "support", "tickets", "{{ticket_number}}", "request-callback", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "support",
+                "tickets",
+                "{{ticket_number}}",
+                "request-callback",
+                ""
+              ]
             },
             "description": "User requests a callback. Sends WhatsApp + email notification to support admin."
           }
@@ -2032,18 +2115,38 @@
           "request": {
             "method": "POST",
             "header": [
-              {"key": "Authorization", "value": "Bearer {{user_token}}"},
-              {"key": "Content-Type", "value": "application/json"}
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n    \"message\": \"Still waiting for a response, please help.\"\n}",
-              "options": {"raw": {"language": "json"}}
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/api/v1/support/tickets/{{ticket_number}}/messages/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "support", "tickets", "{{ticket_number}}", "messages", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "support",
+                "tickets",
+                "{{ticket_number}}",
+                "messages",
+                ""
+              ]
             },
             "description": "Add a text message to the ticket thread."
           }
@@ -2052,18 +2155,41 @@
           "name": "Add Message to Ticket (with image)",
           "request": {
             "method": "POST",
-            "header": [{"key": "Authorization", "value": "Bearer {{user_token}}"}],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              }
+            ],
             "body": {
               "mode": "formdata",
               "formdata": [
-                {"key": "message", "value": "Here is a photo of the damaged flowers.", "type": "text"},
-                {"key": "image", "type": "file", "src": ""}
+                {
+                  "key": "message",
+                  "value": "Here is a photo of the damaged flowers.",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": ""
+                }
               ]
             },
             "url": {
               "raw": "{{base_url}}/api/v1/support/tickets/{{ticket_number}}/messages/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "support", "tickets", "{{ticket_number}}", "messages", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "support",
+                "tickets",
+                "{{ticket_number}}",
+                "messages",
+                ""
+              ]
             },
             "description": "Add a message with an image attachment. Use multipart/form-data."
           }
@@ -5122,12 +5248,23 @@
           "request": {
             "method": "GET",
             "header": [
-              {"key": "Authorization", "value": "Bearer {{admin_token}}"}
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/admin/faqs/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "admin", "faqs", ""],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "faqs",
+                ""
+              ],
               "query": [
                 {
                   "key": "category",
@@ -5145,18 +5282,36 @@
           "request": {
             "method": "POST",
             "header": [
-              {"key": "Authorization", "value": "Bearer {{admin_token}}"},
-              {"key": "Content-Type", "value": "application/json"}
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n    \"question\": \"Can I get same-day delivery?\",\n    \"answer\": \"Yes! Same-day delivery is available for orders placed before 12 PM, subject to slot availability at your nearest store.\",\n    \"category\": \"delivery\",\n    \"sort_order\": 6\n}",
-              "options": {"raw": {"language": "json"}}
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/api/v1/admin/faqs/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "admin", "faqs", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "faqs",
+                ""
+              ]
             },
             "description": "Admin: Create a new FAQ."
           }
@@ -5166,18 +5321,37 @@
           "request": {
             "method": "PATCH",
             "header": [
-              {"key": "Authorization", "value": "Bearer {{admin_token}}"},
-              {"key": "Content-Type", "value": "application/json"}
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n    \"answer\": \"Updated answer text here.\",\n    \"sort_order\": 2\n}",
-              "options": {"raw": {"language": "json"}}
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/api/v1/admin/faqs/1/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "admin", "faqs", "1", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "faqs",
+                "1",
+                ""
+              ]
             },
             "description": "Admin: Partially update an FAQ (all fields optional)."
           }
@@ -5187,12 +5361,24 @@
           "request": {
             "method": "DELETE",
             "header": [
-              {"key": "Authorization", "value": "Bearer {{admin_token}}"}
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/admin/faqs/1/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "admin", "faqs", "1", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "faqs",
+                "1",
+                ""
+              ]
             },
             "description": "Admin: Soft-deactivate an FAQ (sets is_active=false, not permanently deleted)."
           }
@@ -5256,6 +5442,31 @@
               ]
             },
             "description": "Check Redis connectivity."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Store Banners",
+      "item": [
+        {
+          "name": "Get Active Banners (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/stores/4/banners/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "stores",
+                "4",
+                "banners",
+                ""
+              ]
+            },
+            "description": "Public endpoint \u2014 returns only active, date-valid banners for the store. No auth required.\n\nResponse: { success: true, data: Banner[] }"
           }
         }
       ]

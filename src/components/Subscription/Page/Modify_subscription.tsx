@@ -324,7 +324,7 @@ const ModifySubscription: React.FC = () => {
           <div className="space-y-3">
             {availableAddOns.map(addon => {
               const qty = addOns[addon.id] || 0;
-              const imageUrl = addon.imagesUrl || 'https://via.placeholder.com/150';
+              const imageUrl = addon.imagesUrl || '/placeholder.svg';
               return (
                 <div key={addon.id} className="bg-white rounded-2xl p-3 flex items-center gap-3 border-2 border-gray-200">
                   <img src={imageUrl} alt={addon.name} className="w-14 h-14 rounded-lg object-cover bg-gray-100" />

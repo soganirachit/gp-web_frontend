@@ -22,7 +22,7 @@ import ProductCard from "../components/common/ProductCard";
 import BottomNavigation from "./../components/layout/BottomNav";
 import Spinner from "../components/common/Spinner";
 import ProfileIcon from "../assets/icon/Profile.png";
-import SearchIcon from "../assets/icon/Search.png";
+import { SearchBar } from "../components/common/SearchBar";
 import smallgendaIcon from "../assets/svg/smallgenda.svg";
 import scooterIcon from "../assets/svg/gp_daily svg/scooter.svg";
 import clockIcon from "../assets/svg/gp_daily svg/clock.svg";
@@ -174,8 +174,7 @@ const Home2: React.FC = () => {
       setIsLoadingPacks(true);
       setError(null);
 
-      const token = localStorage.getItem("token");
-      if (!token) {
+      if (!localStorage.getItem("phoneNumber")) {
         navigate(`${basePath}/login`, { state: { returnUrl: location.pathname } });
         return;
       }
@@ -310,10 +309,10 @@ const Home2: React.FC = () => {
       localStorage.removeItem("needLocation");
     }
 
-    const token = localStorage.getItem("token");
-    setIsLoggedIn(!!token);
+    const isLoggedIn = !!localStorage.getItem("phoneNumber");
+    setIsLoggedIn(isLoggedIn);
 
-    if (token) {
+    if (isLoggedIn) {
       fetchWalletBalance();
       fetchSubscriptions();
       fetchActiveSubscriptions();
@@ -412,9 +411,9 @@ const Home2: React.FC = () => {
 
   // Helper function to get image URL (handles both string and array)
   const getImageUrl = (imagesUrl?: string | string[]): string => {
-    if (!imagesUrl) return "https://via.placeholder.com/160";
+    if (!imagesUrl) return "/placeholder.svg";
     if (Array.isArray(imagesUrl)) {
-      return imagesUrl[0] || "https://via.placeholder.com/160";
+      return imagesUrl[0] || "/placeholder.svg";
     }
     return imagesUrl;
   };
@@ -495,15 +494,13 @@ const Home2: React.FC = () => {
                 </div>
               </div>
 
-              {/* Search Bar */}
+              {/* Search Bar — unified styling, product suggestions as you type */}
               <div className="mt-4 sm:mt-5">
-                <div
-                  className="bg-white rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 cursor-pointer shadow-sm border border-[#808080]"
-                  onClick={() => navigate('/search')}
-                >
-                  <img src={SearchIcon} alt="Search" className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span className="text-gray-400 text-sm sm:text-base font-medium">Search anything....</span>
-                </div>
+                <SearchBar
+                  mode="product"
+                  productBasePath="/gp-daily"
+                  searchPagePath="/search"
+                />
               </div>
 
               {/* Special Festival Offers Text Overlay */}
@@ -611,7 +608,7 @@ const Home2: React.FC = () => {
 
               {isLoadingPacks ? (
                 <div className="flex justify-center items-center h-40" style={{ backgroundColor: '#f8f6f1' }}>
-                  <Spinner size={80} />
+                  <Spinner size={48} />
                 </div>
               ) : error ? (
                 <div className="text-red-500 text-center py-4">{error}</div>

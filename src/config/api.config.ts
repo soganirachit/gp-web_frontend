@@ -24,7 +24,4 @@ export const getPolygonUrl = () => {
   return `${getApiUrl()}/polygon`;
 };
 
-// export const getStoreProducts = () => {
-//   return `${getApiUrl()}/products`;
-// };
 export default config;

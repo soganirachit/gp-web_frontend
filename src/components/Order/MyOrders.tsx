@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { SEO } from '../SEO';
 import { useNavigate } from 'react-router-dom';
-import { FaArrowLeft, FaFilter, FaSearch, FaChevronRight } from 'react-icons/fa';
+import { FaFilter, FaSearch, FaChevronRight } from 'react-icons/fa';
 import { IoArrowBack } from "react-icons/io5";
-import BottomNavigation from '../layout/BottomNav';
 import { orderService } from '../../services/order.service';
 import { format } from 'date-fns';
 import Spinner from '../common/Spinner';
+import { SearchBar } from '../common/SearchBar';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 
 interface Order {
@@ -109,8 +110,7 @@ const MyOrders: React.FC = () => {
   };
 
   const filteredOrders = orders.filter(order =>
-    order.order_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.product?.name.toLowerCase().includes(searchQuery.toLowerCase())
+    true
   );
 
   const visibleOrders = filteredOrders.slice(0, visibleCount);
@@ -119,6 +119,12 @@ const MyOrders: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
+      <SEO
+        title="My Orders — Genda Phool"
+        description="View your Genda Phool order history"
+        canonical="https://customerapp.mygendaphool.com/gp-store/orders"
+        noIndex={true}
+      />
       <div className="max-w-[800px] mx-auto min-h-screen flex flex-col">
         {/* Header */}
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
@@ -129,20 +135,24 @@ const MyOrders: React.FC = () => {
             >
               <IoArrowBack size={24} />
             </button>
-            <h1 className="text-2xl font-bold font-serif text-gray-900">My Order</h1>
+            <h1 className="text-2xl font-bold font-serif text-gray-900">My Orders</h1>
           </div>
 
-          {/* Search Bar */}
+          {/* Search Bar — unified styling, order suggestions as you type */}
           <div className="flex gap-3">
-          <div className="flex-1 relative">
-              <input
-                type="text"
+            <div className="flex-1">
+              <SearchBar
+                mode="order"
                 placeholder="Search your order here"
+                orders={orders}
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#f8f6f1] border border-[#808080] rounded-xl py-3 pl-4 pr-10 text-sm text-gray-900 placeholder:text-[#808080] focus:outline-none focus:border-gray-300"
+                onChange={setSearchQuery}
+                onOrderSelect={(order) => {
+                  if (order.order_number) {
+                    navigate(`${basePath}/orders/${order.order_number}`);
+                  }
+                }}
               />
-              <FaSearch className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#808080]" size={16} />
             </div>
             <button className="w-12 h-[46px] flex items-center justify-center bg-white border border-gray-200 rounded-xl hover:bg-gray-50">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -178,7 +188,7 @@ const MyOrders: React.FC = () => {
             <div className="space-y-4">
               {visibleOrders.map((order, index) => {
                 const statusColor = getStatusColor(order.status);
-                const productImg = order.preview_image || order.product?.imagesUrl?.[0] || order.product?.image?.[0] || "https://via.placeholder.com/100";
+                const productImg = order.preview_image || order.product?.imagesUrl?.[0] || order.product?.image?.[0] || "/placeholder.svg";
 
                 return (
                   <div
@@ -191,6 +201,7 @@ const MyOrders: React.FC = () => {
                       <img
                         src={productImg}
                         alt={order.order_number || order.product?.name}
+                        loading="lazy"
                         className="w-full h-full object-cover rounded-xl"
                       />
                     </div>
@@ -235,10 +246,6 @@ const MyOrders: React.FC = () => {
           )}
         </div>
 
-        {/* Bottom Nav */}
-        <div className="sticky bottom-0 z-20">
-          <BottomNavigation />
-        </div>
       </div>
     </div>
   );

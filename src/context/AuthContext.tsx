@@ -5,7 +5,7 @@ interface AuthContextType {
   isLoggedIn: boolean;
   phoneNumber: string | null;
   checkLoginStatus: () => boolean;
-  login: (token: string, phone: string, refreshToken?: string) => void;
+  login: (phone: string) => void;
   logout: () => Promise<void>;
 }
 
@@ -13,18 +13,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    // Initialize state from localStorage on first load
-    const token = localStorage.getItem('token');
-    const phone = localStorage.getItem('phoneNumber');
-    return !!(token && phone);
+    return !!localStorage.getItem('access_token');
   });
   const [phoneNumber, setPhoneNumber] = useState<string | null>(() => {
-    // Initialize phone from localStorage on first load
     return localStorage.getItem('phoneNumber');
   });
 
   useEffect(() => {
-    // Check login status whenever the component mounts or localStorage changes
     const handleStorageChange = () => {
       checkLoginStatus();
     };
@@ -45,37 +40,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const checkLoginStatus = () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     const phone = localStorage.getItem('phoneNumber');
-    const isValid = !!(token && phone);
+    const isValid = !!token;
     setIsLoggedIn(isValid);
     setPhoneNumber(phone);
     return isValid;
   };
 
-  const login = (token: string, phone: string, refreshToken?: string) => {
-    localStorage.setItem('token', token);
+  const login = (phone: string) => {
     localStorage.setItem('phoneNumber', phone);
-    if (refreshToken) {
-      localStorage.setItem('refresh_token', refreshToken);
-    }
     setIsLoggedIn(true);
     setPhoneNumber(phone);
-    
-    // Clear temporary store ID when user logs in (they'll use their selected store)
+
+    // Clear temporary store ID when user logs in
     storeService.clearTemporaryStoreId();
   };
 
   const logout = async () => {
-    // Call authService logout which handles API call and always clears localStorage
     const { authService } = await import('../services/auth.service');
     const result = await authService.logout();
-    
-    // Update local state regardless of API call result
+
     setIsLoggedIn(false);
     setPhoneNumber(null);
-    
-    // Log if there was an issue (but still proceed with logout)
+
     if (!result.success) {
       console.warn('Logout API call had issues, but local logout completed:', result.message);
     }
@@ -96,4 +84,4 @@ export const useAuth = () => {
   return context;
 };
 
-export default AuthContext; 
+export default AuthContext;

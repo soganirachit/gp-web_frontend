@@ -25,8 +25,9 @@ export interface CartItem {
 
 export interface CartDeliveryInfo {
   deliveryDate: string; // Format: "28 Oct 2025" or "Today", "Tomorrow", "Day After"
-  timeSlot: string; // Format: "8-11 AM", "11 AM-2 PM", "2-6 PM", "6-9 PM"
-  selectedDate?: Date; // Actual date object for "Pick Date" option
+  timeSlot: string;     // Display label e.g. "8-11 AM"
+  slotId?: number;      // ID from GET /api/v1/delivery/slots/available/
+  selectedDate?: Date;  // Actual date object for "Pick Date" option
 }
 
 interface CartContextType {
@@ -59,12 +60,12 @@ export const clearCartStorage = () => {
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [isSyncing, setIsSyncing] = useState(false);
-  const [pendingAdds, setPendingAdds] = useState<Set<string>>(new Set()); // Track items being added
+  const pendingAddsRef = useRef<Set<string>>(new Set()); // Track items being added (ref — no re-render needed)
   const shouldSyncOnLoginRef = useRef(false); // Flag to indicate we need to sync after login
   const [items, setItems] = useState<CartItem[]>(() => {
     // Load from localStorage on mount
     // Check if user is logged in to decide which cart to load
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     if (token) {
       // User is logged in - load from regular cart
       const savedCart = localStorage.getItem(CART_STORAGE_KEY);
@@ -97,9 +98,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     if (savedInfo) {
       try {
         const parsed = JSON.parse(savedInfo);
-        // Convert selectedDate string back to Date object
+        // Convert selectedDate string back to Date object.
+        // Use local year/month/day to avoid UTC-midnight timezone offset bugs.
         if (parsed.selectedDate && typeof parsed.selectedDate === 'string') {
-          parsed.selectedDate = new Date(parsed.selectedDate);
+          const d = new Date(parsed.selectedDate);
+          parsed.selectedDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
         }
         return parsed;
       } catch {
@@ -113,7 +116,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   // Save to localStorage whenever items change
   // Use temp cart if user is not logged in
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     if (token) {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
       // Don't clear temp cart here - it's handled in the login detection useEffect
@@ -144,7 +147,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addToCart = async (item: Omit<CartItem, 'id'>) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     
     // Check if item with same product and variant already exists
     const existingItemIndex = items.findIndex(
@@ -190,7 +193,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             existingItem.productId,
             storeId,
             item.quantity,
-            item.customizedMessage
+            item.customizedMessage,
+            existingItem.variant?.id
           );
           // Reload cart from API to get all items with correct cart_item_id
           // Add a small delay to ensure API has processed the add
@@ -211,7 +215,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       // Sync to API if logged in
       if (token && newItem.productId) {
         // Mark this item as pending add
-        setPendingAdds(prev => new Set(prev).add(newItem.id));
+        pendingAddsRef.current.add(newItem.id);
         try {
           let storeId: number | null = null;
           try {
@@ -243,11 +247,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             console.error('Store ID not available - cannot add to API cart');
             console.log('Token exists:', !!token, 'SelectedStoreId:', storeService.getSelectedStoreId(), 'TemporaryStoreId:', storeService.getTemporaryStoreId());
             // Remove from pending adds since we're not calling API
-            setPendingAdds(prev => {
-              const next = new Set(prev);
-              next.delete(newItem.id);
-              return next;
-            });
+            pendingAddsRef.current.delete(newItem.id);
             // Still show success since item is in local cart, but log warning
             console.warn('Item added to local cart only - store ID required for API sync');
             // Show user-friendly error
@@ -261,7 +261,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
               newItem.productId,
               storeId,
               newItem.quantity,
-              newItem.customizedMessage
+              newItem.customizedMessage,
+              newItem.variant?.id
             );
             console.log('Successfully called addToCart API');
           } catch (apiError) {
@@ -281,20 +282,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             // Keep the local item even if reload fails
           } finally {
             // Remove from pending adds after reload
-            setPendingAdds(prev => {
-              const next = new Set(prev);
-              next.delete(newItem.id);
-              return next;
-            });
+            pendingAddsRef.current.delete(newItem.id);
           }
         } catch (error) {
           console.error('Error adding cart item to API:', error);
-          // Remove from pending on error
-          setPendingAdds(prev => {
-            const next = new Set(prev);
-            next.delete(newItem.id);
-            return next;
-          });
+          pendingAddsRef.current.delete(newItem.id);
           // Continue with UI update even if API fails
         }
       }
@@ -302,7 +294,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const removeFromCart = async (id: string) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     const itemToRemove = items.find(item => item.id === id);
     
     if (!itemToRemove) return;
@@ -363,7 +355,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateQuantity = async (id: string, quantity: number, specialInstructions?: string) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     
     if (quantity <= 0) {
       await removeFromCart(id);
@@ -391,23 +383,10 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         try {
           await cartService.updateCartItem(item.apiCartItemId, quantity, instructionsToUse);
           console.log('Successfully updated cart item in API');
-          // Update the specific item in state instead of reloading entire cart
-          // This preserves the item ID and ensures UI updates immediately
-          setItems(prevItems => 
-            prevItems.map(prevItem => 
-              prevItem.id === id 
-                ? { ...prevItem, quantity, customizedMessage: instructionsToUse } 
-                : prevItem
-            )
-          );
-          // Optionally reload after a delay to ensure sync, but don't block UI
-          setTimeout(async () => {
-            try {
-              await loadCartFromAPI();
-            } catch (reloadError) {
-              console.error('Error reloading cart after update:', reloadError);
-            }
-          }, 500);
+          // Refresh from API in background — gets server-computed totals, discounts, etc.
+          loadCartFromAPI().catch(reloadError => {
+            console.error('Error reloading cart after update:', reloadError);
+          });
         } catch (error) {
           console.error('Error updating cart item quantity in API:', error);
           // Revert UI update on error
@@ -431,7 +410,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             item.productId,
             storeId,
             quantity,
-            instructionsToUse
+            instructionsToUse,
+            item.variant?.id
           );
           // Reload cart from API to get all items with correct cart_item_id
           // Add a small delay to ensure API has processed the add
@@ -445,7 +425,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateCustomizedMessage = async (id: string, message: string) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     
     // Find the item before updating
     const item = items.find(item => item.id === id);
@@ -464,14 +444,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         // Update the cart item with current quantity and new special instructions
         await cartService.updateCartItem(item.apiCartItemId, item.quantity, message);
         console.log('Successfully updated special instructions in API');
-        // Reload cart to ensure sync
-        setTimeout(async () => {
-          try {
-            await loadCartFromAPI();
-          } catch (reloadError) {
-            console.error('Error reloading cart after update:', reloadError);
-          }
-        }, 500);
+        loadCartFromAPI().catch(reloadError => {
+          console.error('Error reloading cart after update:', reloadError);
+        });
       } catch (error) {
         console.error('Error updating special instructions in API:', error);
         // Revert UI update on error
@@ -499,7 +474,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
    * This should be called when user navigates to basket page
    */
   const loadCartFromAPI = async () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     if (!token) {
       // User not logged in - clear regular cart and use temp cart only
       localStorage.removeItem(CART_STORAGE_KEY);
@@ -534,10 +509,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             existingItemsMap.set(item.apiCartItemId, item);
           }
         });
-        // Also map by productId as fallback
+        // Also map by (productId, variantId) as fallback for same product different variants
+        const compositeKey = (pid: number, vid?: number | null) => `${pid}-${vid ?? 'base'}`;
         items.forEach(item => {
-          if (item.productId && !existingItemsMap.has(item.productId)) {
-            existingItemsMap.set(item.productId, item);
+          const key = compositeKey(item.productId, item.variant?.id);
+          if (item.productId && !existingItemsMap.has(key)) {
+            existingItemsMap.set(key, item);
           }
         });
         
@@ -550,8 +527,10 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
           // Get primary image
           const imageUrl = product?.primary_image || '';
           
-          // Try to preserve existing item ID - check by apiCartItemId first, then productId
-          const existingItem = existingItemsMap.get(apiItem.cart_item_id) || existingItemsMap.get(product?.id);
+          // Try to preserve existing item ID - check by apiCartItemId first, then (productId, variantId)
+          const compositeKey = (pid: number, vid?: number | null) => `${pid}-${vid ?? 'base'}`;
+          const existingItem = existingItemsMap.get(apiItem.cart_item_id)
+            || existingItemsMap.get(compositeKey(product?.id, apiItem.variant?.id));
           const itemId = existingItem?.id || generateCartItemId();
           
           const cartItem: CartItem = {
@@ -565,9 +544,14 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             quantity: apiItem.quantity,
             // Note: API doesn't provide inventory_id in cart response
             // We'll need to get it when syncing or use product.id as fallback
-            inventoryId: product?.id, // Using product.id as fallback - might need to be updated
             customizedMessage: apiItem.special_instructions || undefined,
-            variant: null, // API doesn't provide variant details in cart response
+            variant: apiItem.variant
+              ? {
+                  id: apiItem.variant.id,
+                  name: apiItem.variant.name,
+                  final_price: price,
+                }
+              : null,
             categorySlug: existingItem?.categorySlug, // Preserve categorySlug from existing item if available
           };
           
@@ -588,12 +572,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         // 1. Pending adds (items being added to API)
         // 2. Items without apiCartItemId (from temp cart, need syncing)
         const hasUnsavedItems = items.some(item => !item.apiCartItemId);
-        if (pendingAdds.size === 0 && !hasUnsavedItems) {
+        if (pendingAddsRef.current.size === 0 && !hasUnsavedItems) {
           console.log('API cart is empty and no pending adds or unsaved items, clearing local cart');
           setItems([]);
         } else {
           console.log('API cart is empty but have pending adds or unsaved items, keeping local cart items', {
-            pendingAdds: pendingAdds.size,
+            pendingAdds: pendingAddsRef.current.size,
             hasUnsavedItems,
             itemsCount: items.length
           });
@@ -631,7 +615,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
    * It will update existing items or add new ones
    */
   const syncCartToAPI = async () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     if (!token) {
       throw new Error('User must be logged in to sync cart');
     }
@@ -644,9 +628,10 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     try {
       // First, load current API cart to get existing items
       const cartData = await cartService.getCartData();
-      // Map by product ID since API doesn't provide inventory_id in cart response
+      // Map by (productId, variantId) - same product with different variants = different lines
+      const apiItemKey = (p: { id: number }, v?: { id: number } | null) => `${p?.id ?? 0}-${v?.id ?? 'base'}`;
       const apiItemsMap = new Map(
-        cartData.items.map((item: any) => [item.product.id, item])
+        cartData.items.map((item: any) => [apiItemKey(item.product, item.variant), item])
       );
 
       // Process each local cart item
@@ -655,8 +640,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
           continue; // Skip items without product ID
         }
 
-        // Match by product ID since API doesn't provide inventory_id in cart response
-        const apiItem = apiItemsMap.get(item.productId);
+        const apiItem = apiItemsMap.get(apiItemKey({ id: item.productId }, item.variant));
         
         if (item.apiCartItemId || apiItem) {
           // Item exists in API - update it
@@ -693,7 +677,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
               item.productId,
               storeId,
               item.quantity,
-              item.customizedMessage
+              item.customizedMessage,
+              item.variant?.id
             );
             // Reload cart from API to get all items with correct cart_item_id
             await loadCartFromAPI();
@@ -723,7 +708,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   // Sync cart to API after login when temp cart items are merged
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     if (token && shouldSyncOnLoginRef.current && items.length > 0) {
       // Check if there are items without apiCartItemId (from temp cart)
       const hasUnsavedItems = items.some(item => !item.apiCartItemId);
@@ -763,7 +748,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   // Also watch for token removal to clear cart
   useEffect(() => {
     const checkLoginStatus = async () => {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token');
       const prevToken = localStorage.getItem('prevToken'); // Track previous token state
       
       // Check if token changed from null/undefined to a value (user just logged in)
@@ -790,11 +775,10 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                 // Combine temp items with existing items, avoiding duplicates
                 const mergedItems = [...prevItems];
                 tempItems.forEach((tempItem: CartItem) => {
-                  // Check if item already exists (by productId and inventoryId)
+                  // Check if item already exists (by productId and variantId)
                   const existingIndex = mergedItems.findIndex(
-                    item => item.productId === tempItem.productId && 
-                    (item.inventoryId === tempItem.inventoryId || 
-                     (!item.inventoryId && !tempItem.inventoryId))
+                    item => item.productId === tempItem.productId &&
+                    (item.variant?.id === tempItem.variant?.id || (!item.variant && !tempItem.variant))
                   );
                   if (existingIndex >= 0) {
                     // Update quantity if item exists
@@ -868,7 +852,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
     // Listen for storage changes (login/logout)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'token') {
+      if (e.key === 'access_token') {
         checkLoginStatus();
       }
     };
@@ -882,9 +866,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     window.addEventListener('tokenRemoved', handleTokenRemoved);
     
     // Poll for token changes (for same-tab detection)
-    let lastToken = localStorage.getItem('token');
+    let lastToken = localStorage.getItem('access_token');
     const tokenCheckInterval = setInterval(() => {
-      const currentToken = localStorage.getItem('token');
+      const currentToken = localStorage.getItem('access_token');
       if (lastToken !== currentToken) {
         lastToken = currentToken;
         checkLoginStatus();

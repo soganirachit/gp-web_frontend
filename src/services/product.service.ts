@@ -373,7 +373,9 @@ export function getBasePrice(item: any): number {
   return Number.isNaN(base) ? 0 : base;
 }
 
+/** Show strikethrough on base_price when discount applies. Prefer API discount_percentage when available. */
 export function showStrikeBase(item: any): boolean {
+  if (item?.discount_percentage != null && item.discount_percentage > 0) return true;
   const base = getBasePrice(item);
   const effective = getEffectivePrice(item);
   return base > 0 && effective < base;

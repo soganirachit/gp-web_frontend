@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { authService } from "../../../../services/auth.service";
 import { useFeatureTheme } from "../../../../context/FeatureThemeContext";
+import Spinner from "../../../common/Spinner";
 
 const Login = () => {
     const [phoneNumber, setPhoneNumber] = useState("");
@@ -132,8 +133,8 @@ const Login = () => {
                             <label className="block text-gray-700 mb-1.5 sm:mb-2 text-sm sm:text-base font-medium">
                                 Phone Number
                             </label>
-                            <div className="flex items-center border border-gray-300 rounded-lg sm:rounded-xl overflow-hidden bg-white">
-                                <span className="pl-3 sm:pl-4 pr-1.5 sm:pr-2 text-gray-700 text-sm sm:text-base font-medium">+91</span>
+                            <div className="flex flex-row flex-nowrap items-center border border-gray-300 rounded-lg sm:rounded-xl overflow-hidden bg-white">
+                                <span className="flex-shrink-0 pl-3 sm:pl-4 pr-1.5 sm:pr-2 text-gray-700 text-sm sm:text-base font-medium whitespace-nowrap">+91</span>
                                 <input
                                     type="tel"
                                     required
@@ -155,7 +156,7 @@ const Login = () => {
                             className={`w-full py-3 sm:py-3.5 md:py-4 px-4 rounded-lg sm:rounded-xl font-semibold transition-colors duration-200 text-base sm:text-lg flex items-center justify-center ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
                         >
                             {isLoading ? (
-                                <div className={`w-5 h-5 sm:w-6 sm:h-6 border-2 border-t-transparent rounded-full animate-spin ${feature === 'gpDaily' ? 'border-black' : 'border-white'}`} />
+                                <Spinner size={24} variant="light" className="flex-shrink-0" />
                             ) : (
                                 "Get OTP"
                             )}

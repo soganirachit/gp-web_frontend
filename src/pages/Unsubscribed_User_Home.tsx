@@ -7,7 +7,7 @@ import logo from '../assets/All/logo.png'
 import Banner1 from '../assets/Banner/Banner1.png'
 import Banner2 from '../assets/Banner/Banner1.png'
 import Banner3 from '../assets/Banner/Banner1.png'
-import StoryImage from '../assets/Banner/Story.png'
+const StoryImage = '/story.png';
 import { useNavigate } from 'react-router-dom';
 import { productService } from '../services/product.service';
 import Delivered from '../assets/icon/Frame.png'
@@ -313,7 +313,7 @@ function Unsubscribed_User_Home() {
                       <div className="p-3">
                         <div className="bg-[#f8f6f1] rounded-2xl overflow-hidden aspect-square">
                           <img
-                            src={item.imageUrl || 'https://via.placeholder.com/160'}
+                            src={item.imageUrl || '/placeholder.svg'}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
@@ -364,7 +364,7 @@ function Unsubscribed_User_Home() {
                       <div className="p-3">
                         <div className="bg-[#f8f6f1] rounded-2xl overflow-hidden aspect-square">
                           <img
-                            src={item.imageUrl || 'https://via.placeholder.com/160'}
+                            src={item.imageUrl || '/placeholder.svg'}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />

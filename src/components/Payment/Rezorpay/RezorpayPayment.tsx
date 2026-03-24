@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import Spinner from "../../common/Spinner";
 
 declare global {
   interface Window {
@@ -73,10 +74,8 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
         `${import.meta.env.VITE_API_BASE_URL}/wallet/create-razorpay-order`,
         { amount, purpose },
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`, // Your auth token
-          },
-          timeout: 30000, // 30 seconds timeout
+          withCredentials: true,
+          timeout: 30000,
         }
       );
 
@@ -153,9 +152,7 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
       disabled={isLoading || disabled}
     >
       {isLoading ? (
-        <div className="flex items-center justify-center">
-          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-        </div>
+        <Spinner size={24} variant="light" className="flex-shrink-0" />
       ) : (
         buttonText
       )}

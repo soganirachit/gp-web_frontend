@@ -33,9 +33,9 @@ const ExploreMore: React.FC = () => {
 
   // Helper function to get image URL
   const getImageUrl = (imagesUrl?: string | string[]): string => {
-    if (!imagesUrl) return "https://via.placeholder.com/160";
+    if (!imagesUrl) return "/placeholder.svg";
     if (Array.isArray(imagesUrl)) {
-      return imagesUrl[0] || "https://via.placeholder.com/160";
+      return imagesUrl[0] || "/placeholder.svg";
     }
     return imagesUrl;
   };
@@ -94,14 +94,15 @@ const ExploreMore: React.FC = () => {
             setAllStoreProducts(fetched || []);
 
           } else {
-            // Fallback: best sellers
-            const fetched = await productService.getBestSellers(
-              storeId || undefined,
-              abortController.signal
-            );
-            if (id !== fetchIdRef.current) return;
-            setBestSellers(fetched || []);
-          }
+                // Fallback: All store products (no special ordering)
+                const fetched = await productService.getProductsByOrdering(
+                  undefined,
+                  storeId || undefined,
+                  abortController.signal
+                );
+                if (id !== fetchIdRef.current) return;
+                setAllStoreProducts(fetched || []);
+              }
         } else {
           // GP Daily
           const [productsResult, basePacksResult] = await Promise.all([

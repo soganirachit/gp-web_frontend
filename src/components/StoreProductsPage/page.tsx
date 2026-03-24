@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { SEO } from "../SEO";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
-import { MdLocationOn, MdKeyboardArrowDown } from "react-icons/md";
+import { MdKeyboardArrowDown } from "react-icons/md";
 import { FaChevronRight, FaSearch } from "react-icons/fa";
 import { IoFilterOutline, IoSwapVerticalOutline } from "react-icons/io5";
-import searchImage from "../../assets/icon/Search.png";
 import locationhomeIcon from "../../assets/svg/gp_daily svg/locationhome.svg";
 import { productService, Category, getEffectivePrice, getBasePrice, showStrikeBase } from "../../services/product.service";
 import { storeService } from "../../services/store.service";
 import { addressService } from "../../services/address.service";
 import Spinner from "../common/Spinner";
-import BottomNav from "../layout/BottomNav";
+import { SearchBar } from "../common/SearchBar";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { getApiUrl } from "../../config/api.config";
 
@@ -106,8 +106,7 @@ const StoreProductsPages: React.FC = () => {
         setError(null);
         
         // Initialize temporary store ID if user is not logged in
-        const token = localStorage.getItem("token");
-        if (!token) {
+        if (!localStorage.getItem("phoneNumber")) {
           const existingTempStoreId = storeService.getTemporaryStoreId();
           if (!existingTempStoreId) {
             try {
@@ -144,12 +143,13 @@ const StoreProductsPages: React.FC = () => {
             storeId || undefined,
             "store"
           );
-          console.log("Fetched products for category:", categorySlug, result);
-          console.log("First product image:", result?.[0]?.primary_image);
           setProducts(result || []);
         } else {
-          // Fetch all products - using best sellers as fallback for "All"
-          const result = await productService.getBestSellers(storeId || undefined);
+          // Fetch all products for the store (no special ordering)
+          const result = await productService.getProductsByOrdering(
+            undefined,
+            storeId || undefined
+          );
           setProducts(result || []);
         }
         setDisplayedProducts(6); // Reset displayed products count
@@ -246,7 +246,7 @@ const StoreProductsPages: React.FC = () => {
       }
     }
     
-    return "https://via.placeholder.com/160";
+    return "/placeholder.svg";
   };
 
   const sortedProducts = sortProducts(products, sortBy);
@@ -265,6 +265,17 @@ const StoreProductsPages: React.FC = () => {
   // Combined loading state for full-screen loader
   const isPageLoading = isLoading || isLoadingCategories || isLoadingAddress;
 
+  // Build SEO meta dynamically from the active category.
+  // Must be declared before any early return (Rules of Hooks).
+  const seoDescription = useMemo(() => {
+    if (!categorySlug) {
+      return 'Shop all fresh flowers, garlands, bouquets and pooja items online. Same-day delivery in Jaipur from Genda Phool.';
+    }
+    const cat = categories.find(c => c.slug === categorySlug);
+    const catLabel = cat?.name || categoryName;
+    return `Shop ${catLabel} online — fresh quality products delivered same-day in Jaipur by Genda Phool.`;
+  }, [categorySlug, categories, categoryName]);
+
   // Show full-screen loader while initial data is loading
   if (isPageLoading) {
     return (
@@ -274,8 +285,21 @@ const StoreProductsPages: React.FC = () => {
     );
   }
 
+  const seoTitle = categoryName && categoryName !== 'All Products'
+    ? `${categoryName} — Genda Phool`
+    : 'All Products — Genda Phool';
+
+  const canonicalUrl = categorySlug
+    ? `https://customerapp.mygendaphool.com/gp-store/products?category=${categorySlug}`
+    : 'https://customerapp.mygendaphool.com/gp-store/products';
+
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
+      <SEO
+        title={seoTitle}
+        description={seoDescription}
+        canonical={canonicalUrl}
+      />
       <div className="max-w-[800px] mx-auto bg-[#f8f6f1] min-h-screen pb-20">
         {/* Top Header with Location and Search */}
         <div className="sticky top-0 z-20 bg-[#f8f6f1] border-b border-gray-200">
@@ -301,18 +325,15 @@ const StoreProductsPages: React.FC = () => {
               </div>
             </div>
 
-            {/* Search Bar */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search anything....."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full border border-[#808080] rounded-lg px-4 py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#19411f] focus:border-transparent"
-              />
-              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#808080] w-4 h-4" />
-
-            </div>
+            {/* Search Bar — unified home page styling */}
+            <SearchBar
+              mode="product"
+              storeId={storeService.getStoreIdForProducts() ?? undefined}
+              productBasePath="/gp-store"
+              searchPagePath="/search"
+              value={searchQuery}
+              onChange={setSearchQuery}
+            />
           </div>
 
           {/* Category Filter Buttons */}
@@ -429,6 +450,7 @@ const StoreProductsPages: React.FC = () => {
                       <img
                         src={getProductImageUrl(item)}
                         alt={item.name}
+                        loading="lazy"
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           const img = e.target as HTMLImageElement;
@@ -450,7 +472,7 @@ const StoreProductsPages: React.FC = () => {
                           }
                           
                           // Final fallback to placeholder
-                          img.src = "https://via.placeholder.com/160";
+                          img.src = "/placeholder.svg";
                         }}
                       />
                     </div>
@@ -505,8 +527,6 @@ const StoreProductsPages: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom Navigation */}
-      <BottomNav />
     </div>
   );
 };

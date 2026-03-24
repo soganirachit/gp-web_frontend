@@ -1,4 +1,5 @@
 import axios, { AxiosError } from "axios";
+import api from "./api";
 import { getApiUrl } from "../config/api.config";
 
 export interface Store {
@@ -21,13 +22,6 @@ export interface Store {
   distance_km?: number;
 }
 
-const getHeaders = () => {
-  const token = localStorage.getItem("token");
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
-};
 
 class StoreService {
   async getAllStores(latitude: number, longitude: number): Promise<Store[]> {
@@ -76,10 +70,9 @@ class StoreService {
 
   async switchStore(storeId: number): Promise<void> {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${getApiUrl()}/stores/switch/`,
-        { store_id: storeId },
-        { headers: getHeaders() }
+        { store_id: storeId }
       );
 
       if (!response.data.success) {
@@ -129,12 +122,9 @@ class StoreService {
    * Get store ID - returns logged-in user's store ID if available, otherwise temporary store ID
    */
   getStoreIdForProducts(): number | null {
-    const token = localStorage.getItem("token");
-    if (token) {
-      // User is logged in - use their selected store
+    if (localStorage.getItem("phoneNumber")) {
       return this.getSelectedStoreId();
     } else {
-      // User is not logged in - use temporary store ID
       return this.getTemporaryStoreId();
     }
   }
@@ -202,4 +192,22 @@ class StoreService {
 }
 
 export const storeService = new StoreService();
+
+export interface Banner {
+  id: number;
+  title: string;
+  subtitle?: string;
+  cta_label?: string;
+  cta_link?: string;
+  secondary_cta_label?: string;
+  secondary_cta_link?: string;
+  image_url?: string;
+  title_bg_color: string;
+  cta_bg_color: string;
+  sort_order: number;
+}
+
+// Uses raw axios (no JWT) — banners are public; sending a stale token can cause 401
+export const getStoreBanners = (storeId: number | string) =>
+  axios.get<{ success: boolean; data: Banner[] }>(`${getApiUrl()}/stores/${storeId}/banners/`);
 

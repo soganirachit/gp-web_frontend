@@ -19,7 +19,7 @@ interface FeatureThemeContextValue {
   basePath: string; 
 }
 
-const FeatureThemeContext = createContext<FeatureThemeContextValue | undefined>(
+export const FeatureThemeContext = createContext<FeatureThemeContextValue | undefined>(
   undefined
 );
 

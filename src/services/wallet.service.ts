@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "./api";
 import { getApiUrl } from "../config/api.config";
 import { TransactionType } from "@/interfaces";
 
@@ -8,44 +8,17 @@ const API_URL = `${getApiUrl()}/wallet`;
 class WalletService {
   private readonly TIMEOUT_MS = 30000; // 30 seconds timeout
 
-  private getAuthHeaders() {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      return null;
-    }
-    return {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    };
-  }
-
-  private handleAuthError(error: any) {
-    if (
-      error.response?.status === 401 ||
-      error.message === "Authentication required"
-    ) {
-      localStorage.removeItem("token");
-      throw new Error("Session expired. Please login again.");
-    }
-    throw error;
-  }
-
   async getWalletBalance(): Promise<{
     balance: number;
     transactions: TransactionType[];
     transactionLogs?: any[];
   }> {
     try {
-      const headers = this.getAuthHeaders();
-      if (!headers) {
-        return {
-          balance: 0,
-          transactions: [],
-          transactionLogs: [],
-        };
+      if (!localStorage.getItem("phoneNumber")) {
+        return { balance: 0, transactions: [], transactionLogs: [] };
       }
 
-      const response = await axios.get(`${API_URL}/balance`, { headers });
+      const response = await api.get(`${API_URL}/balance`);
 
       if (response.status === 200) {
         return response.data;
@@ -56,19 +29,7 @@ class WalletService {
         transactionLogs: [],
       };
     } catch (error: any) {
-      if (!localStorage.getItem("token")) {
-        return {
-          balance: 0,
-          transactions: [],
-          transactionLogs: [],
-        };
-      }
-      this.handleAuthError(error);
-      return {
-        balance: 0,
-        transactions: [],
-        transactionLogs: [],
-      };
+      return { balance: 0, transactions: [], transactionLogs: [] };
     }
   }
 
@@ -78,13 +39,8 @@ class WalletService {
     shortageAmount: number;
   }> {
     try {
-      const headers = this.getAuthHeaders();
-      if (!headers) {
-        return {
-          isEnough: false,
-          currentBalance: 0,
-          shortageAmount: amount,
-        };
+      if (!localStorage.getItem("phoneNumber")) {
+        return { isEnough: false, currentBalance: 0, shortageAmount: amount };
       }
 
       const { balance } = await this.getWalletBalance();
@@ -107,26 +63,11 @@ class WalletService {
     key_id: string;
     customer: any;
   }> {
-    try {
-      const headers = this.getAuthHeaders();
-      if (!headers) {
-        throw new Error("Authentication required");
-      }
-
-      const response = await axios.post(
-        `${API_URL}/create-razorpay-order`,
-        { amount },
-        { headers }
-      );
-
-      if (response.status === 200 && response.data.success) {
-        return response.data;
-      }
-      throw new Error(response.data.message || "Failed to create order");
-    } catch (error: any) {
-      this.handleAuthError(error);
-      throw error;
+    const response = await api.post(`${API_URL}/create-razorpay-order`, { amount });
+    if (response.status === 200 && response.data.success) {
+      return response.data;
     }
+    throw new Error(response.data.message || "Failed to create order");
   }
 
   async verifyRazorpayPayment(paymentData: {
@@ -134,26 +75,11 @@ class WalletService {
     razorpay_order_id: string;
     razorpay_signature: string;
   }): Promise<any> {
-    try {
-      const headers = this.getAuthHeaders();
-      if (!headers) {
-        throw new Error("Authentication required");
-      }
-
-      const response = await axios.post(
-        `${API_URL}/verify-payment`,
-        paymentData,
-        { headers }
-      );
-
-      if (response.status === 200 && response.data.success) {
-        return response.data;
-      }
-      throw new Error(response.data.message || "Payment verification failed");
-    } catch (error: any) {
-      this.handleAuthError(error);
-      throw error;
+    const response = await api.post(`${API_URL}/verify-payment`, paymentData);
+    if (response.status === 200 && response.data.success) {
+      return response.data;
     }
+    throw new Error(response.data.message || "Payment verification failed");
   }
 
   async verifyPayment(paymentData: {
@@ -162,56 +88,26 @@ class WalletService {
     razorpay_signature: string;
     amount: number;
   }): Promise<any> {
-    try {
-      const headers = this.getAuthHeaders();
-      if (!headers) {
-        throw new Error("Authentication required");
-      }
-
-      const response = await axios.post(
-        `${API_URL}/add-to-payment`,
-        paymentData,
-        {
-          headers,
-          timeout: this.TIMEOUT_MS,
-        }
-      );
-
-      if (response.status === 200 && response.data.success) {
-        return response.data;
-      }
-      throw new Error(response.data.message || "Payment verification failed");
-    } catch (error: any) {
-      this.handleAuthError(error);
-      throw error;
+    const response = await api.post(`${API_URL}/add-to-payment`, paymentData, {
+      timeout: this.TIMEOUT_MS,
+    });
+    if (response.status === 200 && response.data.success) {
+      return response.data;
     }
+    throw new Error(response.data.message || "Payment verification failed");
   }
 
   // Temporary: Directly add amount to wallet (without Razorpay)
   async addAmountDirect(amount: number): Promise<any> {
-    try {
-      const headers = this.getAuthHeaders();
-      if (!headers) {
-        throw new Error("Authentication required");
-      }
-
-      const response = await axios.post(
-        `${API_URL}/add-to-payment`,
-        { amount },
-        {
-          headers,
-          timeout: this.TIMEOUT_MS,
-        }
-      );
-
-      if (response.status === 200 && response.data.success) {
-        return response.data;
-      }
-      throw new Error(response.data.message || "Failed to add amount");
-    } catch (error: any) {
-      this.handleAuthError(error);
-      throw error;
+    const response = await api.post(
+      `${API_URL}/add-to-payment`,
+      { amount },
+      { timeout: this.TIMEOUT_MS }
+    );
+    if (response.status === 200 && response.data.success) {
+      return response.data;
     }
+    throw new Error(response.data.message || "Failed to add amount");
   }
 
   async checkPaymentStatus(paymentId: string): Promise<{
@@ -219,14 +115,7 @@ class WalletService {
     amount?: number;
   }> {
     try {
-      const headers = this.getAuthHeaders();
-      if (!headers) {
-        throw new Error("Authentication required");
-      }
-
-      // Check if payment exists in our database
-      const response = await axios.get(`${API_URL}/payment-status/${paymentId}`, {
-        headers,
+      const response = await api.get(`${API_URL}/payment-status/${paymentId}`, {
         timeout: this.TIMEOUT_MS,
       });
 
@@ -235,11 +124,9 @@ class WalletService {
       }
       return { status: "failed" };
     } catch (error: any) {
-      // If endpoint doesn't exist, assume payment is still pending
       if (error.response?.status === 404) {
         return { status: "pending" };
       }
-      this.handleAuthError(error);
       return { status: "failed" };
     }
   }
@@ -280,18 +167,10 @@ class WalletService {
     amount: number;
   }): Promise<boolean> {
     try {
-      const headers = this.getAuthHeaders();
-      if (!headers) {
-        throw new Error("Authentication required");
-      }
-
-      const response = await axios.post(
+      const response = await api.post(
         `${API_URL}/recover-payment`,
         paymentData,
-        {
-          headers,
-          timeout: this.TIMEOUT_MS,
-        }
+        { timeout: this.TIMEOUT_MS }
       );
 
       if (response.status === 200 && response.data.success) {

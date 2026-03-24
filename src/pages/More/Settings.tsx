@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { SEO } from '../../components/SEO';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FaChevronRight,
@@ -17,6 +18,7 @@ import Spinner from '../../components/common/Spinner';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import { editCustomerService } from '../../services/editcustomer.service';
+import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
 
 // Import SVG icons
 import subscriptionIcon from '../../assets/icon/subscription.svg';
@@ -38,9 +40,7 @@ const Settings: React.FC = () => {
   const { theme, feature } = useFeatureTheme();
   const { isLoggedIn, logout } = useAuth();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
-  // Treat as logged out if context says so OR token is missing (e.g. after logout that didn't update context)
-  const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('token');
-  const showAsLoggedOut = !isLoggedIn || !hasToken;
+  const showAsLoggedOut = !isLoggedIn || !localStorage.getItem('access_token');
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -63,14 +63,11 @@ const Settings: React.FC = () => {
 
   // Check authentication and redirect if session expired
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const phoneNumber = localStorage.getItem('phoneNumber');
-    if (!isLoggedIn || !token || !phoneNumber) {
-      navigate(`${basePath}/login`, { 
+    if (!isLoggedIn || !localStorage.getItem('access_token')) {
+      navigate(`${basePath}/login`, {
         state: { returnUrl: location.pathname },
-        replace: true 
+        replace: true
       });
-      return;
     }
   }, [isLoggedIn, navigate, basePath, location.pathname]);
 
@@ -425,8 +422,9 @@ const Settings: React.FC = () => {
   };
 
   const formatPhoneNumber = (phone: string) => {
-    if (!phone || phone.length < 10) return phone;
-    return `+91 ${phone}`;
+    const local = formatPhoneForDisplay(phone);
+    if (!local || local.length < 10) return phone || local;
+    return `+91 ${local.slice(0, 5)} ${local.slice(5)}`;
   };
 
   // When not logged in (or no token), show minimal account page with Login button only
@@ -450,8 +448,8 @@ const Settings: React.FC = () => {
             <div className="mb-20 mt-8 text-center">
               <p className="text-xs text-gray-400">
                 By continuing, you agree to our{' '}
-                <a href="#" className="text-gray-500 underline">Terms of Service</a> and{' '}
-                <a href="#" className="text-gray-500 underline">Privacy Policy</a>
+                <a href="/terms" className="text-gray-500 underline">Terms of Service</a> and{' '}
+                <a href="/privacy" className="text-gray-500 underline">Privacy Policy</a>
               </p>
             </div>
           </div>
@@ -472,6 +470,12 @@ const Settings: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
+      <SEO
+        title="My Account — Genda Phool"
+        description="Manage your Genda Phool account"
+        canonical="https://customerapp.mygendaphool.com/gp-store/account"
+        noIndex={true}
+      />
       <div className="w-full max-w-[800px] mx-auto">
         {/* Content Container */}
         <div className="w-full px-4">
@@ -680,11 +684,11 @@ const Settings: React.FC = () => {
           <div className="mb-20 text-center">
             <p className="text-xs text-gray-400">
               By continuing, you agree to our{' '}
-              <a href="#" className="text-gray-500 underline">
+              <a href="/terms" className="text-gray-500 underline">
                 Terms of Service
               </a>{' '}
               and{' '}
-              <a href="#" className="text-gray-500 underline">
+              <a href="/privacy" className="text-gray-500 underline">
                 Privacy Policy
               </a>
             </p>

@@ -1,8 +1,10 @@
-import React, { useEffect } from "react";
+import React, { Suspense, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import FixedHeader from "./FixedHeader";
 import BottomNav from "./BottomNav";
 import { FeatureThemeProvider } from "../../context/FeatureThemeContext";
+import Spinner from "../common/Spinner";
+import { trackPageView } from "../../lib/metaPixel";
 
 const Layout: React.FC = () => {
   const location = useLocation();
@@ -10,6 +12,11 @@ const Layout: React.FC = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
+
+  // Fire Meta Pixel PageView on every route change (critical for SPAs)
+  useEffect(() => {
+    trackPageView();
+  }, [location.pathname, location.search]);
 
   // Define auth routes that should not show BottomNav or Header
   const authRoutes = [
@@ -35,10 +42,6 @@ const Layout: React.FC = () => {
   ];
   const isAuthRoute = authRoutes.includes(location.pathname);
 
-  // Routes that render their own BottomNav (no need for Layout padding)
-  const routesWithOwnBottomNav = ["/account", "/Account"];
-  const hasOwnBottomNav = routesWithOwnBottomNav.includes(location.pathname);
-
   // Routes that should not show BottomNav (location pages, support question form)
   const routesWithoutBottomNav = ["/location"];
   const shouldHideBottomNav = routesWithoutBottomNav.includes(
@@ -60,20 +63,22 @@ const Layout: React.FC = () => {
       <main className={!isAuthRoute && !shouldHideTopPadding ? "pt-4" : ""}>
           <div
             className={
-              !isAuthRoute && !hasOwnBottomNav && !shouldHideBottomNav
+              !isAuthRoute && !shouldHideBottomNav
                 ? "min-h-[calc(100vh-144px)] pb-32"
                 : !isAuthRoute
                 ? "pb-32"
                 : ""
             }
           >
-          <Outlet />
+          <Suspense fallback={<div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50"><Spinner size={400} /></div>}>
+            <Outlet />
+          </Suspense>
         </div>
       </main>
 
       {/* Bottom navigation */}
       {/* <BottomNav /> */}
-        {!isAuthRoute && !hasOwnBottomNav && !shouldHideBottomNav && (
+        {!isAuthRoute && !shouldHideBottomNav && (
           <BottomNav />
         )}
     </div>

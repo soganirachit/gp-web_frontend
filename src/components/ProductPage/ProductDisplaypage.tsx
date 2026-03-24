@@ -4,7 +4,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { basePackService } from "../../services/basepack.service";
 import { BasePack } from "../../services/basepack.service";
 import { walletService } from "../../services/wallet.service";
-import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { productService } from "../../services/product.service";
 import { Product } from "../../services/product.service";
@@ -14,7 +14,6 @@ import ProfileImage from "../../assets/icon/Profile.png";
 import logo from "../../assets/All/logo.png";
 import Spinner from "../common/Spinner";
 import { IoArrowBack } from "react-icons/io5";
-import BottomNav from "../layout/BottomNav";
 import cautionIcon from "../../assets/svg/gp_daily svg/caution.svg";
 import deliveryTruckIcon from "../../assets/svg/gp_daily svg/delivery_truck.svg";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
@@ -228,8 +227,7 @@ const ProductPage: React.FC = () => {
         return;
       }
 
-      const token = localStorage.getItem("token");
-      if (!token) {
+      if (!localStorage.getItem("phoneNumber")) {
         navigate(`${basePath}/login`, {
           state: {
             returnUrl: `${basePath}/product/${id}`,
@@ -275,7 +273,6 @@ const ProductPage: React.FC = () => {
       setOtherBasePacks(otherPacks);
     } catch (error: any) {
       if (error.message === "Session expired. Please login again.") {
-        localStorage.removeItem("token");
         navigate(`${basePath}/login`, {
           state: {
             returnUrl: `${basePath}/product/${id}`,
@@ -409,8 +406,7 @@ const ProductPage: React.FC = () => {
     try {
       // const { id } = useParams<{ id: string }>();
 
-      const token = localStorage.getItem("token");
-      if (!token) {
+      if (!localStorage.getItem("phoneNumber")) {
         toast.error("Please login to continue");
         navigate(`${basePath}/login`, {
           state: {
@@ -511,9 +507,6 @@ const ProductPage: React.FC = () => {
         error.message?.includes("Session expired") ||
         error.message?.includes("Authentication required")
       ) {
-        if (error.message?.includes("Session expired")) {
-          localStorage.removeItem("token");
-        }
         toast.error(error.message || "Please login to continue");
         navigate(`${basePath}/login`, {
           state: { returnUrl: `${basePath}/product/${id}` },
@@ -717,7 +710,7 @@ const ProductPage: React.FC = () => {
                     >
                       <div className="h-32 sm:h-40 w-full">
                         <img
-                          src={itemImage || "https://via.placeholder.com/160"}
+                          src={itemImage || "/placeholder.svg"}
                           alt={item.name}
                           className="w-full h-full object-cover"
                         />
@@ -940,8 +933,6 @@ const ProductPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Bottom Navigation */}
-        <BottomNav />
         {/* Existing modals */}
         <AnimatePresence>
           {showInsufficientBalanceModal && (

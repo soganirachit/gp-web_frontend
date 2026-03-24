@@ -1,4 +1,5 @@
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
+import api from "./api";
 import { getApiUrl } from "../config/api.config";
 
 const API_URL = `${getApiUrl()}/users/me/`;
@@ -58,13 +59,8 @@ export const customerService = {
    * @returns CustomerDetails array (legacy format) for backward compatibility
    */
   async getAllCustomers(): Promise<CustomerDetails[]> {
-    const token = localStorage.getItem("token");
     try {
-      const response = await axios.get(API_URL, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await api.get(API_URL);
 
       // Handle Django API response structure: { success, message, data: { user object } }
       if (!response.data.success || !response.data.data) {
@@ -104,13 +100,8 @@ export const customerService = {
    * @returns DjangoUser object
    */
   async getCurrentUser(): Promise<DjangoUser> {
-    const token = localStorage.getItem("token");
     try {
-      const response = await axios.get(API_URL, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await api.get(API_URL);
 
       // Handle Django API response structure: { success, message, data: { user object } }
       if (!response.data.success || !response.data.data) {

@@ -13,7 +13,6 @@ import { useNetworkRecovery } from "../../../hooks/useNetworkRecovery";
 import { IoMdArrowDown, IoMdArrowUp } from "react-icons/io";
 import walletImage from "../../../assets/icon/Wallet.png";
 import profileImage from "../../../assets/icon/Profile.png";
-import BottomNav from "../../layout/BottomNav";
 import { TransactionType } from "@/interfaces";
 import { format, parseISO } from "date-fns";
 import { INR } from "@/components/constants";
@@ -89,7 +88,6 @@ const Wallet = () => {
     } catch (error: any) {
       console.error('Error fetching wallet:', error);
       if (error.message.includes("Session expired")) {
-        localStorage.removeItem("token");
         toast.error("Session expired. Please login again.");
         navigate("/login", {
           state: {
@@ -107,8 +105,7 @@ const Wallet = () => {
 
   // Fetch wallet balance on component mount and when fetchWalletBalance changes
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
+    if (!localStorage.getItem("phoneNumber")) {
       toast.error("Please login to access your wallet");
       navigate("/login", {
         state: {
@@ -287,7 +284,7 @@ const Wallet = () => {
 
           <div className="text-6xl md:text-7xl font-bold mb-6">
             {isLoadingBalance ? (
-              <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+              <Spinner size={48} variant="light" className="flex-shrink-0" />
             ) : (
               `₹${balance?.toLocaleString()}`
             )}
@@ -682,9 +679,6 @@ const Wallet = () => {
           )}
         </AnimatePresence>
 
-        <div>
-          <BottomNav />
-        </div>
       </div>
     </div>
   );

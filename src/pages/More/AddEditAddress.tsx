@@ -9,6 +9,7 @@ import { useGoogleMaps } from '../../hooks/useGoogleMaps';
 
 import { customerService } from '../../services/getcustomer.service';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
+import Spinner from '../../components/common/Spinner';
 
 const AddEditAddress: React.FC = () => {
   const navigate = useNavigate();
@@ -446,7 +447,7 @@ const AddEditAddress: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 mx-auto mb-4" style={{ borderColor: theme.colors.primary }}></div>
+          <Spinner size={400} className="mb-4" />
           <p className="text-gray-600">Loading map...</p>
         </div>
       </div>
@@ -542,7 +543,7 @@ const AddEditAddress: React.FC = () => {
                     placeholder="Search anything...."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full p-3 pl-4 pr-10 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent shadow-md"
+                    className="w-full p-3 pl-4 pr-10 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent shadow-md text-left"
                     style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
                     onFocus={(e) => {
                       e.currentTarget.style.borderColor = theme.colors.primary;

@@ -18,6 +18,7 @@ import { customerService } from "@/services/getcustomer.service";
 import { orderService } from "@/services/order.service";
 import RazorpayPayment from "../Payment/Rezorpay/RezorpayPayment";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import Spinner from "../common/Spinner";
 
 interface SubscriptionDetails {
   basePackId: string;
@@ -325,7 +326,7 @@ const MapView: React.FC<MapViewProps> = ({ address, themeColor = "#F15A22" }) =>
   if (!isLoaded) {
     return (
       <div className="w-full h-[250px] bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2" style={{ borderColor: themeColor }}></div>
+        <Spinner size={32} />
       </div>
     );
   }
@@ -744,7 +745,7 @@ const ConfirmSubscription: React.FC = () => {
     const resolvedDeliveryTime = storeMetaData.deliveryTime || new Date().toISOString();
 
     const missingFields = {
-      customerId: !resolvedCustomerId && !localStorage.getItem("token"),
+      customerId: !resolvedCustomerId && !localStorage.getItem("phoneNumber"),
       productId: !resolvedProductId,
       quantity: !resolvedQuantity || Number.isNaN(resolvedQuantity),
       addressId: !selectedAddress.id,
@@ -999,7 +1000,7 @@ const ConfirmSubscription: React.FC = () => {
   if (!subscriptionDetails || !selectedAddress) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+        <Spinner size={400} />
       </div>
     );
   }

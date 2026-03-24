@@ -3,6 +3,7 @@ import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { MdMyLocation, MdSearch } from 'react-icons/md';
 import { toast } from 'react-hot-toast';
 import { Toaster } from 'react-hot-toast';
+import Spinner from '../../components/common/Spinner';
 
 // Google Maps API key from environment variables (Vite syntax)
 const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -202,7 +203,7 @@ const Location: React.FC = () => {
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-gray-50 p-4 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-500 border-t-transparent"></div>
+        <Spinner size={400} />
       </div>
     );
   }
@@ -222,7 +223,7 @@ const Location: React.FC = () => {
                 value={location}
                 onChange={(e) => handleLocationSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent shadow-sm"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent shadow-sm text-left"
                 placeholder="Search for your location"
               />
               <button
@@ -278,7 +279,7 @@ const Location: React.FC = () => {
           {/* Loading State */}
           {isLoading ? (
             <div className="h-[400px] bg-gray-100 rounded-lg flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-500 border-t-transparent"></div>
+              <Spinner size={400} />
             </div>
           ) : error ? (
             <div className="h-[400px] bg-gray-100 rounded-lg flex items-center justify-center text-red-500 p-4 text-center">

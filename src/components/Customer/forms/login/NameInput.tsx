@@ -51,10 +51,9 @@ const NameInput: React.FC = () => {
       setError("");
    
 
-      const token = localStorage.getItem("token");
       const phoneNumber = localStorage.getItem("phoneNumber");
 
-      if (!token || !phoneNumber) {
+      if (!phoneNumber) {
         toast.error("Authentication required. Please login again.");
         navigate(`${basePath}/login`);
         return;
