@@ -126,7 +126,7 @@ const Addresses: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f6f1] pb-24">
+    <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
       <div className="max-w-[800px] mx-auto px-4">
         {/* Header */}
         <div className="p-4 pt-6 -mx-4 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200 mb-2 flex items-center gap-3">

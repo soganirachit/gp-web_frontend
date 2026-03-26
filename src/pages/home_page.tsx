@@ -135,7 +135,7 @@ const HomePage: React.FC = () => {
           ]
         }}
       />
-      <div className="max-w-[800px] mx-auto bg-white min-h-screen">
+      <div className="mx-auto min-h-screen w-full max-w-[min(800px,100vw)] bg-white pb-safe-bottom">
         {/* Top Navigation Bar */}
         <div className="bg-white sticky top-0 z-20 px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -161,11 +161,11 @@ const HomePage: React.FC = () => {
             </div>
 
             {/* Right Side Icons */}
-            <div className="relative w-20 h-20 flex-shrink-0 flex items-center justify-center">
+            <div className="relative flex h-14 w-14 flex-shrink-0 items-center justify-center xs:h-16 xs:w-16 sm:h-20 sm:w-20">
               <img
                 src={profilehomeIcon}
                 alt="Profile"
-                className=" absolute inset-0 w-12 h-12 object-contain cursor-pointer self-center justify-self-center"
+                className="absolute inset-0 m-auto h-9 w-9 cursor-pointer object-contain xs:h-10 xs:w-10 sm:h-12 sm:w-12"
                 onClick={() => navigate("/gp-daily/account")}
               />
               <img
@@ -193,7 +193,7 @@ const HomePage: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="pt-6 sm:pt-8 pb-6 sm:pb-8"
+            className="pt-4 pb-4 xs:pt-6 xs:pb-6 sm:pt-8 sm:pb-7"
           >
             <div className="text-left">
               <img
@@ -207,14 +207,14 @@ const HomePage: React.FC = () => {
             </div>
           </motion.div>
 
-          {/* Service Cards Section */}
-          <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-6">
+          {/* Service Cards — proportional height (clamp + aspect), items-start so copy doesn’t stretch vertically */}
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-5 items-start">
             {/* Genda Phool Daily Card */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, delay: 0.1 }}
-              className={`bg-[#FFF5E6] rounded-2xl p-2 sm:p-3 cursor-pointer hover:shadow-lg transition-shadow relative overflow-visible min-h-0 ${!FEATURE_FLAGS.gpDailyEnabled ? 'opacity-60' : ''}`}
+              className={`min-w-0 bg-[#FFF5E6] rounded-2xl p-1.5 sm:p-2.5 cursor-pointer hover:shadow-lg transition-shadow relative overflow-hidden flex flex-col ${!FEATURE_FLAGS.gpDailyEnabled ? 'opacity-60' : ''}`}
               onClick={() => {
                 if (FEATURE_FLAGS.gpDailyEnabled) {
                   if (isLoggedIn) {
@@ -227,41 +227,22 @@ const HomePage: React.FC = () => {
                 }
               }}
             >
-              <div className="flex flex-col h-full">
-                {/* Top Section: Scooter and Logo with overlap */}
-                <div className="relative">
-                  <div className="flex items-start">
-                    <div className="relative flex-shrink-0 w-[130px] h-[130px] sm:w-[300px] sm:h-[300px] flex items-center justify-center -mt-6 sm:-mt-14">
-                      <img
-                        src={dailyScooterSvg}
-                        alt="Daily Scooter"
-                        className="w-full h-full object-contain mt-1"
-                      />
-                      {/* Logo overlapping scooter in top-right area over road lines */}
-                      <div className="absolute right-0 top-[28px] sm:top-[60px] z-10">
-                        <img
-                          src={dailyLogoSvg}
-                          alt="Genda Phool Daily"
-                          className="h-[42px] sm:h-[100px] w-full"
-                        />
-                      </div>
-                      {/* Text overlapping SVGs at the bottom - hidden on mobile, shown on larger screens */}
-                      <div className="absolute bottom-7 left-0 right-0 z-10 px-2 hidden sm:block">
-                        <p className="text-[#DD7600] text-base leading-tight">
-                          Everyday delivery of fresh flowers for Puja or Home Decor.
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-[#DD7600] text-lg sm:text-2xl font-bold flex-shrink-0 ml-auto self-center">›</span>
-                  </div>
-                  {/* Text below SVGs on mobile */}
-                  <div className="mt-0 sm:hidden">
-                    <p className="text-[#DD7600] text-xs leading-tight px-1">
-                      Everyday delivery of fresh flowers for Puja or Home Decor.
-                    </p>
-                  </div>
+              <span className="absolute right-1 top-0.5 z-20 text-[#DD7600] text-base sm:text-2xl font-bold leading-none pointer-events-none" aria-hidden>
+                ›
+              </span>
+              <div className="relative w-full shrink-0 overflow-hidden rounded-[10px] bg-[#FFF5E6]/40 aspect-[5/3] max-h-[min(42vw,5.75rem)] sm:aspect-[4/3] sm:max-h-[min(38vw,9rem)] sm:rounded-xl md:max-h-[11.5rem]">
+                <img
+                  src={dailyScooterSvg}
+                  alt=""
+                  className="pointer-events-none absolute inset-x-0 bottom-0 mx-auto h-[92%] w-[118%] max-w-none object-contain object-bottom sm:h-[94%] sm:w-[108%]"
+                />
+                <div className="absolute right-0 top-0.5 z-10 w-[45%] max-w-[4.25rem] sm:top-1.5 sm:max-w-[6rem] md:max-w-[8rem]">
+                  <img src={dailyLogoSvg} alt="Genda Phool Daily" className="h-auto w-full object-contain object-right drop-shadow-sm" />
                 </div>
               </div>
+              <p className="mt-1 min-w-0 px-0.5 text-left text-[10px] font-medium leading-snug text-[#DD7600] sm:mt-1.5 sm:px-1 sm:text-[11px] md:text-xs md:leading-snug">
+                Everyday delivery of fresh flowers for Puja or Home Decor.
+              </p>
             </motion.div>
 
             {/* Genda Phool Store Card */}
@@ -269,7 +250,7 @@ const HomePage: React.FC = () => {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, delay: 0.2 }}
-              className="bg-[#E8F5E9] rounded-2xl p-2 sm:p-3 cursor-pointer hover:shadow-lg transition-shadow relative overflow-visible min-h-0"
+              className="min-w-0 bg-[#E8F5E9] rounded-2xl p-1.5 sm:p-2.5 cursor-pointer hover:shadow-lg transition-shadow relative overflow-hidden flex flex-col"
               onClick={() => {
                 if (isLoggedIn) {
                   navigate('/gp-store', { state: { mode: 'store' } });
@@ -278,70 +259,57 @@ const HomePage: React.FC = () => {
                 }
               }}
             >
-              <div className="flex flex-col h-full">
-                {/* Top Section: Truck and Logo with overlap */}
-                <div className="relative">
-                  <div className="flex items-start">
-                    <div className="relative flex-shrink-0 w-[130px] h-[130px] sm:w-[300px] sm:h-[300px] flex items-center justify-center -mt-6 sm:-mt-14">
-                      <img
-                        src={truckSvg}
-                        alt="Store Truck"
-                        className="w-full h-full object-contain mt-1"
-                      />
-                      {/* Logo overlapping truck in top-right area */}
-                      <div className="absolute right-0 top-[28px] sm:top-[60px] z-10">
-                        <img
-                          src={storeLogoSvg}
-                          alt="Genda Phool Store"
-                          className="h-[42px] sm:h-[100px] w-full"
-                        />
-                      </div>
-                      {/* Text overlapping SVGs at the bottom - hidden on mobile, shown on larger screens */}
-                      <div className="absolute bottom-7 left-0 right-0 z-10 px-2 hidden sm:block">
-                        <p className="text-[#19411F] text-base leading-tight">
-                          From last minute floral needs to grand bouquets, we got it all!
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-[#19411F] text-lg sm:text-2xl font-bold flex-shrink-0 ml-auto self-center">›</span>
-                  </div>
-                  {/* Text below SVGs on mobile */}
-                  <div className="mt-0 sm:hidden">
-                    <p className="text-[#19411F] text-xs leading-tight px-1">
-                      From last minute floral needs to grand bouquets, we got it all!
-                    </p>
-                  </div>
+              <span className="absolute right-1 top-0.5 z-20 text-[#19411F] text-base sm:text-2xl font-bold leading-none pointer-events-none" aria-hidden>
+                ›
+              </span>
+              <div className="relative w-full shrink-0 overflow-hidden rounded-[10px] bg-[#E8F5E9]/40 aspect-[5/3] max-h-[min(42vw,5.75rem)] sm:aspect-[4/3] sm:max-h-[min(38vw,9rem)] sm:rounded-xl md:max-h-[11.5rem]">
+                <img
+                  src={truckSvg}
+                  alt=""
+                  className="pointer-events-none absolute inset-x-0 bottom-0 mx-auto h-[92%] w-[118%] max-w-none object-contain object-bottom sm:h-[94%] sm:w-[108%]"
+                />
+                <div className="absolute right-0 top-0.5 z-10 w-[45%] max-w-[4.25rem] sm:top-1.5 sm:max-w-[6rem] md:max-w-[8rem]">
+                  <img src={storeLogoSvg} alt="Genda Phool Store" className="h-auto w-full object-contain object-right drop-shadow-sm" />
                 </div>
               </div>
+              <p className="mt-1 min-w-0 px-0.5 text-left text-[10px] font-medium leading-snug text-[#19411F] sm:mt-1.5 sm:px-1 sm:text-[11px] md:text-xs md:leading-snug">
+                From last minute floral needs to grand bouquets, we got it all!
+              </p>
             </motion.div>
           </div>
 
-          {/* Sajawat Card - Full Width */}
+          {/* Sajawat — compact row (illus + copy) so height scales with width, CTA full-width on narrow */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.3 }}
-            className="bg-[#FFF5F5] rounded-2xl p-4 sm:p-6 mb-6 cursor-pointer hover:shadow-lg transition-shadow relative overflow-hidden"
+            className="mb-6 cursor-pointer rounded-2xl bg-[#FFF5F5] p-3 transition-shadow hover:shadow-lg sm:p-5 relative overflow-hidden"
           >
-            <div className="flex items-start justify-between gap-3 sm:gap-6">
-              <div className="flex-1 min-w-0">
+            <div className="flex flex-row items-start gap-2.5 sm:gap-5">
+              <div className="min-w-0 flex-1 pt-0.5">
                 <img
                   src={sajawatLogoSvg}
                   alt="Sajawat by Genda Phool"
-                  className="h-8 sm:h-12 w-auto mb-2"
+                  className="mb-1 h-6 w-auto max-w-[min(100%,12rem)] sm:mb-2 sm:h-10 md:h-12"
                 />
-                <p className="text-[#A91F23] text-sm sm:text-base mb-3 sm:mb-4 leading-relaxed">
+                <p className="mb-2 text-[11px] leading-snug text-[#A91F23] sm:mb-3 sm:text-sm sm:leading-normal md:text-base">
                   A floral first event design and management service, 200+ events executed!
                 </p>
-                <button className="bg-[#A91F23] text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 hover:bg-[#8B1A1D] transition-colors">
-                  Free Consultation <span className="text-white">›</span>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-center gap-1 rounded-lg bg-[#A91F23] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#8B1A1D] sm:inline-flex sm:w-auto sm:justify-start sm:px-5 sm:py-2.5 sm:text-sm md:px-6"
+                >
+                  <span className="text-center">Free Consultation</span>
+                  <span className="shrink-0" aria-hidden>
+                    ›
+                  </span>
                 </button>
               </div>
-              <div className="flex-shrink-0 self-end">
+              <div className="pointer-events-none flex shrink-0 self-center">
                 <img
                   src={garlandSvg}
-                  alt="Garland"
-                  className="h-24 sm:h-40 w-auto object-contain"
+                  alt=""
+                  className="h-[4.5rem] w-auto max-h-[22vw] object-contain xs:h-[5rem] sm:h-28 md:h-36"
                 />
               </div>
             </div>
@@ -364,7 +332,7 @@ const HomePage: React.FC = () => {
             className="mb-8 sm:mb-10"
           >
             <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">WHY CHOOSE US</h2>
-            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-4 items-start">
               <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center">
                 <FaLeaf className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-gray-800" />
                 <div className="text-lg sm:text-2xl font-bold text-gray-800 mb-1">100,000+</div>
@@ -449,7 +417,7 @@ const HomePage: React.FC = () => {
             className="mb-8 sm:mb-10"
           >
             <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">WE ARE LOVED</h2>
-            <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-2">
+            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:gap-4 -mx-1 px-1">
               {[
                 {
                   name: "Priya S.",
@@ -479,7 +447,7 @@ const HomePage: React.FC = () => {
               ].map((review, index) => (
                 <div
                   key={index}
-                  className="w-[180px] sm:w-[200px] min-h-[140px] sm:min-h-[160px] bg-white rounded-xl p-3 sm:p-4 shadow-md flex-shrink-0"
+                  className="w-[min(72vw,11rem)] xs:w-[180px] sm:w-[200px] min-h-[140px] sm:min-h-[160px] snap-start bg-white rounded-xl p-3 sm:p-4 shadow-md flex-shrink-0"
                 >
                   <div className="flex items-center justify-between mb-2 sm:mb-3">
                     <span className="font-bold text-gray-800 text-sm sm:text-base">{review.name}</span>

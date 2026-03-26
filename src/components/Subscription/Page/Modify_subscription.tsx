@@ -206,7 +206,7 @@ const ModifySubscription: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f6f1] font-sans">
-      <div className="max-w-[800px] mx-auto p-4 md:p-6 pb-24">
+      <div className="max-w-[800px] mx-auto p-4 md:p-6 pb-nav-bottom">
 
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">

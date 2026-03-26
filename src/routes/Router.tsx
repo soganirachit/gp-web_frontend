@@ -1,9 +1,11 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
+import { lazyWithRetry as lazy } from '../utils/lazyWithRetry';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import Spinner from '../components/common/Spinner';
 import ProtectedRoute from '../components/common/ProtectedRoute';
 import { FEATURE_FLAGS } from '../config/features';
+import RouteErrorPage from '../components/common/RouteErrorPage';
 
 // Context
 import { StoreProvider } from '../context/StoreContext';
@@ -69,6 +71,7 @@ const router = createBrowserRouter([
   {
     path: '/',
     element: <Layout />,
+    errorElement: <RouteErrorPage />,
     children: [
       { path: '/', element: <Navigate to="/home" replace /> },
       { path: '/startup', element: <Startup /> },
@@ -174,6 +177,7 @@ const router = createBrowserRouter([
         </Suspense>
       </FeatureThemeProvider>
     ),
+    errorElement: <RouteErrorPage />,
   },
 ]);
 

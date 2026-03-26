@@ -445,7 +445,7 @@ const StorePage: React.FC = () => {
           structuredData={productStructuredData ?? undefined}
         />
       )}
-      <div className="max-w-[800px] mx-auto relative pb-20">
+      <div className="relative mx-auto w-full max-w-[min(800px,100vw)] pb-nav-bottom">
         {/* Header */}
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -756,11 +756,11 @@ const StorePage: React.FC = () => {
                   <FaChevronRight className="text-xs" />
                 </button>
               </div>
-              <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
+              <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
                 {relatedProducts.map((item) => (
                   <div
                     key={item.id || item.slug}
-                    className="flex-shrink-0 w-[160px] bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer hover:shadow-md transition-shadow relative"
+                    className="flex-shrink-0 w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer hover:shadow-md transition-shadow relative"
                     onClick={() => handleProductClick(item)}
                   >
                     {/* Label Badge */}

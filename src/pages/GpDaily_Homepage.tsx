@@ -439,12 +439,12 @@ const Home2: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-[#f8f6f1] pb-24">
-        <div className="max-w-[800px] mx-auto">
+      <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
+        <div className="mx-auto w-full max-w-[min(800px,100vw)]">
           {/* Top Header with Gradient Background */}
-          <div className="relative px-3 sm:px-4 pt-0 pb-8 sm:pb-12" style={{
+          <div className="relative px-3 sm:px-4 pt-0 pb-6 xs:pb-8 sm:pb-12" style={{
             background: 'linear-gradient(to bottom, rgba(250, 193, 20, 0.8), rgba(250, 193, 20, 0.4))',
-            minHeight: '280px'
+            minHeight: 'clamp(220px, 42vw, 280px)'
           }}>
             {/* Banner PNG Background with reduced opacity */}
             <img
@@ -479,11 +479,11 @@ const Home2: React.FC = () => {
                 </div>
 
                 {/* Right Side Icons - Only Profile */}
-                <div className="relative w-20 h-20 flex-shrink-0 flex items-center justify-center">
+                <div className="relative w-14 h-14 xs:w-16 xs:h-16 sm:w-20 sm:h-20 flex-shrink-0 flex items-center justify-center">
                   <img
                     src={profilehomeIcon}
                     alt="Profile"
-                    className=" absolute inset-0 w-12 h-12 object-contain cursor-pointer self-center justify-self-center"
+                    className="absolute inset-0 m-auto h-9 w-9 xs:h-10 xs:w-10 sm:h-12 sm:w-12 object-contain cursor-pointer"
                     onClick={() => navigate(`${basePath}/account`)}
                   />
                   <img
@@ -504,13 +504,13 @@ const Home2: React.FC = () => {
               </div>
 
               {/* Special Festival Offers Text Overlay */}
-              <div className="mt-5 flex flex-col items-start pl-4">
+              <div className="mt-5 flex flex-col items-start pl-2 pr-2 sm:pl-4">
                 <img
                   src={topBannerSvg}
                   alt="Special Festival Offers Available"
-                  className="h-12 sm:h-14 mb-2 pr-12 mt-8 ml-8"
+                  className="h-10 xs:h-12 sm:h-14 mb-2 mt-4 max-w-full sm:ml-8 sm:pr-12"
                 />
-                <button className="flex items-center mt-4 ml-8 gap-1 text-[#FAA222] text-sm font-medium underline self-start">
+                <button type="button" className="flex items-center mt-3 sm:mt-4 ml-0 sm:ml-8 gap-1 text-[#FAA222] text-xs xs:text-sm font-medium underline self-start">
                   <span>Curated for you</span>
                   <FaChevronRight className="text-xs" />
                 </button>
@@ -546,7 +546,7 @@ const Home2: React.FC = () => {
               <div className="bg-[#FFF5DC] rounded-2xl p-4 border border-gray-200">
                 <div className="flex items-center justify-between mb-4 pl-1">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-semibold text-gray-900">
+                    <h2 className="text-lg xs:text-xl sm:text-2xl font-semibold text-gray-900 leading-tight [overflow-wrap:anywhere]">
                       Namaste, {userFirstName || ""}
                     </h2>
                     <img
@@ -595,8 +595,8 @@ const Home2: React.FC = () => {
           <div className="px-4 py-4 space-y-6">
             {/* Puja Packs Section */}
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-semibold text-gray-800">Puja Packs</h2>
+              <div className="flex items-center justify-between gap-2 mb-4">
+                <h2 className="text-lg xs:text-xl sm:text-2xl font-semibold text-gray-800 min-w-0 pr-2">Puja Packs</h2>
                 <button
                   onClick={() => navigate("/explore-more?category=Puja Flowers&section=Puja Packs")}
                   className="flex items-center gap-1 text-gray-900 text-sm font-medium"
@@ -613,9 +613,9 @@ const Home2: React.FC = () => {
               ) : error ? (
                 <div className="text-red-500 text-center py-4">{error}</div>
               ) : (
-                <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
+                <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
                   {basePacks.map((pack, index) => (
-                    <div key={pack.id} className="flex-shrink-0 w-[calc((100%-2rem)/3)] min-w-[calc((100%-2rem)/3)]">
+                    <div key={pack.id} className="w-[min(46vw,10.75rem)] xs:w-[11rem] flex-shrink-0 snap-start">
                       <ProductCard
                         imageUrl={getImageUrl(pack.imagesUrl)}
                         packName={pack.name}
@@ -633,8 +633,8 @@ const Home2: React.FC = () => {
 
             {/* Exotic Packs Section */}
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-semibold text-gray-800">Exotic Packs</h2>
+              <div className="flex items-center justify-between gap-2 mb-4">
+                <h2 className="text-lg xs:text-xl sm:text-2xl font-semibold text-gray-800 min-w-0 pr-2">Exotic Packs</h2>
                 <button
                   onClick={() => navigate("/explore-more?category=Exotic Flowers&section=Exotic Packs")}
                   className="flex items-center gap-1 text-gray-900 text-sm font-medium"
@@ -644,12 +644,12 @@ const Home2: React.FC = () => {
                 </button>
               </div>
 
-              <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
+              <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
                   {products
                   .filter((item) => item.category === "EXOTIC" && item.isAvailable)
                   .slice(0, 6)
                   .map((item, index) => (
-                    <div key={item.id} className="flex-shrink-0 w-[calc((100%-2rem)/3)] min-w-[calc((100%-2rem)/3)]">
+                    <div key={item.id} className="w-[min(46vw,10.75rem)] xs:w-[11rem] flex-shrink-0 snap-start">
                       <ProductCard
                         imageUrl={getImageUrl(item.imagesUrl)}
                         packName={item.name}

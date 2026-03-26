@@ -281,7 +281,7 @@ const OrderDetails: React.FC = () => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-4 pb-24 relative bg-[#f8f6f1]">
+        <div className="flex-1 px-4 pb-nav-bottom relative bg-[#f8f6f1]">
           <div className="space-y-4">
             {/* Order Item Card */}
             <div className="p-4">
@@ -443,23 +443,27 @@ const OrderDetails: React.FC = () => {
             {/* Order Information */}
             <div className="bg-white rounded-2xl p-4 shadow-sm">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Order Information</h2>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
+              <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] items-center gap-x-2 gap-y-1 sm:grid-cols-[8.5rem_1fr] sm:items-center">
                   <span className="text-sm text-gray-600">Order ID</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900">{order.order_number}</span>
+                  <div className="flex min-w-0 items-center justify-end gap-2 sm:justify-start">
+                    <span className="truncate text-right text-sm font-medium text-gray-900 sm:text-left">
+                      {order.order_number}
+                    </span>
                     <button
+                      type="button"
                       onClick={() => copyToClipboard(order.order_number)}
-                      className="text-gray-400 hover:text-gray-600"
+                      className="inline-flex shrink-0 rounded-md p-1.5 text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                      aria-label="Copy order ID"
                     >
-                      <FaCopy size={14} />
+                      <FaCopy className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
                 {(order.order_type_label || order.order_type) && (
-                  <div className="flex items-center justify-between">
+                  <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] items-center gap-x-2 sm:grid-cols-[8.5rem_1fr]">
                     <span className="text-sm text-gray-600">Order Type</span>
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="break-words text-right text-sm font-medium text-gray-900 sm:text-left">
                       {order.order_type_label ||
                         (order.order_type === 'online'
                           ? 'Store Order'
@@ -471,9 +475,11 @@ const OrderDetails: React.FC = () => {
                     </span>
                   </div>
                 )}
-                <div className="flex items-center justify-between">
+                <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] items-center gap-x-2 sm:grid-cols-[8.5rem_1fr]">
                   <span className="text-sm text-gray-600">Placed On</span>
-                  <span className="text-sm font-medium text-gray-900">{formatDate(order.created_at)}</span>
+                  <span className="text-sm font-medium text-gray-900 text-right sm:text-left break-words">
+                    {formatDate(order.created_at)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -513,7 +519,7 @@ const OrderDetails: React.FC = () => {
                 onClick={() => navigate(`${basePath}`)}
                 className="px-8 py-3 bg-[#19411f] text-white rounded-xl font-semibold hover:bg-[#145028] transition-colors"
               >
-                Shop More from Genda Phool Store
+                Shop More
               </button>
             </div>
 

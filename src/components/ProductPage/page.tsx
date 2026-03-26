@@ -186,7 +186,7 @@ const ProductPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
-      <div className="max-w-[800px] mx-auto bg-[#f8f6f1] min-h-screen pb-20">
+      <div className="mx-auto min-h-screen w-full max-w-[min(800px,100vw)] bg-[#f8f6f1] pb-nav-bottom">
         {/* Top Navigation Bar */}
         <div className="bg-[#f8f6f1] sticky top-0 z-20 px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -555,7 +555,7 @@ const ProductPage: React.FC = () => {
             </div>
           ) : (
             // Show grid view for selected subcategory or Exotic Flowers
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 xs:gap-4 items-start">
               {filteredProducts.map((item, index) => (
                 <div key={item.id} className="flex-shrink-0">
                   <ProductCard

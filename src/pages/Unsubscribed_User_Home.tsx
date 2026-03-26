@@ -81,8 +81,8 @@ function Unsubscribed_User_Home() {
   }
 
   return (
-    <div className="bg-[#f8f6f1] min-h-screen cursor-pointer" onClick={handlePageClick}>
-      <div className="max-w-[800px] mx-auto">
+    <div className="bg-[#f8f6f1] min-h-screen cursor-pointer overflow-x-clip" onClick={handlePageClick}>
+      <div className="mx-auto w-full max-w-[min(800px,100vw)] pb-safe-bottom">
         {/* Header */}
         {/* <div className="flex items-center justify-between p-4 md:p-6">
           <img src={logo} alt="Logo" className="h-16 md:h-20" />
@@ -301,13 +301,13 @@ function Unsubscribed_User_Home() {
                 No flowers available at the moment
               </div>
             ) : (
-              <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
+              <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
                 {products
                   .filter(item => item.type === 'FLOWERS' && item.isAvailable)
                   .map(item => (
                     <div
                       key={item.id}
-                      className="flex-shrink-0 w-[160px] md:w-[200px] h-[280px] md:h-[320px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer"
+                      className="flex-shrink-0 w-[min(42vw,10rem)] xs:w-[160px] md:w-[200px] min-h-[260px] md:min-h-[320px] snap-start bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer"
                       onClick={() => handleProductClick(item)}
                     >
                       <div className="p-3">
@@ -352,13 +352,13 @@ function Unsubscribed_User_Home() {
                 No leaves available at the moment
               </div>
             ) : (
-              <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
+              <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
                 {products
                   .filter(item => item.type === 'LEAVES' && item.isAvailable)
                   .map(item => (
                     <div
                       key={item.id}
-                      className="flex-shrink-0 w-[160px] md:w-[200px] h-[280px] md:h-[320px] bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer"
+                      className="flex-shrink-0 w-[min(42vw,10rem)] xs:w-[160px] md:w-[200px] min-h-[260px] md:min-h-[320px] snap-start bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer"
                       onClick={() => handleProductClick(item)}
                     >
                       <div className="p-3">

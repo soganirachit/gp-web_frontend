@@ -179,7 +179,7 @@ const MyOrders: React.FC = () => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-4 pb-24 relative bg-[#f8f6f1]">
+        <div className="flex-1 px-4 pb-nav-bottom relative bg-[#f8f6f1]">
           {loading ? (
             <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
               <Spinner size={400} />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { FaArrowLeft, FaMapMarkerAlt, FaCheck } from "react-icons/fa";
+import { FaArrowLeft, FaMapMarkerAlt, FaCheck, FaTimes } from "react-icons/fa";
 import { MdLocationOn, MdMyLocation } from "react-icons/md";
 import { IoArrowBack } from "react-icons/io5";
 import { BsThreeDotsVertical } from "react-icons/bs";
@@ -46,6 +46,10 @@ const AddressSelection: React.FC = () => {
     isValid: boolean;
     message?: string;
   } | null>(null);
+  /** Brief on-map hint when GPS / geocode succeeds (replaces toast) */
+  const [showMapLocationHint, setShowMapLocationHint] = useState(false);
+  /** After saving a new address, show on-screen confirmation (replaces toast) */
+  const [showAddressAddedInline, setShowAddressAddedInline] = useState(false);
 
   const [formData, setFormData] = useState({
     houseNo: "",
@@ -186,7 +190,9 @@ const AddressSelection: React.FC = () => {
 
       const newAddress = await addressService.createAddress(addressData);
 
-      toast.success("Address added successfully");
+      setShowAddressAddedInline(true);
+      window.setTimeout(() => setShowAddressAddedInline(false), 5000);
+
       setShowAddForm(false);
 
       // Reset form
@@ -243,14 +249,17 @@ const AddressSelection: React.FC = () => {
       }
 
       const validation = await addressService.validateAddressInDeliveryArea(address.coordinates);
-      setAddressValidation(validation);
+      setAddressValidation({
+        isValid: validation.isValid,
+        message:
+          validation.message ||
+          (validation.isValid ? 'We deliver to this location.' : 'Address is outside delivery area'),
+      });
 
       if (!validation.isValid) {
         toast.error(validation.message || 'Address is outside delivery area');
         return false;
       }
-
-      toast.success('Address is within delivery area!');
       return true;
     } catch (error) {
       console.error('Error validating address:', error);
@@ -349,9 +358,9 @@ const AddressSelection: React.FC = () => {
         navigate(cartPath, {
           state: {
             selectedAddress: selectedAddress,
+            addressUpdated: true,
           },
         });
-        toast.success('Address selected successfully');
         return;
       }
 
@@ -818,11 +827,8 @@ const AddressSelection: React.FC = () => {
                 coordinates: `${latitude},${longitude}`
               }));
 
-              const successMsg = 'Location detected successfully';
-              if (lastToastMessage.current !== successMsg) {
-                lastToastMessage.current = successMsg;
-                toast.success(successMsg);
-              }
+              setShowMapLocationHint(true);
+              window.setTimeout(() => setShowMapLocationHint(false), 4000);
             }
           } catch (error) {
             console.error('Error fetching address:', error);
@@ -956,6 +962,15 @@ const AddressSelection: React.FC = () => {
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
                 <MdLocationOn className="text-orange-500 text-4xl drop-shadow-lg animate-bounce" />
               </div>
+              {showMapLocationHint && (
+                <div
+                  className="absolute top-3 left-1/2 z-30 -translate-x-1/2 max-w-[90%] rounded-full px-3 py-1.5 text-center text-xs font-medium text-white shadow-md"
+                  style={{ backgroundColor: theme.colors.primary }}
+                  role="status"
+                >
+                  Location detected — adjust pin if needed
+                </div>
+              )}
             </div>
 
             {/* Location Validation Status */}
@@ -1060,6 +1075,27 @@ const AddressSelection: React.FC = () => {
               </button>
               <h1 className="text-2xl font-semibold text-gray-800">Confirm delivery address</h1>
             </div>
+
+            {showAddressAddedInline && (
+              <div
+                className="mb-4 flex items-start gap-3 rounded-2xl border border-[#19411F]/20 bg-[#E6F4EA] px-4 py-3"
+                role="status"
+              >
+                <FaCheck className="mt-0.5 flex-shrink-0 text-[#19411F]" aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-900">Address saved</p>
+                  <p className="text-xs text-gray-600">You can select it below for delivery.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddressAddedInline(false)}
+                  className="flex-shrink-0 rounded-full p-1 text-gray-500 hover:bg-black/5"
+                  aria-label="Dismiss"
+                >
+                  <FaTimes className="text-sm" />
+                </button>
+              </div>
+            )}
 
             {/* Address List */}
             <div className="space-y-4 mb-4">

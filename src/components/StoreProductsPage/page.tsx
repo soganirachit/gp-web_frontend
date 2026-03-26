@@ -300,7 +300,7 @@ const StoreProductsPages: React.FC = () => {
         description={seoDescription}
         canonical={canonicalUrl}
       />
-      <div className="max-w-[800px] mx-auto bg-[#f8f6f1] min-h-screen pb-20">
+      <div className="mx-auto min-h-screen w-full max-w-[min(800px,100vw)] bg-[#f8f6f1] pb-nav-bottom">
         {/* Top Header with Location and Search */}
         <div className="sticky top-0 z-20 bg-[#f8f6f1] border-b border-gray-200">
           <div className="px-4 pt-6 pb-3">
@@ -420,7 +420,7 @@ const StoreProductsPages: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="px-4 py-6">
+        <div className="px-3 xs:px-4 py-4 xs:py-6">
           {error ? (
             <div className="text-red-500 text-center py-4 text-base">
               {error}
@@ -428,7 +428,7 @@ const StoreProductsPages: React.FC = () => {
           ) : (
             <>
               {/* Category Title */}
-              <h1 className="text-2xl font-bold text-gray-900 mb-4">
+              <h1 className="text-xl xs:text-2xl font-bold text-gray-900 mb-3 xs:mb-4 leading-tight [overflow-wrap:anywhere]">
                 {categoryName}
               </h1>
 
@@ -438,11 +438,11 @@ const StoreProductsPages: React.FC = () => {
                   <p>No products found in this category.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-2 gap-2 xs:gap-4 mb-6 items-start">
                   {visibleProducts.map((item) => (
                     <div
                       key={item.id || item.slug}
-                      className="bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer hover:shadow-md transition-shadow relative"
+                      className="min-w-0 bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer hover:shadow-md transition-shadow relative"
                       onClick={() => handleProductClick(item)}
                     >
                     {/* Product Image */}
@@ -480,7 +480,7 @@ const StoreProductsPages: React.FC = () => {
                     {/* Product Info */}
                     <div className="p-3">
                       <div className="flex items-start justify-between mb-1">
-                        <h3 className="text-sm font-semibold text-gray-900 flex-1 pr-2">
+                        <h3 className="text-xs xs:text-sm font-semibold text-gray-900 flex-1 min-w-0 pr-1 line-clamp-2 leading-snug">
                           {item.name}
                         </h3>
                         {/* Bestseller Badge */}

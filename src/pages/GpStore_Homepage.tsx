@@ -297,12 +297,12 @@ const GpStore_Homepage: React.FC = () => {
               description="Shop fresh loose flowers, bouquets, garlands, pooja kits, diyas and incense online. Same-day delivery in Jaipur."
               canonical="https://customerapp.mygendaphool.com/gp-store"
             />
-            <div className="min-h-screen bg-[#f8f6f1] pb-24">
-                <div className="max-w-[800px] mx-auto">
+            <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
+                <div className="mx-auto w-full max-w-[min(800px,100vw)]">
                     {/* Top Header with Green Background */}
-                    <div className="relative px-3 sm:px-4 pt-0 pb-8 sm:pb-12" style={{
+                    <div className="relative px-3 sm:px-4 pt-0 pb-6 xs:pb-8 sm:pb-12" style={{
                         background: 'linear-gradient(to bottom, #DAFFD9, #D8F0D7)',
-                        minHeight: '280px'
+                        minHeight: 'clamp(220px, 42vw, 280px)'
                     }}>
                         {/* Content Overlay */}
                         <div className="relative z-10 pt-0">
@@ -330,7 +330,7 @@ const GpStore_Homepage: React.FC = () => {
                                 </div>
 
                                 {/* Right Side Icons - Only Profile */}
-                                <div className="relative w-20 h-20 flex-shrink-0 flex items-center justify-center">
+                                <div className="relative w-14 h-14 xs:w-16 xs:h-16 sm:w-20 sm:h-20 flex-shrink-0 flex items-center justify-center">
                                     <img
                                         src={profilehomeIcon}
                                         alt="Profile"
@@ -357,16 +357,16 @@ const GpStore_Homepage: React.FC = () => {
 
                             {/* Delivery Banner - Inside the green header */}
                             <div className="mt-4 sm:mt-5">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex-1 pr-4">
-                                        <p className="text-gray-800 text-lg md:text-xl lg:text-2xl font-medium">
+                                <div className="flex flex-col gap-3 xs:flex-row xs:items-center xs:justify-between">
+                                    <div className="flex-1 min-w-0 pr-0 xs:pr-3">
+                                        <p className="text-gray-800 text-sm xs:text-base md:text-lg lg:text-xl font-medium leading-snug [overflow-wrap:anywhere]">
                                             Order in <span className="font-bold">2hrs</span> and get it by tomorrow <span className="font-bold">12PM!</span>
                                         </p>
                                     </div>
                                     <img
                                         src={truckStoreIcon}
                                         alt="Delivery Truck"
-                                        className="w-40 h-24 md:w-48 md:h-28 lg:w-56 lg:h-32 object-contain flex-shrink-0"
+                                        className="w-36 h-20 xs:w-40 xs:h-24 md:w-48 md:h-28 object-contain flex-shrink-0 self-center xs:self-auto"
                                     />
                                 </div>
                             </div>
@@ -387,8 +387,8 @@ const GpStore_Homepage: React.FC = () => {
                                     alt="Namaste"
                                     className="h-8 sm:h-14 w-auto mb-2 sm:mb-3"
                                 />
-                                <p className="text-gray-600 text-sm sm:text-base">
-                                    We are Genda Phool! Your partner<br></br> for everyday floral needs.
+                                <p className="text-gray-600 text-sm sm:text-base leading-snug [overflow-wrap:anywhere]">
+                                    We are Genda Phool! Your partner for everyday floral needs.
                                 </p>
                             </div>
                         </motion.div>
@@ -396,12 +396,12 @@ const GpStore_Homepage: React.FC = () => {
 
                     {/* Pick your Blooms Section */}
                     <div className="px-4 py-4">
-                        <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800 mb-6">Pick your Blooms</h2>
-                        <div className="grid grid-cols-4 gap-3">
+                        <h2 className="font-ibm-plex-serif text-lg xs:text-[22px] font-semibold leading-tight xs:leading-[28px] tracking-normal text-gray-800 mb-4 xs:mb-6">Pick your Blooms</h2>
+                        <div className="grid grid-cols-3 gap-2 xs:gap-3 sm:grid-cols-4">
                             {categories.map((category) => (
                                 <div
                                     key={category.id}
-                                    className="flex flex-col items-center cursor-pointer"
+                                    className="flex min-w-0 flex-col items-center cursor-pointer"
                                     onClick={() => navigate(`${basePath}/products?category=${category.slug}`, { state: { categoryName: category.name, categorySlug: category.slug } })}
                                 >
                                     <div 
@@ -424,7 +424,7 @@ const GpStore_Homepage: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
-                                    <span className="text-xs text-center text-gray-700 font-medium leading-tight">
+                                    <span className="w-full px-0.5 text-center text-[10px] xs:text-xs text-gray-700 font-medium leading-tight line-clamp-2 [overflow-wrap:anywhere]">
                                         {category.name}
                                     </span>
                                 </div>
@@ -432,33 +432,33 @@ const GpStore_Homepage: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="px-4 py-4">
-                        <div className="relative w-full rounded-2xl overflow-hidden bg-[#F1FCF0]">
-                            <div className="absolute inset-0 flex flex-col justify-center pl-6 sm:pl-10 z-10 w-3/4 sm:w-2/3">
-                                <h2 className="font-ibm-plex-serif text-xl sm:text-3xl font-semibold text-[#1A1A1A] leading-tight mb-4 sm:mb-6">
-                                    Wedding Bliss,{' '}
-                                    <br />
-                                    Wrapped in Gifts
+                    <div className="px-4 py-3 xs:py-4">
+                        {/* Single mint panel: copy left, art merged on right — no empty white strip */}
+                        <div className="relative isolate min-h-[9.5rem] overflow-hidden rounded-2xl bg-[#E8F5E9] sm:min-h-[11rem] lg:min-h-[12.5rem]">
+                            <img
+                                src={bannerSvg}
+                                alt="Wedding Bliss"
+                                className="pointer-events-none absolute -right-4 bottom-0 top-0 z-0 h-full w-[min(58%,200px)] object-cover object-right sm:-right-2 sm:w-[min(52%,240px)] md:w-[min(48%,280px)] lg:right-0 lg:w-[42%] lg:max-w-[320px]"
+                            />
+                            <div className="relative z-10 flex min-h-[9.5rem] max-w-[min(100%,20rem)] flex-col justify-center px-4 py-4 pr-[min(42%,9rem)] xs:min-h-[10rem] xs:max-w-[22rem] xs:pr-[min(40%,10rem)] sm:min-h-[11rem] sm:px-6 sm:py-5 sm:pr-[38%] lg:max-w-[55%] lg:px-10 lg:py-8 lg:pr-6">
+                                <h2 className="font-ibm-plex-serif text-lg font-semibold leading-tight text-[#1A1A1A] xs:text-xl sm:text-2xl md:text-3xl">
+                                    Wedding Bliss, Wrapped in Gifts
                                 </h2>
                                 <button
+                                    type="button"
                                     onClick={() => navigate(`${basePath}/products`)}
-                                    className="w-fit bg-[#19411F] text-white px-6 py-2.5 sm:px-8 sm:py-3 rounded-lg font-medium text-sm sm:text-base tracking-wide hover:bg-[#1e4d1c] transition-colors shadow-sm flex items-center justify-center"
+                                    className="mt-3 w-full rounded-lg bg-[#19411F] px-4 py-2.5 text-center text-sm font-medium tracking-wide text-white shadow-sm transition-colors hover:bg-[#1e4d1c] sm:mt-4 sm:w-fit sm:px-8 sm:py-3 sm:text-base"
                                 >
                                     SHOP NOW
                                 </button>
                             </div>
-                            <img
-                                src={bannerSvg}
-                                alt="Wedding Bliss"
-                                className="w-full h-auto object-cover ml-auto"
-                            />
                         </div>
                     </div>
 
                     {/* all Packs Section */}
                     <div className="px-4 py-4">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">All Packs</h2>
+                            <h2 className="font-ibm-plex-serif text-lg xs:text-[22px] font-semibold leading-tight xs:leading-[28px] tracking-normal text-gray-800 min-w-0 pr-2">All Packs</h2>
                             <button
                                 onClick={() => navigate(`${basePath}/products`)}
                                 className="flex items-center gap-1 text-gray-500 text-sm font-medium"
@@ -467,11 +467,11 @@ const GpStore_Homepage: React.FC = () => {
                                 <FaChevronRight className="text-xs" />
                             </button>
                         </div>
-                        <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
+                        <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
                             {products.map((product) => (
                                 <div
                                     key={product.id}
-                                    className="flex-shrink-0 w-[160px] bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
+                                    className="flex-shrink-0 w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
                                     onClick={() => handleProductClick(product)}
                                 >
                                     <div className="aspect-square bg-[#f8f6f1] overflow-hidden">
@@ -508,7 +508,7 @@ const GpStore_Homepage: React.FC = () => {
                     {/* Best Section */}
                     <div className="px-4 py-4">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">Best Sellers</h2>
+                            <h2 className="font-ibm-plex-serif text-lg xs:text-[22px] font-semibold leading-tight xs:leading-[28px] tracking-normal text-gray-800 min-w-0 pr-2">Best Sellers</h2>
                             <button
                                onClick={() => navigate(`${basePath}/products`)}
                                 className="flex items-center gap-1 text-gray-500 text-sm font-medium"
@@ -517,12 +517,12 @@ const GpStore_Homepage: React.FC = () => {
                                 <FaChevronRight className="text-xs" />
                             </button>
                         </div>
-                        <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
+                        <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
                             {filteredBestSellers.length > 0 ? (
                                 filteredBestSellers.map((bestSeller) => (
                                     <div
                                         key={bestSeller.id}
-                                        className="flex-shrink-0 w-[160px] bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer relative"
+                                        className="flex-shrink-0 w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer relative"
                                         onClick={() => handleBestSellerClick(bestSeller)}
                                     >
                                         <div className="aspect-square bg-[#f8f6f1] overflow-hidden relative">
@@ -578,7 +578,7 @@ const GpStore_Homepage: React.FC = () => {
                     {/* Premium Packs Section */}
                     <div className="px-4 py-4">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-ibm-plex-serif text-[22px] font-semibold leading-[28px] tracking-normal text-gray-800">Premium Packs</h2>
+                            <h2 className="font-ibm-plex-serif text-lg xs:text-[22px] font-semibold leading-tight xs:leading-[28px] tracking-normal text-gray-800 min-w-0 pr-2">Premium Packs</h2>
                             <button
                                 onClick={() => navigate(`${basePath}/products`)}
                                 className="flex items-center gap-1 text-gray-500 text-sm font-medium"
@@ -587,12 +587,12 @@ const GpStore_Homepage: React.FC = () => {
                                 <FaChevronRight className="text-xs" />
                             </button>
                         </div>
-                        <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
+                        <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
                             {filteredPremiumProducts.length > 0 ? (
                                 filteredPremiumProducts.map((product) => (
                                 <div
                                     key={product.id}
-                                    className="flex-shrink-0 w-[160px] bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
+                                    className="flex-shrink-0 w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
                                     onClick={() => handleProductClick(product)}
                                 >
                                     <div className="aspect-square bg-[#f8f6f1] overflow-hidden">

@@ -30,6 +30,10 @@ const config: Config = {
         'safe-top':    'env(safe-area-inset-top)',
         'safe-left':   'env(safe-area-inset-left)',
         'safe-right':  'env(safe-area-inset-right)',
+        /** Space above bottom nav / home indicator (6rem nav + safe area) */
+        'nav-bottom': 'calc(6rem + env(safe-area-inset-bottom, 0px))',
+        /** Layout main content padding when bottom nav visible */
+        'layout-pb': 'calc(8rem + env(safe-area-inset-bottom, 0px))',
       },
     },
   },

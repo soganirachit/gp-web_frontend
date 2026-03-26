@@ -64,8 +64,8 @@ const SearchPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f6f1] relative">
-      <div className="max-w-[800px] mx-auto">
+    <div className="min-h-screen bg-[#f8f6f1] relative overflow-x-clip">
+      <div className="mx-auto w-full max-w-[min(800px,100vw)]">
         {/* Header */}
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3 mb-6">
@@ -86,7 +86,7 @@ const SearchPage: React.FC = () => {
         </div>
 
         {/* Search Results */}
-        <div className="px-4 min-h-[50vh] flex flex-col pb-48">
+        <div className="px-3 xs:px-4 min-h-[50vh] flex flex-col pb-nav-bottom">
           {searchQuery === '' ? (
             <div className="text-center text-gray-500 mt-8">
               Start typing to search products...
@@ -96,7 +96,7 @@ const SearchPage: React.FC = () => {
               No results found for "{searchQuery}"
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 mt-4">
+            <div className="grid grid-cols-2 gap-2 xs:gap-4 mt-4 items-start">
               {filteredItems.map((item) => (
                 <div
                   key={item.id}

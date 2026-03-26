@@ -6,7 +6,7 @@ const Privacy: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-[#f8f6f1] pb-24">
+    <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
       <SEO
         title="Privacy Policy — Genda Phool"
         description="Privacy Policy for Genda Phool — how we collect, use, and protect your data."

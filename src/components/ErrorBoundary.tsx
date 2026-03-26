@@ -25,20 +25,28 @@ class ErrorBoundary extends Component<Props, State> {
 
   render(): ReactNode {
     if (this.state.hasError) {
+      const msg = this.state.error?.message || '';
+      const isChunk =
+        msg.includes('Failed to fetch dynamically imported module') ||
+        msg.includes('Loading chunk') ||
+        msg.includes('Importing a module script failed');
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100">
-          <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">
-              Oops! Something went wrong
+        <div className="min-h-screen flex items-center justify-center bg-[#f8f6f1] px-4">
+          <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 max-w-md w-full text-center">
+            <h1 className="text-lg font-semibold text-gray-900 mb-2">
+              {isChunk ? 'Update required' : 'Something went wrong'}
             </h1>
-            <p className="text-gray-600 mb-4">
-              {this.state.error?.message || 'An unexpected error occurred.'}
+            <p className="text-sm text-gray-600 mb-4">
+              {isChunk
+                ? 'We could not load the latest page files. Refresh to get the newest version.'
+                : msg || 'An unexpected error occurred.'}
             </p>
             <button
+              type="button"
               onClick={() => window.location.reload()}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+              className="w-full rounded-xl bg-[#19411F] text-white px-4 py-3 text-sm font-semibold hover:opacity-95"
             >
-              Refresh Page
+              Refresh page
             </button>
           </div>
         </div>

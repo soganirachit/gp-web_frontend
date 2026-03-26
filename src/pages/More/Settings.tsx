@@ -134,31 +134,58 @@ const Settings: React.FC = () => {
     };
   }, [isStoreDropdownOpen]);
 
+  /** Parse "lat,lng" or JSON { lat, lng } from localStorage (same keys as home / delivery flows). */
+  const parseStoredUserCoordinates = (): { lat: number; lng: number } | null => {
+    const raw = localStorage.getItem('userCoordinates');
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.lat != null && parsed?.lng != null) {
+        const lat = Number(parsed.lat);
+        const lng = Number(parsed.lng);
+        if (!Number.isNaN(lat) && !Number.isNaN(lng)) return { lat, lng };
+      }
+    } catch {
+      const parts = raw.split(',').map((s) => parseFloat(s.trim()));
+      if (parts.length >= 2 && !Number.isNaN(parts[0]) && !Number.isNaN(parts[1])) {
+        return { lat: parts[0], lng: parts[1] };
+      }
+    }
+    return null;
+  };
+
+  const resolveLatLngForStores = (
+    addresses: Awaited<ReturnType<typeof addressService.getAllAddresses>>
+  ): { lat: number; lng: number } | null => {
+    const tryParse = (coord: string | undefined): { lat: number; lng: number } | null => {
+      if (!coord?.trim()) return null;
+      const [a, b] = coord.split(',').map((s) => parseFloat(s.trim()));
+      if (!Number.isNaN(a) && !Number.isNaN(b)) return { lat: a, lng: b };
+      return null;
+    };
+
+    const ordered = [...addresses].sort((a, b) => {
+      if (a.isDefault && !b.isDefault) return -1;
+      if (!a.isDefault && b.isDefault) return 1;
+      return 0;
+    });
+    for (const addr of ordered) {
+      const p = tryParse(addr.coordinates);
+      if (p) return p;
+    }
+    return parseStoredUserCoordinates();
+  };
+
   const fetchStores = async () => {
     try {
       setIsLoadingStores(true);
-      // Get default address
       const addresses = await addressService.getAllAddresses();
-      const defaultAddress = addresses.find(addr => addr.isDefault) || addresses[0];
+      const loc = resolveLatLngForStores(addresses);
 
-      if (!defaultAddress || !defaultAddress.coordinates) {
-        setError("No address found. Please add an address first.");
-        setIsLoadingStores(false);
-        return;
-      }
-
-      // Parse coordinates
-      const [lat, lng] = defaultAddress.coordinates.split(',').map(Number);
-      if (isNaN(lat) || isNaN(lng)) {
-        setError("Invalid address coordinates.");
-        setIsLoadingStores(false);
-        return;
-      }
-
-      // Fetch stores and nearest store
+      // Always load stores: API returns all active stores when lat/lng are omitted (sorted by distance when provided).
       const [storesList, nearestStore] = await Promise.all([
-        storeService.getAllStores(lat, lng),
-        storeService.getNearestStore(lat, lng),
+        loc ? storeService.getAllStores(loc.lat, loc.lng) : storeService.getAllStores(),
+        loc ? storeService.getNearestStore(loc.lat, loc.lng) : Promise.resolve(null as Store | null),
       ]);
 
       setStores(storesList);

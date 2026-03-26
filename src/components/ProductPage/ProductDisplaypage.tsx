@@ -604,7 +604,7 @@ const ProductPage: React.FC = () => {
   const categoryName = product?.category === "PUJA" ? "Puja Pack" : product?.category === "EXOTIC" ? "Exotic Pack" : "Puja Pack";
 
   return (
-    <div className="min-h-screen bg-[#f8f6f1] pb-24">
+    <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom overflow-x-clip">
       <div className="max-w-[800px] mx-auto relative">
         {/* Header */}
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">

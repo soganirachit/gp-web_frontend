@@ -118,7 +118,7 @@ const CustomerSupport: React.FC = () => {
         </div>
 
         {/* Content */}
-        <div className="px-4 pb-24">
+        <div className="px-4 pb-nav-bottom">
           {/* Orders Dropdown - Delivered in last 6 hours */}
           <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
             <label className="text-sm font-semibold text-gray-700 mb-3 block">

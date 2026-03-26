@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, forwardRef } from "react";
 import Spinner from "../../common/Spinner";
+import { loadRazorpayScript } from "../../../lib/razorpayLoader";
 
 // Type declaration for Razorpay
 interface RazorpayOptions {
@@ -77,16 +78,10 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
     return () => { isMountedRef.current = false; };
   }, []);
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     try {
-      console.log('CartRazorpayPayment - handlePayment called', {
-        hasWindowRazorpay: typeof (window as any).Razorpay !== 'undefined',
-        razorpayOrderId,
-        amount,
-        currency,
-      });
-
       setIsLoading(true);
+      await loadRazorpayScript();
 
       const options: RazorpayOptions = {
         key: razorpayKey,
@@ -123,11 +118,10 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
         },
       };
 
-      const RazorpayConstructor = (window as any).Razorpay;
+      const RazorpayConstructor = (window as unknown as { Razorpay: new (opts: RazorpayOptions) => RazorpayInstance }).Razorpay;
 
       if (typeof RazorpayConstructor !== 'function') {
-        console.error('CartRazorpayPayment - Razorpay script not loaded');
-        throw new Error('Payment gateway is not ready. Please wait a moment and try again.');
+        throw new Error('Payment gateway is not ready. Please try again.');
       }
 
       const razorpayInstance = new RazorpayConstructor(options);
@@ -142,20 +136,6 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
       );
     }
   };
-
-  useEffect(() => {
-    // Load Razorpay script
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-    };
-  }, []);
 
   return (
     <button

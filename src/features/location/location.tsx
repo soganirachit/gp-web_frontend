@@ -2,7 +2,6 @@ import React, { useState, KeyboardEvent, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { MdMyLocation, MdSearch } from 'react-icons/md';
 import { toast } from 'react-hot-toast';
-import { Toaster } from 'react-hot-toast';
 import Spinner from '../../components/common/Spinner';
 
 // Google Maps API key from environment variables (Vite syntax)
@@ -210,7 +209,6 @@ const Location: React.FC = () => {
 
   return (
     <>
-      <Toaster position="top-center" />
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-2xl font-bold mb-6">Find Your Location</h1>

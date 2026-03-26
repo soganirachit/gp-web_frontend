@@ -32,7 +32,7 @@ const Refer: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50 pb-nav-bottom">
       {/* Hero Section */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -71,16 +71,17 @@ const Refer: React.FC = () => {
         {/* Share Options */}
         <div className="bg-white rounded-xl p-6 shadow-sm">
           <h2 className="text-lg font-semibold mb-4">Share via</h2>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-2 xs:gap-3 sm:gap-4">
             {shareOptions.map((option, index) => (
               <motion.button
                 key={index}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className={`${option.bgColor} p-4 rounded-xl flex flex-col items-center`}
+                type="button"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={`${option.bgColor} flex min-w-0 flex-col items-center rounded-xl p-2 xs:p-4`}
               >
-                <span className="text-2xl mb-2">{option.icon}</span>
-                <span className="text-sm">{option.label}</span>
+                <span className="mb-1 text-xl xs:mb-2 xs:text-2xl">{option.icon}</span>
+                <span className="text-center text-[10px] font-medium leading-tight xs:text-sm">{option.label}</span>
               </motion.button>
             ))}
           </div>

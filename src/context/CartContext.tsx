@@ -713,14 +713,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       // Check if there are items without apiCartItemId (from temp cart)
       const hasUnsavedItems = items.some(item => !item.apiCartItemId);
       if (hasUnsavedItems) {
-        console.log('Syncing cart to API after login, items count:', items.length);
         shouldSyncOnLoginRef.current = false; // Reset flag before sync
         
         // Use a small delay to ensure state is fully updated
         const syncTimeout = setTimeout(() => {
           syncCartToAPI()
             .then(() => {
-              console.log('Cart synced successfully after login');
               // Reload cart from API to get updated items with apiCartItemId
               setTimeout(() => {
                 loadCartFromAPI().catch(err => {

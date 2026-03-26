@@ -24,6 +24,8 @@ import { getApiUrl } from '../../../config/api.config';
 import { useNetworkRecovery } from '../../../hooks/useNetworkRecovery';
 import { SEO } from '../../../components/SEO';
 import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
+import { loadRazorpayScript } from '../../../lib/razorpayLoader';
+import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -141,29 +143,36 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
 
   return (
     <>
-      {/* Backdrop — covers everything including bottom nav */}
-      <div className="fixed inset-0 bg-black bg-opacity-40 z-40" style={{ zIndex: 48 }} onClick={onClose} />
+      {/* Backdrop above app chrome (bottom nav z-50) */}
+      <div className="fixed inset-0 z-[90] bg-black/40" onClick={onClose} aria-hidden />
 
-      {/* Bottom sheet */}
-      <div className="fixed bottom-20 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl max-h-[calc(100vh-5rem)] flex flex-col">
+      {/* Bottom sheet — flush to safe bottom so it isn’t fighting the nav */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-[100] flex max-h-[min(88dvh,100vh)] flex-col rounded-t-[24px] bg-white pb-safe-bottom shadow-2xl sm:rounded-t-[28px]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="promo-modal-title"
+      >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-gray-300 rounded-full" />
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-900">Promo Codes</h2>
+        <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
+          <h2 id="promo-modal-title" className="text-base font-bold text-gray-900 sm:text-lg">
+            Promo Codes
+          </h2>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <FaTimes className="text-gray-600" />
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
+        <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-3 sm:space-y-5 sm:py-4">
 
           {/* Manual entry */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">Enter Promo Code</label>
+            <label className="mb-1.5 block text-xs font-medium text-gray-700 sm:text-sm">Enter Promo Code</label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -171,12 +180,12 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                 onChange={(e) => setManualCode(e.target.value.toUpperCase())}
                 onKeyDown={(e) => e.key === 'Enter' && handleManualApply()}
                 placeholder="e.g. POOJA10"
-                className="flex-1 border-2 border-gray-200 focus:border-[#19411F] rounded-xl px-4 py-2.5 text-sm font-medium uppercase tracking-wider outline-none transition-colors"
+                className="min-w-0 flex-1 rounded-xl border-2 border-gray-200 px-3 py-2 text-sm font-medium uppercase tracking-wider outline-none transition-colors focus:border-[#19411F] sm:px-4 sm:py-2.5"
               />
               <button
                 onClick={handleManualApply}
                 disabled={!manualCode.trim() || isApplying}
-                className="bg-[#19411F] text-white px-5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#1e5a1c] transition-colors flex items-center justify-center"
+                className="flex shrink-0 items-center justify-center rounded-xl bg-[#19411F] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#1e5a1c] disabled:cursor-not-allowed disabled:opacity-50 sm:px-5 sm:py-2.5"
               >
                 {isApplying ? '...' : 'Apply'}
               </button>
@@ -219,7 +228,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                   return (
                     <div
                       key={coupon.id}
-                      className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-colors ${
+                      className={`flex items-center justify-between gap-2 rounded-xl border-2 p-3 transition-colors sm:rounded-2xl sm:p-4 ${
                         isApplied
                           ? 'border-[#19411F] bg-[#f0f7f0]'
                           : 'border-dashed border-gray-300 bg-gray-50'
@@ -280,7 +289,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
 const Cart: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, phoneNumber: authPhoneNumber } = useAuth();
   const { feature } = useFeatureTheme();
   const { storePendingPayment, getPendingPayments, removePendingPayment, retryWithBackoff } = useNetworkRecovery();
   const {
@@ -288,7 +297,6 @@ const Cart: React.FC = () => {
     deliveryInfo,
     removeFromCart,
     updateQuantity,
-    updateCustomizedMessage,
     updateDeliveryInfo,
     getTotalPrice,
     syncCartToAPI,
@@ -334,7 +342,6 @@ const Cart: React.FC = () => {
     };
   }, [navigate, location.pathname, feature]);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editQuantity, setEditQuantity] = useState<number>(1);
   const [editMessage, setEditMessage] = useState<string>('');
   const datePickerRef = useRef<HTMLDivElement>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -359,7 +366,28 @@ const Cart: React.FC = () => {
     total: number;
   } | null>(null);
   const [isLoadingCartTotals, setIsLoadingCartTotals] = useState(false);
+  /** After first totals fetch, refreshes (e.g. during checkout) must not show the full-page loader */
+  const [hasLoadedCartTotalsOnce, setHasLoadedCartTotalsOnce] = useState(false);
+  /** After first successful address + totals + sync idle, checkout must not full-screen when sync runs again */
+  const [basketHydratedOnce, setBasketHydratedOnce] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [showAddressSavedBanner, setShowAddressSavedBanner] = useState(false);
+
+  useEffect(() => {
+    if ((location.state as { addressUpdated?: boolean } | null)?.addressUpdated) {
+      setShowAddressSavedBanner(true);
+      navigate('.', { replace: true, state: {} });
+    }
+  }, [location.state, navigate]);
+
+  useEffect(() => {
+    if (!showPromoModal) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [showPromoModal]);
 
   // Apply promo code
   const handleApplyPromoCode = async (code: string) => {
@@ -437,13 +465,30 @@ const Cart: React.FC = () => {
     };
   }, [appliedPromoCode]);
 
-  // Trigger Razorpay button
+  // Preload Razorpay SDK when basket opens so checkout is not blocked on first load
+  useEffect(() => {
+    loadRazorpayScript().catch(() => {});
+  }, []);
+
+  // Open Razorpay only after SDK is ready (avoids "Payment gateway is not ready")
   useEffect(() => {
     if (!shouldTriggerPayment) return;
-    const timer = setTimeout(() => {
-      if (paymentButtonRef.current) paymentButtonRef.current.click();
-    }, 200);
-    return () => clearTimeout(timer);
+    let cancelled = false;
+    (async () => {
+      try {
+        await loadRazorpayScript();
+        if (cancelled) return;
+        requestAnimationFrame(() => paymentButtonRef.current?.click());
+      } catch (e) {
+        if (cancelled) return;
+        toast.error(e instanceof Error ? e.message : 'Payment could not start. Please try again.');
+        setShouldTriggerPayment(false);
+        setIsProcessingPayment(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [shouldTriggerPayment]);
 
   // Fetch available delivery slots for a given date from the backend.
@@ -533,11 +578,13 @@ const Cart: React.FC = () => {
         // Small delay to ensure all state updates are complete
         const timer = setTimeout(() => {
           setIsInitialLoading(false);
+          setBasketHydratedOnce(true);
         }, 100);
         return () => clearTimeout(timer);
       }
     } else {
       setIsInitialLoading(false);
+      setBasketHydratedOnce(true);
     }
   }, [isLoggedIn, isLoadingAddress, isLoadingCartTotals, isSyncing]);
 
@@ -560,10 +607,38 @@ const Cart: React.FC = () => {
         setCartTotals(null);
       } finally {
         setIsLoadingCartTotals(false);
+        setHasLoadedCartTotalsOnce(true);
       }
     };
     fetchCartTotals();
   }, [isLoggedIn, items]);
+
+  // Prefill Razorpay contact/name/email from profile (state was never set before → empty mobile on Razorpay)
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const customers = await customerService.getAllCustomers();
+        const c = customers[0];
+        if (!c || cancelled) return;
+        const name = [c.firstName, c.lastName].filter(Boolean).join(' ').trim();
+        const email = (c.emailAddress || '').trim();
+        const contact = formatPhoneForDisplay(c.phoneNumber);
+        setCustomerInfo((prev) => ({
+          ...prev,
+          ...(name ? { name } : {}),
+          ...(email ? { email } : {}),
+          ...(contact ? { contact } : {}),
+        }));
+      } catch (_) {
+        /* profile optional for checkout; fallbacks below */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]);
 
   // Fetch address
   useEffect(() => {
@@ -669,29 +744,56 @@ const Cart: React.FC = () => {
     if (deliveryInfo) updateDeliveryInfo({ ...deliveryInfo, timeSlot: slot.slot_name, slotId: slot.id });
   };
 
+  const isBouquetItem = (item: (typeof items)[number]) => {
+    const slug = item.categorySlug?.toLowerCase() ?? '';
+    if (slug.includes('bouquet')) return true;
+    return item.name.toLowerCase().includes('bouquet');
+  };
+
   const handleEditItem = (itemId: string) => {
-    const item = items.find(i => i.id === itemId);
-    if (item) { setEditingItemId(itemId); setEditQuantity(item.quantity); setEditMessage(item.customizedMessage || ''); }
+    const item = items.find((i) => i.id === itemId);
+    if (!item || !isBouquetItem(item)) return;
+    setEditingItemId(itemId);
+    setEditMessage(item.customizedMessage || '');
     setOpenMenuId(null);
   };
 
   const handleSaveEdit = async (itemId: string) => {
+    const item = items.find((i) => i.id === itemId);
+    if (!item) return;
     try {
-      // Update both quantity and special instructions together in a single API call
-      await updateQuantity(itemId, editQuantity, editMessage.trim());
+      await updateQuantity(itemId, item.quantity, editMessage.trim());
       setEditingItemId(null);
-      toast.success('Item updated successfully');
+      toast.success('Message updated');
     } catch (error: any) {
-      // Prefer API message like "Only 55 units available" when present
       const apiMessage =
         error?.response?.data?.message ||
         error?.response?.data?.detail ||
         error?.message;
-      toast.error(apiMessage || 'Failed to update item. Please try again.');
+      toast.error(apiMessage || 'Failed to update message. Please try again.');
     }
   };
 
-  const handleCancelEdit = () => { setEditingItemId(null); setEditQuantity(1); setEditMessage(''); };
+  const handleCancelEdit = () => {
+    setEditingItemId(null);
+    setEditMessage('');
+  };
+
+  const handleQuantityDelta = async (itemId: string, delta: number) => {
+    const item = items.find((i) => i.id === itemId);
+    if (!item) return;
+    const next = Math.max(1, item.quantity + delta);
+    if (next === item.quantity && delta < 0) return;
+    try {
+      await updateQuantity(itemId, next, item.customizedMessage || '');
+    } catch (error: any) {
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.detail ||
+        error?.message;
+      toast.error(apiMessage || 'Could not update quantity.');
+    }
+  };
 
   const handleDeleteItem = async (itemId: string) => {
     try {
@@ -720,7 +822,6 @@ const Cart: React.FC = () => {
     try {
       await syncCartToAPI();
       await loadCartFromAPI();
-      toast.success('Cart synced successfully');
       try {
         setIsLoadingCartTotals(true);
         const cartData = await cartService.getCartData();
@@ -733,7 +834,7 @@ const Cart: React.FC = () => {
         });
       } catch (_) {} finally { setIsLoadingCartTotals(false); }
     } catch (_) {
-      toast.error('Failed to sync cart. Please try again.');
+      toast.error("We couldn't update your basket. Check your connection and try checkout again.");
       return;
     }
 
@@ -791,7 +892,6 @@ const Cart: React.FC = () => {
       amount
     );
     clearCart();
-    removePendingPayment(orderNumber); // clean up any stored pending payment
     toast.success('Order placed successfully!');
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
     navigate(`${basePath}/payment-success`, {
@@ -805,7 +905,11 @@ const Cart: React.FC = () => {
     for (let i = 0; i < MAX_POLLS; i++) {
       try {
         const status = await paymentService.getPaymentStatus(razorpayOrderId);
-        if (status.status === 'completed' && status.order_number) {
+        const st = status.status?.toLowerCase() ?? '';
+        const done =
+          (st === 'completed' || st === 'complete' || st === 'paid' || st === 'success') &&
+          Boolean(status.order_number);
+        if (done && status.order_number) {
           finalizeOrder(status.order_number, parseFloat(status.amount) || amountPaise / 100);
           return true;
         }
@@ -924,14 +1028,24 @@ const Cart: React.FC = () => {
     return [address.houseNo, address.streetName, address.area, address.city, address.state, address.pincode].filter(Boolean).join(', ');
   };
 
+  const razorpayPrefillContact =
+    customerInfo.contact ||
+    formatPhoneForDisplay(authPhoneNumber || localStorage.getItem('phoneNumber') || '') ||
+    undefined;
+
   // Auth guard
   if (!isLoggedIn || !localStorage.getItem('access_token')) {
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
     return <Navigate to={`${basePath}/login`} state={{ returnUrl: location.pathname, fromCart: true }} replace />;
   }
 
-  // Show loader until all data is loaded
-  const isPageLoading = isInitialLoading || (isLoggedIn && (isLoadingAddress || isLoadingCartTotals || isSyncing));
+  // Full-page loader: initial paint + first totals fetch + first-time sync — not checkout-triggered syncCartToAPI()
+  const isPageLoading =
+    isInitialLoading ||
+    (isLoggedIn &&
+      (isLoadingAddress ||
+        (isLoadingCartTotals && !hasLoadedCartTotalsOnce) ||
+        (isSyncing && !basketHydratedOnce)));
   
   if (isPageLoading) {
     return (
@@ -949,7 +1063,7 @@ const Cart: React.FC = () => {
         canonical="https://customerapp.mygendaphool.com/gp-store/basket"
         noIndex={true}
       />
-      <div className="max-w-[800px] mx-auto pb-20">
+      <div className="mx-auto w-full max-w-[min(800px,100vw)] pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]">
         {/* Header */}
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -961,6 +1075,26 @@ const Cart: React.FC = () => {
         </div>
 
         <div className="px-4 py-4 space-y-4">
+          {showAddressSavedBanner && (
+            <div
+              className="flex items-start gap-3 rounded-2xl border border-[#19411F]/20 bg-[#E6F4EA] px-4 py-3"
+              role="status"
+            >
+              <FaCheck className="mt-0.5 flex-shrink-0 text-[#19411F]" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-gray-900">Delivery address updated</p>
+                <p className="text-xs text-gray-600 mt-0.5">We deliver to this location.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddressSavedBanner(false)}
+                className="flex-shrink-0 rounded-full p-1 text-gray-500 hover:bg-black/5"
+                aria-label="Dismiss"
+              >
+                <FaTimes className="text-sm" />
+              </button>
+            </div>
+          )}
           {items.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500 text-lg">Your cart is empty</p>
@@ -975,81 +1109,123 @@ const Cart: React.FC = () => {
             <>
               {/* Product Items */}
               {items.map((item) => (
-                <div key={item.id} className="bg-white rounded-[25px] p-4 shadow-sm relative">
+                <div key={item.id} className="relative rounded-[25px] bg-white p-4 shadow-sm">
                   <div className="flex gap-4">
                     <img
                       src={item.image}
                       alt={item.name}
                       loading="lazy"
-                      className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
+                      className="h-20 w-20 flex-shrink-0 rounded-lg object-cover"
                       onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
                     />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between mb-1">
-                        <h3 className="font-semibold text-gray-900 text-base">
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-start justify-between gap-2">
+                        <h3 className="text-base font-semibold text-gray-900 [overflow-wrap:anywhere]">
                           {item.name}
-                          {item.variant?.name && <span className="text-gray-600 font-normal"> ({item.variant.name})</span>}
-                          {' '}x{item.quantity}
+                          {item.variant?.name && (
+                            <span className="font-normal text-gray-600"> ({item.variant.name})</span>
+                          )}
                         </h3>
-                        <div className="relative">
-                          <button onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
+                        <div className="relative shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
+                            className="rounded-full p-1 transition-colors hover:bg-gray-100"
+                            aria-label="Item actions"
+                          >
                             <FaEllipsisV className="text-gray-600" />
                           </button>
                           {openMenuId === item.id && (
                             <>
                               <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
-                              <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[120px]">
-                                <button onClick={() => handleEditItem(item.id)} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 rounded-t-lg">Edit</button>
-                                <button onClick={() => handleDeleteItem(item.id)} className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-50 rounded-b-lg">Delete</button>
+                              <div className="absolute right-0 top-8 z-20 min-w-[140px] rounded-lg border border-gray-200 bg-white shadow-lg">
+                                {isBouquetItem(item) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditItem(item.id)}
+                                    className="w-full rounded-t-lg px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                  >
+                                    Edit message
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteItem(item.id)}
+                                  className={`w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-50 ${isBouquetItem(item) ? 'rounded-b-lg' : 'rounded-lg'}`}
+                                >
+                                  Delete
+                                </button>
                               </div>
                             </>
                           )}
                         </div>
                       </div>
                       {deliveryInfo && (
-                        <div className="text-sm text-gray-600 mb-1">
+                        <div className="mb-1 text-sm text-gray-600">
                           <div>Delivery: {deliveryInfo.deliveryDate}</div>
                           <div>Time Slot: {deliveryInfo.timeSlot}</div>
                         </div>
                       )}
-                      <div className="text-lg font-bold text-gray-900 mb-2">₹{item.price} each</div>
-                      {item.categorySlug?.toLowerCase().includes('bouquet') && item.customizedMessage && !editingItemId && (
-                        <div className="text-sm text-gray-600">Message: {item.customizedMessage}</div>
+                      <div className="mb-2 text-lg font-bold text-gray-900">₹{item.price} each</div>
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-500">Qty</span>
+                        <button
+                          type="button"
+                          onClick={() => handleQuantityDelta(item.id, -1)}
+                          disabled={item.quantity <= 1}
+                          className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 transition-colors hover:bg-gray-200 disabled:opacity-40"
+                          aria-label="Decrease quantity"
+                        >
+                          <FaMinus className="text-xs text-gray-600" />
+                        </button>
+                        <span className="min-w-[1.5rem] text-center text-base font-semibold text-gray-900">{item.quantity}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleQuantityDelta(item.id, 1)}
+                          className="flex h-8 w-8 items-center justify-center rounded-full bg-[#19411F] text-white transition-colors hover:bg-[#1e5a1c]"
+                          aria-label="Increase quantity"
+                        >
+                          <FaPlus className="text-xs" />
+                        </button>
+                      </div>
+                      {isBouquetItem(item) && item.customizedMessage && editingItemId !== item.id && (
+                        <div className="text-sm text-gray-600 [overflow-wrap:anywhere]">
+                          <span className="font-medium text-gray-700">Message: </span>
+                          {item.customizedMessage}
+                        </div>
                       )}
                     </div>
                   </div>
 
-                  {editingItemId === item.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+                  {editingItemId === item.id && isBouquetItem(item) && (
+                    <div className="mt-4 space-y-3 border-t border-gray-200 pt-4">
                       <div>
-                        <label className="text-sm font-medium text-gray-700 mb-2 block">Quantity</label>
-                        <div className="flex items-center gap-3">
-                          <button onClick={() => setEditQuantity(Math.max(1, editQuantity - 1))} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-                            <FaMinus className="text-gray-600 text-xs" />
-                          </button>
-                          <span className="text-base font-semibold text-gray-900 min-w-[2rem] text-center">{editQuantity}</span>
-                          <button onClick={() => setEditQuantity(editQuantity + 1)} className="w-8 h-8 rounded-full bg-[#19411F] hover:bg-[#1e5a1c] text-white flex items-center justify-center transition-colors">
-                            <FaPlus className="text-white text-xs" />
-                          </button>
-                        </div>
-                      </div>
-                      {item.categorySlug?.toLowerCase().includes('bouquet') && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-700 mb-2 block">Customized Message (optional)</label>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">Customized message (optional)</label>
                         <textarea
                           value={editMessage}
                           onChange={(e) => { if (e.target.value.length <= 500) setEditMessage(e.target.value); }}
                           placeholder="Add a personalized message for the bouquet..."
-                          className="w-full p-3 rounded-lg border-2 border-gray-200 focus:border-[#19411F] focus:outline-none resize-none text-sm"
+                          className="w-full resize-none rounded-lg border-2 border-gray-200 p-3 text-sm focus:border-[#19411F] focus:outline-none"
                           rows={3}
                           maxLength={500}
                         />
-                        <div className="text-xs text-gray-500 mt-1 text-right">{editMessage.length}/500</div>
+                        <div className="mt-1 text-right text-xs text-gray-500">{editMessage.length}/500</div>
                       </div>
-                      )}
-                      <div className="flex gap-3 pt-2">
-                        <button onClick={handleCancelEdit} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center justify-center">Cancel</button>
-                        <button onClick={() => handleSaveEdit(item.id)} className="flex-1 px-4 py-2 bg-[#19411F] text-white rounded-lg hover:bg-[#1e5a1c] transition-colors text-sm font-medium flex items-center justify-center">Save</button>
+                      <div className="flex gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleCancelEdit}
+                          className="flex flex-1 items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSaveEdit(item.id)}
+                          className="flex flex-1 items-center justify-center rounded-lg bg-[#19411F] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1e5a1c]"
+                        >
+                          Save
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1059,17 +1235,20 @@ const Cart: React.FC = () => {
               {/* Delivery Date and Time */}
               <div className="bg-white rounded-[25px] p-4 shadow-sm relative">
                 <h3 className="text-base font-semibold text-gray-900 mb-3">Delivery Date</h3>
-                <div className="grid grid-cols-4 gap-2 mb-4">
+                <div className="grid grid-cols-2 gap-2 xs:grid-cols-4 mb-4">
                   {(['today', 'tomorrow', 'dayAfter', 'pickDate'] as const).map((opt) => (
                     <button
                       key={opt}
+                      type="button"
                       onClick={() => handleDateOptionSelect(opt)}
-                      className={`px-2.5 py-2 min-h-[36px] rounded-xl text-[10px] font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                      className={`px-2 py-2 min-h-[40px] xs:min-h-[36px] rounded-xl text-[10px] xs:text-[10px] font-medium transition-colors flex items-center justify-center gap-1 text-center leading-tight ${
                         selectedDateOption === opt ? 'bg-[#19411F] text-white' : 'bg-white text-gray-700 border border-gray-200'
                       }`}
                     >
-                      {opt === 'pickDate' && <BsCalendar4 className="text-[10px] flex-shrink-0" />}
-                      <span className="whitespace-nowrap">{opt === 'today' ? 'Today' : opt === 'tomorrow' ? 'Tomorrow' : opt === 'dayAfter' ? 'Day After' : 'Pick Date'}</span>
+                      {opt === 'pickDate' && <BsCalendar4 className="flex-shrink-0 text-[10px]" aria-hidden />}
+                      <span className="min-w-0 [overflow-wrap:anywhere]">
+                        {opt === 'today' ? 'Today' : opt === 'tomorrow' ? 'Tomorrow' : opt === 'dayAfter' ? 'Day After' : 'Pick Date'}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -1137,58 +1316,71 @@ const Cart: React.FC = () => {
                 </div>
               </div>
 
-              {/* Delivery Details */}
-              <div className="bg-white rounded-[25px] p-4 shadow-sm">
-                <div className="flex items-center justify-between mb-3">
+              {/* Delivery Details — fixed visual height; full address on Edit */}
+              <div className="h-[7.25rem] overflow-hidden rounded-[25px] bg-white p-3 shadow-sm sm:h-[7.5rem] sm:p-4">
+                <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className="text-base font-semibold text-gray-900">Delivery Details</h3>
-                  <button onClick={handleEditAddress} className="text-gray-600 hover:text-gray-800 transition-colors">
+                  <button
+                    type="button"
+                    onClick={handleEditAddress}
+                    className="shrink-0 text-gray-600 transition-colors hover:text-gray-800"
+                    aria-label="Edit delivery address"
+                  >
                     <IoCreateOutline className="text-xl" />
                   </button>
                 </div>
                 {isLoadingAddress ? (
                   <p className="text-sm text-gray-500">Loading address...</p>
                 ) : defaultAddress ? (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <MdLocationOn className="text-[#19411F] text-lg" />
-                      <span className="text-sm font-medium text-gray-900">{defaultAddress.type}</span>
+                  <div className="min-h-0">
+                    <div className="mb-1 flex items-center gap-2">
+                      <MdLocationOn className="flex-shrink-0 text-lg text-[#19411F]" />
+                      <span className="truncate text-sm font-medium text-gray-900">{defaultAddress.type}</span>
                     </div>
-                    <p className="text-sm text-gray-600 ml-7">{formatAddress(defaultAddress)}</p>
+                    <p className="line-clamp-2 pl-7 text-sm leading-snug text-gray-600">
+                      {formatAddress(defaultAddress)}
+                    </p>
                   </div>
                 ) : (
                   <div>
-                    <p className="text-sm text-gray-500 mb-2">No address found</p>
-                    <button onClick={handleEditAddress} className="text-sm text-[#19411F] font-medium hover:underline">Add Address</button>
+                    <p className="mb-2 text-sm text-gray-500">No address found</p>
+                    <button type="button" onClick={handleEditAddress} className="text-sm font-medium text-[#19411F] hover:underline">
+                      Add Address
+                    </button>
                   </div>
                 )}
               </div>
 
               {/* ── Promo Code ─────────────────────────────────────────────── */}
-              <div className="bg-white rounded-[25px] p-4 shadow-sm border-2 border-[#19411F]">
+              <div className="bg-white rounded-2xl py-2.5 px-3 shadow-sm border-2 border-[#19411F]">
                 {appliedPromoCode ? (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-[#f0f7f0] flex items-center justify-center">
-                        <FaCheck className="text-[#19411F] text-sm" />
+                  <div className="flex items-center justify-between gap-2 min-h-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 shrink-0 rounded-full bg-[#f0f7f0] flex items-center justify-center">
+                        <FaCheck className="text-[#19411F] text-xs" />
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">"{appliedPromoCode}" applied</p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">"{appliedPromoCode}" applied</p>
                         {promoDiscount > 0 && (
                           <p className="text-xs text-[#19411F] font-medium">You save ₹{promoDiscount.toLocaleString('en-IN')}</p>
                         )}
                       </div>
                     </div>
-                    <button onClick={handleRemovePromoCode} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <button type="button" onClick={handleRemovePromoCode} className="p-1.5 hover:bg-gray-100 rounded-full transition-colors shrink-0">
                       <FaTimes className="text-gray-500 text-sm" />
                     </button>
                   </div>
                 ) : (
-                  <button onClick={() => setShowPromoModal(true)} className="w-full flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <FaTag className="text-[#19411F] text-lg" />
-                      <span className="text-base font-medium text-gray-900">Add Promo Code</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowPromoModal(true)}
+                    className="w-full flex items-center justify-between gap-2 py-0.5 min-h-0"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FaTag className="text-[#19411F] text-sm shrink-0" aria-hidden />
+                      <span className="text-sm font-semibold text-gray-900">Add Promo Code</span>
                     </div>
-                    <FaPlus className="text-[#19411F] text-lg" />
+                    <FaPlus className="text-[#19411F] text-sm shrink-0" aria-hidden />
                   </button>
                 )}
               </div>
@@ -1238,7 +1430,7 @@ const Cart: React.FC = () => {
                     razorpayKey={razorpayKey}
                     customerName={customerInfo.name}
                     customerEmail={customerInfo.email}
-                    customerContact={customerInfo.contact}
+                    customerContact={razorpayPrefillContact}
                     onSuccess={handlePaymentSuccess}
                     onError={handlePaymentError}
                     buttonText=""
@@ -1251,9 +1443,12 @@ const Cart: React.FC = () => {
               <button
                 onClick={handleCheckout}
                 disabled={isProcessingPayment}
-                className="w-full bg-[#19411F] text-white py-4 rounded-[25px] text-base font-semibold hover:bg-[#1e5a1c] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                className="w-full bg-[#19411F] text-white py-4 rounded-[25px] text-base font-semibold hover:bg-[#1e5a1c] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {isProcessingPayment ? 'Processing...' : 'Checkout'}
+                {isProcessingPayment && (
+                  <Spinner size={22} variant="light" className="!inline-flex" />
+                )}
+                {isProcessingPayment ? 'Preparing payment…' : 'Checkout'}
               </button>
             </>
           )}

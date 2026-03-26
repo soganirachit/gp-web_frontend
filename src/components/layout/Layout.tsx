@@ -64,9 +64,9 @@ const Layout: React.FC = () => {
           <div
             className={
               !isAuthRoute && !shouldHideBottomNav
-                ? "min-h-[calc(100vh-144px)] pb-32"
+                ? "min-h-[calc(100dvh-144px)] min-h-[calc(100vh-144px)] pb-layout-pb"
                 : !isAuthRoute
-                ? "pb-32"
+                ? "pb-layout-pb"
                 : ""
             }
           >

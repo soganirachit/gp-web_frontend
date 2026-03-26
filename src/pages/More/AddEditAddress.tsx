@@ -53,6 +53,7 @@ const AddEditAddress: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [pincode, setPincode] = useState('');
 
+  const [showMapLocationHint, setShowMapLocationHint] = useState(false);
   const [locationValidation, setLocationValidation] = useState<{
     isValid: boolean;
     message?: string;
@@ -204,14 +205,18 @@ const AddEditAddress: React.FC = () => {
       }
 
       const validation = await addressService.validateAddressInDeliveryArea(coordinates);
-      setLocationValidation(validation);
+      setLocationValidation({
+        isValid: validation.isValid,
+        message:
+          validation.message ||
+          (validation.isValid ? 'We deliver to this location.' : 'Address is outside delivery area'),
+      });
 
       if (!validation.isValid) {
         toast.error(validation.message || 'Address is outside delivery area');
         return false;
       }
 
-      toast.success('Address is within delivery area!');
       return true;
     } catch (error) {
       console.error('Error validating location:', error);
@@ -352,11 +357,8 @@ const AddEditAddress: React.FC = () => {
                   if (pin) setPincode(pin);
                 }
               }
-              const successMsg = 'Location detected successfully';
-              if (lastToastMessage.current !== successMsg) {
-                lastToastMessage.current = successMsg;
-                toast.success(successMsg);
-              }
+              setShowMapLocationHint(true);
+              window.setTimeout(() => setShowMapLocationHint(false), 4000);
             }
           } catch (error) {
             console.error('Error fetching address:', error);
@@ -634,6 +636,34 @@ const AddEditAddress: React.FC = () => {
             </svg>
           </button>
         </div>
+
+        {showMapLocationHint && (
+          <div
+            className="mb-3 rounded-full px-3 py-1.5 text-center text-xs font-medium text-white shadow-md"
+            style={{ backgroundColor: theme.colors.primary }}
+            role="status"
+          >
+            Location detected — adjust the map pin if needed
+          </div>
+        )}
+
+        {locationValidation && (
+          <div
+            className={`mb-4 rounded-xl border p-3 text-sm ${
+              locationValidation.isValid
+                ? 'border-green-200 bg-green-50 text-green-800'
+                : 'border-red-200 bg-red-50 text-red-800'
+            }`}
+            role="status"
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${locationValidation.isValid ? 'bg-green-500' : 'bg-red-500'}`}
+              />
+              {locationValidation.message}
+            </div>
+          </div>
+        )}
 
         {/* Delivering to Section */}
         {deliveryAddress && (

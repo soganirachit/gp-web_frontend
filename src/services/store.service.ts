@@ -24,13 +24,19 @@ export interface Store {
 
 
 class StoreService {
-  async getAllStores(latitude: number, longitude: number): Promise<Store[]> {
+  /**
+   * List active stores. If lat/lng are omitted or invalid, the API returns all stores in default order
+   * (backend does not require location). With lat/lng, results are sorted by distance.
+   */
+  async getAllStores(latitude?: number, longitude?: number): Promise<Store[]> {
     try {
+      const hasLoc =
+        latitude !== undefined &&
+        longitude !== undefined &&
+        !Number.isNaN(latitude) &&
+        !Number.isNaN(longitude);
       const response = await axios.get(`${getApiUrl()}/stores/`, {
-        params: {
-          lat: latitude,
-          lng: longitude,
-        },
+        params: hasLoc ? { lat: latitude, lng: longitude } : {},
       });
 
       if (response.data.success && Array.isArray(response.data.data)) {

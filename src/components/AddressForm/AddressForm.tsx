@@ -70,13 +70,12 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
     try {
       setValidatingCoordinates(true);
       const validation = await addressService.validateAddressInDeliveryArea(formData.coordinates);
-      setValidationResult(validation);
-      
-      if (validation.isValid) {
-        toast.success(validation.message || "Coordinates are valid!");
-      } else {
-        toast.error(validation.message || "Coordinates are outside delivery area");
-      }
+      setValidationResult({
+        isValid: validation.isValid,
+        message:
+          validation.message ||
+          (validation.isValid ? 'We deliver to this location.' : 'Outside delivery area'),
+      });
     } catch (error) {
       toast.error("Failed to validate coordinates");
       setValidationResult({ isValid: false, message: "Validation failed" });

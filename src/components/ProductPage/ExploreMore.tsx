@@ -266,7 +266,7 @@ const ExploreMore: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
-      <div className="max-w-[800px] mx-auto bg-[#f8f6f1] min-h-screen pb-20">
+      <div className="mx-auto min-h-screen w-full max-w-[min(800px,100vw)] bg-[#f8f6f1] pb-nav-bottom">
         {/* Header */}
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-20 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -288,7 +288,7 @@ const ExploreMore: React.FC = () => {
             <div className="text-red-500 text-center py-4 text-base">{error}</div>
           ) : (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 xs:gap-6 items-start">
                 {displayedProducts.map((item, index) => renderCard(item, index))}
               </div>
 

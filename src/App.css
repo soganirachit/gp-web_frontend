@@ -1,0 +1,10 @@
+/* Mobile baseline: prevent horizontal scroll from full-width children; stable viewport on notched phones */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+#root {
+  overflow-x: clip;
+  min-height: 100dvh;
+}

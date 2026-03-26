@@ -6,7 +6,7 @@ const Terms: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-[#f8f6f1] pb-24">
+    <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
       <SEO
         title="Terms of Service — Genda Phool"
         description="Terms of Service for Genda Phool — fresh flower delivery in Jaipur."

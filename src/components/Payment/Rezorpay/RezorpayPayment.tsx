@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import Spinner from "../../common/Spinner";
+import { loadRazorpayScript } from "../../../lib/razorpayLoader";
 
 declare global {
   interface Window {
@@ -83,6 +84,8 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
         throw new Error(response.data.message);
       }
 
+      await loadRazorpayScript();
+
       const { order, key_id, customer } = response.data;
 
       const options = {
@@ -132,17 +135,7 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
   };
 
   useEffect(() => {
-    // Load Razorpay script
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-    };
+    loadRazorpayScript().catch(() => {});
   }, []);
 
   return (

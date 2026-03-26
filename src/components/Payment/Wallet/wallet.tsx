@@ -242,8 +242,8 @@ const Wallet = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f6f1]">
-      <div className="max-w-[800px] mx-auto">
+    <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom overflow-x-clip">
+      <div className="mx-auto w-full max-w-[min(800px,100vw)]">
         {/* Network Status & Header */}
         {!isOnline && (
           <div className="bg-red-500 text-white p-2 text-center text-sm">
@@ -318,12 +318,13 @@ const Wallet = () => {
           <h2 className="text-2xl md:text-2xl font-semibold mb-4">Add Money To Wallet</h2>
 
           {/* Quick Amount Buttons */}
-          <div className="grid grid-cols-4 gap-3 md:gap-4 mb-6">
+          <div className="grid grid-cols-2 gap-2 xs:grid-cols-4 xs:gap-3 md:gap-4 mb-6">
             {QUICK_AMOUNTS.map((amount) => (
               <button
                 key={amount}
+                type="button"
                 onClick={() => handleQuickAmount(amount)}
-                className={`py-2 md:py-3 rounded-2xl border-2 font-medium ${customAmount === amount.toString()
+                className={`py-2.5 md:py-3 rounded-2xl border-2 text-sm xs:text-base font-medium ${customAmount === amount.toString()
                   ? "border-[#FAA222] text-black bg-[#FAA222]"
                   : "border-gray-200 text-gray-600 bg-white "
                   } md:text-lg`}

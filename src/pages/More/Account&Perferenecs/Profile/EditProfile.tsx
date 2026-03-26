@@ -156,7 +156,7 @@ const Profile: React.FC = () => {
         </div>
 
         {/* Save Changes Button */}
-        <div className="px-4 mt-6 pb-32">
+        <div className="px-4 mt-6 pb-layout-pb">
           {error && <div className="text-red-500 mb-4 text-center">{error}</div>}
           <button 
             onClick={handleSaveChanges}

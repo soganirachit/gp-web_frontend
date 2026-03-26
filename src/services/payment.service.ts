@@ -15,6 +15,55 @@ const getPaymentApiUrl = () => {
 
 const API_URL = getPaymentApiUrl();
 
+/** Same wrapper pattern as create-order: `{ success, data: { ... } }` */
+function unwrapResponseBody(raw: unknown): Record<string, unknown> {
+  if (raw == null || typeof raw !== "object") return {};
+  const r = raw as Record<string, unknown>;
+  if (r.success === false) return r;
+  if (r.data != null && typeof r.data === "object" && !Array.isArray(r.data)) {
+    return r.data as Record<string, unknown>;
+  }
+  return r;
+}
+
+/** Build the shape Cart expects after POST /verify/ (handles wrapped + alternate keys). */
+function normalizeVerifyResponse(raw: unknown): VerifyPaymentResponse {
+  const body = unwrapResponseBody(raw);
+
+  let order = body.order as VerifyPaymentResponse["order"] | undefined;
+  let payment = body.payment as VerifyPaymentResponse["payment"] | unknown;
+
+  if (!order && typeof body.order_number === "string") {
+    order = {
+      id: Number(body.order_id) || 0,
+      order_number: body.order_number,
+    };
+  }
+
+  if (order && !payment) {
+    if (body.payment_id != null || typeof body.payment_status === "string") {
+      payment = {
+        id: Number(body.payment_id) || 0,
+        status: String(body.payment_status || "completed"),
+      };
+    } else {
+      payment = { id: 0, status: "completed" };
+    }
+  }
+
+  if (!order?.order_number || payment == null || typeof payment !== "object") {
+    const msg =
+      (typeof body.message === "string" && body.message) ||
+      "Payment verified but response did not include order details. Check server /verify/ payload.";
+    throw new Error(msg);
+  }
+
+  return {
+    order,
+    payment: payment as VerifyPaymentResponse["payment"],
+  };
+}
+
 export interface CreateCheckoutOrderRequest {
   delivery_address_id: number;
   delivery_slot_id?: number;
@@ -196,7 +245,7 @@ class PaymentService {
         throw new Error(errorMessage);
       }
 
-      return response.data;
+      return normalizeVerifyResponse(response.data);
     } catch (error: any) {
       console.error('Error verifying payment:', error);
 
@@ -221,7 +270,21 @@ class PaymentService {
         `${API_URL}/status/${razorpayOrderId}/`
       );
 
-      return response.data;
+      const body = unwrapResponseBody(response.data);
+      const st = String(body.status ?? "").toLowerCase();
+      return {
+        razorpay_order_id: String(body.razorpay_order_id ?? razorpayOrderId),
+        status: st,
+        amount: String(body.amount ?? ""),
+        order_id:
+          body.order_id != null ? Number(body.order_id) : undefined,
+        order_number:
+          body.order_number != null ? String(body.order_number) : undefined,
+        razorpay_payment_id:
+          body.razorpay_payment_id != null
+            ? String(body.razorpay_payment_id)
+            : undefined,
+      };
     } catch (error: any) {
       console.error('Error getting payment status:', error);
       headerService.handleError(error);
