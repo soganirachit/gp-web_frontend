@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { IoArrowBack, IoCreateOutline } from 'react-icons/io5';
 import { BsCalendar4 } from 'react-icons/bs';
 import { MdLocationOn } from 'react-icons/md';
-import { FaTag, FaPlus, FaMinus, FaEllipsisV, FaTimes, FaCheck } from 'react-icons/fa';
+import { FaTag, FaPlus, FaMinus, FaTimes, FaCheck } from 'react-icons/fa';
 import { useCart } from '../../../context/CartContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useFeatureTheme } from '../../../context/FeatureThemeContext';
@@ -11,7 +11,7 @@ import { addressService, Address } from '../../../services/address.service';
 import { storeService } from '../../../services/store.service';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import { format, addDays, isToday, isTomorrow } from 'date-fns';
+import { format, addDays, isToday, isTomorrow, startOfDay } from 'date-fns';
 import toast from 'react-hot-toast';
 import CartRazorpayPayment from '../../../components/Payment/Rezorpay/CartRazorpayPayment';
 import { paymentService } from '../../../services/payment.service';
@@ -49,6 +49,12 @@ const formatSlotTimeRange = (start: string, end: string): string => {
   const startStr = s.m > 0 ? `${s.h}:${String(s.m).padStart(2, '0')}` : `${s.h}`;
   const endStr = e.m > 0 ? `${e.h}:${String(e.m).padStart(2, '0')}` : `${e.h}`;
   return `${startStr}-${endStr}${e.period}`;
+};
+
+// Parse "HH:mm:ss" / "HH:mm" into minutes from midnight
+const toMinutes = (timeStr: string): number => {
+  const [h = '0', m = '0'] = (timeStr || '').split(':');
+  return Number(h) * 60 + Number(m);
 };
 
 interface ApplyCouponResponse {
@@ -313,7 +319,7 @@ const Cart: React.FC = () => {
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const [availableSlots, setAvailableSlots] = useState<DeliverySlot[]>([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  // (Bouquet message editing uses inline UI; no overflow menu needed)
 
   // Check authentication and redirect if session expired
   useEffect(() => {
@@ -372,6 +378,17 @@ const Cart: React.FC = () => {
   const [basketHydratedOnce, setBasketHydratedOnce] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [showAddressSavedBanner, setShowAddressSavedBanner] = useState(false);
+
+  const isSlotSelectable = (slot: DeliverySlot, date: Date) => {
+    // For non-today dates, all API-available slots stay selectable.
+    if (!isToday(date)) return true;
+    // For today: only slots strictly ahead of current time are selectable.
+    // This also disables the currently running slot as requested.
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const slotStartMinutes = toMinutes(slot.start_time);
+    return slotStartMinutes > nowMinutes;
+  };
 
   useEffect(() => {
     if ((location.state as { addressUpdated?: boolean } | null)?.addressUpdated) {
@@ -494,6 +511,8 @@ const Cart: React.FC = () => {
   // Fetch available delivery slots for a given date from the backend.
   // Falls back to empty array on error — checkout button will show a message.
   const fetchSlotsForDate = async (date: Date) => {
+    const normalizedDate = startOfDay(date);
+    const formattedDate = format(normalizedDate, 'dd MMM yyyy');
     setIsLoadingSlots(true);
     try {
       const storeId = storeService.getStoreIdForProducts() ?? 4;
@@ -509,22 +528,32 @@ const Cart: React.FC = () => {
           return { id: s.id, slot_name: s.slot_name, start_time: s.start_time, end_time: s.end_time };
         });
       setAvailableSlots(slots);
-      // Auto-select first slot, or restore previously selected slot if still available
-      if (slots.length > 0) {
+      const selectableSlots = slots.filter((slot) => isSlotSelectable(slot, normalizedDate));
+      // Auto-select only selectable slots for today; keep existing behavior for other dates.
+      if (selectableSlots.length > 0) {
         const restored = deliveryInfo?.slotId
-          ? slots.find(s => s.id === deliveryInfo.slotId)
+          ? selectableSlots.find(s => s.id === deliveryInfo.slotId)
           : null;
-        const toSelect = restored ?? slots[0];
+        const toSelect = restored ?? selectableSlots[0];
         setSelectedSlotId(toSelect.id);
         setSelectedTimeSlot(toSelect.slot_name);
         updateDeliveryInfo({
-          ...(deliveryInfo ?? { deliveryDate: format(date, 'dd MMM yyyy'), selectedDate: date }),
+          ...(deliveryInfo ?? {}),
+          deliveryDate: formattedDate,
+          selectedDate: normalizedDate,
           timeSlot: toSelect.slot_name,
           slotId: toSelect.id,
         });
       } else {
         setSelectedSlotId(null);
         setSelectedTimeSlot('');
+        updateDeliveryInfo({
+          ...(deliveryInfo ?? {}),
+          deliveryDate: formattedDate,
+          selectedDate: normalizedDate,
+          timeSlot: '',
+          slotId: undefined,
+        });
       }
     } catch {
       setAvailableSlots([]);
@@ -704,16 +733,24 @@ const Cart: React.FC = () => {
     setSelectedDateOption(option);
     if (option === 'pickDate') { setShowDatePicker(true); return; }
     const dateMap = { today: new Date(), tomorrow: addDays(new Date(), 1), dayAfter: addDays(new Date(), 2) };
-    const selectedDate = dateMap[option];
+    const selectedDate = startOfDay(dateMap[option]);
     updateDeliveryInfo({ deliveryDate: format(selectedDate, 'dd MMM yyyy'), timeSlot: '', slotId: undefined, selectedDate });
     fetchSlotsForDate(selectedDate);
   };
 
   const handleDatePickerChange = (date: Date | null) => {
     if (date) {
+      const today = startOfDay(new Date());
+      const pickedDate = startOfDay(date);
+      if (pickedDate < today) return;
       setShowDatePicker(false);
-      updateDeliveryInfo({ deliveryDate: format(date, 'dd MMM yyyy'), timeSlot: '', slotId: undefined, selectedDate: date });
-      fetchSlotsForDate(date);
+      const dayAfter = addDays(today, 2);
+      if (isToday(pickedDate)) setSelectedDateOption('today');
+      else if (isTomorrow(pickedDate)) setSelectedDateOption('tomorrow');
+      else if (format(pickedDate, 'yyyy-MM-dd') === format(dayAfter, 'yyyy-MM-dd')) setSelectedDateOption('dayAfter');
+      else setSelectedDateOption('pickDate');
+      updateDeliveryInfo({ deliveryDate: format(pickedDate, 'dd MMM yyyy'), timeSlot: '', slotId: undefined, selectedDate: pickedDate });
+      fetchSlotsForDate(pickedDate);
     }
   };
 
@@ -739,15 +776,25 @@ const Cart: React.FC = () => {
   }, [showDatePicker]);
 
   const handleTimeSlotSelect = (slot: DeliverySlot) => {
+    const selectedDate =
+      deliveryInfo?.selectedDate instanceof Date
+        ? deliveryInfo.selectedDate
+        : deliveryInfo?.selectedDate
+        ? new Date(deliveryInfo.selectedDate)
+        : new Date();
+    if (!isSlotSelectable(slot, selectedDate)) return;
     setSelectedSlotId(slot.id);
     setSelectedTimeSlot(slot.slot_name);
     if (deliveryInfo) updateDeliveryInfo({ ...deliveryInfo, timeSlot: slot.slot_name, slotId: slot.id });
   };
 
   const isBouquetItem = (item: (typeof items)[number]) => {
-    const slug = item.categorySlug?.toLowerCase() ?? '';
-    if (slug.includes('bouquet')) return true;
-    return item.name.toLowerCase().includes('bouquet');
+    const categorySlug = item.categorySlug?.toLowerCase() ?? '';
+    const productSlug = item.productSlug?.toLowerCase() ?? '';
+    const name = item.name?.toLowerCase() ?? '';
+    if (categorySlug.includes('bouquet')) return true;
+    if (productSlug.includes('bouquet')) return true;
+    return name.includes('bouquet');
   };
 
   const handleEditItem = (itemId: string) => {
@@ -755,7 +802,6 @@ const Cart: React.FC = () => {
     if (!item || !isBouquetItem(item)) return;
     setEditingItemId(itemId);
     setEditMessage(item.customizedMessage || '');
-    setOpenMenuId(null);
   };
 
   const handleSaveEdit = async (itemId: string) => {
@@ -798,7 +844,6 @@ const Cart: React.FC = () => {
   const handleDeleteItem = async (itemId: string) => {
     try {
       await removeFromCart(itemId);
-      setOpenMenuId(null);
       toast.success('Item removed from cart');
     } catch (_) {
       toast.error('Failed to remove item. Please try again.');
@@ -1109,120 +1154,134 @@ const Cart: React.FC = () => {
             <>
               {/* Product Items */}
               {items.map((item) => (
-                <div key={item.id} className="relative rounded-[25px] bg-white p-4 shadow-sm">
-                  <div className="flex gap-4">
+                <div key={item.id} className="relative rounded-[24px] border border-[#e9e5de] bg-white p-4 shadow-sm">
+                  <div className="flex items-start gap-3">
                     <img
                       src={item.image}
                       alt={item.name}
                       loading="lazy"
-                      className="h-20 w-20 flex-shrink-0 rounded-lg object-cover"
+                      className="h-[5.25rem] w-[5.25rem] flex-shrink-0 rounded-2xl object-cover"
                       onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex items-start justify-between gap-2">
-                        <h3 className="text-base font-semibold text-gray-900 [overflow-wrap:anywhere]">
-                          {item.name}
-                          {item.variant?.name && (
-                            <span className="font-normal text-gray-600"> ({item.variant.name})</span>
-                          )}
-                        </h3>
-                        <div className="relative shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
-                            className="rounded-full p-1 transition-colors hover:bg-gray-100"
-                            aria-label="Item actions"
-                          >
-                            <FaEllipsisV className="text-gray-600" />
-                          </button>
-                          {openMenuId === item.id && (
-                            <>
-                              <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
-                              <div className="absolute right-0 top-8 z-20 min-w-[140px] rounded-lg border border-gray-200 bg-white shadow-lg">
-                                {isBouquetItem(item) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleEditItem(item.id)}
-                                    className="w-full rounded-t-lg px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                  >
-                                    Edit message
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteItem(item.id)}
-                                  className={`w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-50 ${isBouquetItem(item) ? 'rounded-b-lg' : 'rounded-lg'}`}
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
+                      <h3 className="text-sm font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere]">
+                        {item.name} x {item.quantity}
+                        {item.variant?.name && (
+                          <span className="font-normal text-gray-600"> ({item.variant.name})</span>
+                        )}
+                      </h3>
                       {deliveryInfo && (
-                        <div className="mb-1 text-sm text-gray-600">
+                        <div className="mt-0.5 text-xs leading-snug text-gray-600">
                           <div>Delivery: {deliveryInfo.deliveryDate}</div>
                           <div>Time Slot: {deliveryInfo.timeSlot}</div>
                         </div>
                       )}
-                      <div className="mb-2 text-lg font-bold text-gray-900">₹{item.price} each</div>
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className="text-xs font-medium text-gray-500">Qty</span>
+                      <div className="mt-1 text-base font-semibold leading-tight text-gray-900">
+                        ₹{Number(item.price).toFixed(2)} each
+                      </div>
+                      {/* Bouquet message UI is rendered below (add/edit state) */}
+                    </div>
+
+                    {/* Right controls: action aligned above + button */}
+                    <div className="relative grid grid-cols-[2rem_1.25rem_2rem] grid-rows-2 items-center gap-x-1 gap-y-1 pt-0.5">
+                      {/* Row 1: action button (only in col 3) */}
+                      <div className="col-start-3 row-start-1 flex justify-center">
                         <button
                           type="button"
-                          onClick={() => handleQuantityDelta(item.id, -1)}
-                          disabled={item.quantity <= 1}
-                          className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 transition-colors hover:bg-gray-200 disabled:opacity-40"
-                          aria-label="Decrease quantity"
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="flex !min-h-0 !min-w-0 h-8 w-8 items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-50"
+                          aria-label="Remove item"
                         >
-                          <FaMinus className="text-xs text-gray-600" />
-                        </button>
-                        <span className="min-w-[1.5rem] text-center text-base font-semibold text-gray-900">{item.quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleQuantityDelta(item.id, 1)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full bg-[#19411F] text-white transition-colors hover:bg-[#1e5a1c]"
-                          aria-label="Increase quantity"
-                        >
-                          <FaPlus className="text-xs" />
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                            <path d="M8 7V5.8C8 5.11994 8.119 4.65101 8.4446 4.3254C8.7702 4 9.23913 4 9.91919 4H14.0808C14.7609 4 15.2298 4 15.5554 4.3254C15.881 4.65101 16 5.11994 16 5.8V7M10 11V16M14 11V16M5 7H19M18 7V17.2C18 18.8802 18 19.7202 17.673 20.362C17.3854 20.9265 16.9265 21.3854 16.362 21.673C15.7202 22 14.8802 22 13.2 22H10.8C9.11984 22 8.27976 22 7.63803 21.673C7.07354 21.3854 6.6146 20.9265 6.32698 20.362C6 19.7202 6 18.8802 6 17.2V7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
                         </button>
                       </div>
-                      {isBouquetItem(item) && item.customizedMessage && editingItemId !== item.id && (
-                        <div className="text-sm text-gray-600 [overflow-wrap:anywhere]">
-                          <span className="font-medium text-gray-700">Message: </span>
-                          {item.customizedMessage}
-                        </div>
-                      )}
+
+                      {/* Row 2: qty controls */}
+                      <button
+                        type="button"
+                        onClick={() => handleQuantityDelta(item.id, -1)}
+                        disabled={item.quantity <= 1}
+                        className="col-start-1 row-start-2 flex !min-h-0 !min-w-0 h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 disabled:opacity-60"
+                        aria-label="Decrease quantity"
+                      >
+                        <FaMinus className="text-[8px]" />
+                      </button>
+                      <span className="col-start-2 row-start-2 min-w-[1rem] text-center text-xs font-medium text-gray-900">
+                        {item.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleQuantityDelta(item.id, 1)}
+                        className="col-start-3 row-start-2 flex !min-h-0 !min-w-0 h-8 w-8 items-center justify-center rounded-full bg-[#19411F] text-white transition-colors hover:bg-[#1e5a1c]"
+                        aria-label="Increase quantity"
+                      >
+                        <FaPlus className="text-[8px]" />
+                      </button>
                     </div>
                   </div>
 
+                  {/* Bouquet: custom message UI (matches reference screenshots) */}
+                  {isBouquetItem(item) && editingItemId !== item.id && (
+                    <div className="mt-2 pl-24 pr-1">
+                      {item.customizedMessage ? (
+                        <div className="flex items-center justify-between gap-3 px-1">
+                          <p className="flex-1 min-w-0 text-xs text-gray-500 leading-snug truncate">
+                            <span className="font-medium text-gray-500">Customized Message:</span>{' '}
+                            {item.customizedMessage}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleEditItem(item.id)}
+                            className="flex !min-h-0 !min-w-0 h-8 w-8 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100"
+                            aria-label="Edit custom message"
+                          >
+                            <IoCreateOutline className="text-lg" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingItemId(item.id);
+                            setEditMessage('');
+                          }}
+                          className="inline-flex items-center gap-2 rounded-full border border-[#19411F] bg-white px-3 py-1.5 text-xs font-semibold text-[#19411F] hover:bg-[#f1f7f2]"
+                        >
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[#19411F] text-[#19411F]">
+                            <svg width="12" height="12" viewBox="0 0 20 20" fill="none" aria-hidden>
+                              <path d="M10 4.5V15.5M4.5 10H15.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                            </svg>
+                          </span>
+                          Add custom message
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {editingItemId === item.id && isBouquetItem(item) && (
-                    <div className="mt-4 space-y-3 border-t border-gray-200 pt-4">
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-700">Customized message (optional)</label>
-                        <textarea
-                          value={editMessage}
-                          onChange={(e) => { if (e.target.value.length <= 500) setEditMessage(e.target.value); }}
-                          placeholder="Add a personalized message for the bouquet..."
-                          className="w-full resize-none rounded-lg border-2 border-gray-200 p-3 text-sm focus:border-[#19411F] focus:outline-none"
-                          rows={3}
-                          maxLength={500}
-                        />
-                        <div className="mt-1 text-right text-xs text-gray-500">{editMessage.length}/500</div>
-                      </div>
-                      <div className="flex gap-3 pt-1">
+                    <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-3">
+                      <textarea
+                        value={editMessage}
+                        onChange={(e) => { if (e.target.value.length <= 500) setEditMessage(e.target.value); }}
+                        placeholder="Add a customized message"
+                        className="w-full resize-none rounded-xl border border-gray-200 bg-[#fafafa] p-3 text-sm text-gray-900 outline-none focus:border-[#19411F]"
+                        rows={3}
+                        maxLength={500}
+                      />
+                      <div className="mt-3 flex justify-end gap-2">
                         <button
                           type="button"
                           onClick={handleCancelEdit}
-                          className="flex flex-1 items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                          className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                         >
                           Cancel
                         </button>
                         <button
                           type="button"
                           onClick={() => handleSaveEdit(item.id)}
-                          className="flex flex-1 items-center justify-center rounded-lg bg-[#19411F] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1e5a1c]"
+                          className="rounded-xl bg-[#19411F] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1e5a1c]"
                         >
                           Save
                         </button>
@@ -1284,7 +1343,7 @@ const Cart: React.FC = () => {
                       <DatePicker
                         selected={deliveryInfo?.selectedDate || null}
                         onChange={handleDatePickerChange}
-                        minDate={new Date()}
+                        minDate={startOfDay(new Date())}
                         inline
                         calendarClassName="!border-0 !shadow-none"
                         className="w-full"
@@ -1301,23 +1360,39 @@ const Cart: React.FC = () => {
                   ) : (
                     <div className="grid gap-2 w-full" style={{ gridTemplateColumns: `repeat(${availableSlots.length}, 1fr)` }}>
                       {availableSlots.map((slot) => (
+                        (() => {
+                          const selectedDate =
+                            deliveryInfo?.selectedDate instanceof Date
+                              ? deliveryInfo.selectedDate
+                              : deliveryInfo?.selectedDate
+                              ? new Date(deliveryInfo.selectedDate)
+                              : new Date();
+                          const disabled = !isSlotSelectable(slot, selectedDate);
+                          return (
                         <button
                           key={slot.id}
                           onClick={() => handleTimeSlotSelect(slot)}
+                          disabled={disabled}
                           className={`w-full min-w-0 px-2.5 py-2 min-h-[36px] rounded-xl text-[10px] font-medium transition-colors flex items-center justify-center gap-1.5 ${
-                            selectedSlotId === slot.id ? 'bg-[#19411F] text-white' : 'bg-white text-gray-700 border border-gray-200'
+                            disabled
+                              ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                              : selectedSlotId === slot.id
+                              ? 'bg-[#19411F] text-white'
+                              : 'bg-white text-gray-700 border border-gray-200'
                           }`}
                         >
                           {slot.start_time && slot.end_time ? formatSlotTimeRange(slot.start_time, slot.end_time) : (slot.slot_name || 'Slot')}
                         </button>
+                          );
+                        })()
                       ))}
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Delivery Details — fixed visual height; full address on Edit */}
-              <div className="h-[7.25rem] overflow-hidden rounded-[25px] bg-white p-3 shadow-sm sm:h-[7.5rem] sm:p-4">
+              {/* Delivery Details */}
+              <div className="rounded-[25px] bg-white p-4 shadow-sm">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className="text-base font-semibold text-gray-900">Delivery Details</h3>
                   <button
@@ -1332,12 +1407,12 @@ const Cart: React.FC = () => {
                 {isLoadingAddress ? (
                   <p className="text-sm text-gray-500">Loading address...</p>
                 ) : defaultAddress ? (
-                  <div className="min-h-0">
+                  <div>
                     <div className="mb-1 flex items-center gap-2">
                       <MdLocationOn className="flex-shrink-0 text-lg text-[#19411F]" />
                       <span className="truncate text-sm font-medium text-gray-900">{defaultAddress.type}</span>
                     </div>
-                    <p className="line-clamp-2 pl-7 text-sm leading-snug text-gray-600">
+                    <p className="line-clamp-3 pl-7 text-sm leading-snug text-gray-600">
                       {formatAddress(defaultAddress)}
                     </p>
                   </div>

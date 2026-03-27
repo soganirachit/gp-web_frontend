@@ -33,9 +33,7 @@ const BottomNav: React.FC = () => {
   const isActive = (paths: string | string[]) => {
     if (Array.isArray(paths)) {
       return paths.some(path => {
-        if (path === "/") {
-          return location.pathname === "/";
-        }
+        if (path === "/home") return location.pathname === "/home";
         if (path === "/gp-daily") {
           // Only match exact /gp-daily
           return location.pathname === "/gp-daily";
@@ -47,10 +45,8 @@ const BottomNav: React.FC = () => {
         return location.pathname === path || location.pathname.startsWith(path + "/");
       });
     }
-    // Special case for home - only match exactly "/"
-    if (paths === "/") {
-      return location.pathname === "/";
-    }
+    // Special case for home - only match exactly "/home"
+    if (paths === "/home") return location.pathname === "/home";
     // Special case for /gp-daily - only match exactly "/gp-daily"
     if (paths === "/gp-daily") {
       return location.pathname === "/gp-daily";
@@ -69,13 +65,13 @@ const BottomNav: React.FC = () => {
         <div className="w-full max-w-[min(800px,100vw)] mx-0 sm:mx-4 bg-white shadow-lg rounded-t-none sm:rounded-t-lg pointer-events-auto overflow-visible">
           <div className="flex justify-between items-center px-3 py-2 pt-2">
             <Link
-              to="/"
-              className={`flex flex-col items-center justify-center flex-1 relative ${isActive("/")
+              to="/home"
+              className={`flex flex-col items-center justify-center flex-1 relative ${isActive("/home")
                 ? theme.classes.bottomNavActiveText
                 : theme.classes.bottomNavInactiveText
                 }`}
             >
-              {isActive("/") && (
+              {isActive("/home") && (
                 <img
                   src={storeGreenBanner}
                   alt=""
@@ -85,10 +81,10 @@ const BottomNav: React.FC = () => {
               <img
                 src={homeIcon}
                 alt="Home"
-                className={`w-5 h-5 mb-0.5 relative z-10 ${isActive("/") ? "brightness-0 invert" : "opacity-90"
+                className={`w-5 h-5 mb-0.5 relative z-10 ${isActive("/home") ? "brightness-0 invert" : "opacity-90"
                   }`}
               />
-              <span className={`text-[10px] font-medium relative z-10 ${isActive("/") ? "text-white" : "text-[#19411f]"}`}>Home</span>
+              <span className={`text-[10px] font-medium relative z-10 ${isActive("/home") ? "text-white" : "text-[#19411f]"}`}>Home</span>
             </Link>
 
             <Link
@@ -203,13 +199,13 @@ const BottomNav: React.FC = () => {
       <div className="w-full max-w-[min(800px,100vw)] mx-0 sm:mx-4 bg-white shadow-lg rounded-t-none sm:rounded-t-lg pointer-events-auto overflow-visible">
         <div className="flex justify-between items-center px-3 py-2 pt-2">
           <Link
-            to="/"
-            className={`flex flex-col items-center justify-center flex-1 relative ${isActive("/")
+            to="/home"
+            className={`flex flex-col items-center justify-center flex-1 relative ${isActive("/home")
               ? theme.classes.bottomNavActiveText
               : theme.classes.bottomNavInactiveText
               }`}
           >
-            {isActive("/") && (
+            {isActive("/home") && (
               <img
                 src={activeBg}
                 alt=""
@@ -219,10 +215,10 @@ const BottomNav: React.FC = () => {
             <img
               src={homeIcon}
               alt="Home"
-              className={`w-5 h-5 mb-0.5 relative z-10 ${isActive("/") ? "" : "opacity-90"
+              className={`w-5 h-5 mb-0.5 relative z-10 ${isActive("/home") ? "" : "opacity-90"
                 }`}
             />
-            <span className={`text-[10px] font-medium relative z-10 ${isActive("/") ? "text-gray-700" : ""}`}>Home</span>
+            <span className={`text-[10px] font-medium relative z-10 ${isActive("/home") ? "text-gray-700" : ""}`}>Home</span>
           </Link>
 
           <Link

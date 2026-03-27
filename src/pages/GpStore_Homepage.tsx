@@ -14,6 +14,7 @@ import Spinner from "../components/common/Spinner";
 import { SearchBar } from "../components/common/SearchBar";
 import ErrorBoundary from "../components/ErrorBoundary";
 import SearchIcon from "../assets/icon/Search.png";
+import { useAuth } from "../context/AuthContext";
 // Note: If truckstore.svg doesn't exist, rename truckhome.svg to truckstore.svg
 import truckStoreIcon from "../assets/svg/gp_store_svg/truckhome.svg";
 import storeGreenBanner from "../assets/svg/gp_store_svg/greenbanner.svg";
@@ -33,6 +34,7 @@ const GpStore_Homepage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { theme, feature } = useFeatureTheme();
+    const { isLoggedIn } = useAuth();
     const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
 
     const [deliveryLocation, setDeliveryLocation] = useState<string>("");
@@ -164,6 +166,12 @@ const GpStore_Homepage: React.FC = () => {
     const fetchLatestAddress = useCallback(async () => {
         try {
             setIsLoadingAddress(true);
+            if (!isLoggedIn) {
+                // Logged out: never show a previously-saved address in the header.
+                setDeliveryLocation("");
+                setAddressType("Home");
+                return;
+            }
             const addresses = await addressService.getAllAddresses();
             // Get default address first, otherwise get the latest address
             const defaultAddress = addresses.find(addr => addr.isDefault);
@@ -187,19 +195,20 @@ const GpStore_Homepage: React.FC = () => {
             }
         } catch (error) {
             console.error("Error fetching address:", error);
-            setDeliveryLocation(localStorage.getItem("userLocation") || "");
+            // Avoid showing stale address when logged out or on failures.
+            setDeliveryLocation("");
             setAddressType("Home");
         } finally {
             setIsLoadingAddress(false);
         }
-    }, []);
+    }, [isLoggedIn]);
 
     useEffect(() => {
         let isMounted = true;
         const abortController = new AbortController();
         
         const initializeStore = async () => {
-            if (localStorage.getItem("phoneNumber")) {
+            if (isLoggedIn) {
                 // User is logged in
                 if (isMounted) {
                     fetchCustomerName();
@@ -208,6 +217,8 @@ const GpStore_Homepage: React.FC = () => {
             } else {
                 // User is not logged in - set address loading to false immediately
                 if (isMounted) {
+                    setDeliveryLocation("");
+                    setAddressType("Home");
                     setIsLoadingAddress(false);
                 }
                 
@@ -322,7 +333,11 @@ const GpStore_Homepage: React.FC = () => {
                                         <div className="flex flex-col min-w-0">
                                             <span className="text-sm sm:text-base font-bold text-gray-800">{addressType}</span>
                                             <span className="text-xs sm:text-sm text-gray-700 truncate font-medium">
-                                                {isLoadingAddress ? 'Loading...' : deliveryLocation || 'Tap to set address'}
+                                                {isLoadingAddress
+                                                  ? 'Loading...'
+                                                  : isLoggedIn
+                                                  ? (deliveryLocation || 'Tap to set address')
+                                                  : 'Tap to set address'}
                                             </span>
                                         </div>
                                         <MdKeyboardArrowDown className="text-gray-600 flex-shrink-0 text-lg sm:text-xl" />
@@ -434,20 +449,20 @@ const GpStore_Homepage: React.FC = () => {
 
                     <div className="px-4 py-3 xs:py-4">
                         {/* Single mint panel: copy left, art merged on right — no empty white strip */}
-                        <div className="relative isolate min-h-[9.5rem] overflow-hidden rounded-2xl bg-[#E8F5E9] sm:min-h-[11rem] lg:min-h-[12.5rem]">
+                        <div className="relative isolate min-h-[9.5rem] overflow-hidden rounded-2xl bg-[#F2FEF4] sm:min-h-[11rem] lg:min-h-[12.5rem]">
                             <img
                                 src={bannerSvg}
                                 alt="Wedding Bliss"
                                 className="pointer-events-none absolute -right-4 bottom-0 top-0 z-0 h-full w-[min(58%,200px)] object-cover object-right sm:-right-2 sm:w-[min(52%,240px)] md:w-[min(48%,280px)] lg:right-0 lg:w-[42%] lg:max-w-[320px]"
                             />
                             <div className="relative z-10 flex min-h-[9.5rem] max-w-[min(100%,20rem)] flex-col justify-center px-4 py-4 pr-[min(42%,9rem)] xs:min-h-[10rem] xs:max-w-[22rem] xs:pr-[min(40%,10rem)] sm:min-h-[11rem] sm:px-6 sm:py-5 sm:pr-[38%] lg:max-w-[55%] lg:px-10 lg:py-8 lg:pr-6">
-                                <h2 className="font-ibm-plex-serif text-lg font-semibold leading-tight text-[#1A1A1A] xs:text-xl sm:text-2xl md:text-3xl">
+                                <h2 className="font-ibm-plex-serif text-[1.4rem] font-medium leading-tight text-[#1A1A1A] xs:text-[1.55rem] sm:text-xl md:text-2xl">
                                     Wedding Bliss, Wrapped in Gifts
                                 </h2>
                                 <button
                                     type="button"
                                     onClick={() => navigate(`${basePath}/products`)}
-                                    className="mt-3 w-full rounded-lg bg-[#19411F] px-4 py-2.5 text-center text-sm font-medium tracking-wide text-white shadow-sm transition-colors hover:bg-[#1e4d1c] sm:mt-4 sm:w-fit sm:px-8 sm:py-3 sm:text-base"
+                                    className="mt-3 w-fit rounded-full bg-[#19411F] px-2 py-1 text-center text-[6px] font-base tracking-wide text-white shadow-sm transition-colors hover:bg-[#1e4d1c] sm:mt-4 sm:px-4 sm:py-2 sm:text-base"
                                 >
                                     SHOP NOW
                                 </button>

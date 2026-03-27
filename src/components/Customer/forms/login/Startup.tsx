@@ -38,16 +38,11 @@ const Startup: React.FC = () => {
     }
     const basePath = finalFeature === 'gpStore' ? '/gp-store' : '/gp-daily';
 
-    // If user is already logged in, redirect immediately without showing splash
-    if (isLoggedIn) {
-      navigate('/home', { replace: true });
-      return;
-    }
-
-    // Auto-navigate to feature-prefixed login after 2.5 seconds for non-logged-in users
+    // Always show startup splash for ~3s before navigating.
+    // After startup, always take the user to the homepage.
     const timer = setTimeout(() => {
-      navigate(`${basePath}/login`, { state: from ? { from } : undefined });
-    }, 2500);
+      navigate('/home', { replace: true });
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, [navigate, from, isLoggedIn, location.pathname]);

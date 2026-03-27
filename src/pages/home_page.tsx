@@ -43,7 +43,8 @@ const HomePage: React.FC = () => {
   // Function to fetch the latest address from API (only when logged in — avoids wrong JWT for guests)
   const fetchLatestAddress = useCallback(async () => {
     if (!isLoggedIn) {
-      setDeliveryLocation(localStorage.getItem('userLocation') || '');
+      // Logged out: never show a previously-saved address in the header.
+      setDeliveryLocation('');
       setAddressType('Home');
       setIsLoadingAddress(false);
       return;
@@ -153,7 +154,11 @@ const HomePage: React.FC = () => {
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm sm:text-base font-bold text-gray-800">{addressType}</span>
                   <span className="text-xs sm:text-sm text-gray-600 truncate font-medium">
-                    {isLoadingAddress ? 'Loading...' : deliveryLocation || 'Tap to set address'}
+                    {isLoadingAddress
+                      ? 'Loading...'
+                      : isLoggedIn
+                      ? (deliveryLocation || 'Tap to set address')
+                      : 'Tap to set address'}
                   </span>
                 </div>
                 <MdKeyboardArrowDown className="text-gray-600 flex-shrink-0 text-lg sm:text-xl" />

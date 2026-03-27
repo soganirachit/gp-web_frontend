@@ -1,8 +1,8 @@
 {
   "info": {
-    "_postman_id": "genda-phool-api-collection",
-    "name": "Genda Phool E-Commerce API",
-    "description": "Complete API collection for Genda Phool Backend - 126 endpoints across 19 sections.\n\nIncludes: Authentication, User Profile, Address, Products, Cart, Orders, POS, Payments (Razorpay + Wallet), Subscriptions, Support, Notifications, Delivery Partner, Delivery Slots, Discounts, Invoices, Admin & Analytics.\n\nBase URL: http://185.137.122.250:8083/api/v1\nSwagger Docs: http://185.137.122.250:8083/api/docs/",
+    "_postman_id": "genda-phool-admin-api-collection",
+    "name": "Genda Phool Admin API",
+    "description": "Complete API collection for Genda Phool Backend.\n\nAuthentication: Bearer Token (Authorization: Bearer <access_token>)\n\nTest Credentials:\n  Admin (phone):    9999999999 / Admin@123\n  Delivery Partner: 9777777777 / Delivery@123\n\nBase URL: https://apigp.mygendaphool.com/api/v1\nSwagger Docs: https://apigp.mygendaphool.com/api/docs/",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -30,12 +30,72 @@
                 ""
               ]
             },
-            "description": "Login for Admin and Store Manager using phone/email + password. Returns JWT access/refresh tokens and user profile with assigned_store (for Store Managers).",
+            "description": "Login for Admin, Super Admin, Store Manager, Store Staff, Support Agent, Delivery Manager.\n\nTest credentials:\n  Super Admin:      +919000000001 / SuperAdmin@123\n  Admin:            +919000000002 / Admin@123456\n  Store Manager:    +919000000003 / StoreManager@123\n  Store Staff:      +919000000004 / StoreStaff@123\n  Support Agent:    +919000000005 / Support@123456\n  Delivery Manager: +919000000006 / DeliveryMgr@123\n\nPhone format: All phone fields now return E.164 format (+919876543210), not national format (09876543210). Send phone as +919876543210 or bare 9876543210 — both are accepted.",
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"username\": \"9876543210\",\n    \"password\": \"Admin@123\"\n}"
+              "raw": "{\n    \"username\": \"9999999999\",\n    \"password\": \"Admin@123\"\n}"
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.success) {",
+                  "    pm.collectionVariables.set(\"access_token\", res.data.access);",
+                  "    pm.collectionVariables.set(\"refresh_token\", res.data.refresh);",
+                  "    console.log(\"Tokens saved to collection variables\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delivery Partner Login (Phone/Password)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"phone\": \"9777777777\",\n    \"password\": \"Delivery@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/delivery-login/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "delivery-login",
+                ""
+              ]
+            },
+            "description": "Login for delivery partners using phone number + password.\n\nResponse includes JWT tokens and the delivery partner profile:\n  user.partner.id, vehicle_type, vehicle_number, store_id, store_name, is_available, total_deliveries, average_rating\n\nSave the access token as {{delivery_token}} for use in all /delivery/ endpoints."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.success) {",
+                  "    pm.collectionVariables.set(\"access_token\", res.data.access);",
+                  "    pm.collectionVariables.set(\"refresh_token\", res.data.refresh);",
+                  "    console.log(\"Delivery partner tokens saved\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         },
         {
           "name": "Send OTP (WhatsApp)",
@@ -62,7 +122,7 @@
                 ""
               ]
             },
-            "description": "Send OTP via WhatsApp using gp_daily_authcode template message."
+            "description": "Send OTP via WhatsApp using gp_daily_authcode template message.\n\nPhone format: All phone fields now return E.164 format (+919876543210), not national format (09876543210). Send phone as +919876543210 or bare 9876543210 — both are accepted."
           }
         },
         {
@@ -90,7 +150,7 @@
                 ""
               ]
             },
-            "description": "DEBUG ONLY: Retrieve OTP from database for testing. Only works when DEBUG=True."
+            "description": "DEBUG ONLY: Retrieve OTP from database for testing. Only works when DEBUG=True.\n\nPhone format: All phone fields now return E.164 format (+919876543210), not national format (09876543210). Send phone as +919876543210 or bare 9876543210 — both are accepted."
           }
         },
         {
@@ -105,7 +165,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"phone\": \"9876543210\",\n    \"otp\": \"123456\"\n}"
+              "raw": "{\n    \"phone\": \"9876543210\",\n    \"otp\": \"123456\",\n    \"device_id\": \"test-device-001\",\n    \"device_type\": \"android\",\n    \"fcm_token\": \"\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/auth/verify-otp/",
@@ -118,7 +178,7 @@
                 ""
               ]
             },
-            "description": "Verify OTP and receive JWT access and refresh tokens."
+            "description": "Verify OTP and receive JWT access and refresh tokens.\n\nPhone format: All phone fields now return E.164 format (+919876543210), not national format (09876543210). Send phone as +919876543210 or bare 9876543210 — both are accepted."
           }
         },
         {
@@ -157,6 +217,10 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
               }
             ],
             "url": {
@@ -170,7 +234,11 @@
                 ""
               ]
             },
-            "description": "Logout from current session."
+            "description": "Logout from current session.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refresh\": \"{{refresh_token}}\"\n}"
+            }
           }
         },
         {
@@ -266,7 +334,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"first_name\": \"John\",\n    \"last_name\": \"Doe\",\n    \"email\": \"john.doe@example.com\",\n    \"date_of_birth\": \"1990-01-01\",\n    \"gender\": \"male\"\n}"
+              "raw": "{\n    \"first_name\": \"John\",\n    \"last_name\": \"Doe\",\n    \"email\": \"john.doe@example.com\",\n    \"date_of_birth\": \"1990-01-01\",\n    \"gender\": \"male\",\n    \"language_preference\": \"en\",\n    \"notification_enabled\": true,\n    \"whatsapp_updates\": true\n}"
             },
             "url": {
               "raw": "{{base_url}}/users/me/update/",
@@ -323,7 +391,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"notifications_enabled\": true,\n    \"language\": \"en\"\n}"
+              "raw": "{\n    \"push_notifications\": true,\n    \"email_notifications\": true,\n    \"sms_notifications\": false,\n    \"whatsapp_notifications\": true,\n    \"marketing_emails\": false,\n    \"promotional_notifications\": false,\n    \"preferred_delivery_time\": \"morning\",\n    \"delivery_instructions\": \"\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/users/preferences/update/",
@@ -338,6 +406,41 @@
               ]
             },
             "description": "Update user preferences."
+          }
+        },
+        {
+          "name": "Delete Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"No longer need the account\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/me/delete-account/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "delete-account",
+                ""
+              ]
+            },
+            "description": "Permanently delete the customer account. PII is anonymised; financial records (orders, payments, invoices) are retained per GST Act 2017 / RBI guidelines. All sessions are blacklisted immediately.\n\nBody: { \"reason\": \"optional reason string\" }"
           }
         }
       ]
@@ -408,6 +511,26 @@
               ]
             },
             "description": "Returns the single nearest store. If equidistant, returns random. Auto-assigns store if authenticated."
+          }
+        },
+        {
+          "name": "List Banners (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/stores/{{store_id}}/banners/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "stores",
+                "{{store_id}}",
+                "banners",
+                ""
+              ]
+            },
+            "description": "Public: List active banners for a store. No auth required. Use store_id (numeric)."
           }
         },
         {
@@ -531,7 +654,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"address_line1\": \"123 Main Street\",\n    \"address_line2\": \"Apartment 4B\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"postal_code\": \"400001\",\n    \"address_type\": \"home\",\n    \"is_default\": true\n}"
+              "raw": "{\n    \"address_line1\": \"123 Main Street\",\n    \"address_line2\": \"Apartment 4B\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"address_type\": \"office\",\n    \"is_default\": true,\n    \"pincode\": \"400001\",\n    \"landmark\": \"Near Metro Station\",\n    \"latitude\": 19.076,\n    \"longitude\": 72.8777,\n    \"receiver_name\": \"Rahul Sharma\",\n    \"receiver_phone\": \"+919876543210\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/users/addresses/",
@@ -544,19 +667,24 @@
                 ""
               ]
             },
-            "description": "Create new address."
+            "description": "Create a new delivery address. address_type accepts any custom label (e.g. 'home', 'work', 'office', 'parents house', 'gym'). Max 50 characters. 'home' and 'work' are normalized to lowercase."
           }
         },
         {
-          "name": "Get / Update / Delete Address",
+          "name": "Get Address",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{base_url}}/users/addresses/{{address_id}}/",
               "host": [
@@ -569,8 +697,85 @@
                 ""
               ]
             },
-            "description": "GET: Retrieve address details.\nPUT: Update address (send JSON body).\nDELETE: Delete address."
-          }
+            "description": "Retrieve a specific address by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Address (PATCH)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"address_line1\": \"456 New Street\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\",\n    \"address_type\": \"home\",\n    \"landmark\": \"Near park\",\n    \"receiver_name\": \"Rachit Sogani\",\n    \"receiver_phone\": \"+919529624068\",\n    \"is_default\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/users/addresses/{{address_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "addresses",
+                "{{address_id}}",
+                ""
+              ]
+            },
+            "description": "Partial address update — only send the fields you want to change. All fields are optional.\naddress_type: any string label (home, work, office, etc.)\nPincode validated only when included."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Address",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users/addresses/{{address_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "addresses",
+                "{{address_id}}",
+                ""
+              ]
+            },
+            "description": "Soft-delete a specific address by ID."
+          },
+          "response": []
         },
         {
           "name": "Set Default Address",
@@ -674,7 +879,7 @@
                 }
               ]
             },
-            "description": "Get all products with optional filters. Supports store-aware filtering."
+            "description": "Get all products with optional filters. Supports store-aware filtering.\n\nPricing fields: `base_price` (MRP), `sale_price` (manual admin markdown, null if not set), `current_price` (effective price the customer pays — auto-discounts applied on base_price during offer periods, else sale_price or base_price), `discount_percentage` (effective % off vs base_price, covers both sale and auto-discounts), `cost_price` (BOM-computed internal cost — not shown to customer)."
           }
         },
         {
@@ -701,7 +906,7 @@
                 }
               ]
             },
-            "description": "Get product details by slug. Pass store_id for store-specific pricing and availability."
+            "description": "Get product details by slug. Pass store_id for store-specific pricing and availability.\n\nPricing fields: `base_price` (MRP), `sale_price` (manual admin markdown, null if not set), `current_price` (effective price the customer pays — auto-discounts applied on base_price during offer periods, else sale_price or base_price), `discount_percentage` (effective % off vs base_price, covers both sale and auto-discounts), `cost_price` (BOM-computed internal cost — not shown to customer)."
           }
         },
         {
@@ -849,7 +1054,7 @@
                 }
               ]
             },
-            "description": "Get featured/promoted products. Supports store-aware filtering."
+            "description": "Get featured/promoted products. Supports store-aware filtering.\n\nPricing fields: `base_price` (MRP), `sale_price` (manual admin markdown, null if not set), `current_price` (effective price the customer pays — auto-discounts applied on base_price during offer periods, else sale_price or base_price), `discount_percentage` (effective % off vs base_price, covers both sale and auto-discounts), `cost_price` (BOM-computed internal cost — not shown to customer)."
           }
         },
         {
@@ -882,7 +1087,7 @@
                 }
               ]
             },
-            "description": "Get best selling products. Supports store-aware filtering."
+            "description": "Get best selling products. Supports store-aware filtering.\n\nPricing fields: `base_price` (MRP), `sale_price` (manual admin markdown, null if not set), `current_price` (effective price the customer pays — auto-discounts applied on base_price during offer periods, else sale_price or base_price), `discount_percentage` (effective % off vs base_price, covers both sale and auto-discounts), `cost_price` (BOM-computed internal cost — not shown to customer)."
           }
         },
         {
@@ -911,7 +1116,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -986,7 +1191,7 @@
                 ""
               ]
             },
-            "description": "Get user's shopping cart with items and totals."
+            "description": "Get user's shopping cart with items and totals.\n\nEach item's `unit_price` reflects the product's effective price at time of cart fetch (auto-refreshed on GET). Cart totals: subtotal = Σ(unit_price×qty), net = subtotal - coupon_discount, delivery = 0 if subtotal ≥ free_threshold else store.delivery_fee, tax = (net + delivery) × 5%, total = net + delivery + tax."
           }
         },
         {
@@ -1005,7 +1210,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"product_id\": 1,\n    \"store_id\": 1,\n    \"quantity\": 2,\n    \"special_instructions\": \"Fresh flowers only\"\n}"
+              "raw": "{\n    \"product_id\": 1,\n    \"store_id\": 1,\n    \"variant_id\": null,\n    \"quantity\": 2,\n    \"special_instructions\": \"Fresh flowers only\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/cart/add/",
@@ -1018,7 +1223,7 @@
                 ""
               ]
             },
-            "description": "Add a product to the cart for a specific store.\n\nInventory rules:\n- Perishable products: no stock check (always available for scheduled orders).\n- Non-perishable: must have sufficient available_quantity in the store's inventory."
+            "description": "Add a product to the cart for a specific store.\n\nInventory rules:\n- Perishable products: no stock check (always available for scheduled orders).\n- Non-perishable: must have sufficient available_quantity in the store's inventory.\n\nvariant_id is optional — pass variant ID to add a specific size/packaging variant. Different variants of the same product are separate cart lines."
           }
         },
         {
@@ -1037,7 +1242,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"quantity\": 3\n}"
+              "raw": "{\n    \"quantity\": 3,\n    \"special_instructions\": \"\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/cart/items/{{cart_item_id}}/",
@@ -1198,7 +1403,7 @@
       "name": "07 - Orders",
       "item": [
         {
-          "name": "Checkout \u2014 Pay from Wallet",
+          "name": "Checkout — Pay from Wallet",
           "request": {
             "method": "POST",
             "header": [
@@ -1253,7 +1458,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"delivery_address_id\": 1,\n    \"payment_method\": \"razorpay\",\n    \"delivery_instructions\": \"Ring doorbell\",\n    \"idempotency_key\": \"{{$guid}}\"\n}"
+              "raw": "{\n    \"delivery_address_id\": 1,\n    \"payment_method\": \"razorpay\",\n    \"delivery_instructions\": \"Ring doorbell\",\n    \"idempotency_key\": \"{{$guid}}\",\n    \"delivery_slot_id\": 0,\n    \"delivery_date\": \"2026-02-25\",\n    \"delivery_time_slot\": \"\",\n    \"customer_notes\": \"\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/orders/create/",
@@ -1364,7 +1569,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"reason\": \"Changed my mind\"\n}"
+              "raw": "{\n    \"cancellation_reason\": \"Changed my mind\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/orders/{{order_number}}/cancel/",
@@ -1388,7 +1593,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -1397,7 +1602,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"status\": \"confirmed\",\n    \"notes\": \"Order confirmed by store\",\n    \"reason\": \"Out of stock\"\n}"
+              "raw": "{\n    \"status\": \"confirmed\",\n    \"delivery_notes\": \"Order confirmed by store\",\n    \"cancellation_reason\": \"Out of stock\",\n    \"delivery_image\": null,\n    \"failure_reason\": \"\",\n    \"latitude\": null,\n    \"longitude\": null\n}"
             },
             "url": {
               "raw": "{{base_url}}/orders/{{order_number}}/update-status/",
@@ -1415,13 +1620,13 @@
           }
         },
         {
-          "name": "POS - Create Order",
+          "name": "POS - Create Order (Walk-in / Phone / Bulk)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -1430,7 +1635,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"items\": [\n        {\"inventory_id\": 1, \"quantity\": 2},\n        {\"inventory_id\": 3, \"quantity\": 1}\n    ],\n    \"payment_method\": \"cash\",\n    \"customer_phone\": \"9876543210\"\n}"
+              "raw": "{\n    \"customer_phone\": \"9876543210\",\n    \"store_id\": 1,\n    \"payment_method\": \"pos_cash\",\n    \"discount_amount\": 0,\n    \"customer_notes\": \"\",\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 2\n        },\n        {\n            \"product_id\": 2,\n            \"variant_id\": 5,\n            \"quantity\": 1\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/pos/orders/create/",
@@ -1444,7 +1654,7 @@
                 ""
               ]
             },
-            "description": "POS: Create in-store point-of-sale order."
+            "description": "Create a POS order. Supports three channels:\n- walk_in: immediate, no delivery address needed\n- phone: requires delivery_address and delivery_date\n- bulk: requires delivery_address and delivery_date; optionally company_name and gstin\n\nSet use_auto_discount=true to have the backend apply the best system discount automatically."
           }
         }
       ]
@@ -1533,6 +1743,86 @@
           }
         },
         {
+          "name": "POS — Create Razorpay Order (Step 1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"customer_phone\": \"9876543210\",\n    \"store_id\": 4,\n    \"items\": [{\"product_id\": 1, \"quantity\": 2}],\n    \"discount_amount\": 0,\n    \"use_auto_discount\": false,\n    \"customer_notes\": \"\",\n    \"pos_channel\": \"walk_in\",\n    \"company_name\": \"\",\n    \"gstin\": \"\",\n    \"delivery_instructions\": \"\",\n    \"delivery_address\": null,\n    \"delivery_date\": null,\n    \"delivery_slot_id\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/razorpay/create-pos-order/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "razorpay",
+                "create-pos-order",
+                ""
+              ]
+            },
+            "description": "POS Step 1 — Validates POS payload, computes total, creates Razorpay order, stores PendingPosCheckout. Returns razorpay_order_id + key_id for the Razorpay SDK. Auth: store staff / admin token."
+          }
+        },
+        {
+          "name": "POS — Verify Razorpay Payment & Create Order (Step 2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"razorpay_order_id\": \"{{razorpay_order_id}}\",\n    \"razorpay_payment_id\": \"{{razorpay_payment_id}}\",\n    \"razorpay_signature\": \"{{razorpay_signature}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/razorpay/verify-pos/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "razorpay",
+                "verify-pos",
+                ""
+              ]
+            },
+            "description": "POS Step 2 — Verifies Razorpay signature, creates POS order + Payment record (method=razorpay, status=captured), deletes PendingPosCheckout. Returns order_number and payment_id."
+          }
+        },
+        {
           "name": "Poll Razorpay Payment Status (Step 3 - optional)",
           "request": {
             "method": "GET",
@@ -1558,6 +1848,32 @@
               ]
             },
             "description": "Optional polling endpoint. After calling verify/, poll this to confirm the order was created. Returns status (pending/completed/failed), order_number and razorpay_payment_id when completed."
+          }
+        },
+        {
+          "name": "Razorpay Payment Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/payments/razorpay/status/{{razorpay_order_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "payments",
+                "razorpay",
+                "status",
+                "{{razorpay_order_id}}",
+                ""
+              ]
+            },
+            "description": "Check Razorpay payment status for a given razorpay_order_id."
           }
         }
       ]
@@ -1636,7 +1952,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"order_number\": \"ORD123456\",\n    \"amount\": 250\n}"
+              "raw": "{\n    \"amount\": 250,\n    \"order_id\": \"ORD123456\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/wallet/pay/",
@@ -1899,7 +2215,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -2273,7 +2589,7 @@
                 ""
               ]
             },
-            "description": "Get ticket details with messages."
+            "description": "Get full ticket detail including messages.\n\nSide effect: clears `has_unread_by_staff` when viewed by admin/staff; clears `has_unread_by_customer` when viewed by the customer.\n\nResponse includes `order_summary` object with `order_number`, `delivery_date`, `total_amount`, `status` — or `null` if no linked order."
           }
         },
         {
@@ -2317,7 +2633,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -2351,7 +2667,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -2385,7 +2701,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -2412,10 +2728,173 @@
                   "key": "store_id",
                   "value": "",
                   "description": "Filter by store ID (admin only)"
+                },
+                {
+                  "key": "unread",
+                  "value": "true",
+                  "description": "Filter to tickets with unread messages (has_unread_by_staff=true)",
+                  "disabled": true
                 }
               ]
             },
-            "description": "Admin: View all tickets with filters."
+            "description": "Admin/store manager: list all tickets with filters.\nStore managers are auto-scoped to their store's tickets (via order→store).\n\nNew: `?unread=true` to see only tickets with unread customer messages.\n`?store_id=` for superadmin to filter by store."
+          }
+        },
+        {
+          "name": "List Eligible Orders for Support",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/support/eligible-orders/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "support",
+                "eligible-orders",
+                ""
+              ]
+            },
+            "description": "List orders eligible for support ticket creation."
+          }
+        },
+        {
+          "name": "Get Ticket Predefined Questions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/support/ticket-questions/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "support",
+                "ticket-questions",
+                ""
+              ]
+            },
+            "description": "Get predefined questions for support ticket guided flow."
+          }
+        },
+        {
+          "name": "Request Agent Escalation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/support/tickets/{{ticket_number}}/request-agent/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "support",
+                "tickets",
+                "{{ticket_number}}",
+                "request-agent",
+                ""
+              ]
+            },
+            "description": "Request escalation to a human agent for a support ticket."
+          }
+        },
+        {
+          "name": "Request Callback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/support/tickets/{{ticket_number}}/request-callback/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "support",
+                "tickets",
+                "{{ticket_number}}",
+                "request-callback",
+                ""
+              ]
+            },
+            "description": "Request a callback for a support ticket."
+          }
+        },
+        {
+          "name": "Support Agents (Assign Dropdown)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/support/agents/?store_id=4",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "support",
+                "agents",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "4",
+                  "description": "Filter agents by store (admin only). Omit to get all agents."
+                }
+              ]
+            },
+            "description": "Returns users assignable to tickets.\n\n- Admin/super admin: all support_agent, admin, store_manager users. Filter by ?store_id= to scope to a store.\n- Store manager: staff of their own store only."
           }
         }
       ]
@@ -2423,6 +2902,31 @@
     {
       "name": "12 - Notifications",
       "item": [
+        {
+          "name": "WebSocket — Real-time Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://185.137.122.250:8083/ws/notifications/?token={{access_token}}",
+              "host": [
+                "ws://185.137.122.250:8083"
+              ],
+              "path": [
+                "ws",
+                "notifications",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}"
+                }
+              ]
+            },
+            "description": "WebSocket connection for real-time notifications.\n\nConnect: ws://<host>/ws/notifications/?token=<JWT_access_token>\n\nOn connect server sends:\n  { \"type\": \"unread_count\", \"count\": 3 }\n\nServer pushes on new notification:\n  { \"type\": \"new_notification\", \"notification\": { \"id\", \"title\", \"body\", \"notification_type\", \"created_at\" } }\n\nChannel groups by role:\n  Store Manager:     store_notifications_{store_id}\n  Delivery Partner:  delivery_partner_{partner_id}\n  Customer:          customer_{user_id}\n\nEvents by role:\n  Store Manager:     new_order, support_request\n  Delivery Partner:  order_assigned\n  Customer:          order_update, support_reply, wallet_update"
+          }
+        },
         {
           "name": "List Notifications",
           "request": {
@@ -2580,7 +3084,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -2698,7 +3202,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -2722,7 +3226,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -2731,7 +3235,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"delivery_partner_id\": 1,\n    \"date\": \"2026-02-15\",\n    \"order_ids\": [1, 2, 3]\n}"
+              "raw": "{\n    \"delivery_partner_id\": 1,\n    \"order_ids\": [\n        1,\n        2,\n        3\n    ],\n    \"delivery_date\": \"2026-02-15\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/delivery/routes/create/",
@@ -2880,7 +3384,7 @@
                 ""
               ]
             },
-            "description": "Delivery Partner: Get today's delivery orders."
+            "description": "Get all orders assigned to the delivery partner for today.\ndelivery_address includes latitude and longitude for map navigation.\nReturns orders in statuses: ready, out_for_delivery, delivered, failed, cancelled."
           }
         },
         {
@@ -2906,7 +3410,7 @@
                 ""
               ]
             },
-            "description": "Delivery Partner: Mark order as picked up from store."
+            "description": "Mark an order as picked up from store. Transitions: ready -> out_for_delivery.\nNo request body required. Order must be in 'ready' status and assigned to the requesting partner."
           }
         },
         {
@@ -2925,7 +3429,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"status\": \"delivered\",\n    \"latitude\": 19.0760,\n    \"longitude\": 72.8777\n}"
+              "raw": "{\n    \"status\": \"delivered\",\n    \"latitude\": 26.9124,\n    \"longitude\": 75.7873,\n    \"delivery_notes\": \"Left with security\",\n    \"override_location\": false\n}"
             },
             "url": {
               "raw": "{{base_url}}/delivery/orders/{{order_id}}/update-status/",
@@ -2940,11 +3444,11 @@
                 ""
               ]
             },
-            "description": "Delivery Partner: Update delivery status of an order."
+            "description": "Update order delivery status. Order must be out_for_delivery before marking delivered.\n\nPayload by status:\n  delivered:   { \"status\": \"delivered\", \"latitude\": 26.91, \"longitude\": 75.78, \"delivery_notes\": \"\", \"override_location\": false }\n    -> Without override: lat/lng must be within 200m of delivery address\n    -> With override_location=true: 200m check is skipped — current coords are still logged in order timeline for audit\n\n  delivered (override):  { \"status\": \"delivered\", \"latitude\": 26.91, \"longitude\": 75.78, \"override_location\": true }\n    -> Use when partner cannot get within 200m (gated society, wrong pin, etc.)\n    -> Always send lat/lng alongside override so coordinates are recorded\n\n  failed:      { \"status\": \"failed\", \"failure_reason\": \"Customer not available\" }\n  cancelled:   { \"status\": \"cancelled\", \"cancellation_reason\": \"Customer refused delivery\" }"
           }
         },
         {
-          "name": "Get Next Stop",
+          "name": "Get Next Delivery Order",
           "request": {
             "method": "GET",
             "header": [
@@ -2954,13 +3458,15 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/delivery/next-stop/",
+              "raw": "{{base_url}}/delivery/next-order/",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
+                "api",
+                "v1",
                 "delivery",
-                "next-stop",
+                "next-order",
                 ""
               ]
             },
@@ -2983,7 +3489,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"type\": \"check_in\",\n    \"latitude\": 19.0760,\n    \"longitude\": 72.8777\n}"
+              "raw": "{\n    \"latitude\": 19.076,\n    \"longitude\": 72.8777\n}"
             },
             "url": {
               "raw": "{{base_url}}/delivery/attendance/mark/",
@@ -2997,7 +3503,7 @@
                 ""
               ]
             },
-            "description": "Delivery Partner: Mark check-in/check-out attendance."
+            "description": "Mark attendance check-in or check-out.\nFirst call of the day = check-in. Requires GPS — must be within 5m of store.\nSecond call = check-out. Blocked if any order is out_for_delivery.\nAuto-sets partner availability: on-duty on check-in, off-duty on check-out."
           }
         },
         {
@@ -3137,7 +3643,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -3171,7 +3677,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -3206,7 +3712,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -3261,7 +3767,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -3270,7 +3776,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"discount_level\": \"product\",\n    \"discount_type\": \"percentage\",\n    \"discount_value\": 20,\n    \"product\": 1,\n    \"store\": 1,\n    \"priority\": 10,\n    \"is_active\": true,\n    \"valid_from\": \"2026-02-01T00:00:00Z\",\n    \"valid_until\": \"2026-12-31T23:59:59Z\"\n}"
+              "raw": "{\n    \"discount_level\": \"product\",\n    \"discount_type\": \"percentage\",\n    \"discount_value\": 20,\n    \"product\": 1,\n    \"store\": 1,\n    \"priority\": 10,\n    \"is_active\": true,\n    \"valid_from\": \"2026-02-01T00:00:00Z\",\n    \"valid_to\": \"2026-12-31T23:59:59Z\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/discounts/create/",
@@ -3293,7 +3799,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -3326,7 +3832,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -3404,7 +3910,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -3428,7 +3934,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -3437,7 +3943,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"order_id\": 1\n}"
+              "raw": "{\n    \"order\": 1\n}"
             },
             "url": {
               "raw": "{{base_url}}/invoices/admin/generate/",
@@ -3461,7 +3967,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -3470,7 +3976,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"method\": \"whatsapp\"\n}"
+              "raw": "{\n    \"channel\": \"whatsapp\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/invoices/admin/{{invoice_id}}/resend/",
@@ -3500,7 +4006,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -3524,7 +4030,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -3548,7 +4054,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -3557,7 +4063,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"name\": \"Genda Phool Store Mumbai\",\n    \"code\": \"GP-MUM-001\",\n    \"address\": \"123 Main Road, Mumbai\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\",\n    \"phone\": \"9876543210\",\n    \"email\": \"mumbai@gendaphool.com\",\n    \"opening_time\": \"08:00:00\",\n    \"closing_time\": \"21:00:00\",\n    \"max_orders_per_day\": 200,\n    \"max_delivery_radius_km\": 15,\n    \"delivery_fee\": 40,\n    \"free_delivery_threshold\": 500,\n    \"min_order_amount\": 100\n}"
+              "raw": "{\n    \"name\": \"Genda Phool Store Mumbai\",\n    \"code\": \"GP-MUM-001\",\n    \"address\": \"123 Main Road, Mumbai\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\",\n    \"phone\": \"\",\n    \"email\": \"\",\n    \"latitude\": null,\n    \"longitude\": null,\n    \"opening_time\": \"08:00:00\",\n    \"closing_time\": \"21:00:00\",\n    \"is_active\": true,\n    \"delivery_fee\": 40,\n    \"free_delivery_threshold\": 500,\n    \"store_type\": \"both\",\n    \"is_online\": true\n}"
             },
             "url": {
               "raw": "{{base_url}}/admin-ops/stores/",
@@ -3580,22 +4086,116 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/admin-ops/stores/{{store_id}}/",
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "admin-ops",
                 "stores",
-                "{{store_id}}",
+                "{{store_code}}",
                 ""
               ]
             },
-            "description": "Admin: Get store details by ID."
+            "description": "Admin: Get store details by store code."
+          }
+        },
+        {
+          "name": "Get Store Online Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/status/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "status",
+                ""
+              ]
+            },
+            "description": "Get the current online status and store type for a store.\n\nReturns: is_online, store_type, is_active"
+          }
+        },
+        {
+          "name": "Set Store Online / Offline",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/status/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "status",
+                ""
+              ]
+            },
+            "description": "Toggle store online/offline without deactivating it.\n\nis_online: true = visible to customers, false = hidden\nstore_type: online_only | daily_only | both",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"is_online\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "Set Store Type",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/status/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "status",
+                ""
+              ]
+            },
+            "description": "Update what operations a store supports.\n\nboth        → supports online orders AND daily walk-in ops\nonline_only → only accepts online orders\ndaily_only  → only daily walk-in / POS operations, no online orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"store_type\": \"both\",\n    \"is_online\": true\n}"
+            }
           }
         },
         {
@@ -3605,7 +4205,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -3614,21 +4214,54 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"name\": \"Genda Phool Store Mumbai Updated\",\n    \"code\": \"GP-MUM-001\",\n    \"address\": \"456 Updated Road, Mumbai\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\",\n    \"phone\": \"9876543210\",\n    \"email\": \"mumbai@gendaphool.com\",\n    \"opening_time\": \"07:00:00\",\n    \"closing_time\": \"22:00:00\",\n    \"max_orders_per_day\": 300,\n    \"max_delivery_radius_km\": 20,\n    \"delivery_fee\": 35,\n    \"free_delivery_threshold\": 400,\n    \"min_order_amount\": 80\n}"
+              "raw": "{\n    \"name\": \"Genda Phool Store Mumbai\",\n    \"code\": \"GP-MUM-001\",\n    \"address\": \"123 Main Road, Mumbai\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\",\n    \"phone\": \"\",\n    \"email\": \"\",\n    \"latitude\": null,\n    \"longitude\": null,\n    \"opening_time\": \"08:00:00\",\n    \"closing_time\": \"21:00:00\",\n    \"is_active\": true,\n    \"delivery_fee\": 40,\n    \"free_delivery_threshold\": 500\n}"
             },
             "url": {
-              "raw": "{{base_url}}/admin-ops/stores/{{store_id}}/",
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "admin-ops",
                 "stores",
-                "{{store_id}}",
+                "{{store_code}}",
                 ""
               ]
             },
-            "description": "Admin: Update store details."
+            "description": "Admin: Update store details by store code.\n\n⚡ Updating delivery_fee or free_delivery_threshold immediately recalculates all active customer carts for this store."
+          }
+        },
+        {
+          "name": "Update Store Delivery Fee (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/GP-JPR/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "GP-JPR",
+                ""
+              ]
+            },
+            "description": "Update store delivery fee. Immediately recalculates all active customer carts for this store.\n\nChange GP-JPR to your store code.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"delivery_fee\": \"20.00\",\n    \"free_delivery_threshold\": \"500.00\"\n}"
+            }
           }
         },
         {
@@ -3638,22 +4271,279 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/admin-ops/stores/{{store_id}}/",
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "admin-ops",
                 "stores",
-                "{{store_id}}",
+                "{{store_code}}",
                 ""
               ]
             },
-            "description": "Admin: Delete a store."
+            "description": "Admin: Delete a store by store code."
+          }
+        },
+        {
+          "name": "List Banners (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "banners",
+                ""
+              ]
+            },
+            "description": "Admin: List all banners (incl. inactive) for a store by store code."
+          }
+        },
+        {
+          "name": "Create Banner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"Pre-Book Your Pooja Items!\",\n    \"subtitle\": \"Order now and get 10% off\",\n    \"cta_label\": \"Pre-Book Now!\",\n    \"cta_link\": \"/gp-store/products?category=pooja-items\",\n    \"secondary_cta_label\": \"Book Now ›\",\n    \"secondary_cta_link\": \"/gp-store/\",\n    \"image_url\": \"\",\n    \"title_bg_color\": \"#3a5f2e\",\n    \"cta_bg_color\": \"#e8922a\",\n    \"is_active\": true,\n    \"start_date\": \"\",\n    \"end_date\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "banners",
+                ""
+              ]
+            },
+            "description": "Admin: Create a new offer banner for a store."
+          }
+        },
+        {
+          "name": "Get Banner Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/{{banner_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "banners",
+                "{{banner_id}}",
+                ""
+              ]
+            },
+            "description": "Admin: Get banner details by ID."
+          }
+        },
+        {
+          "name": "Update Banner",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"Updated Banner Title\",\n    \"subtitle\": \"Updated subtitle\",\n    \"cta_label\": \"Shop Now\",\n    \"cta_link\": \"/gp-store/products\",\n    \"title_bg_color\": \"#3a5f2e\",\n    \"cta_bg_color\": \"#e8922a\",\n    \"is_active\": true,\n    \"start_date\": \"\",\n    \"end_date\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/{{banner_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "banners",
+                "{{banner_id}}",
+                ""
+              ]
+            },
+            "description": "Admin: Full update of a banner."
+          }
+        },
+        {
+          "name": "Update Banner (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"is_active\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/{{banner_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "banners",
+                "{{banner_id}}",
+                ""
+              ]
+            },
+            "description": "Admin: Partial update of a banner (e.g. toggle is_active)."
+          }
+        },
+        {
+          "name": "Delete Banner",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/{{banner_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "banners",
+                "{{banner_id}}",
+                ""
+              ]
+            },
+            "description": "Admin: Delete a banner by ID."
+          }
+        },
+        {
+          "name": "Reorder Banners",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"ordered_ids\": [2, 1, 3]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/reorder/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "banners",
+                "reorder",
+                ""
+              ]
+            },
+            "description": "Admin: Reorder banners by passing list of banner IDs in desired order."
+          }
+        },
+        {
+          "name": "Upload Banner Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/{{banner_id}}/image/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "banners",
+                "{{banner_id}}",
+                "image",
+                ""
+              ]
+            },
+            "description": "Admin: Upload banner background image (multipart). Max 5MB, JPG/PNG/WebP."
           }
         },
         {
@@ -3663,7 +4553,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -3687,7 +4577,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -3719,7 +4609,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -3744,7 +4634,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -3777,7 +4667,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -3802,7 +4692,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -3835,7 +4725,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -3859,7 +4749,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -3892,7 +4782,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -3917,7 +4807,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -3950,7 +4840,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -3975,7 +4865,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4011,7 +4901,7 @@
                 }
               ]
             },
-            "description": "Admin: List all users with optional filters for role, active status, store, and search."
+            "description": "List users. Admins see all users with full filter options. Store staff are restricted to customer search only (for POS lookup)."
           }
         },
         {
@@ -4021,7 +4911,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4036,7 +4926,174 @@
                 ""
               ]
             },
-            "description": "Admin: Get user details by ID."
+            "description": "Admin: Get full user details including wallet_balance, wallet_is_active, total_orders, total_spend, active_subscriptions, total_subscriptions, and addresses list."
+          }
+        },
+        {
+          "name": "List User Addresses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/users/{{user_id}}/addresses/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "users",
+                "{{user_id}}",
+                "addresses",
+                ""
+              ],
+              "query": []
+            },
+            "description": "Admin: List all non-deleted addresses for a user."
+          }
+        },
+        {
+          "name": "Update User Address",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/users/{{user_id}}/addresses/{{address_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "users",
+                "{{user_id}}",
+                "addresses",
+                "{{address_id}}",
+                ""
+              ],
+              "query": []
+            },
+            "description": "Admin: Patch address fields. user_id cannot be changed. receiver_phone is the mobile for this address (not the login phone).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"address_type\": \"home\",\n    \"address_line1\": \"123 Main Road\",\n    \"address_line2\": \"Near Park\",\n    \"landmark\": \"Opposite temple\",\n    \"city\": \"Jaipur\",\n    \"state\": \"Rajasthan\",\n    \"pincode\": \"302001\",\n    \"receiver_name\": \"Divya Jain\",\n    \"receiver_phone\": \"9876543210\",\n    \"is_default\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Get User Wallet",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/users/{{user_id}}/wallet/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "users",
+                "{{user_id}}",
+                "wallet",
+                ""
+              ]
+            },
+            "description": "Admin: View wallet balance, is_active, is_locked, and last 20 transactions for a user."
+          }
+        },
+        {
+          "name": "Adjust User Wallet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/users/{{user_id}}/wallet/adjust/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "users",
+                "{{user_id}}",
+                "wallet",
+                "adjust",
+                ""
+              ]
+            },
+            "description": "Admin: Credit or debit a user wallet balance.\ntransaction_type: credit | debit\nDebit is blocked if balance is insufficient or wallet is locked.\nEvery adjustment is logged as a WalletTransaction with the admin reason.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"transaction_type\": \"credit\",\n    \"amount\": 100.0,\n    \"reason\": \"Goodwill credit for delayed delivery\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Customer Transaction Trail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/users/{{user_id}}/transactions/?date_from=2026-01-01&date_to=2026-12-31",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "users",
+                "{{user_id}}",
+                "transactions",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "date_from",
+                  "value": "2026-01-01",
+                  "description": "Filter from date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "date_to",
+                  "value": "2026-12-31",
+                  "description": "Filter to date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "description": "Return only one section: payment | wallet (omit for both)"
+                }
+              ]
+            },
+            "description": "Admin: Complete financial trail for a customer.\n\npayments — every order payment (Store/POS/Subscription), payment method (razorpay/wallet/cod/pos_*), Razorpay IDs, status, and nested refunds (amount, refund_method, razorpay_refund_id, processed_by).\n\nwallet_transactions — all wallet movements: order debits, refund credits, admin adjustments.\n\nsummary — total_paid, total_refunded, net_paid, wallet_credits, wallet_debits (always all-time).\n\nFilters: ?date_from / ?date_to scope payments and wallet entries. ?type=payment returns only payments section; ?type=wallet returns only wallet section."
           }
         },
         {
@@ -4046,7 +5103,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -4080,7 +5137,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4106,7 +5163,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4130,7 +5187,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -4162,7 +5219,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4187,7 +5244,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -4220,7 +5277,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4245,7 +5302,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4276,12 +5333,12 @@
                 },
                 {
                   "key": "availability_type",
-                  "value": "store",
-                  "description": "Filter by availability type (store, online, both)"
+                  "value": "store,both",
+                  "description": "Filter by availability: store | daily | both. Supports comma-separated values e.g. store,both"
                 }
               ]
             },
-            "description": "Admin: List all products with optional filters for category, status, search, and availability."
+            "description": "Admin: List all products with optional filters for category, status, search, and availability. Response includes is_available, store_name, and bom_items array per product.\n\nPricing fields: `base_price` (MRP), `sale_price` (manual admin markdown, null if not set), `current_price` (effective price the customer pays — auto-discounts applied on base_price during offer periods, else sale_price or base_price), `discount_percentage` (effective % off vs base_price, covers both sale and auto-discounts), `cost_price` (BOM-computed internal cost — not shown to customer)."
           }
         },
         {
@@ -4291,7 +5348,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -4300,7 +5357,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"name\": \"Rose Garland\",\n    \"sku\": \"RG-001\",\n    \"description\": \"Beautiful rose garland\",\n    \"short_description\": \"Rose garland\",\n    \"category\": 1,\n    \"product_type\": \"composite\",\n    \"availability_type\": \"store\",\n    \"base_price\": 150,\n    \"sale_price\": 130,\n    \"cost_price\": 80,\n    \"unit\": \"piece\",\n    \"unit_value\": 1,\n    \"is_active\": true,\n    \"is_featured\": false,\n    \"is_best_seller\": false,\n    \"is_available_for_subscription\": true,\n    \"track_inventory\": true,\n    \"low_stock_threshold\": 5,\n    \"sub_products_input\": [\n        {\n            \"component_product_id\": 2,\n            \"quantity\": 50,\n            \"unit\": \"piece\"\n        },\n        {\n            \"component_product_id\": 3,\n            \"quantity\": 1,\n            \"unit\": \"meter\"\n        }\n    ],\n    \"variants_input\": [\n        {\n            \"name\": \"Small\",\n            \"variant_type\": \"size\",\n            \"sku\": \"RG-001-S\",\n            \"price_adjustment\": 0,\n            \"is_active\": true,\n            \"sub_products\": [\n                {\n                    \"component_product_id\": 2,\n                    \"quantity\": 30,\n                    \"unit\": \"piece\"\n                }\n            ]\n        },\n        {\n            \"name\": \"Large\",\n            \"variant_type\": \"size\",\n            \"sku\": \"RG-001-L\",\n            \"price_adjustment\": 50,\n            \"is_active\": true,\n            \"sub_products\": [\n                {\n                    \"component_product_id\": 2,\n                    \"quantity\": 70,\n                    \"unit\": \"piece\"\n                }\n            ]\n        }\n    ],\n    \"label_ids\": [\n        1,\n        2\n    ],\n    \"store_ids\": [\n        1\n    ]\n}"
+              "raw": "{\n    \"name\": \"Marigold Garland (Small)\",\n    \"store\": 4,\n    \"category\": 1,\n    \"base_price\": \"120.00\",\n    \"sale_price\": \"99.00\",\n    \"short_description\": \"Fresh marigold garland\",\n    \"availability_type\": \"daily\",\n    \"unit\": \"piece\",\n    \"is_perishable\": true,\n    \"is_active\": true,\n    \"is_featured\": false,\n    \"is_best_seller\": false,\n    \"bom_items_input\": [\n        {\n            \"inventory_item_id\": 1,\n            \"quantity\": \"0.250\"\n        },\n        {\n            \"inventory_item_id\": 2,\n            \"quantity\": \"0.050\"\n        }\n    ],\n    \"variants_input\": [\n        {\n            \"name\": \"Small\",\n            \"variant_type\": \"size\",\n            \"price_adjustment\": \"0.00\",\n            \"description\": \"Small size ~15cm\",\n            \"is_active\": true,\n            \"display_order\": 1,\n            \"bom_overrides\": [\n                {\n                    \"inventory_item_id\": 1,\n                    \"quantity\": \"0.200\"\n                }\n            ]\n        }\n    ],\n    \"label_ids\": []\n}"
             },
             "url": {
               "raw": "{{base_url}}/admin-ops/products/",
@@ -4313,7 +5370,7 @@
                 ""
               ]
             },
-            "description": "Create product with optional nested sub_products_input (composite), variants_input, label_ids, store_ids (auto-creates inventory)."
+            "description": "Create a product with BOM (Bill of Materials) architecture. Use bom_items_input to specify which InventoryItems (raw materials) are consumed per unit of this product. Variants can override BOM quantities via bom_overrides. Removed fields: sub_products, store_ids, product_type, cost_price, track_inventory. Added fields: store (FK id), bom_items_input, variants_input with bom_overrides.\n\nNote: `cost_price` is auto-computed from BOM — do not send in request."
           }
         },
         {
@@ -4323,7 +5380,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4338,7 +5395,7 @@
                 ""
               ]
             },
-            "description": "Admin: Get product details by ID."
+            "description": "Admin: Get product details by ID. Response includes is_available, store_name, and bom_items array.\n\nPricing fields: `base_price` (MRP), `sale_price` (manual admin markdown, null if not set), `current_price` (effective price the customer pays — auto-discounts applied on base_price during offer periods, else sale_price or base_price), `discount_percentage` (effective % off vs base_price, covers both sale and auto-discounts), `cost_price` (BOM-computed internal cost — not shown to customer)."
           }
         },
         {
@@ -4348,7 +5405,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -4357,7 +5414,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"name\": \"Fresh Rose Bouquet Premium\",\n    \"sku\": \"GP-ROSE-001\",\n    \"description\": \"A premium bouquet of 12 fresh red roses\",\n    \"short_description\": \"12 premium fresh red roses\",\n    \"category\": 1,\n    \"product_type\": \"simple\",\n    \"availability_type\": \"both\",\n    \"base_price\": 349.00,\n    \"sale_price\": 299.00,\n    \"cost_price\": 180.00,\n    \"unit\": \"bunch\",\n    \"unit_value\": 1,\n    \"track_inventory\": true,\n    \"low_stock_threshold\": 15,\n    \"is_perishable\": true,\n    \"shelf_life_days\": 3,\n    \"is_active\": true,\n    \"is_featured\": true,\n    \"is_best_seller\": true\n}"
+              "raw": "{\n    \"name\": \"Marigold Garland (Large)\",\n    \"store\": 4,\n    \"category\": 1,\n    \"base_price\": \"180.00\",\n    \"sale_price\": \"149.00\",\n    \"short_description\": \"Fresh marigold garland \\u2014 large\",\n    \"availability_type\": \"daily\",\n    \"unit\": \"piece\",\n    \"is_perishable\": true,\n    \"is_active\": true,\n    \"is_featured\": true,\n    \"is_best_seller\": false,\n    \"bom_items_input\": [\n        {\n            \"inventory_item_id\": 1,\n            \"quantity\": \"0.500\"\n        },\n        {\n            \"inventory_item_id\": 2,\n            \"quantity\": \"0.100\"\n        }\n    ],\n    \"variants_input\": [],\n    \"label_ids\": []\n}"
             },
             "url": {
               "raw": "{{base_url}}/admin-ops/products/{{product_id}}/",
@@ -4371,7 +5428,7 @@
                 ""
               ]
             },
-            "description": "Admin: Update product details."
+            "description": "Admin: Update product details with BOM format. Response includes is_available, store_name, and bom_items array. Removed fields: sub_products, store_ids, product_type, cost_price, track_inventory.\n\nNote: `cost_price` is auto-computed from BOM — do not send in request."
           }
         },
         {
@@ -4381,7 +5438,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4406,7 +5463,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4426,34 +5483,211 @@
           }
         },
         {
-          "name": "List Sub-Products (Component Picker)",
+          "name": "Upload Product Images",
           "request": {
-            "method": "GET",
+            "method": "POST",
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "One or more image files (repeat this key for multiple)"
+                },
+                {
+                  "key": "alt_text",
+                  "value": "Rose bouquet front view",
+                  "type": "text",
+                  "description": "Alt text applied to all uploaded images"
+                },
+                {
+                  "key": "display_order",
+                  "value": "0",
+                  "type": "text",
+                  "description": "Starting display_order index (increments per file)"
+                }
+              ]
+            },
             "url": {
-              "raw": "{{base_url}}/admin-ops/sub-products/?search=",
+              "raw": "{{base_url}}/admin-ops/products/{{product_id}}/images/",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "admin-ops",
-                "sub-products",
+                "products",
+                "{{product_id}}",
+                "images",
+                ""
+              ]
+            },
+            "description": "Upload one or more gallery images for a product.\n\nRequest: multipart/form-data\n  images     — file field (repeat for multiple files)\n  alt_text   — optional, applied to all uploaded images\n  display_order — optional integer, first image gets this value, each subsequent +1\n\nResponse:\n  { uploaded: [{ id, image, alt_text, display_order }], count: N }"
+          }
+        },
+        {
+          "name": "Delete Product Image",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/products/{{product_id}}/images/{{image_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "products",
+                "{{product_id}}",
+                "images",
+                "{{image_id}}",
+                ""
+              ]
+            },
+            "description": "Delete a specific gallery image from a product. The file is removed from storage. Admin/Store Staff only."
+          }
+        },
+        {
+          "name": "Upload Variant Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "The variant image file (replaces existing if any)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/admin-ops/products/{{product_id}}/variants/{{variant_id}}/image/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "products",
+                "{{product_id}}",
+                "variants",
+                "{{variant_id}}",
+                "image",
+                ""
+              ]
+            },
+            "description": "Upload or replace the image for a specific product variant.\n\nRequest: multipart/form-data\n  image — single file (required)\n\nResponse:\n  { variant_id, image: '<full URL>' }\n\nNote: If the variant already has an image, the old file is deleted from storage before saving the new one."
+          }
+        },
+        {
+          "name": "Bulk Import Products (CSV/Excel)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "CSV (.csv) or Excel (.xlsx) file. Max 5MB, max 500 rows."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/admin-ops/products/bulk-import/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "products",
+                "bulk-import",
+                ""
+              ]
+            },
+            "description": "Bulk create/update products from a CSV or Excel file.\n\nRequest: multipart/form-data, field: file\nLimits: 5MB max, 500 rows max\n\nRequired columns: name, sku, base_price\nOptional: short_description, description, category (ID or name), availability_type, sale_price, cost_price, is_active, is_featured, track_inventory, low_stock_threshold, is_perishable, shelf_life_days, store_ids (comma-sep), label_ids (comma-sep), sub_products\n\nsub_products format: component_id:qty,component_id:qty  e.g. '101:2,102:5'\n  - 1 component → simple product\n  - 2+ components → composite product\n\nCreate vs Update: matched by SKU. Existing SKU → update; new SKU → create.\n\nResponse:\n  { created: N, updated: N, failed: N, total: N, errors: [{row, sku, message}] }"
+          }
+        },
+        {
+          "name": "Download Bulk Import Template",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/products/bulk-import/template/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "products",
+                "bulk-import",
+                "template",
+                ""
+              ]
+            },
+            "description": "Download a CSV template file with all supported column headers and two example rows (one simple product, one composite)."
+          }
+        },
+        {
+          "name": "List Inventory Items (BOM Picker)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/inventory-items/?store_id=4",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "inventory-items",
                 ""
               ],
               "query": [
                 {
-                  "key": "search",
-                  "value": "",
-                  "description": "Search by name or SKU"
+                  "key": "store_id",
+                  "value": "4",
+                  "description": "Filter by store ID to get InventoryItems available for BOM selection"
                 }
               ]
             },
-            "description": "List all active simple products that can be used as components in composite products."
+            "description": "List active InventoryItems for a store. Used as a picker when creating or editing products — select which raw materials (inventory items) go into the BOM of a product or variant. Replaces the old /admin-ops/sub-products/ endpoint."
           }
         },
         {
@@ -4463,11 +5697,11 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/admin-ops/inventory/?store_id=1&product_id=1&low_stock=true",
+              "raw": "{{base_url}}/admin-ops/inventory/?store_id=4",
               "host": [
                 "{{base_url}}"
               ],
@@ -4479,22 +5713,12 @@
               "query": [
                 {
                   "key": "store_id",
-                  "value": "1",
-                  "description": "Filter by store ID"
-                },
-                {
-                  "key": "product_id",
-                  "value": "1",
-                  "description": "Filter by product ID"
-                },
-                {
-                  "key": "low_stock",
-                  "value": "true",
-                  "description": "Filter low stock items only"
+                  "value": "4",
+                  "description": "Filter by store ID (required for store-scoped results)"
                 }
               ]
             },
-            "description": "Admin: List inventory with optional filters for store, product, and low stock."
+            "description": "Admin: List all InventoryItems (raw materials) for a store. No pagination — returns full list. Use store_id to filter by store."
           }
         },
         {
@@ -4504,7 +5728,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -4513,7 +5737,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"quantity\": 100,\n    \"reorder_level\": 20,\n    \"reorder_quantity\": 50,\n    \"store_price\": 249.00,\n    \"bin_location\": \"A1-S3\",\n    \"is_active\": true\n}"
+              "raw": "{\n    \"quantity\": \"150.00\",\n    \"reorder_level\": \"15.00\",\n    \"bin_location\": \"B2\",\n    \"is_active\": true,\n    \"cost_price\": \"27.00\",\n    \"notes\": \"Stock restocked\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/admin-ops/inventory/{{inventory_id}}/update/",
@@ -4528,7 +5752,7 @@
                 ""
               ]
             },
-            "description": "Admin: Update inventory details including quantity, pricing, and location."
+            "description": "Admin: Update InventoryItem details including quantity, cost price, reorder level, bin location, and notes. All fields are optional (partial update)."
           }
         },
         {
@@ -4538,27 +5762,346 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}",
+                "value": "Bearer {{access_token}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/admin/inventory/{{inventory_id}}/toggle-availability/",
+              "raw": "{{base_url}}/admin-ops/inventory/{{inventory_id}}/toggle-availability/",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
-                "api",
-                "v1",
-                "admin",
+                "admin-ops",
                 "inventory",
                 "{{inventory_id}}",
                 "toggle-availability",
                 ""
               ]
-            }
+            },
+            "description": "Toggle inventory is_active — enables or disables the InventoryItem. When disabled, the item cannot be used in BOM calculations or new orders."
           },
           "response": []
+        },
+        {
+          "name": "Create Inventory Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Marigold Flowers\",\n    \"unit\": \"kg\",\n    \"cost_price\": \"25.00\",\n    \"quantity\": \"100.00\",\n    \"reorder_level\": \"10.00\",\n    \"is_perishable\": true,\n    \"bin_location\": \"A1\",\n    \"store\": 4\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin-ops/inventory/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "inventory",
+                ""
+              ]
+            },
+            "description": "Create a new raw material InventoryItem for a store. InventoryItems are standalone raw materials (not linked to products). bin_location is the physical storage location. cost_price is the purchase cost per unit."
+          }
+        },
+        {
+          "name": "Delete Inventory Item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/inventory/{{inventory_id}}/delete/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "inventory",
+                "{{inventory_id}}",
+                "delete",
+                ""
+              ]
+            },
+            "description": "Remove the inventory record for a product at a store. The Product itself is NOT deleted — only the store-level stock entry is removed. Store managers can only delete their own store's inventory."
+          }
+        },
+        {
+          "name": "Bulk Upload Inventory (CSV)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "description": "CSV file. Required columns: name, unit, cost_price, store_id, quantity, reorder_level. Optional: is_perishable, bin_location"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/admin-ops/inventory/bulk-upload/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "inventory",
+                "bulk-upload",
+                ""
+              ]
+            },
+            "description": "Upload a CSV to create or update InventoryItems (raw materials) in bulk.\n\nRequired columns: name, unit, cost_price, store_id, quantity, reorder_level\nOptional columns: is_perishable, bin_location\n\nExisting InventoryItems (matched by name + store_id) are updated; new rows are created.\n\nReturns: { created: N, updated: N, errors: [{row, error}] }"
+          }
+        },
+        {
+          "name": "Inventory Stock Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/inventory/stock-report/?store_id=1&date_from=2026-03-01&date_to=2026-03-31",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "inventory",
+                "stock-report",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "1",
+                  "description": "Required for admin; auto-scoped for store managers"
+                },
+                {
+                  "key": "date_from",
+                  "value": "2026-03-01",
+                  "description": "Start date YYYY-MM-DD"
+                },
+                {
+                  "key": "date_to",
+                  "value": "2026-03-31",
+                  "description": "End date YYYY-MM-DD (max 366 days range)"
+                },
+                {
+                  "key": "item_id",
+                  "value": "",
+                  "description": "Optional: filter to one InventoryItem by its ID",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Returns opening stock, closing stock, total IN/OUT and cost consumed per InventoryItem over the given date range. Use item_id to filter to a single item.\n\nResponse per item:\n  item_id, item_name, unit\n  opening_stock   — qty at start of period\n  closing_stock   — qty at end of period\n  total_in        — stock added in period\n  total_out       — stock consumed in period\n  cost_per_unit   — latest captured cost\n  total_cost_consumed — total_out × cost_per_unit\n\nTransaction types logged: stock_in (create/bulk), manual_adjustment (PUT update), order_deduction (delivery), bulk_upload (CSV)"
+          }
+        },
+        {
+          "name": "List Product Labels (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/labels/?is_active=true",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "labels",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "is_active",
+                  "value": "true",
+                  "description": "Optional: filter by active status (true/false)"
+                }
+              ]
+            },
+            "description": "List all product labels. Accessible by store staff and above. Supports ?is_active=true filter."
+          }
+        },
+        {
+          "name": "Create Product Label",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"New Arrival\",\n    \"color_code\": \"#FF6B6B\",\n    \"icon\": \"star\",\n    \"is_active\": true,\n    \"display_order\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin-ops/labels/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "labels",
+                ""
+              ]
+            },
+            "description": "Create a new product label. Admin only. Slug is auto-generated from name.\n\nFields:\n  name (required) — label display name\n  color_code — hex color e.g. #FF6B6B\n  icon — icon name/identifier\n  is_active — default true\n  display_order — ordering index"
+          }
+        },
+        {
+          "name": "Get Product Label",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/labels/{{label_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "labels",
+                "{{label_id}}",
+                ""
+              ]
+            },
+            "description": "Retrieve a single product label by ID. Admin only."
+          }
+        },
+        {
+          "name": "Update Product Label",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Best Seller\",\n    \"color_code\": \"#FFD700\",\n    \"icon\": \"trophy\",\n    \"is_active\": true,\n    \"display_order\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin-ops/labels/{{label_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "labels",
+                "{{label_id}}",
+                ""
+              ]
+            },
+            "description": "Full update of a product label. Admin only. Slug is NOT updated even if name changes."
+          }
+        },
+        {
+          "name": "Partial Update Product Label",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"is_active\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin-ops/labels/{{label_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "labels",
+                "{{label_id}}",
+                ""
+              ]
+            },
+            "description": "Partial update of a product label (e.g. toggle is_active). Admin only."
+          }
+        },
+        {
+          "name": "Delete Product Label",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/labels/{{label_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "labels",
+                "{{label_id}}",
+                ""
+              ]
+            },
+            "description": "Delete a product label permanently. Admin only. Note: labels assigned to products will lose this label association."
+          }
         },
         {
           "name": "List Tax Configurations",
@@ -4567,7 +6110,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4591,7 +6134,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -4623,7 +6166,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4648,7 +6191,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -4681,7 +6224,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4706,7 +6249,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4747,7 +6290,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -4779,7 +6322,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4804,7 +6347,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -4837,7 +6380,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4862,7 +6405,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4903,7 +6446,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -4935,7 +6478,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -4960,7 +6503,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -4993,7 +6536,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -5018,7 +6561,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -5049,7 +6592,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -5074,7 +6617,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -5108,11 +6651,11 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/admin-ops/orders/?status=pending&order_type=online&store_id=1&date_from=2025-01-01&date_to=2025-12-31&search=GP-",
+              "raw": "{{base_url}}/admin-ops/orders/?status=pending&order_type=online&store_id=1&date_from=2025-01-01&date_to=2025-12-31&delivery_date_from=2025-01-01&delivery_date_to=2025-12-31&search=GP-",
               "host": [
                 "{{base_url}}"
               ],
@@ -5130,7 +6673,7 @@
                 {
                   "key": "order_type",
                   "value": "online",
-                  "description": "Filter by order type (online, pos)"
+                  "description": "Exact filter: online (Store Order) | pos (POS Order) | subscription (Subscription Order)"
                 },
                 {
                   "key": "store_id",
@@ -5151,6 +6694,23 @@
                   "key": "search",
                   "value": "GP-",
                   "description": "Search by order number"
+                },
+                {
+                  "key": "type",
+                  "value": "store",
+                  "description": "Filter by order category: 'store' (online/pos orders) or 'daily' (subscription orders)"
+                },
+                {
+                  "key": "delivery_date_from",
+                  "value": "",
+                  "description": "Filter by delivery date from (YYYY-MM-DD)",
+                  "disabled": true
+                },
+                {
+                  "key": "delivery_date_to",
+                  "value": "",
+                  "description": "Filter by delivery date to (YYYY-MM-DD)",
+                  "disabled": true
                 }
               ]
             },
@@ -5164,7 +6724,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -5181,6 +6741,2011 @@
             },
             "description": "Admin: Get detailed order information by order number."
           }
+        },
+        {
+          "name": "Store Surcharges",
+          "item": [
+            {
+              "name": "List Store Surcharges",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/surcharges/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "stores",
+                    "{{store_code}}",
+                    "surcharges",
+                    ""
+                  ]
+                },
+                "description": "Admin: List all surcharges for a specific store (packaging fee, service charge, etc.)."
+              }
+            },
+            {
+              "name": "Create Store Surcharge",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Packaging Fee\",\n    \"surcharge_type\": \"fixed\",\n    \"amount\": 10.00,\n    \"min_order_amount\": null,\n    \"is_active\": true,\n    \"description\": \"Standard packaging fee\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/surcharges/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "stores",
+                    "{{store_code}}",
+                    "surcharges",
+                    ""
+                  ]
+                },
+                "description": "Admin: Create a new surcharge for a store. surcharge_type: 'fixed' or 'percentage'."
+              }
+            },
+            {
+              "name": "Surcharge Detail",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/surcharges/{{surcharge_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "surcharges",
+                    "{{surcharge_id}}",
+                    ""
+                  ]
+                },
+                "description": "Admin: Get, update or delete a surcharge by ID."
+              }
+            },
+            {
+              "name": "Update Surcharge",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Packaging Fee\",\n    \"surcharge_type\": \"fixed\",\n    \"amount\": 15.00,\n    \"is_active\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/surcharges/{{surcharge_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "surcharges",
+                    "{{surcharge_id}}",
+                    ""
+                  ]
+                },
+                "description": "Admin: Update surcharge details."
+              }
+            },
+            {
+              "name": "Delete Surcharge",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/surcharges/{{surcharge_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "surcharges",
+                    "{{surcharge_id}}",
+                    ""
+                  ]
+                },
+                "description": "Admin: Delete a surcharge."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delivery Slots",
+          "item": [
+            {
+              "name": "List Delivery Slots",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/slots/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "stores",
+                    "{{store_code}}",
+                    "slots",
+                    ""
+                  ]
+                },
+                "description": "Admin: List all delivery slots for a specific store."
+              }
+            },
+            {
+              "name": "Create Delivery Slot",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"slot_name\": \"Morning\",\n    \"start_time\": \"07:00:00\",\n    \"end_time\": \"10:00:00\",\n    \"is_active\": true,\n    \"days_of_week\": [0, 1, 2, 3, 4, 5, 6]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/slots/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "stores",
+                    "{{store_code}}",
+                    "slots",
+                    ""
+                  ]
+                },
+                "description": "Admin: Create a delivery slot. days_of_week: [0=Mon, 1=Tue, ..., 6=Sun]. max_orders is optional (unlimited if omitted)."
+              }
+            },
+            {
+              "name": "Delivery Slot Detail",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/slots/{{slot_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "slots",
+                    "{{slot_id}}",
+                    ""
+                  ]
+                },
+                "description": "Admin: Get a delivery slot by ID."
+              }
+            },
+            {
+              "name": "Update Delivery Slot",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"slot_name\": \"Morning\",\n    \"start_time\": \"07:00:00\",\n    \"end_time\": \"11:00:00\",\n    \"is_active\": true,\n    \"days_of_week\": [0, 1, 2, 3, 4, 5, 6]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/slots/{{slot_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "slots",
+                    "{{slot_id}}",
+                    ""
+                  ]
+                },
+                "description": "Admin: Update a delivery slot."
+              }
+            },
+            {
+              "name": "Delete Delivery Slot",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/slots/{{slot_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "slots",
+                    "{{slot_id}}",
+                    ""
+                  ]
+                },
+                "description": "Admin: Delete a delivery slot."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Store Delivery Partners",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/delivery-partners/?available_only=true",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "delivery-partners",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "available_only",
+                  "value": "true",
+                  "description": "Filter to only available partners"
+                }
+              ]
+            },
+            "description": "Admin: List delivery partners assigned to a specific store. Use ?available_only=true to filter to currently available partners."
+          }
+        },
+        {
+          "name": "Store Staff List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/staff/?store_id=1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "staff",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "1",
+                  "description": "Filter by store ID"
+                },
+                {
+                  "key": "role",
+                  "value": "delivery_partner",
+                  "description": "Filter by role (optional)",
+                  "disabled": true
+                },
+                {
+                  "key": "is_active",
+                  "value": "true",
+                  "description": "Filter by active status (optional)",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List all staff for a store. Filter by store_id, role, is_active.\n\nRoles: admin, super_admin, store_manager, store_staff, delivery_partner, delivery_manager, support_agent\n\nPhone format: All phone fields now return E.164 format (+919876543210), not national format (09876543210). Send phone as +919876543210 or bare 9876543210 — both are accepted."
+          }
+        },
+        {
+          "name": "Delivery Partner Attendance — Today",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/delivery-partners/attendance/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "delivery-partners",
+                "attendance",
+                ""
+              ]
+            },
+            "description": "Get attendance for all delivery partners of a store for today.\n\nResponse includes: status, checkin_time, checkout_time, working_hours, has_checked_in.\nStatus values: present, absent, on_leave, half_day"
+          }
+        },
+        {
+          "name": "Delivery Partner Attendance — Single Date",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/delivery-partners/attendance/?date=2026-03-14",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "delivery-partners",
+                "attendance",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2026-03-14",
+                  "description": "Date in YYYY-MM-DD format"
+                }
+              ]
+            },
+            "description": "Get attendance for all delivery partners of a store for a specific date.\n\nDefault store_code values: GP-AND, GP-BAN, GP-THN, GP-JPR"
+          }
+        },
+        {
+          "name": "Delivery Partner Attendance — Historical Range",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/delivery-partners/attendance/?date_from=2026-03-01&date_to=2026-03-14",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "delivery-partners",
+                "attendance",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "date_from",
+                  "value": "2026-03-01"
+                },
+                {
+                  "key": "date_to",
+                  "value": "2026-03-14"
+                }
+              ]
+            },
+            "description": "Get attendance history for all delivery partners across a date range (max 90 days).\n\nResponse groups by partner with a daily breakdown array and a summary (present_days, absent_days, total_days)."
+          }
+        },
+        {
+          "name": "Store Customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/customers/?search=&is_active=true",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "customers",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search by phone, name, or email"
+                },
+                {
+                  "key": "is_active",
+                  "value": "true",
+                  "description": "Filter by active status"
+                }
+              ]
+            },
+            "description": "Admin/Store Manager: List customers (role=customer) who have placed at least one order at this store. Returns wallet_balance, total_orders_at_store, total_spend_at_store per customer."
+          }
+        },
+        {
+          "name": "Store Production Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/production/?date=2025-02-21",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "production",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2025-02-21",
+                  "description": "Delivery date (YYYY-MM-DD). Defaults to today if omitted."
+                }
+              ]
+            },
+            "description": "Returns all non-cancelled orders for the store on the given delivery date, aggregated product quantities, and BOM (base products needed) from sub-product components. Store managers see only their own store."
+          }
+        },
+        {
+          "name": "Store Production History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/production-history/?date_from=2026-01-01&date_to=2026-01-31",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "stores",
+                "{{store_code}}",
+                "production-history",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "date_from",
+                  "value": "2026-01-01",
+                  "description": "Range start (YYYY-MM-DD). Required."
+                },
+                {
+                  "key": "date_to",
+                  "value": "2026-01-31",
+                  "description": "Range end (YYYY-MM-DD). Required. Max 90 days."
+                }
+              ]
+            },
+            "description": "Returns per-day production data (orders, product quantities, BOM) for every date in the requested range in a single API call. Maximum 90-day range. Replaces N calls to the single-date production endpoint for production history views."
+          }
+        },
+        {
+          "name": "Order Actions",
+          "item": [
+            {
+              "name": "Accept Order",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/orders/{{order_number}}/accept/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "orders",
+                    "{{order_number}}",
+                    "accept",
+                    ""
+                  ]
+                },
+                "description": "Admin: Accept a pending store order. Moves status: pending → confirmed. Only for online/pos orders (not subscription/daily)."
+              }
+            },
+            {
+              "name": "Reject Order",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"reason\": \"out_of_stock\",\n    \"notes\": \"Rose petals are out of stock today\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/orders/{{order_number}}/reject/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "orders",
+                    "{{order_number}}",
+                    "reject",
+                    ""
+                  ]
+                },
+                "description": "Admin: Reject a pending store order with reason. Moves status: pending → cancelled. Reason choices: out_of_stock, cannot_deliver, store_closed, order_too_large, duplicate_order, other."
+              }
+            },
+            {
+              "name": "Mark Order Preparing",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/orders/{{order_number}}/prepare/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "orders",
+                    "{{order_number}}",
+                    "prepare",
+                    ""
+                  ]
+                },
+                "description": "Admin: Mark an accepted order as preparing. Moves status: confirmed → preparing. Once preparing, order CANNOT be cancelled."
+              }
+            },
+            {
+              "name": "Schedule Delivery (In-House)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"delivery_type\": \"in_house\",\n    \"delivery_partner_id\": 1,\n    \"notes\": \"Handle with care - fragile flowers\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/orders/{{order_number}}/schedule-delivery/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "orders",
+                    "{{order_number}}",
+                    "schedule-delivery",
+                    ""
+                  ]
+                },
+                "description": "Admin: Schedule delivery for a preparing order. delivery_type: 'in_house' (requires delivery_partner_id) or '3pl'. Moves status: preparing → out_for_delivery."
+              }
+            },
+            {
+              "name": "Schedule Delivery (3PL)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"delivery_type\": \"3pl\",\n    \"notes\": \"Third party logistics\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/orders/{{order_number}}/schedule-delivery/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "orders",
+                    "{{order_number}}",
+                    "schedule-delivery",
+                    ""
+                  ]
+                },
+                "description": "Admin: Schedule delivery using 3rd party logistics. No delivery_partner_id needed."
+              }
+            },
+            {
+              "name": "Issue Refund",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"amount\": 32.10,\n    \"refund_method\": \"original\",\n    \"speed\": \"normal\",\n    \"notes\": \"Full refund for cancelled order\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/orders/{{order_number}}/issue-refund/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "orders",
+                    "{{order_number}}",
+                    "issue-refund",
+                    ""
+                  ]
+                },
+                "description": "Admin: Issue a refund for a cancelled order. refund_method: 'original' (back to payment method) or 'wallet' (in-app wallet credit). speed: 'normal' (5-7 days) or 'optimum' (instant). Supports partial refunds — call multiple times."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Partial Updates (PATCH)",
+          "item": [
+            {
+              "name": "PATCH Category",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Updated Name\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/categories/{{category_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "categories",
+                    "{{category_id}}",
+                    ""
+                  ]
+                },
+                "description": "Partial update: PATCH Category"
+              }
+            },
+            {
+              "name": "PATCH Product",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"is_active\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/products/{{product_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "products",
+                    "{{product_id}}",
+                    ""
+                  ]
+                },
+                "description": "Partial update: PATCH Product\n\nNote: `cost_price` is auto-computed from BOM — do not send in request."
+              }
+            },
+            {
+              "name": "PATCH Store",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"is_active\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "stores",
+                    "{{store_code}}",
+                    ""
+                  ]
+                },
+                "description": "Partial update: PATCH Store by store code"
+              }
+            },
+            {
+              "name": "PATCH Employee",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"is_active\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/employees/{{employee_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "employees",
+                    "{{employee_id}}",
+                    ""
+                  ]
+                },
+                "description": "Partial update: PATCH Employee"
+              }
+            },
+            {
+              "name": "PATCH Zone",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"is_active\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/zones/{{zone_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "zones",
+                    "{{zone_id}}",
+                    ""
+                  ]
+                },
+                "description": "Partial update: PATCH Zone"
+              }
+            },
+            {
+              "name": "PATCH Coupon",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"is_active\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/coupons/{{coupon_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "coupons",
+                    "{{coupon_id}}",
+                    ""
+                  ]
+                },
+                "description": "Partial update: PATCH Coupon"
+              }
+            },
+            {
+              "name": "PATCH Configuration",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"value\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/config/{{config_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "config",
+                    "{{config_id}}",
+                    ""
+                  ]
+                },
+                "description": "Partial update: PATCH Configuration"
+              }
+            },
+            {
+              "name": "PATCH Tax Configuration",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"is_active\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/tax-config/{{tax_config_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "tax-config",
+                    "{{tax_config_id}}",
+                    ""
+                  ]
+                },
+                "description": "Partial update: PATCH Tax Configuration"
+              }
+            },
+            {
+              "name": "PATCH FAQ",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"is_active\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/faqs/{{faq_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "faqs",
+                    "{{faq_id}}",
+                    ""
+                  ]
+                },
+                "description": "Partial update: PATCH FAQ"
+              }
+            },
+            {
+              "name": "PATCH Delivery Slot",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"is_active\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/delivery/admin/slots/{{slot_id}}/update/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "delivery",
+                    "admin",
+                    "slots",
+                    "{{slot_id}}",
+                    "update",
+                    ""
+                  ]
+                },
+                "description": "Partial update: PATCH Delivery Slot"
+              }
+            },
+            {
+              "name": "PATCH Discount",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"is_active\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/discounts/{{discount_id}}/update/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "discounts",
+                    "{{discount_id}}",
+                    "update",
+                    ""
+                  ]
+                },
+                "description": "Partial update: PATCH Discount"
+              }
+            },
+            {
+              "name": "PATCH User Profile",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{auth_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"first_name\": \"Updated\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/users/me/update/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "users",
+                    "me",
+                    "update",
+                    ""
+                  ]
+                },
+                "description": "Partial update: PATCH User Profile"
+              }
+            },
+            {
+              "name": "PATCH User Preferences",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{auth_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"push_notifications\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/users/preferences/update/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "users",
+                    "preferences",
+                    "update",
+                    ""
+                  ]
+                },
+                "description": "Partial update: PATCH User Preferences"
+              }
+            },
+            {
+              "name": "PATCH User Address",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{auth_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"label\": \"Home\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/users/addresses/{{address_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "users",
+                    "addresses",
+                    "{{address_id}}",
+                    ""
+                  ]
+                },
+                "description": "Partial update: PATCH User Address"
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Staff Members",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin-ops/staff/?store_id=&role=&is_active=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin-ops",
+                "staff",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "",
+                  "description": "Filter by store ID"
+                },
+                {
+                  "key": "role",
+                  "value": "",
+                  "description": "store_manager | store_staff | delivery_manager | support_agent | delivery_partner | admin"
+                },
+                {
+                  "key": "is_active",
+                  "value": "",
+                  "description": "true / false"
+                }
+              ]
+            },
+            "description": "List all non-customer users. Filter by store_id, role, is_active.\n\nPhone format: All phone fields now return E.164 format (+919876543210), not national format (09876543210). Send phone as +919876543210 or bare 9876543210 — both are accepted."
+          }
+        },
+        {
+          "name": "Register Staff Member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+919900000001\",\n  \"password\": \"Store@2024\",\n  \"first_name\": \"Priya\",\n  \"last_name\": \"Sharma\",\n  \"role\": \"store_manager\",\n  \"store_id\": 1,\n  \"email\": \"priya@gendaphool.com\",\n  \"gender\": \"female\",\n  \"date_of_birth\": \"1995-08-20\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin-ops/staff/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin-ops",
+                "staff",
+                ""
+              ]
+            },
+            "description": "Register a new staff member (creates user + assigns role in one call).\n\nValid roles: store_manager, store_staff, support_agent, delivery_manager, admin, super_admin\n\nPre-created test accounts:\n  +919000000001 / SuperAdmin@123  - super_admin\n  +919000000002 / Admin@123456    - admin\n  +919000000003 / StoreManager@123 - store_manager (GP-AND)\n  +919000000004 / StoreStaff@123  - store_staff (GP-AND)\n  +919000000005 / Support@123456  - support_agent\n  +919000000006 / DeliveryMgr@123 - delivery_manager\n\nPhone format: All phone fields now return E.164 format (+919876543210), not national format (09876543210). Send phone as +919876543210 or bare 9876543210 — both are accepted."
+          }
+        },
+        {
+          "name": "Register Delivery Partner (Staff)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+919900000002\",\n  \"password\": \"Delivery@2024\",\n  \"first_name\": \"Amit\",\n  \"last_name\": \"Kumar\",\n  \"role\": \"delivery_partner\",\n  \"store_id\": 1,\n  \"vehicle_type\": \"bike\",\n  \"vehicle_number\": \"RJ14AB5678\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin-ops/staff/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin-ops",
+                "staff",
+                ""
+              ]
+            },
+            "description": "Phone format: All phone fields now return E.164 format (+919876543210), not national format (09876543210). Send phone as +919876543210 or bare 9876543210 — both are accepted."
+          }
+        },
+        {
+          "name": "Get Staff Member Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin-ops/staff/{{staff_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin-ops",
+                "staff",
+                "{{staff_id}}",
+                ""
+              ]
+            },
+            "description": "Phone format: All phone fields now return E.164 format (+919876543210), not national format (09876543210). Send phone as +919876543210 or bare 9876543210 — both are accepted."
+          }
+        },
+        {
+          "name": "Update Staff Member",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Updated\",\n  \"role\": \"store_staff\",\n  \"store_id\": 2,\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin-ops/staff/{{staff_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin-ops",
+                "staff",
+                "{{staff_id}}",
+                ""
+              ]
+            },
+            "description": "Updatable: first_name, last_name, email, gender, date_of_birth, role, store_id, is_active, vehicle_type, vehicle_number\n\nPhone format: All phone fields now return E.164 format (+919876543210), not national format (09876543210). Send phone as +919876543210 or bare 9876543210 — both are accepted."
+          }
+        },
+        {
+          "name": "Deactivate Staff Member",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin-ops/staff/{{staff_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin-ops",
+                "staff",
+                "{{staff_id}}",
+                ""
+              ]
+            },
+            "description": "Soft deactivation — sets is_active=False on user and StoreEmployee record. Does not delete.\n\nPhone format: All phone fields now return E.164 format (+919876543210), not national format (09876543210). Send phone as +919876543210 or bare 9876543210 — both are accepted."
+          }
+        },
+        {
+          "name": "Reset Staff Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"NewPass@2024\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin-ops/staff/{{staff_id}}/set-password/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin-ops",
+                "staff",
+                "{{staff_id}}",
+                "set-password",
+                ""
+              ]
+            },
+            "description": "Phone format: All phone fields now return E.164 format (+919876543210), not national format (09876543210). Send phone as +919876543210 or bare 9876543210 — both are accepted."
+          }
+        },
+        {
+          "name": "Assign Delivery Partner to Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"delivery_partner_id\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin-ops/orders/GP-20260305-JAI001/assign-partner/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin-ops",
+                "orders",
+                "GP-20260305-JAI001",
+                "assign-partner",
+                ""
+              ]
+            },
+            "description": "Assign a delivery partner to an order. Use delivery_partner_id: null to unassign. Partner and order must be from the same store."
+          }
+        },
+        {
+          "name": "Store Banners",
+          "item": [
+            {
+              "name": "Get Active Banners (Public)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/stores/4/banners/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "stores",
+                    "4",
+                    "banners",
+                    ""
+                  ]
+                },
+                "description": "Public endpoint — returns only active, date-valid banners for the store. No auth required."
+              },
+              "response": []
+            },
+            {
+              "name": "List All Banners (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "stores",
+                    "{{store_code}}",
+                    "banners",
+                    ""
+                  ]
+                },
+                "description": "Admin — returns ALL banners including inactive and expired."
+              },
+              "response": []
+            },
+            {
+              "name": "Create Banner",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "stores",
+                    "{{store_code}}",
+                    "banners",
+                    ""
+                  ]
+                },
+                "description": "title required. cta_link/secondary_cta_link must start with / or be a full URL. Colors must be valid hex (#rgb or #rrggbb). end_date must be >= start_date.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Ganesh Utsav Special\",\n  \"subtitle\": \"100 slots only \\u2014 book fast!\",\n  \"cta_label\": \"Pre-Book Now\",\n  \"cta_link\": \"/gp-store/products?category=pooja-items\",\n  \"secondary_cta_label\": \"View All\",\n  \"secondary_cta_link\": \"/gp-store/products\",\n  \"image_url_input\": \"\",\n  \"title_bg_color\": \"#3a5f2e\",\n  \"cta_bg_color\": \"#e8922a\",\n  \"is_active\": true,\n  \"start_date\": null,\n  \"end_date\": null,\n  \"sort_order\": 0\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Banner Detail",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/1/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "stores",
+                    "{{store_code}}",
+                    "banners",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Get a single banner by ID. Store code must match."
+              },
+              "response": []
+            },
+            {
+              "name": "Update Banner (Full PUT)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/1/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "stores",
+                    "{{store_code}}",
+                    "banners",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Updated Title\",\n  \"subtitle\": \"Updated subtitle\",\n  \"cta_label\": \"Shop Now\",\n  \"cta_link\": \"/gp-store/products\",\n  \"secondary_cta_label\": \"\",\n  \"secondary_cta_link\": \"\",\n  \"title_bg_color\": \"#3a5f2e\",\n  \"cta_bg_color\": \"#e8922a\",\n  \"is_active\": true,\n  \"start_date\": null,\n  \"end_date\": null,\n  \"sort_order\": 0\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Partial Update Banner (PATCH)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/1/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "stores",
+                    "{{store_code}}",
+                    "banners",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Send only the fields you want to change. Useful for toggling is_active, updating sort_order, etc.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"is_active\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Banner",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/1/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "stores",
+                    "{{store_code}}",
+                    "banners",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Permanently deletes the banner."
+              },
+              "response": []
+            },
+            {
+              "name": "Reorder Banners",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/reorder/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "stores",
+                    "{{store_code}}",
+                    "banners",
+                    "reorder",
+                    ""
+                  ]
+                },
+                "description": "Pass banner IDs in the desired display order. sort_order is set to array index (0 = first). All IDs must belong to the store.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ordered_ids\": [\n    3,\n    1,\n    2\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Upload Banner Image",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/banners/1/image/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "stores",
+                    "{{store_code}}",
+                    "banners",
+                    "1",
+                    "image",
+                    ""
+                  ]
+                },
+                "description": "Upload banner image via multipart/form-data. Field name: 'image'. Accepted: JPEG, PNG, WebP. Max 5MB. Returns { image_url } — store this as image_url_input on next PATCH if needed (upload sets it automatically).",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "image",
+                      "type": "file",
+                      "src": "",
+                      "description": "Banner image (JPEG/PNG/WebP, max 5MB)"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Employee HR Profile",
+          "item": [
+            {
+              "name": "Get Employee Profile",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/staff/33/profile/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "staff",
+                    "33",
+                    "profile",
+                    ""
+                  ]
+                },
+                "description": "Returns full HR profile for a staff user (auto-created with employee code if first access). Replace 33 with the user ID."
+              },
+              "response": []
+            },
+            {
+              "name": "Update Employee Profile (PATCH)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/staff/33/profile/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "staff",
+                    "33",
+                    "profile",
+                    ""
+                  ]
+                },
+                "description": "All fields optional. Use multipart/form-data (not JSON) when uploading aadhar_image or pan_image.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"address_line1\": \"123 MG Road\",\n  \"city\": \"Jaipur\",\n  \"state\": \"Rajasthan\",\n  \"pincode\": \"302001\",\n  \"current_address\": \"Same as permanent\",\n  \"aadhar_number\": \"123456789012\",\n  \"pan_number\": \"ABCDE1234F\",\n  \"emergency_contact_name\": \"Sunita Devi\",\n  \"emergency_contact_phone\": \"9876543210\",\n  \"blood_group\": \"O+\",\n  \"upi_id\": \"ravi@upi\",\n  \"bank_account_name\": \"Ravi Kumar\",\n  \"bank_account_number\": \"123456789012\",\n  \"bank_ifsc\": \"SBIN0001234\",\n  \"monthly_salary\": \"18000.00\",\n  \"allowed_leaves\": 12\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Upload Aadhar / PAN Image",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin-ops/staff/33/profile/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin-ops",
+                    "staff",
+                    "33",
+                    "profile",
+                    ""
+                  ]
+                },
+                "description": "Use multipart/form-data. Fields: aadhar_image (file), pan_image (file), aadhar_number, pan_number. Accepted: JPG/PNG/PDF.",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "image",
+                      "type": "file",
+                      "src": "",
+                      "description": "Banner image (JPEG/PNG/WebP, max 5MB)"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
         }
       ]
     },
@@ -5194,7 +8759,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
@@ -5219,11 +8784,11 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/admin-ops/analytics/store/{{store_id}}/",
+              "raw": "{{base_url}}/admin-ops/analytics/store/{{store_id}}/?date_from=2026-01-01&date_to=2026-01-31",
               "host": [
                 "{{base_url}}"
               ],
@@ -5233,9 +8798,21 @@
                 "store",
                 "{{store_id}}",
                 ""
+              ],
+              "query": [
+                {
+                  "key": "date_from",
+                  "value": "2026-01-01",
+                  "description": "Filter start date (YYYY-MM-DD). When set, today/week/month breakdowns return 0."
+                },
+                {
+                  "key": "date_to",
+                  "value": "2026-01-31",
+                  "description": "Filter end date (YYYY-MM-DD)."
+                }
               ]
             },
-            "description": "Admin: Get detailed analytics for a specific store by ID."
+            "description": "Admin: Get detailed analytics for a specific store. Returns orders, revenue, order-type breakdown, category breakdown, subscription metrics, daily time-series, zone-level analytics, and top products. Supports optional date_from/date_to filters (YYYY-MM-DD). When no date range is set, includes today/week/month breakdowns."
           }
         }
       ]
@@ -5250,18 +8827,16 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/admin/faqs/",
+              "raw": "{{base_url}}/admin-ops/faqs/",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
-                "api",
-                "v1",
-                "admin",
+                "admin-ops",
                 "faqs",
                 ""
               ],
@@ -5284,7 +8859,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -5301,14 +8876,12 @@
               }
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/admin/faqs/",
+              "raw": "{{base_url}}/admin-ops/faqs/",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
-                "api",
-                "v1",
-                "admin",
+                "admin-ops",
                 "faqs",
                 ""
               ]
@@ -5323,7 +8896,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               },
               {
                 "key": "Content-Type",
@@ -5340,16 +8913,14 @@
               }
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/admin/faqs/1/",
+              "raw": "{{base_url}}/admin-ops/faqs/{{faq_id}}/",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
-                "api",
-                "v1",
-                "admin",
+                "admin-ops",
                 "faqs",
-                "1",
+                "{{faq_id}}",
                 ""
               ]
             },
@@ -5363,24 +8934,60 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{access_token}}"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/admin/faqs/1/",
+              "raw": "{{base_url}}/admin-ops/faqs/{{faq_id}}/",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
-                "api",
-                "v1",
-                "admin",
+                "admin-ops",
                 "faqs",
-                "1",
+                "{{faq_id}}",
                 ""
               ]
             },
             "description": "Admin: Soft-deactivate an FAQ (sets is_active=false, not permanently deleted)."
+          }
+        },
+        {
+          "name": "Update FAQ (Partial)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"question\": \"Updated question?\",\n    \"answer\": \"Updated answer.\",\n    \"is_active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/admin-ops/faqs/{{faq_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "faqs",
+                "{{faq_id}}",
+                ""
+              ]
+            },
+            "description": "Admin: Partially update an FAQ."
           }
         }
       ]
@@ -5447,27 +9054,47 @@
       ]
     },
     {
-      "name": "Store Banners",
+      "name": "21 - Public Feeds & Sitemap",
       "item": [
         {
-          "name": "Get Active Banners (Public)",
+          "name": "Meta Catalogue Feed",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/stores/4/banners/",
+              "raw": "{{base_url}}/feeds/meta-catalogue/?store_id=4",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
-                "stores",
-                "4",
-                "banners",
-                ""
+                "feeds",
+                "meta-catalogue",
+                "?store_id=4"
               ]
             },
-            "description": "Public endpoint \u2014 returns only active, date-valid banners for the store. No auth required.\n\nResponse: { success: true, data: Banner[] }"
-          }
+            "description": "Public feed for Meta (Facebook/Instagram) product catalogue. No auth. Returns { data: [...] }. Use ?store_id= to select store (default 4)."
+          },
+          "response": []
+        },
+        {
+          "name": "Google Merchant Feed",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/feeds/google-merchant/?store_id=4",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "feeds",
+                "google-merchant",
+                "?store_id=4"
+              ]
+            },
+            "description": "Public feed for Google Merchant Centre. No auth. Returns { items: [...] }."
+          },
+          "response": []
         }
       ]
     }
@@ -5475,7 +9102,7 @@
   "variable": [
     {
       "key": "base_url",
-      "value": "http://185.137.122.250:8083/api/v1",
+      "value": "https://apigp.mygendaphool.com/api/v1",
       "type": "string"
     },
     {
@@ -5622,6 +9249,46 @@
       "key": "category_id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "faq_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "razorpay_order_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "store_code",
+      "value": "GP-JPR",
+      "type": "string"
+    },
+    {
+      "key": "surcharge_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "banner_id",
+      "value": "1",
+      "type": "string"
     }
-  ]
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  }
 }

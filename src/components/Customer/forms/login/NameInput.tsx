@@ -18,6 +18,11 @@ const NameInput: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  const isValidEmail = (value: string) => {
+    // Lightweight, production-safe validation (avoids blocking legitimate emails).
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+  };
+
   const handleSubmit = async () => {
     console.log("handleSubmit called");
 
@@ -33,6 +38,11 @@ const NameInput: React.FC = () => {
 
     if (!email.trim()) {
       toast.error("Please enter your email");
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      toast.error("Enter valid email");
       return;
     }
 
@@ -97,8 +107,13 @@ const NameInput: React.FC = () => {
       }
     } catch (err: any) {
       console.log("Error in onboarding:", err);
-      const errorMessage =
+      let errorMessage =
         err.message || "Failed to save details. Please try again.";
+
+      // Backend may return a generic "validation error" for invalid email.
+      if (typeof errorMessage === "string" && errorMessage.toLowerCase().includes("validation error")) {
+        errorMessage = "Enter valid email";
+      }
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {

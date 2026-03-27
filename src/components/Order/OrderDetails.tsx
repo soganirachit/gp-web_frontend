@@ -444,16 +444,16 @@ const OrderDetails: React.FC = () => {
             <div className="bg-white rounded-2xl p-4 shadow-sm">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Order Information</h2>
               <div className="grid grid-cols-1 gap-3">
-                <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] items-center gap-x-2 gap-y-1 sm:grid-cols-[8.5rem_1fr] sm:items-center">
+                <div className="grid grid-cols-[6.25rem_minmax(0,1fr)] items-center gap-x-2 sm:grid-cols-[8.5rem_minmax(0,1fr)]">
                   <span className="text-sm text-gray-600">Order ID</span>
-                  <div className="flex min-w-0 items-center justify-end gap-2 sm:justify-start">
-                    <span className="truncate text-right text-sm font-medium text-gray-900 sm:text-left">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate text-sm font-medium text-gray-900">
                       {order.order_number}
                     </span>
                     <button
                       type="button"
                       onClick={() => copyToClipboard(order.order_number)}
-                      className="inline-flex shrink-0 rounded-md p-1.5 text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                      className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-50 hover:text-gray-600"
                       aria-label="Copy order ID"
                     >
                       <FaCopy className="h-3.5 w-3.5" />
@@ -461,9 +461,9 @@ const OrderDetails: React.FC = () => {
                   </div>
                 </div>
                 {(order.order_type_label || order.order_type) && (
-                  <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] items-center gap-x-2 sm:grid-cols-[8.5rem_1fr]">
+                  <div className="grid grid-cols-[6.25rem_minmax(0,1fr)] items-center gap-x-2 sm:grid-cols-[8.5rem_minmax(0,1fr)]">
                     <span className="text-sm text-gray-600">Order Type</span>
-                    <span className="break-words text-right text-sm font-medium text-gray-900 sm:text-left">
+                    <span className="break-words text-sm font-medium text-gray-900">
                       {order.order_type_label ||
                         (order.order_type === 'online'
                           ? 'Store Order'
@@ -475,9 +475,9 @@ const OrderDetails: React.FC = () => {
                     </span>
                   </div>
                 )}
-                <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] items-center gap-x-2 sm:grid-cols-[8.5rem_1fr]">
+                <div className="grid grid-cols-[6.25rem_minmax(0,1fr)] items-center gap-x-2 sm:grid-cols-[8.5rem_minmax(0,1fr)]">
                   <span className="text-sm text-gray-600">Placed On</span>
-                  <span className="text-sm font-medium text-gray-900 text-right sm:text-left break-words">
+                  <span className="break-words text-sm font-medium text-gray-900">
                     {formatDate(order.created_at)}
                   </span>
                 </div>

@@ -48,6 +48,7 @@ const CancelSubscriptionSuccess = lazy(() => import('../components/Subscription/
 
 const Wallet = lazy(() => import('../components/Payment/Wallet/wallet'));
 const PaymentSuccessful = lazy(() => import('../components/Payment/payment_successful'));
+const StoreOrderConfirmation = lazy(() => import('../components/Order/StoreOrderConfirmation'));
 
 const Refer = lazy(() => import('../pages/Refer/Refer'));
 const CustomerSupport = lazy(() => import('../pages/More/CustomerSupport'));
@@ -73,7 +74,7 @@ const router = createBrowserRouter([
     element: <Layout />,
     errorElement: <RouteErrorPage />,
     children: [
-      { path: '/', element: <Navigate to="/home" replace /> },
+      { path: '/', element: <Startup /> },
       { path: '/startup', element: <Startup /> },
       { path: '/search', element: <Search /> },
       { path: '/explore-more', element: <ExploreMore /> },
@@ -159,6 +160,7 @@ const router = createBrowserRouter([
       { path: '/wallet', element: <ProtectedRoute><Wallet /></ProtectedRoute> },
       { path: '/gp-daily/wallet', element: <ProtectedRoute><Wallet /></ProtectedRoute> },
       { path: '/gp-store/wallet', element: <ProtectedRoute><Wallet /></ProtectedRoute> },
+      { path: '/gp-store/payment-success', element: <ProtectedRoute><StoreOrderConfirmation /></ProtectedRoute> },
       { path: '/payment-success', element: <ProtectedRoute><PaymentSuccessful /></ProtectedRoute> },
       { path: '/refer', element: <ProtectedRoute><Refer /></ProtectedRoute> },
       { path: '/customer-support', element: <ProtectedRoute><CustomerSupport /></ProtectedRoute> },

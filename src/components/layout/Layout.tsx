@@ -48,10 +48,17 @@ const Layout: React.FC = () => {
     location.pathname
   ) || location.pathname.includes("/customer-support/questions");
 
-  // Routes that should not have top padding
+  // Routes that should not have top padding.
+  // Important: pathname is like `/gp-store/orders`, so we must use prefix matching.
   const routesWithoutTopPadding = ["/gp-daily", "/gp-store"];
-  const shouldHideTopPadding = routesWithoutTopPadding.includes(
-    location.pathname
+  const shouldHideTopPadding = routesWithoutTopPadding.some((p) =>
+    location.pathname.startsWith(p)
+  );
+
+  // Many GP Store/Daily screens already apply their own `pb-nav-bottom`.
+  // Avoid double bottom padding from `pb-layout-pb`.
+  const isGpStoreOrDailyRoute = routesWithoutTopPadding.some((p) =>
+    location.pathname.startsWith(p)
   );
 
   return (
@@ -63,11 +70,13 @@ const Layout: React.FC = () => {
       <main className={!isAuthRoute && !shouldHideTopPadding ? "pt-4" : ""}>
           <div
             className={
-              !isAuthRoute && !shouldHideBottomNav
-                ? "min-h-[calc(100dvh-144px)] min-h-[calc(100vh-144px)] pb-layout-pb"
-                : !isAuthRoute
-                ? "pb-layout-pb"
-                : ""
+              isAuthRoute
+                ? ""
+                : !shouldHideBottomNav
+                ? `min-h-[calc(100dvh-144px)] min-h-[calc(100vh-144px)] ${isGpStoreOrDailyRoute ? "pb-0" : "pb-layout-pb"}`
+                : isGpStoreOrDailyRoute
+                ? "pb-0"
+                : "pb-layout-pb"
             }
           >
           <Suspense fallback={<div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50"><Spinner size={400} /></div>}>

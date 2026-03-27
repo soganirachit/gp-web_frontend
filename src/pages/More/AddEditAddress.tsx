@@ -600,12 +600,33 @@ const AddEditAddress: React.FC = () => {
               mapTypeControl: false,
               streetViewControl: false,
               fullscreenControl: false,
-              disableDefaultUI: true
+              disableDefaultUI: true,
+              // Allow map dragging freely (pin is fixed at center; move map to move pin)
+              draggable: true,
+              gestureHandling: 'greedy',
+              scrollwheel: true
             }}
           />
-          {/* Fixed Marker - Black */}
-          <div className="absolute left-1/2 top-[40%] -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
-            <MdLocationOn className="text-black text-5xl drop-shadow-lg" />
+          {/* Fixed Marker — classic teardrop pin (modern + subtle pulse) */}
+          <div className="absolute left-1/2 top-[40%] -translate-x-1/2 -translate-y-full pointer-events-none z-20">
+            <div className="relative">
+              {/* shadow */}
+              <div className="absolute left-1/2 top-[44px] h-3 w-7 -translate-x-1/2 rounded-full bg-black/15 blur-[6px]" />
+              {/* pulse ring */}
+              <div
+                className="absolute left-1/2 top-[44px] h-6 w-6 rounded-full"
+                style={{ backgroundColor: theme.colors.primary, animation: 'gpPinPulse 1.6s ease-out infinite' }}
+              />
+              {/* pin */}
+              <svg width="34" height="48" viewBox="0 0 24 34" fill="none" aria-hidden className="drop-shadow-[0_8px_16px_rgba(0,0,0,0.14)]">
+                <path
+                  d="M12 33C12 33 22 21.6 22 13C22 6.37258 17.5228 1 12 1C6.47715 1 2 6.37258 2 13C2 21.6 12 33 12 33Z"
+                  fill={theme.colors.primary}
+                />
+                <circle cx="12" cy="13" r="5.2" fill="white" opacity="0.98" />
+                <circle cx="12" cy="13" r="2.2" fill={theme.colors.primary} opacity="0.9" />
+              </svg>
+            </div>
           </div>
           {/* Locate Me Button - At the bottom */}
           <button
@@ -639,11 +660,25 @@ const AddEditAddress: React.FC = () => {
 
         {showMapLocationHint && (
           <div
-            className="mb-3 rounded-full px-3 py-1.5 text-center text-xs font-medium text-white shadow-md"
-            style={{ backgroundColor: theme.colors.primary }}
+            className="mb-3 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 shadow-sm"
             role="status"
           >
-            Location detected — adjust the map pin if needed
+            <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-100" aria-hidden>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                <path d="M16.667 5.833L8.333 14.167 3.333 9.167" stroke="#166534" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <span className="flex-1 min-w-0 truncate font-semibold">
+              Location detected
+              <span className="font-medium"> — drag map to adjust pin</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowMapLocationHint(false)}
+              className="flex-shrink-0 text-xs font-semibold text-green-700/80 hover:text-green-800"
+            >
+              Dismiss
+            </button>
           </div>
         )}
 

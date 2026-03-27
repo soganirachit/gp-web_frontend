@@ -341,7 +341,7 @@ const StoreProductsPages: React.FC = () => {
             <div className="flex gap-2 overflow-x-auto no-scrollbar">
               <button
                 onClick={() => handleCategoryClick(null)}
-                className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex h-7 flex-shrink-0 items-center px-3 rounded-2xl text-xs leading-none font-medium transition-colors ${
                   !selectedCategorySlug
                     ? 'bg-[#19411f] text-white'
                     : ' text-[#222222]'
@@ -353,7 +353,7 @@ const StoreProductsPages: React.FC = () => {
                 <button
                   key={category.id}
                   onClick={() => handleCategoryClick(category.slug)}
-                  className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                  className={`flex h-7 flex-shrink-0 items-center px-3 rounded-2xl text-xs leading-none font-medium transition-colors whitespace-nowrap ${
                     selectedCategorySlug === category.slug
                       ? 'bg-[#19411f] text-white'
                       : ' text-[#222222]'
@@ -365,16 +365,33 @@ const StoreProductsPages: React.FC = () => {
             </div>
 
             {/* Sort and Filter Buttons */}
-            <div className="flex items-center gap-3 mt-3">
+            <div className="mt-2.5 flex items-center gap-2">
               <button
                 onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-                className="flex items-center gap-2 px-3 py-2 bg-[#fff] border border[#E9E6E2] rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                className="flex h-7 items-center gap-1.5 rounded-2xl border border-[#D8D3CD] bg-[#f8f6f1] px-2.5 text-[11px] leading-none font-medium text-gray-700 shadow-[0_1px_0_rgba(0,0,0,0.03)] transition-colors hover:bg-[#f1eee7]"
               >
-                <IoSwapVerticalOutline className="w-4 h-4" />
+                <IoSwapVerticalOutline className="h-3 w-3" />
                 <span>Sort</span>
               </button>
-              <button className="flex items-center gap-2 px-3 py-2 bg-[#fff] border border-[#E9E6E2] rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
-                <IoFilterOutline className="w-4 h-4" />
+              <button className="flex h-7 items-center gap-1.5 rounded-2xl border border-[#D8D3CD] bg-[#f8f6f1] px-2.5 text-[11px] leading-none font-medium text-gray-700 shadow-[0_1px_0_rgba(0,0,0,0.03)] transition-colors hover:bg-[#f1eee7]">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                  <g clipPath="url(#clip0_store_filter)">
+                    <path d="M13.9997 2.66699H9.33301" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M6.66667 2.66699H2" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M14 8H8" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M5.33333 8H2" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M14.0003 13.333H10.667" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M8 13.333H2" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M9.33301 1.33301V3.99967" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M5.33301 6.66699V9.33366" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M10.667 12V14.6667" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+                  </g>
+                  <defs>
+                    <clipPath id="clip0_store_filter">
+                      <rect width="16" height="16" fill="white" />
+                    </clipPath>
+                  </defs>
+                </svg>
                 <span>Filter</span>
               </button>
             </div>
@@ -442,7 +459,7 @@ const StoreProductsPages: React.FC = () => {
                   {visibleProducts.map((item) => (
                     <div
                       key={item.id || item.slug}
-                      className="min-w-0 bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer hover:shadow-md transition-shadow relative"
+                      className="relative min-w-0 overflow-hidden rounded-2xl bg-white shadow-sm transition-shadow hover:shadow-md cursor-pointer flex h-full flex-col"
                       onClick={() => handleProductClick(item)}
                     >
                     {/* Product Image */}
@@ -478,7 +495,7 @@ const StoreProductsPages: React.FC = () => {
                     </div>
 
                     {/* Product Info */}
-                    <div className="p-3">
+                    <div className="p-3 flex min-h-[6.5rem] flex-col">
                       <div className="flex items-start justify-between mb-1">
                         <h3 className="text-xs xs:text-sm font-semibold text-gray-900 flex-1 min-w-0 pr-1 line-clamp-2 leading-snug">
                           {item.name}
@@ -490,13 +507,11 @@ const StoreProductsPages: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      {item.short_description && (
-                        <p className="text-xs text-gray-500 mb-1 truncate">
-                          {item.short_description}
-                        </p>
-                      )}
+                      <p className="mb-1 min-h-[1rem] truncate text-xs text-gray-500">
+                        {item.short_description || ""}
+                      </p>
                       {/* Price and Arrow — effective_price only; show struck base when effective < base */}
-                      <div className="flex items-center justify-between gap-2 mt-2">
+                      <div className="mt-auto flex items-center justify-between gap-2">
                         <p className="text-gray-900 text-base font-bold">
                           {showStrikeBase(item) && (
                             <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(item)}</span>

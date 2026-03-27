@@ -345,11 +345,11 @@ const ProductPage: React.FC = () => {
 
         {/* Sort and Filter Buttons */}
         <div className="bg-[#f8f6f1] px-8 py-2 flex items-center justify-start gap-2">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-[#222222]">
+          <button className="flex items-center gap-2 px-4 py-2 bg-[#f8f6f1] border border-gray-200 rounded-xl text-sm font-medium text-[#222222] hover:bg-[#f1eee7] transition-colors">
             <img src={sortIcon} alt="Sort" className="w-4 h-4" />
             Sort
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-[#222222]">
+          <button className="flex items-center gap-2 px-4 py-2 bg-[#f8f6f1] border border-gray-200 rounded-xl text-sm font-medium text-[#222222] hover:bg-[#f1eee7] transition-colors">
             <img src={filterIcon} alt="Filter" className="w-4 h-4" />
             Filter
           </button>

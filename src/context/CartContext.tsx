@@ -552,7 +552,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                   final_price: price,
                 }
               : null,
-            categorySlug: existingItem?.categorySlug, // Preserve categorySlug from existing item if available
+            // Prefer API category slug; fall back to any preserved local value
+            categorySlug: (product as any)?.category?.slug || existingItem?.categorySlug,
           };
           
           console.log('Mapped cart item:', { 
