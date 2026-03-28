@@ -31,7 +31,6 @@ const OTPVerification: React.FC = () => {
   const [otp, setOtp] = useState<string[]>(new Array(6).fill(""));
   const [countdown, setCountdown] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [error, setError] = useState('');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Array of images to cycle through
@@ -127,7 +126,6 @@ const OTPVerification: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      setError('');
       const response = await authService.verifyOTP(phoneNumber, otpString);
 
       // Handle new Django API response structure
@@ -196,7 +194,6 @@ const OTPVerification: React.FC = () => {
       }
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || err.message || err.error || 'Invalid OTP';
-      setError(errorMessage);
       setOtp(new Array(6).fill(""));
       toast.error(errorMessage);
     } finally {
@@ -210,7 +207,6 @@ const OTPVerification: React.FC = () => {
     try {
       await authService.sendOTP(phoneNumber);
       setCountdown(30);
-      setError('');
     } catch (err: any) {
       let errorMessage = err?.response?.data?.message || err?.message || 'Failed to resend OTP';
       
@@ -225,8 +221,8 @@ const OTPVerification: React.FC = () => {
           errorMessage = "Too many OTP requests. Please wait a few minutes before trying again.";
         }
       }
-      
-      setError(errorMessage);
+
+      toast.error(errorMessage);
     }
   };
 
@@ -297,16 +293,6 @@ const OTPVerification: React.FC = () => {
               <span>Edit number</span>
             </button>
           </div>
-
-          {error && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-red-500 text-xs sm:text-sm mb-4 sm:mb-6 text-center"
-            >
-              {error}
-            </motion.div>
-          )}
 
           <form onSubmit={(e) => { e.preventDefault(); handleVerify(); }} className="space-y-4 sm:space-y-5 md:space-y-6">
             <div className="flex gap-2 sm:gap-3 justify-center">

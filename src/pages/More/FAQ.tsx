@@ -16,7 +16,8 @@ const FAQ: React.FC = () => {
   const [expandedFAQ, setExpandedFAQ] = useState<string>('');
   const [faqSections, setFaqSections] = useState<FAQSection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { theme } = useFeatureTheme();
+  const { theme, feature } = useFeatureTheme();
+  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
 
   useEffect(() => {
     const fetchFAQs = async () => {
@@ -70,7 +71,8 @@ const FAQ: React.FC = () => {
         {/* Header */}
         <div className="px-4 pt-4 flex items-center gap-3">
           <button
-            onClick={() => navigate(-1)}
+            type="button"
+            onClick={() => navigate(`${basePath}/account`)}
             className="hover:bg-gray-100 rounded-full p-2 transition-colors"
           >
             <IoArrowBack className="text-xl" />

@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { IoArrowBack, IoCreateOutline } from 'react-icons/io5';
+import { IoArrowBack, IoCreateOutline, IoTrashOutline } from 'react-icons/io5';
 import { BsCalendar4 } from 'react-icons/bs';
 import { MdLocationOn } from 'react-icons/md';
 import { FaTag, FaPlus, FaMinus, FaTimes, FaCheck } from 'react-icons/fa';
@@ -50,6 +50,9 @@ const formatSlotTimeRange = (start: string, end: string): string => {
   const endStr = e.m > 0 ? `${e.h}:${String(e.m).padStart(2, '0')}` : `${e.h}`;
   return `${startStr}-${endStr}${e.period}`;
 };
+
+const getSlotDisplayLabel = (slot: DeliverySlot): string =>
+  slot.start_time && slot.end_time ? formatSlotTimeRange(slot.start_time, slot.end_time) : slot.slot_name || '';
 
 // Parse "HH:mm:ss" / "HH:mm" into minutes from midnight
 const toMinutes = (timeStr: string): number => {
@@ -126,6 +129,26 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [isFetchingCoupons, setIsFetchingCoupons] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  /** Lifts sheet above mobile keyboard (visualViewport shrinks when IME is open) */
+  const [sheetInset, setSheetInset] = useState({ bottom: 0, maxHeight: '88dvh' as string });
+  const manualInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const sync = () => {
+      const insetBottom = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      const maxH = Math.max(220, Math.min(vv.height * 0.92, window.innerHeight * 0.88));
+      setSheetInset({ bottom: insetBottom, maxHeight: `${maxH}px` });
+    };
+    vv.addEventListener('resize', sync);
+    vv.addEventListener('scroll', sync);
+    sync();
+    return () => {
+      vv.removeEventListener('resize', sync);
+      vv.removeEventListener('scroll', sync);
+    };
+  }, []);
 
   const loadCoupons = async () => {
     try {
@@ -152,9 +175,10 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
       {/* Backdrop above app chrome (bottom nav z-50) */}
       <div className="fixed inset-0 z-[90] bg-black/40" onClick={onClose} aria-hidden />
 
-      {/* Bottom sheet — flush to safe bottom so it isn’t fighting the nav */}
+      {/* Bottom sheet — bottom/maxHeight follow visualViewport so content stays above the keyboard */}
       <div
-        className="fixed inset-x-0 bottom-0 z-[100] flex max-h-[min(88dvh,100vh)] flex-col rounded-t-[24px] bg-white pb-safe-bottom shadow-2xl sm:rounded-t-[28px]"
+        className="fixed inset-x-0 z-[100] flex min-h-0 flex-col rounded-t-[24px] bg-white pb-safe-bottom shadow-2xl sm:rounded-t-[28px]"
+        style={{ bottom: sheetInset.bottom, maxHeight: sheetInset.maxHeight }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="promo-modal-title"
@@ -174,17 +198,23 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
           </button>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-3 sm:space-y-5 sm:py-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-3 sm:space-y-5 sm:py-4">
 
           {/* Manual entry */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-700 sm:text-sm">Enter Promo Code</label>
             <div className="flex gap-2">
               <input
+                ref={manualInputRef}
                 type="text"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value.toUpperCase())}
                 onKeyDown={(e) => e.key === 'Enter' && handleManualApply()}
+                onFocus={(e) => {
+                  window.setTimeout(() => {
+                    e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                  }, 300);
+                }}
                 placeholder="e.g. POOJA10"
                 className="min-w-0 flex-1 rounded-xl border-2 border-gray-200 px-3 py-2 text-sm font-medium uppercase tracking-wider outline-none transition-colors focus:border-[#19411F] sm:px-4 sm:py-2.5"
               />
@@ -390,6 +420,24 @@ const Cart: React.FC = () => {
     return slotStartMinutes > nowMinutes;
   };
 
+  /** Slots the user can actually book for the currently selected delivery date (past slots for "today" are omitted from UI). */
+  const slotsToShow = useMemo(() => {
+    const raw =
+      deliveryInfo?.selectedDate instanceof Date
+        ? deliveryInfo.selectedDate
+        : deliveryInfo?.selectedDate
+          ? new Date(deliveryInfo.selectedDate)
+          : new Date();
+    const day = startOfDay(raw);
+    return availableSlots.filter((slot) => isSlotSelectable(slot, day));
+  }, [availableSlots, deliveryInfo?.selectedDate]);
+
+  /** True when at least one slot can still be booked for today (after load). */
+  const hasSelectableTodaySlots = useMemo(() => {
+    const today = startOfDay(new Date());
+    return availableSlots.some((slot) => isSlotSelectable(slot, today));
+  }, [availableSlots]);
+
   useEffect(() => {
     if ((location.state as { addressUpdated?: boolean } | null)?.addressUpdated) {
       setShowAddressSavedBanner(true);
@@ -536,12 +584,12 @@ const Cart: React.FC = () => {
           : null;
         const toSelect = restored ?? selectableSlots[0];
         setSelectedSlotId(toSelect.id);
-        setSelectedTimeSlot(toSelect.slot_name);
+        setSelectedTimeSlot(getSlotDisplayLabel(toSelect));
         updateDeliveryInfo({
           ...(deliveryInfo ?? {}),
           deliveryDate: formattedDate,
           selectedDate: normalizedDate,
-          timeSlot: toSelect.slot_name,
+          timeSlot: getSlotDisplayLabel(toSelect),
           slotId: toSelect.id,
         });
       } else {
@@ -563,6 +611,26 @@ const Cart: React.FC = () => {
       setIsLoadingSlots(false);
     }
   };
+
+  // If "Today" has no bookable slots, hide it and move selection off "today" (e.g. to tomorrow).
+  useEffect(() => {
+    if (isLoadingSlots) return;
+    const today = startOfDay(new Date());
+    const hasTodaySlots = availableSlots.some((s) => isSlotSelectable(s, today));
+    if (hasTodaySlots) return;
+    if (selectedDateOption !== 'today') return;
+    const tomorrow = addDays(new Date(), 1);
+    setSelectedDateOption('tomorrow');
+    updateDeliveryInfo({
+      ...(deliveryInfo ?? {}),
+      deliveryDate: format(tomorrow, 'dd MMM yyyy'),
+      timeSlot: '',
+      slotId: undefined,
+      selectedDate: tomorrow,
+    });
+    fetchSlotsForDate(tomorrow);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run when slot data proves today is unavailable
+  }, [isLoadingSlots, availableSlots, selectedDateOption]);
 
   // Load cart from API on mount
   useEffect(() => {
@@ -784,8 +852,8 @@ const Cart: React.FC = () => {
         : new Date();
     if (!isSlotSelectable(slot, selectedDate)) return;
     setSelectedSlotId(slot.id);
-    setSelectedTimeSlot(slot.slot_name);
-    if (deliveryInfo) updateDeliveryInfo({ ...deliveryInfo, timeSlot: slot.slot_name, slotId: slot.id });
+    setSelectedTimeSlot(getSlotDisplayLabel(slot));
+    if (deliveryInfo) updateDeliveryInfo({ ...deliveryInfo, timeSlot: getSlotDisplayLabel(slot), slotId: slot.id });
   };
 
   const isBouquetItem = (item: (typeof items)[number]) => {
@@ -1163,125 +1231,119 @@ const Cart: React.FC = () => {
                       className="h-[5.25rem] w-[5.25rem] flex-shrink-0 rounded-2xl object-cover"
                       onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
                     />
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-sm font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere]">
-                        {item.name} x {item.quantity}
-                        {item.variant?.name && (
-                          <span className="font-normal text-gray-600"> ({item.variant.name})</span>
-                        )}
-                      </h3>
-                      {deliveryInfo && (
-                        <div className="mt-0.5 text-xs leading-snug text-gray-600">
-                          <div>Delivery: {deliveryInfo.deliveryDate}</div>
-                          <div>Time Slot: {deliveryInfo.timeSlot}</div>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere]">
+                            {item.name} x {item.quantity}
+                            {item.variant?.name && (
+                              <span className="font-normal text-gray-600"> ({item.variant.name})</span>
+                            )}
+                          </h3>
+                          {deliveryInfo && (
+                            <div className="mt-0.5 text-xs leading-snug text-gray-600">
+                              <div>Delivery: {deliveryInfo.deliveryDate}</div>
+                              <div>Time Slot: {deliveryInfo.timeSlot}</div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <div className="mt-1 text-base font-semibold leading-tight text-gray-900">
-                        ₹{Number(item.price).toFixed(2)} each
-                      </div>
-                      {/* Bouquet message UI is rendered below (add/edit state) */}
-                    </div>
-
-                    {/* Right controls: action aligned above + button */}
-                    <div className="relative grid grid-cols-[2rem_1.25rem_2rem] grid-rows-2 items-center gap-x-1 gap-y-1 pt-0.5">
-                      {/* Row 1: action button (only in col 3) */}
-                      <div className="col-start-3 row-start-1 flex justify-center">
                         <button
                           type="button"
                           onClick={() => handleDeleteItem(item.id)}
-                          className="flex !min-h-0 !min-w-0 h-8 w-8 items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-50"
+                          className="touch-target-compact flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-red-500 transition-colors hover:bg-gray-200"
                           aria-label="Remove item"
                         >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                            <path d="M8 7V5.8C8 5.11994 8.119 4.65101 8.4446 4.3254C8.7702 4 9.23913 4 9.91919 4H14.0808C14.7609 4 15.2298 4 15.5554 4.3254C15.881 4.65101 16 5.11994 16 5.8V7M10 11V16M14 11V16M5 7H19M18 7V17.2C18 18.8802 18 19.7202 17.673 20.362C17.3854 20.9265 16.9265 21.3854 16.362 21.673C15.7202 22 14.8802 22 13.2 22H10.8C9.11984 22 8.27976 22 7.63803 21.673C7.07354 21.3854 6.6146 20.9265 6.32698 20.362C6 19.7202 6 18.8802 6 17.2V7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
+                          <IoTrashOutline className="h-[15px] w-[15px]" aria-hidden />
                         </button>
                       </div>
-
-                      {/* Row 2: qty controls */}
-                      <button
-                        type="button"
-                        onClick={() => handleQuantityDelta(item.id, -1)}
-                        disabled={item.quantity <= 1}
-                        className="col-start-1 row-start-2 flex !min-h-0 !min-w-0 h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 disabled:opacity-60"
-                        aria-label="Decrease quantity"
-                      >
-                        <FaMinus className="text-[8px]" />
-                      </button>
-                      <span className="col-start-2 row-start-2 min-w-[1rem] text-center text-xs font-medium text-gray-900">
-                        {item.quantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleQuantityDelta(item.id, 1)}
-                        className="col-start-3 row-start-2 flex !min-h-0 !min-w-0 h-8 w-8 items-center justify-center rounded-full bg-[#19411F] text-white transition-colors hover:bg-[#1e5a1c]"
-                        aria-label="Increase quantity"
-                      >
-                        <FaPlus className="text-[8px]" />
-                      </button>
+                      <div className="mt-1 flex min-h-[1.75rem] items-center justify-between gap-2">
+                        <span className="text-base font-semibold leading-tight text-gray-900">
+                          ₹{Number(item.price).toFixed(2)} each
+                        </span>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityDelta(item.id, -1)}
+                            disabled={item.quantity <= 1}
+                            className="touch-target-compact flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition-colors hover:bg-gray-200 disabled:opacity-50"
+                            aria-label="Decrease quantity"
+                          >
+                            <FaMinus className="text-[7px]" />
+                          </button>
+                          <span className="min-w-[0.875rem] text-center text-[11px] font-medium tabular-nums text-gray-900">
+                            {item.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityDelta(item.id, 1)}
+                            className="touch-target-compact flex h-6 w-6 items-center justify-center rounded-full bg-[#19411F] text-white transition-colors hover:bg-[#1e5a1c]"
+                            aria-label="Increase quantity"
+                          >
+                            <FaPlus className="text-[7px]" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Bouquet: custom message UI (matches reference screenshots) */}
+                  {/* Bouquet: custom message */}
                   {isBouquetItem(item) && editingItemId !== item.id && (
-                    <div className="mt-2 pl-24 pr-1">
-                      {item.customizedMessage ? (
-                        <div className="flex items-center justify-between gap-3 px-1">
-                          <p className="flex-1 min-w-0 text-xs text-gray-500 leading-snug truncate">
-                            <span className="font-medium text-gray-500">Customized Message:</span>{' '}
-                            {item.customizedMessage}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => handleEditItem(item.id)}
-                            className="flex !min-h-0 !min-w-0 h-8 w-8 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-                            aria-label="Edit custom message"
-                          >
-                            <IoCreateOutline className="text-lg" />
-                          </button>
-                        </div>
-                      ) : (
+                    item.customizedMessage ? (
+                      <div className="mt-2 flex items-center justify-between gap-3 pl-[5.25rem] pr-1 sm:pl-24">
+                        <p className="min-w-0 flex-1 truncate text-xs leading-snug text-gray-500">
+                          <span className="font-medium text-gray-500">Customized Message:</span>{' '}
+                          {item.customizedMessage}
+                        </p>
                         <button
                           type="button"
-                          onClick={() => {
-                            setEditingItemId(item.id);
-                            setEditMessage('');
-                          }}
-                          className="inline-flex items-center gap-2 rounded-full border border-[#19411F] bg-white px-3 py-1.5 text-xs font-semibold text-[#19411F] hover:bg-[#f1f7f2]"
+                          onClick={() => handleEditItem(item.id)}
+                          className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100"
+                          aria-label="Edit custom message"
                         >
-                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[#19411F] text-[#19411F]">
-                            <svg width="12" height="12" viewBox="0 0 20 20" fill="none" aria-hidden>
-                              <path d="M10 4.5V15.5M4.5 10H15.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                            </svg>
-                          </span>
-                          Add custom message
+                          <IoCreateOutline className="text-lg" />
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingItemId(item.id);
+                          setEditMessage('');
+                        }}
+                        className="touch-target-compact mt-2 ml-[5.25rem] mr-1 inline-flex h-auto w-auto items-center gap-2 rounded-full border border-[#19411F] bg-white px-3 py-1.5 text-[11px] font-semibold leading-snug text-[#19411F] hover:bg-[#f1f7f2] sm:ml-24"
+                      >
+                        <span className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-[#19411F] text-[#19411F]">
+                          <svg width="10" height="10" viewBox="0 0 20 20" fill="none" aria-hidden>
+                            <path d="M10 4.5V15.5M4.5 10H15.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                          </svg>
+                        </span>
+                        Add custom message
+                      </button>
+                    )
                   )}
 
                   {editingItemId === item.id && isBouquetItem(item) && (
-                    <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-3">
+                    <div className="mt-2 pl-[5.25rem] pr-1 sm:pl-24 sm:pr-3">
                       <textarea
                         value={editMessage}
                         onChange={(e) => { if (e.target.value.length <= 500) setEditMessage(e.target.value); }}
                         placeholder="Add a customized message"
-                        className="w-full resize-none rounded-xl border border-gray-200 bg-[#fafafa] p-3 text-sm text-gray-900 outline-none focus:border-[#19411F]"
-                        rows={3}
+                        className="min-h-[4.75rem] w-full resize-none rounded-lg border border-gray-200 bg-[#fafafa] px-3 py-2.5 text-xs leading-snug text-gray-900 outline-none focus:border-[#19411F]"
+                        rows={2}
                         maxLength={500}
                       />
-                      <div className="mt-3 flex justify-end gap-2">
+                      <div className="mt-2.5 flex justify-end gap-2">
                         <button
                           type="button"
                           onClick={handleCancelEdit}
-                          className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          className="touch-target-compact inline-flex h-auto items-center rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
                         >
                           Cancel
                         </button>
                         <button
                           type="button"
                           onClick={() => handleSaveEdit(item.id)}
-                          className="rounded-xl bg-[#19411F] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1e5a1c]"
+                          className="touch-target-compact inline-flex h-auto items-center rounded-lg bg-[#19411F] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#1e5a1c]"
                         >
                           Save
                         </button>
@@ -1295,13 +1357,21 @@ const Cart: React.FC = () => {
               <div className="bg-white rounded-[25px] p-4 shadow-sm relative">
                 <h3 className="text-base font-semibold text-gray-900 mb-3">Delivery Date</h3>
                 <div className="grid grid-cols-2 gap-2 xs:grid-cols-4 mb-4">
-                  {(['today', 'tomorrow', 'dayAfter', 'pickDate'] as const).map((opt) => (
+                  {(['today', 'tomorrow', 'dayAfter', 'pickDate'] as const).map((opt) => {
+                    const isTodayDisabled =
+                      opt === 'today' && !isLoadingSlots && !hasSelectableTodaySlots;
+                    return (
                     <button
                       key={opt}
                       type="button"
+                      disabled={isTodayDisabled}
                       onClick={() => handleDateOptionSelect(opt)}
                       className={`px-2 py-2 min-h-[40px] xs:min-h-[36px] rounded-xl text-[10px] xs:text-[10px] font-medium transition-colors flex items-center justify-center gap-1 text-center leading-tight ${
-                        selectedDateOption === opt ? 'bg-[#19411F] text-white' : 'bg-white text-gray-700 border border-gray-200'
+                        isTodayDisabled
+                          ? 'cursor-not-allowed border border-gray-200 bg-gray-50 text-gray-400'
+                          : selectedDateOption === opt
+                            ? 'bg-[#19411F] text-white'
+                            : 'bg-white text-gray-700 border border-gray-200'
                       }`}
                     >
                       {opt === 'pickDate' && <BsCalendar4 className="flex-shrink-0 text-[10px]" aria-hidden />}
@@ -1309,7 +1379,8 @@ const Cart: React.FC = () => {
                         {opt === 'today' ? 'Today' : opt === 'tomorrow' ? 'Tomorrow' : opt === 'dayAfter' ? 'Day After' : 'Pick Date'}
                       </span>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <h3 className="text-base font-semibold text-gray-900 mb-3 mt-4">
@@ -1343,7 +1414,11 @@ const Cart: React.FC = () => {
                       <DatePicker
                         selected={deliveryInfo?.selectedDate || null}
                         onChange={handleDatePickerChange}
-                        minDate={startOfDay(new Date())}
+                        minDate={
+                          isLoadingSlots || hasSelectableTodaySlots
+                            ? startOfDay(new Date())
+                            : addDays(startOfDay(new Date()), 1)
+                        }
                         inline
                         calendarClassName="!border-0 !shadow-none"
                         className="w-full"
@@ -1355,36 +1430,28 @@ const Cart: React.FC = () => {
                 <div className="w-full">
                   {isLoadingSlots ? (
                     <div className="text-xs text-gray-400 py-2 text-center">Checking availability...</div>
-                  ) : availableSlots.length === 0 ? (
+                  ) : slotsToShow.length === 0 ? (
                     <div className="text-xs text-red-500 py-2 text-center">No slots available for this date</div>
                   ) : (
-                    <div className="grid gap-2 w-full" style={{ gridTemplateColumns: `repeat(${availableSlots.length}, 1fr)` }}>
-                      {availableSlots.map((slot) => (
-                        (() => {
-                          const selectedDate =
-                            deliveryInfo?.selectedDate instanceof Date
-                              ? deliveryInfo.selectedDate
-                              : deliveryInfo?.selectedDate
-                              ? new Date(deliveryInfo.selectedDate)
-                              : new Date();
-                          const disabled = !isSlotSelectable(slot, selectedDate);
-                          return (
+                    <div
+                      className="grid w-full min-w-0 gap-2"
+                      style={{
+                        gridTemplateColumns: `repeat(${slotsToShow.length}, minmax(0, 1fr))`,
+                      }}
+                    >
+                      {slotsToShow.map((slot) => (
                         <button
                           key={slot.id}
+                          type="button"
                           onClick={() => handleTimeSlotSelect(slot)}
-                          disabled={disabled}
-                          className={`w-full min-w-0 px-2.5 py-2 min-h-[36px] rounded-xl text-[10px] font-medium transition-colors flex items-center justify-center gap-1.5 ${
-                            disabled
-                              ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
-                              : selectedSlotId === slot.id
+                          className={`w-full min-w-0 px-1.5 py-2 min-h-[36px] rounded-xl text-[10px] xs:text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                            selectedSlotId === slot.id
                               ? 'bg-[#19411F] text-white'
                               : 'bg-white text-gray-700 border border-gray-200'
                           }`}
                         >
                           {slot.start_time && slot.end_time ? formatSlotTimeRange(slot.start_time, slot.end_time) : (slot.slot_name || 'Slot')}
                         </button>
-                          );
-                        })()
                       ))}
                     </div>
                   )}

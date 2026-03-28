@@ -131,7 +131,8 @@ const Addresses: React.FC = () => {
         {/* Header */}
         <div className="p-4 pt-6 -mx-4 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200 mb-2 flex items-center gap-3">
           <button
-            onClick={() => navigate(-1)}
+            type="button"
+            onClick={() => navigate(`${basePath}/account`)}
             className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
           >
             <IoArrowBack size={24} />

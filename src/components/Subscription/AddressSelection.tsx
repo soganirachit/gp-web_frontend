@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { FaArrowLeft, FaMapMarkerAlt, FaCheck, FaTimes } from "react-icons/fa";
+import { FaArrowLeft, FaCheck, FaTimes } from "react-icons/fa";
 import { MdLocationOn, MdMyLocation } from "react-icons/md";
 import { IoArrowBack } from "react-icons/io5";
-import { BsThreeDotsVertical } from "react-icons/bs";
 import { toast } from "react-hot-toast";
 import { addressService, Address } from "../../services/address.service";
 import { GoogleMap } from "@react-google-maps/api";
@@ -12,10 +11,12 @@ import ReactDOM from "react-dom/client";
 import { orderService } from "../../services/order.service";
 import { subscriptionService } from "../../services/subscription.service";
 import { customerService } from "../../services/getcustomer.service";
-import { FaPen } from "react-icons/fa";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import Spinner from "../common/Spinner";
 import { formatPhoneForDisplay } from "../../utils/phoneDisplay";
+import homeIcon from "../../assets/svg/adressbook/home.svg";
+import workIcon from "../../assets/svg/adressbook/office.svg";
+import othersIcon from "../../assets/svg/adressbook/others.svg";
 
 const AddressSelection: React.FC = () => {
   const navigate = useNavigate();
@@ -64,9 +65,39 @@ const AddressSelection: React.FC = () => {
     coordinates: "",
     setAsDefault: false,
   });
-  const [expandedMenuId, setExpandedMenuId] = useState<string | null>(null);
   const isStoreProduct = location.state?.product?.isStore;
   const [userData, setUserData] = useState<any>(null);
+
+  const getTypeIcon = (type: string) => {
+    const t = type?.toLowerCase();
+    if (t === "home") return homeIcon;
+    if (t === "work" || t === "office") return workIcon;
+    return othersIcon;
+  };
+
+  /** Same pattern as My Addresses — static preview map per card */
+  const AddressThumbnailMap: React.FC<{ coordinates: string }> = ({ coordinates }) => {
+    const parts = coordinates.split(",").map((s) => Number(s.trim()));
+    const lat = parts[0];
+    const lng = parts[1];
+    if (!isLoaded || Number.isNaN(lat) || Number.isNaN(lng)) {
+      return <div className="h-full w-full animate-pulse rounded-lg bg-gray-200" />;
+    }
+    return (
+      <GoogleMap
+        mapContainerStyle={{ width: "100%", height: "100%", borderRadius: "0.5rem" }}
+        center={{ lat, lng }}
+        zoom={15}
+        options={{
+          disableDefaultUI: true,
+          draggable: false,
+          zoomControl: false,
+          scrollwheel: false,
+          disableDoubleClickZoom: true,
+        }}
+      />
+    );
+  };
 
   useEffect(() => {
     // Prevent double execution in StrictMode
@@ -890,7 +921,7 @@ const AddressSelection: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f6f1]">
+    <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
       {/* Header */}
       {/* <div className="bg-[#f8f6f1] sticky top-0 z-10 border-b">
         <div className="max-w-[800px] mx-auto px-4 py-3">
@@ -921,8 +952,8 @@ const AddressSelection: React.FC = () => {
         </div>
       </div> */}
 
-      {/* Main Content */}
-      <div className="max-w-[800px] mx-auto p-4">
+      {/* Main Content — bottom padding clears fixed bottom nav when scrolling */}
+      <div className="mx-auto max-w-[800px] p-4 pb-6">
         {showAddForm ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Map Section */}
@@ -1064,16 +1095,17 @@ const AddressSelection: React.FC = () => {
             </div>
           </form>
         ) : (
-          <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="py-4 flex items-center mb-2">
+          <div className="flex flex-col">
+            {/* Header — aligned with My Addresses / reference */}
+            <div className="-mx-4 mb-4 flex items-center gap-3 border-b border-gray-200 bg-[#f8f6f1] px-4 py-4 pt-6 sticky top-0 z-10">
               <button
+                type="button"
                 onClick={() => navigate(-1)}
-                className="hover:bg-gray-100 rounded-full p-2 transition-colors mr-3"
+                className="-ml-2 rounded-full p-2 transition-colors hover:bg-black/5"
               >
-                <IoArrowBack className="text-xl" />
+                <IoArrowBack size={24} className="text-gray-900" />
               </button>
-              <h1 className="text-2xl font-semibold text-gray-800">Confirm delivery address</h1>
+              <h1 className="font-serif text-2xl font-bold text-gray-900">Delivery address</h1>
             </div>
 
             {showAddressAddedInline && (
@@ -1097,89 +1129,80 @@ const AddressSelection: React.FC = () => {
               </div>
             )}
 
-            {/* Address List */}
-            <div className="space-y-4 mb-4">
-              {addresses.map((address) => (
-                <div
-                  key={address.id}
-                  onClick={() => handleAddressSelect(address)}
-                  className={`rounded-2xl p-5 cursor-pointer transition-all relative shadow-sm ${selectedAddress?.id === address.id
-                    ? "bg-[#E6F4EA] border border-[#E6F4EA]"
-                    : "bg-white border border-transparent"
+            {/* Address List — layout matches My Addresses: left details + right map */}
+            <div className="mb-6 space-y-4">
+              {addresses.map((address) => {
+                const icon = getTypeIcon(address.type || "home");
+                const addressTypeLower = address.type?.toLowerCase() || "";
+                const isGreenBg = addressTypeLower !== "work" && addressTypeLower !== "office";
+                const iconBgClass = isGreenBg ? "bg-[#ECFDF5]" : "bg-[#EEF2FF]";
+                const isSelected = selectedAddress?.id === address.id;
+
+                return (
+                  <div
+                    key={address.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleAddressSelect(address)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleAddressSelect(address);
+                      }
+                    }}
+                    className={`cursor-pointer rounded-3xl p-5 shadow-sm transition-all ${
+                      isSelected
+                        ? "border-2 border-[#19411F] bg-[#F2FEF4]"
+                        : "border border-transparent bg-white"
                     }`}
-                >
-                  {/* Row 1: Type - Default - Menu */}
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-semibold text-gray-800 capitalize">
-                        {address.type || 'Home'}
-                      </h3>
-                      {address.isDefault && (
-                        <span className="bg-[#C6F6D5] text-[#22543D] text-xs px-2 py-0.5 rounded-2xl font-semibold">
-                          Default
-                        </span>
-                      )}
-                    </div>
-                    {/* Menu action */}
-                    <div className="relative">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setExpandedMenuId(expandedMenuId === address.id ? null : address.id);
-                        }}
-                        className="text-gray-400 p-1 hover:bg-black/5 rounded-full"
-                      >
-                        <BsThreeDotsVertical />
-                      </button>
-
-                      {expandedMenuId === address.id && (
-                        <div className="absolute right-0 top-8 bg-white shadow-lg rounded-lg py-1 z-10 border min-w-[120px]">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`${basePath}/addresses/edit`, { state: { address } });
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 bg-white flex items-center gap-2"
+                  >
+                    <div className="flex justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-2 flex items-center gap-3">
+                          <div
+                            className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${iconBgClass}`}
                           >
-                            <FaPen className="text-xs" />
-                            <span>Edit</span>
-                          </button>
+                            <img src={icon} alt={address.type || "Address"} className="h-5 w-5" />
+                          </div>
+                          <h3 className="text-lg font-semibold capitalize text-gray-800">
+                            {address.type || "Home"}
+                          </h3>
+                          {address.isDefault && (
+                            <span className="flex-shrink-0 rounded-2xl bg-[#E6F4EA] px-2 py-1 text-xs font-semibold text-[#1E8E3E]">
+                              Default
+                            </span>
+                          )}
                         </div>
-                      )}
+                        <p className="mb-1 break-words pr-2 text-sm leading-relaxed text-gray-500">
+                          {[
+                            address.houseNo,
+                            address.streetName,
+                            address.area,
+                            address.landmark,
+                            address.city,
+                            address.state,
+                          ]
+                            .filter(Boolean)
+                            .join(", ")}
+                          {address.pincode ? ` - ${address.pincode}` : ""}
+                        </p>
+                        <p className="text-sm font-medium text-gray-800">
+                          {address.associatedPhoneNumber
+                            ? `+91 ${formatPhoneForDisplay(address.associatedPhoneNumber)}`
+                            : "+91 —"}
+                        </p>
+                      </div>
+                      <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                        {address.coordinates ? (
+                          <AddressThumbnailMap coordinates={address.coordinates} />
+                        ) : (
+                          <div className="h-full w-full bg-gray-200" />
+                        )}
+                      </div>
                     </div>
                   </div>
-
-                  {/* Row 2: Full Address */}
-                  <p className="text-gray-600 text-sm leading-relaxed mb-3 pr-4">
-                    {[
-                      address.houseNo,
-                      address.streetName,
-                      address.area,
-                      address.landmark
-                    ].filter(Boolean).join(', ')}
-                    {address.pincode && ` - ${address.pincode}`}
-                  </p>
-
-                  {/* Row 3: Location - City - Phone */}
-                  <div className="flex items-center text-gray-500 text-sm gap-2">
-                    <FaMapMarkerAlt className="text-gray-900" />
-                    <span className="font-medium text-gray-700">
-                      {address.city && address.city.toLowerCase() !== 'unknown' ? (
-                        address.city
-                      ) : (
-                        <span className="italic">NA</span>
-                      )}
-                    </span>
-                    <span className="ml-3 font-medium text-gray-800">
-                      {address.associatedPhoneNumber ? (
-                        `+91 ${formatPhoneForDisplay(address.associatedPhoneNumber)}`
-                      ) : (
-                        <span className="italic">NA</span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Validation Message */}
@@ -1196,9 +1219,9 @@ const AddressSelection: React.FC = () => {
               </div>
             )}
 
-            {/* Bottom Buttons */}
-            <div className="mt-auto pt-2 md:relative md:bg-transparent md:p-0">
-              <div className="max-w-[800px] mx-auto space-y-3">
+            {/* Bottom Buttons — in document flow so they scroll above bottom nav */}
+            <div className="pt-2">
+              <div className="mx-auto max-w-[800px] space-y-3">
                 <button
                   onClick={() => navigate(`${basePath}/addresses/add`)}
                   className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-base font-semibold hover:opacity-90 shadow-sm ${

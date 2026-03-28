@@ -13,6 +13,8 @@ export interface Store {
   latitude: string;
   longitude: string;
   is_active: boolean;
+  /** From GET /stores/ — false means store is temporarily offline for ordering */
+  is_online?: boolean;
   opening_time: string;
   closing_time: string;
   delivery_fee: string;

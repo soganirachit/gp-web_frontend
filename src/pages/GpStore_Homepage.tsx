@@ -26,6 +26,8 @@ import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
 // Large banner served from public/ for better caching
 const bannerSvg = '/gp_store_banner.svg';
 import BottomNavigation from "../components/layout/BottomNav";
+import { formatProductTitleCase } from "../lib/formatProductTitleCase";
+import { ProductImageTag } from "../components/common/ProductImageTag";
 import namasteSvg from '../assets/svg/namaste.svg';
 
 
@@ -40,7 +42,10 @@ const GpStore_Homepage: React.FC = () => {
     const [deliveryLocation, setDeliveryLocation] = useState<string>("");
     const [addressType, setAddressType] = useState<string>("Home");
     const [isLoadingAddress, setIsLoadingAddress] = useState(true);
+    /** All Packs — GET /products/ (no ordering) */
     const [products, setProducts] = useState<BestSeller[]>([]);
+    /** Premium Packs — GET /products/?label=premium (see Postman List Products + List Labels) */
+    const [premiumProducts, setPremiumProducts] = useState<BestSeller[]>([]);
     const [isLoadingProducts, setIsLoadingProducts] = useState(true);
     const [userFirstName, setUserFirstName] = useState<string>("");
     const [categories, setCategories] = useState<Category[]>([]);
@@ -67,31 +72,33 @@ const GpStore_Homepage: React.FC = () => {
     const fetchProducts = async (signal?: AbortSignal) => {
         try {
             setIsLoadingProducts(true);
-            // Use productService instead of storeProductService
-            // Get best sellers or all products based on store ID
             const storeId = storeService.getStoreIdForProducts();
-            
-            // Ensure store ID is available before fetching (especially for non-logged-in users)
+            const sid = storeId || undefined;
             if (!storeId) {
                 console.warn("Store ID not available, products may not load correctly");
             }
-            
-            const fetchedProducts = await productService.getBestSellers(storeId || undefined, signal);
-            // Best sellers are already filtered, but ensure we have products
-            setProducts(fetchedProducts || []);
+
+            const normalizeList = (list: unknown[]) =>
+                (list || []).map((p) => productService.normalizeToBestSeller(p as Record<string, unknown>));
+
+            const [allPacksRaw, premiumRaw] = await Promise.all([
+                productService.getProductsByOrdering(undefined, sid, signal),
+                productService.getProductsByLabel("premium", sid, signal, "-order_count"),
+            ]);
+
+            setProducts(normalizeList(allPacksRaw as unknown[]));
+            setPremiumProducts(normalizeList(premiumRaw as unknown[]).slice(0, 12));
         } catch (error: any) {
-            // Don't log error if request was aborted (component unmounted)
             if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-                console.log('Products request was canceled');
+                console.log("Products request was canceled");
                 return;
             }
             console.error("Error fetching products:", error);
-            // If 401 error, user might not be authenticated - this is OK for non-logged-in users
-            // Products should still be accessible without auth if store_id is provided
             if (error?.response?.status === 401) {
                 console.warn("Products endpoint returned 401 - store_id might be required");
             }
             setProducts([]);
+            setPremiumProducts([]);
         } finally {
             setIsLoadingProducts(false);
         }
@@ -134,6 +141,7 @@ const GpStore_Homepage: React.FC = () => {
         }
     };
 
+    /** Best Sellers — GET /products/?label=best-seller (not GET /products/best-sellers/) */
     const fetchBestSellers = async (signal?: AbortSignal) => {
         try {
             setIsLoadingBestSellers(true);
@@ -144,7 +152,12 @@ const GpStore_Homepage: React.FC = () => {
                 console.warn("Store ID not available, best sellers may not load correctly");
             }
             
-            const fetchedBestSellers = await productService.getBestSellers(storeId || undefined, signal);
+            const fetchedBestSellers = await productService.getProductsByLabel(
+                "best-seller",
+                storeId || undefined,
+                signal,
+                "-order_count"
+            );
             setBestSellers(fetchedBestSellers);
         } catch (error: any) {
             // Don't log error if request was aborted (component unmounted)
@@ -295,11 +308,7 @@ const GpStore_Homepage: React.FC = () => {
         );
     }
 
-    // Get premium products (fallback to products if best sellers not available)
-    const premiumProducts = products.slice(3, 6);
-
     const filteredBestSellers = bestSellers;
-    const filteredPremiumProducts = premiumProducts;
 
     return (
         <ErrorBoundary>
@@ -412,15 +421,16 @@ const GpStore_Homepage: React.FC = () => {
                     {/* Pick your Blooms Section */}
                     <div className="px-4 py-4">
                         <h2 className="font-ibm-plex-serif text-lg xs:text-[22px] font-semibold leading-tight xs:leading-[28px] tracking-normal text-gray-800 mb-4 xs:mb-6">Pick your Blooms</h2>
-                        <div className="grid grid-cols-3 gap-2 xs:gap-3 sm:grid-cols-4">
+                        {/* Fixed tile size (≈4× per row on phone) — does not stretch when there are few categories */}
+                        <div className="flex flex-wrap gap-x-2.5 gap-y-5 xs:gap-x-3">
                             {categories.map((category) => (
                                 <div
                                     key={category.id}
-                                    className="flex min-w-0 flex-col items-center cursor-pointer"
+                                    className="flex w-[4.5rem] xs:w-[5rem] shrink-0 flex-col items-center cursor-pointer"
                                     onClick={() => navigate(`${basePath}/products?category=${category.slug}`, { state: { categoryName: category.name, categorySlug: category.slug } })}
                                 >
                                     <div 
-                                        className="w-full aspect-square bg-white rounded-2xl overflow-hidden mb-2 shadow-sm flex items-center justify-center"
+                                        className="aspect-square w-full rounded-2xl overflow-hidden mb-2 shadow-sm flex items-center justify-center"
                                         style={{ backgroundColor: category.color_code || '#ffffff' }}
                                     >
                                         {category.icon ? (
@@ -483,40 +493,46 @@ const GpStore_Homepage: React.FC = () => {
                             </button>
                         </div>
                         <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
-                            {products.map((product) => (
-                                <div
-                                    key={product.id}
-                                    className="flex-shrink-0 w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
-                                    onClick={() => handleProductClick(product)}
-                                >
-                                    <div className="aspect-square bg-[#f8f6f1] overflow-hidden">
-                                        <img
-                                            src={getImageUrl(product.primary_image)}
-                                            alt={product.name}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    </div>
-                                    <div className="p-3">
-                                        <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
-                                            {product.name}
-                                        </h3>
-                                        {product.short_description && (
-                                            <p className="text-xs text-gray-500 mb-1 truncate">
-                                                {product.short_description}
-                                            </p>
-                                        )}
-                                        <div className="flex items-center justify-between gap-2">
-                                            <p className="text-gray-900 text-base font-bold">
-                                                {showStrikeBase(product) && (
-                                                    <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(product)}</span>
-                                                )}
-                                                ₹{getEffectivePrice(product)}/{product.unit || "box"}
-                                            </p>
-                                            <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
+                            {products.length > 0 ? (
+                                products.map((product) => (
+                                    <div
+                                        key={product.id}
+                                        className="flex flex-shrink-0 flex-col w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
+                                        onClick={() => handleProductClick(product)}
+                                    >
+                                        <div className="aspect-square bg-[#f8f6f1] overflow-hidden">
+                                            <img
+                                                src={getImageUrl(product.primary_image)}
+                                                alt={product.name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        <div className="flex flex-1 flex-col p-3">
+                                            <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
+                                                {formatProductTitleCase(product.name)}
+                                            </h3>
+                                            <div className="mb-1 min-h-[1.25rem] shrink-0">
+                                                {product.short_description ? (
+                                                    <p className="truncate text-xs text-gray-500">
+                                                        {formatProductTitleCase(product.short_description)}
+                                                    </p>
+                                                ) : null}
+                                            </div>
+                                            <div className="mt-auto flex items-center justify-between gap-2">
+                                                <p className="text-gray-900 text-base font-bold">
+                                                    <span>₹{getEffectivePrice(product)}</span>
+                                                    {showStrikeBase(product) && (
+                                                        <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(product)}</span>
+                                                    )}
+                                                </p>
+                                                <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))
+                            ) : (
+                                <p className="text-sm text-gray-500">No products available</p>
+                            )}
                         </div>
                     </div>
 
@@ -537,20 +553,11 @@ const GpStore_Homepage: React.FC = () => {
                                 filteredBestSellers.map((bestSeller) => (
                                     <div
                                         key={bestSeller.id}
-                                        className="flex-shrink-0 w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer relative"
+                                        className="relative flex flex-shrink-0 flex-col w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
                                         onClick={() => handleBestSellerClick(bestSeller)}
                                     >
-                                        <div className="aspect-square bg-[#f8f6f1] overflow-hidden relative">
-                                            {/* Label Badge - positioned over image */}
-                                            {bestSeller.labels && bestSeller.labels.length > 0 && (
-                                                <div className="absolute top-2 left-2 z-10">
-                                                    <span
-                                                        className="inline-block text-white text-[10px] font-semibold px-2 py-1 rounded bg-[#19411F]"
-                                                    >
-                                                        {bestSeller.labels[0].name.toUpperCase()}
-                                                    </span>
-                                                </div>
-                                            )}
+                                        <div className="relative aspect-square bg-[#f8f6f1] overflow-hidden">
+                                            <ProductImageTag labels={bestSeller.labels} />
                                             <img
                                                 src={bestSeller.primary_image || "/placeholder.svg"}
                                                 alt={bestSeller.name}
@@ -561,21 +568,23 @@ const GpStore_Homepage: React.FC = () => {
                                                 }}
                                             />
                                         </div>
-                                        <div className="p-3">
+                                        <div className="flex flex-1 flex-col p-3">
                                             <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
-                                                {bestSeller.name}
+                                                {formatProductTitleCase(bestSeller.name)}
                                             </h3>
-                                            {bestSeller.short_description && (
-                                                <p className="text-xs text-gray-500 mb-1 truncate">
-                                                    {bestSeller.short_description}
-                                                </p>
-                                            )}
-                                            <div className="flex items-center justify-between gap-2">
+                                            <div className="mb-1 min-h-[1.25rem] shrink-0">
+                                                {bestSeller.short_description ? (
+                                                    <p className="truncate text-xs text-gray-500">
+                                                        {formatProductTitleCase(bestSeller.short_description)}
+                                                    </p>
+                                                ) : null}
+                                            </div>
+                                            <div className="mt-auto flex items-center justify-between gap-2">
                                                 <p className="text-gray-900 text-base font-bold">
+                                                    <span>₹{getEffectivePrice(bestSeller)}</span>
                                                     {showStrikeBase(bestSeller) && (
-                                                        <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(bestSeller)}</span>
+                                                        <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(bestSeller)}</span>
                                                     )}
-                                                    ₹{getEffectivePrice(bestSeller)}
                                                 </p>
                                                 <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
                                             </div>
@@ -603,35 +612,38 @@ const GpStore_Homepage: React.FC = () => {
                             </button>
                         </div>
                         <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
-                            {filteredPremiumProducts.length > 0 ? (
-                                filteredPremiumProducts.map((product) => (
+                            {premiumProducts.length > 0 ? (
+                                premiumProducts.map((product) => (
                                 <div
                                     key={product.id}
-                                    className="flex-shrink-0 w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
+                                    className="flex flex-shrink-0 flex-col w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
                                     onClick={() => handleProductClick(product)}
                                 >
-                                    <div className="aspect-square bg-[#f8f6f1] overflow-hidden">
+                                    <div className="relative aspect-square bg-[#f8f6f1] overflow-hidden">
+                                        <ProductImageTag labels={product.labels} />
                                         <img
                                             src={getImageUrl(product.primary_image)}
                                             alt={product.name}
                                             className="w-full h-full object-cover"
                                         />
                                     </div>
-                                    <div className="p-3">
+                                    <div className="flex flex-1 flex-col p-3">
                                         <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
-                                            {product.name}
+                                            {formatProductTitleCase(product.name)}
                                         </h3>
-                                        {product.short_description && (
-                                            <p className="text-xs text-gray-500 mb-1 truncate">
-                                                {product.short_description}
-                                            </p>
-                                        )}
-                                        <div className="flex items-center justify-between gap-2">
+                                        <div className="mb-1 min-h-[1.25rem] shrink-0">
+                                            {product.short_description ? (
+                                                <p className="truncate text-xs text-gray-500">
+                                                    {formatProductTitleCase(product.short_description)}
+                                                </p>
+                                            ) : null}
+                                        </div>
+                                        <div className="mt-auto flex items-center justify-between gap-2">
                                             <p className="text-gray-900 text-base font-bold">
+                                                <span>₹{getEffectivePrice(product)}</span>
                                                 {showStrikeBase(product) && (
-                                                    <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(product)}</span>
+                                                    <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(product)}</span>
                                                 )}
-                                                ₹{getEffectivePrice(product)}/{product.unit || "box"}
                                             </p>
                                             <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
                                         </div>

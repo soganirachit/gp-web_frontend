@@ -83,7 +83,11 @@ const Profile: React.FC = () => {
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
         <div className="px-4 pt-4 flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="hover:bg-gray-100 rounded-full p-2 transition-colors">
+          <button
+            type="button"
+            onClick={() => navigate(`${basePath}/account`)}
+            className="hover:bg-gray-100 rounded-full p-2 transition-colors"
+          >
             <IoArrowBack className="text-xl" />
           </button>
           <h1 className="text-xl font-medium">Edit Profile</h1>

@@ -98,6 +98,12 @@
   .mb-safe {
     margin-bottom: max(0px, env(safe-area-inset-bottom));
   }
+
+  /* Override @layer base 44×44 touch targets for dense inline controls (e.g. cart message) */
+  .touch-target-compact {
+    min-height: 0 !important;
+    min-width: 0 !important;
+  }
 }
 
 @keyframes bannerFadeIn {

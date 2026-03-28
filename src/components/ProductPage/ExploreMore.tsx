@@ -65,20 +65,23 @@ const ExploreMore: React.FC = () => {
           const sectionUpper = section.toUpperCase();
 
           if (categoryUpper === "BEST" || sectionUpper.includes("BEST")) {
-            // → GET api/v1/products/best-sellers/
-            const fetched = await productService.getBestSellers(
+            // → GET api/v1/products/?label=best-seller&ordering=-order_count
+            const fetched = await productService.getProductsByLabel(
+              "best-seller",
               storeId || undefined,
-              abortController.signal
+              abortController.signal,
+              "-order_count"
             );
             if (id !== fetchIdRef.current) return;
             setBestSellers(fetched || []);
 
           } else if (categoryUpper === "PREMIUM" || sectionUpper.includes("PREMIUM")) {
-            // → GET api/v1/products/?ordering=-order_count
-            const fetched = await productService.getProductsByOrdering(
-              "-order_count",
+            // → GET api/v1/products/?label=premium&ordering=-order_count
+            const fetched = await productService.getProductsByLabel(
+              "premium",
               storeId || undefined,
-              abortController.signal
+              abortController.signal,
+              "-order_count"
             );
             if (id !== fetchIdRef.current) return;
             setPremiumProducts(fetched || []);
@@ -226,15 +229,10 @@ const ExploreMore: React.FC = () => {
   };
 
   const renderCard = (item: any, index: number) => {
-    const priceUnit =
-      activeFeature === "gpStore"
-        ? item.unit || (item.type === "LEAVES" ? "kg" : "box")
-        : "Day";
-
     const effective = getEffectivePrice(item);
     const base = getBasePrice(item);
     const showStrike = showStrikeBase(item);
-    const price = effective > 0 ? `₹${effective}/${priceUnit}` : "";
+    const price = effective > 0 ? `₹${effective}` : "";
 
     const imageUrl = item.primary_image || getImageUrl(item.imagesUrl);
 

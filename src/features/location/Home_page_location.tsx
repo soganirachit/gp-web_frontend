@@ -564,28 +564,36 @@ const HomePageLocation: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen max-w-[800px] mx-auto flex flex-col ${theme.classes.authPageBackground}`}>
-      {/* Header */}
-      <div className={`sticky top-0 z-10 ${theme.classes.authPageBackground}`}>
-        <div className="max-w-[800px] mx-auto px-4 py-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="text-gray-600 p-2 hover:bg-gray-100 rounded-full"
-          >
-            <MdArrowBack className="text-xl" />
-          </button>
+    <div
+      className={`min-h-screen max-w-[800px] mx-auto flex flex-col pb-nav-bottom ${theme.classes.authPageBackground}`}
+    >
+      {/* Header — same pattern as AddEditAddress / Addresses (back + title aligned) */}
+      <div className="flex flex-1 flex-col px-4 pb-4">
+        <div
+          className={`sticky top-0 z-10 -mx-4 mb-2 border-b border-gray-200 px-4 pb-3 pt-5 ${theme.classes.authPageBackground}`}
+        >
+          <div className="flex items-start gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="-ml-2 shrink-0 rounded-full p-2 text-gray-600 transition-colors hover:bg-black/5"
+              aria-label="Go back"
+            >
+              <MdArrowBack className="text-xl" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl font-semibold leading-tight text-gray-900">
+                Delivery Address
+              </h1>
+              <p className="mt-1.5 text-base leading-snug text-gray-600">
+                Where should we deliver your flowers?
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col max-w-[800px] mx-auto w-full px-4 pb-4">
-        <h1 className="text-2xl font-semibold mb-2">Delivery Address</h1>
-        <p className="text-gray-600 mb-6">
-          Where should we deliver your flowers?
-        </p>
-        
-{/* Search Bar */}
-<div className="relative mb-6">
+        {/* Search Bar */}
+        <div className="relative mb-6">
           <div className="relative">
             {isLoaded ? (
               <Autocomplete
@@ -815,7 +823,7 @@ const HomePageLocation: React.FC = () => {
         )}
 
         {/* Confirm Button */}
-        <div className="max-w-[800px] w-full mx-auto px-4 mt-4 bottom-4 left-0 right-0 md:static md:px-0 md:mt-6">
+        <div className="mt-4 w-full md:mt-6">
           <button
             onClick={handleSaveLocation}
             className={`w-full py-3 rounded-3xl font-medium transition-colors ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}

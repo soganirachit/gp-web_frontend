@@ -274,7 +274,7 @@ const SupportTicketChat: React.FC = () => {
           <div className="px-4 pt-4 pb-3">
             <div className="flex items-start gap-3 mb-3">
               <button
-                onClick={() => navigate(-1)}
+                onClick={() => navigate(`${basePath}/customer-support`)}
                 className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0 mt-1"
               >
                 <IoArrowBack size={22} className="text-gray-700" />

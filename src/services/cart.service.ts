@@ -47,6 +47,18 @@ export interface CartResponse {
   data: CartData;
 }
 
+/** Response from POST /cart/switch-store/ — migrates cart to the new store. */
+export interface CartSwitchStoreResponse {
+  success?: boolean;
+  message?: string;
+  data?: {
+    kept_items?: unknown[];
+    removed_items?: unknown[];
+  };
+  kept_items?: unknown[];
+  removed_items?: unknown[];
+}
+
 class CartService {
   /**
    * Get user's cart
@@ -68,6 +80,25 @@ class CartService {
   async getCartData(): Promise<CartData> {
     const response = await this.getCart();
     return response.data;
+  }
+
+  /**
+   * Switch cart to another store. Items available at the new store are kept (prices updated);
+   * unavailable items are removed. Call after POST /stores/switch/ with the same store_id.
+   */
+  async switchCartStore(storeId: number): Promise<CartSwitchStoreResponse> {
+    try {
+      const headers = headerService.getHeaders();
+      const response = await api.post<CartSwitchStoreResponse>(
+        `${API_URL}/switch-store/`,
+        { store_id: storeId },
+        { headers }
+      );
+      return response.data;
+    } catch (error: any) {
+      headerService.handleError(error);
+      throw error;
+    }
   }
 
   /**

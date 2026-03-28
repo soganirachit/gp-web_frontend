@@ -108,7 +108,8 @@ const CustomerSupport: React.FC = () => {
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3 mb-4">
             <button
-              onClick={() => navigate(-1)}
+              type="button"
+              onClick={() => navigate(`${basePath}/account`)}
               className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
             >
               <IoArrowBack size={24} />

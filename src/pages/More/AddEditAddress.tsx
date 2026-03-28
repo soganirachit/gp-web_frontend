@@ -462,7 +462,8 @@ const AddEditAddress: React.FC = () => {
         {/* Header */}
         <div className="py-4 flex items-center">
           <button
-            onClick={() => navigate(-1)}
+            type="button"
+            onClick={() => navigate(`${basePath}/addresses`)}
             className="hover:bg-gray-100 rounded-full p-2 transition-colors mr-3"
           >
             <IoArrowBack className="text-xl" />

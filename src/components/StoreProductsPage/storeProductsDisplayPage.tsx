@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { SEO } from "../SEO";
 import { trackViewContent, trackAddToCart } from "../../lib/metaPixel";
@@ -11,13 +11,15 @@ import ProfileImage from "../../assets/icon/Profile.png";
 import logo from "../../assets/All/logo.png";
 import Spinner from "../common/Spinner";
 import { IoArrowBack } from "react-icons/io5";
-import { FaChevronRight } from "react-icons/fa";
+import { FaChevronRight, FaMinus, FaPlus } from "react-icons/fa";
 import { productService, getEffectivePrice, getBasePrice, showStrikeBase } from "../../services/product.service";
 import DatePicker from "react-datepicker";
 import clockIcon from "../../assets/svg/gp_store_svg/clock.svg";
 import deliveryIcon from "../../assets/svg/gp_store_svg/delivery.svg";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
+import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
+import { ProductImageTag } from "../common/ProductImageTag";
 
 interface ProductImage {
   id: number;
@@ -76,6 +78,18 @@ interface ProductDetail {
 
 type SubscriptionType = "Daily" | "custom";
 
+const gallerySlideVariants = {
+  enter: (dir: number) => ({
+    x: dir >= 0 ? '100%' : '-100%',
+    opacity: 0,
+  }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir: number) => ({
+    x: dir >= 0 ? '-100%' : '100%',
+    opacity: 0,
+  }),
+};
+
 const StorePage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
@@ -105,6 +119,14 @@ const StorePage: React.FC = () => {
 
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  /** 1 = next (slide from right), -1 = prev (slide from left) */
+  const [gallerySlideDir, setGallerySlideDir] = useState(1);
+  const gallerySwipeStartX = useRef<number | null>(null);
+  const selectedImageIndexRef = useRef(0);
+
+  useEffect(() => {
+    selectedImageIndexRef.current = selectedImageIndex;
+  }, [selectedImageIndex]);
 
   const fetchProductBySlug = async () => {
     try {
@@ -372,6 +394,63 @@ const StorePage: React.FC = () => {
     return list;
   }, [product]);
 
+  const goToGalleryImage = (idx: number) => {
+    if (idx === selectedImageIndex) return;
+    const n = orderedImages.length;
+    let dir = idx > selectedImageIndex ? 1 : -1;
+    if (n > 1) {
+      if (selectedImageIndex === n - 1 && idx === 0) dir = 1;
+      if (selectedImageIndex === 0 && idx === n - 1) dir = -1;
+    }
+    setGallerySlideDir(dir);
+    setSelectedImageIndex(idx);
+  };
+
+  /** Minimum horizontal movement to count as a swipe (touch-friendly, not too loose). */
+  const SWIPE_THRESHOLD_PX = 36;
+
+  const resolveGalleryTransitionDir = (prev: number, next: number, n: number): number => {
+    if (n <= 1 || prev === next) return 1;
+    if (prev === n - 1 && next === 0) return 1;
+    if (prev === 0 && next === n - 1) return -1;
+    return next > prev ? 1 : -1;
+  };
+
+  const handleGalleryPointerDown = (e: React.PointerEvent) => {
+    if (orderedImages.length <= 1) return;
+    gallerySwipeStartX.current = e.clientX;
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleGalleryPointerUp = (e: React.PointerEvent) => {
+    if (gallerySwipeStartX.current == null || orderedImages.length <= 1) return;
+    const dx = e.clientX - gallerySwipeStartX.current;
+    gallerySwipeStartX.current = null;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
+    const n = orderedImages.length;
+    const prev = selectedImageIndexRef.current;
+    const next =
+      dx < 0
+        ? (prev + 1) % n
+        : (prev - 1 + n) % n;
+    if (next === prev) return;
+    setGallerySlideDir(resolveGalleryTransitionDir(prev, next, n));
+    setSelectedImageIndex(next);
+  };
+
+  const handleGalleryPointerCancel = () => {
+    gallerySwipeStartX.current = null;
+  };
+
   // Build Schema.org Product structured data from live product fields.
   // Generic — works for all products and categories.
   const productStructuredData = useMemo(() => {
@@ -463,52 +542,101 @@ const StorePage: React.FC = () => {
         <div className="px-4">
           {/* Product Image Gallery */}
           <div className="mt-4">
-            {/* Main image */}
-            <div className="aspect-square w-full rounded-xl overflow-hidden border-2 border-blue-200">
-              <img
-                src={orderedImages[selectedImageIndex]?.src || '/placeholder.svg'}
-                alt={orderedImages[selectedImageIndex]?.alt || product.name}
-                loading="lazy"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/placeholder.svg";
-                }}
-              />
+            <div
+              className={`relative aspect-square w-full overflow-hidden rounded-xl border-2 border-gray-900 ${
+                orderedImages.length > 1
+                  ? 'cursor-grab touch-none active:cursor-grabbing'
+                  : ''
+              }`}
+              onPointerDown={handleGalleryPointerDown}
+              onPointerUp={handleGalleryPointerUp}
+              onPointerCancel={handleGalleryPointerCancel}
+              role={orderedImages.length > 1 ? 'region' : undefined}
+              aria-label={
+                orderedImages.length > 1
+                  ? 'Product images — swipe left for next, right for previous; loops from last to first'
+                  : undefined
+              }
+            >
+              <ProductImageTag labels={product.labels} />
+              <AnimatePresence initial={false} custom={gallerySlideDir} mode="sync">
+                <motion.div
+                  key={selectedImageIndex}
+                  role="img"
+                  aria-label={orderedImages[selectedImageIndex]?.alt || product.name}
+                  custom={gallerySlideDir}
+                  variants={gallerySlideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ type: 'tween', duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
+                  className="pointer-events-none absolute inset-0 select-none"
+                >
+                  <img
+                    src={orderedImages[selectedImageIndex]?.src || '/placeholder.svg'}
+                    alt={orderedImages[selectedImageIndex]?.alt || product.name}
+                    loading="lazy"
+                    draggable={false}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/placeholder.svg';
+                    }}
+                  />
+                </motion.div>
+              </AnimatePresence>
             </div>
 
-            {/* Thumbnail strip — only shown when there are 2+ images */}
+            {/* Thumbnails + pagination dots (dots sit below thumbnails, right-aligned — matches product UI) */}
             {orderedImages.length > 1 && (
-              <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
-                {orderedImages.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedImageIndex(idx)}
-                    className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
-                      idx === selectedImageIndex
-                        ? 'border-[#2A6B28]'
-                        : 'border-gray-200'
-                    }`}
-                    aria-label={`View image ${idx + 1}`}
-                  >
-                    <img
-                      src={img.src}
-                      alt={img.alt}
-                      loading="lazy"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/placeholder.svg';
-                      }}
+              <>
+                <div className="mt-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                  {orderedImages.map((img, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => goToGalleryImage(idx)}
+                      className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${
+                        idx === selectedImageIndex
+                          ? 'border-[#2A6B28]'
+                          : 'border-gray-200'
+                      }`}
+                      aria-label={`View image ${idx + 1}`}
+                    >
+                      <img
+                        src={img.src}
+                        alt={img.alt}
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/placeholder.svg';
+                        }}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <div
+                  className="mt-2 flex justify-center gap-1.5"
+                  aria-hidden
+                >
+                  {orderedImages.map((_, idx) => (
+                    <span
+                      key={idx}
+                      className={`h-1.5 rounded-full transition-all ${
+                        idx === selectedImageIndex
+                          ? 'w-5 bg-[#19411F]'
+                          : 'w-1.5 bg-gray-300'
+                      }`}
                     />
-                  </button>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
           {/* Product Name and Badge */}
           <div className="mt-4 flex items-start justify-between gap-3">
             <h1 className="font-ibm-plex-serif text-2xl font-bold text-gray-900 flex-1">
-              {product.name}
+              {formatProductTitleCase(product.name)}
             </h1>
             {getPriceDisplay().showStrike && getPriceDisplay().discountPercentage > 0 && (
               <span className="bg-[#19411F] text-white text-sm font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap">
@@ -517,16 +645,14 @@ const StorePage: React.FC = () => {
             )}
           </div>
 
-          {/* Price Section — effective_price (or variant final_price); strike base only when effective < base */}
-          <div className="mt-4 flex items-center gap-3">
+          {/* Offer price first, then struck MRP when discounted */}
+          <div className="mt-4 flex items-center gap-3 flex-wrap">
+            <span className="text-2xl font-bold text-gray-900">₹{getPriceDisplay().price}</span>
             {getPriceDisplay().showStrike && (
               <span className="text-xl font-medium text-gray-500 line-through">
                 ₹{getPriceDisplay().originalPrice.toFixed(0)}
               </span>
             )}
-            <span className="text-2xl font-bold text-gray-900">
-              ₹{getPriceDisplay().price}
-            </span>
           </div>
 
           {/* Delivery Information Card */}
@@ -547,37 +673,41 @@ const StorePage: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-base font-semibold text-[#19411F]">Free Delivery</p>
-                  <p className="text-sm text-gray-600 mt-0.5">On orders above ₹999/-</p>
+                  <p className="text-sm text-gray-600 mt-0.5">Above ₹149/-</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Quantity Selector */}
-          <div className="flex items-center justify-between py-4 mt-6">
-            <span className="text-base font-medium text-gray-900">Quantity</span>
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between gap-3 py-4">
+            <span className="shrink-0 text-base font-medium text-gray-900">Quantity</span>
+            <div className="flex items-center gap-1.5">
               <button
-                className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 text-gray-700 text-xl font-medium hover:bg-gray-200 transition-colors"
+                type="button"
+                className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200"
                 onClick={() => setQuantity(Math.max(0, quantity - 1))}
+                aria-label="Decrease quantity"
               >
-                −
+                <FaMinus className="block text-[9px] leading-none" aria-hidden />
               </button>
-              <span className="text-lg font-semibold text-gray-900 w-8 text-center">
+              <span className="min-w-[1.125rem] px-0.5 text-center text-base font-semibold tabular-nums leading-none text-gray-900">
                 {quantity}
               </span>
               <button
-                className="w-10 h-10 rounded-full flex items-center justify-center bg-[#19411F] text-white text-xl font-medium hover:bg-[#1e5a1c] transition-colors"
+                type="button"
+                className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#19411F] text-white transition-colors hover:bg-[#1e5a1c]"
                 onClick={() => setQuantity(quantity + 1)}
+                aria-label="Increase quantity"
               >
-                +
+                <FaPlus className="block text-[9px] leading-none" aria-hidden />
               </button>
             </div>
           </div>
 
           {/* Select Size Section */}
           {getActiveVariants().length > 0 && (
-            <div className="mt-6">
+            <div>
               <div className="mb-3">
                 <span className="text-base font-medium text-gray-900">Select Size</span>
               </div>
@@ -587,24 +717,24 @@ const StorePage: React.FC = () => {
                   <button
                     key={variant.id}
                     onClick={() => setSelectedVariant(variant)}
-                    className={`flex flex-col items-center text-center p-3 rounded-2xl border-2 transition-all flex-shrink-0 ${
+                    className={`flex min-h-0 flex-col items-center justify-center gap-1 px-3 py-2 text-center rounded-xl border-2 transition-all flex-shrink-0 ${
                       selectedVariant?.id === variant.id
                         ? 'bg-[#E6F4EA] border-[#19411F]'
                         : 'bg-white border-gray-200'
                     }`}
-                    style={{ minWidth: '120px' }}
+                    style={{ minWidth: '108px' }}
                   >
-                    <span className={`text-sm font-semibold mb-1 ${
+                    <span className={`text-sm font-semibold leading-tight ${
                       selectedVariant?.id === variant.id ? 'text-[#19411F]' : 'text-gray-900'
                     }`}>
-                      {variant.name}
+                      {formatProductTitleCase(String(variant.name ?? ''))}
                     </span>
-                    <span className="text-base font-bold text-gray-900 mb-1">
+                    <span className="text-base font-bold leading-tight text-gray-900">
                       ₹{variant.final_price}
                     </span>
-                    <span className="text-xs text-gray-600">
-                      {getVariantDescription(variant)}
-                    </span>
+                    {/* <span className="text-xs leading-tight text-gray-600">
+                      {formatProductTitleCase(getVariantDescription(variant))}
+                    </span> */}
                   </button>
                 ))}
                 </div>
@@ -614,7 +744,7 @@ const StorePage: React.FC = () => {
 
           {/* Customized Message — only for bouquet categories */}
           {product.category_slug?.toLowerCase().includes('bouquet') && (
-          <div className="mt-6">
+          <div className="mt-6 mb-6">
             <div className="mb-3">
               <span className="text-base font-medium text-gray-900">Customized Message (optional)</span>
             </div>
@@ -641,7 +771,7 @@ const StorePage: React.FC = () => {
           {/* Add to Basket Button */}
           <button
             onClick={createStoreOrder}
-            className="w-full bg-[#19411F] text-white py-3.5 rounded-[25px] text-base font-semibold mt-6 mb-6 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            className="w-full bg-[#19411F] text-white py-3.5 rounded-[25px] text-base font-semibold mb-6 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             disabled={!product || (isLoggedIn && (product.in_stock === false || product.is_available === false))}
           >
             {!isLoggedIn || (product?.in_stock !== false && product?.is_available !== false) ? "Add to Basket" : "Out of Stock"}
@@ -760,20 +890,11 @@ const StorePage: React.FC = () => {
                 {relatedProducts.map((item) => (
                   <div
                     key={item.id || item.slug}
-                    className="flex-shrink-0 w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer hover:shadow-md transition-shadow relative"
+                    className="flex-shrink-0 w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                     onClick={() => handleProductClick(item)}
                   >
-                    {/* Label Badge */}
-                    {item.labels && item.labels.length > 0 && (
-                      <div className="absolute top-2 left-2 z-10">
-                        <span
-                          className="inline-block text-white text-[10px] font-semibold px-2 py-1 rounded bg-[#19411F]"
-                        >
-                          {item.labels[0].name.toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                    <div className="aspect-square bg-[#f8f6f1] overflow-hidden">
+                    <div className="relative aspect-square bg-[#f8f6f1] overflow-hidden">
+                      <ProductImageTag labels={item.labels} />
                       <img
                         src={
                           item.primary_image ||
@@ -791,19 +912,19 @@ const StorePage: React.FC = () => {
                     </div>
                     <div className="p-3">
                       <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
-                        {item.name}
+                        {formatProductTitleCase(item.name)}
                       </h3>
                       {item.short_description && (
                         <p className="text-xs text-gray-500 mb-2 truncate">
-                          {item.short_description}
+                          {formatProductTitleCase(item.short_description)}
                         </p>
                       )}
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-base font-bold text-gray-900">
+                          <span>₹{getEffectivePrice(item)}</span>
                           {showStrikeBase(item) && (
-                            <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(item)}</span>
+                            <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(item)}</span>
                           )}
-                          ₹{getEffectivePrice(item)}/
                         </p>
                         <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
                       </div>

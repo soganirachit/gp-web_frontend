@@ -1,15 +1,18 @@
 import React from 'react';
 import { FaChevronRight } from 'react-icons/fa';
+import { ProductImageTag } from './ProductImageTag';
 
 interface ProductCardProps {
   imageUrl: string;
   packName: string;
   description: string;
   price: string;
-  /** If set and less than effective price, show struck-through MRP before price (e.g. ~~₹149~~ ₹129) */
+  /** If set, show struck-through MRP after the offer price (₹129 ~~₹149~~) */
   originalPrice?: number;
   showDailyButton?: boolean;
   showBestsellerTag?: boolean;
+  /** Optional API labels (shown on image top-left; overrides showBestsellerTag when set) */
+  labels?: { name?: string; slug?: string }[];
   onClick?: () => void;
   className?: string;
 }
@@ -22,6 +25,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   originalPrice,
   showDailyButton = false,
   showBestsellerTag = false,
+  labels,
   onClick,
   className = ''
 }) => {
@@ -39,12 +43,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
           className="w-full h-full object-cover"
         />
 
-        {/* Bestseller Tag */}
-        {showBestsellerTag && (
-          <div className="absolute top-2 left-0 sm:top-3 sm:left-0 bg-[#19411F] px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-r text-[10px] sm:text-xs font-medium text-white">
-            Bestseller
-          </div>
-        )}
+        {(labels && labels.length > 0) ? (
+          <ProductImageTag labels={labels} />
+        ) : showBestsellerTag ? (
+          <ProductImageTag labels={[{ name: 'Bestseller' }]} />
+        ) : null}
       </div>
 
       {/* Information Section */}
@@ -73,13 +76,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
         </div>
 
-        {/* Price and Chevron — optional struck-through MRP when originalPrice provided */}
+        {/* Offer price first, then struck MRP when applicable */}
         <div className="flex items-center justify-between mt-1.5 sm:mt-3">
           <span className="text-sm sm:text-base md:text-lg font-semibold text-gray-900">
-            {originalPrice != null && originalPrice > 0 && (
-              <span className="text-gray-500 font-medium line-through mr-1">₹{originalPrice}</span>
-            )}
             {price}
+            {originalPrice != null && originalPrice > 0 && (
+              <span className="text-gray-500 font-medium line-through ml-1">₹{originalPrice}</span>
+            )}
           </span>
           <FaChevronRight className="text-black text-xs sm:text-sm md:text-base" />
         </div>

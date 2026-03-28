@@ -217,7 +217,7 @@ const TicketQuestionForm: React.FC = () => {
         <div className="text-center">
           <p className="text-gray-600 mb-4">Order information is missing</p>
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(`${basePath}/customer-support`)}
             className="px-4 py-2 bg-[#166534] text-white rounded-lg"
           >
             Go Back
@@ -233,7 +233,7 @@ const TicketQuestionForm: React.FC = () => {
         <div className="text-center">
           <p className="text-gray-600 mb-4">No questions available</p>
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(`${basePath}/customer-support`)}
             className="px-4 py-2 bg-[#166534] text-white rounded-lg"
           >
             Go Back
@@ -261,7 +261,8 @@ const TicketQuestionForm: React.FC = () => {
         <div className="p-4 pt-6 flex-shrink-0 bg-[#f8f6f1] border-b border-gray-200 z-10">
           <div className="flex items-center gap-3 mb-2">
             <button
-              onClick={() => navigate(-1)}
+              type="button"
+              onClick={() => navigate(`${basePath}/customer-support`)}
               className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
             >
               <IoArrowBack size={24} />

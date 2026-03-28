@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { walletService } from "../../../services/wallet.service";
 import { toast } from "react-hot-toast";
 import { useAuth } from "../../../context/AuthContext";
+import { useFeatureTheme } from "../../../context/FeatureThemeContext";
 import { useCart, CartItem, CartDeliveryInfo } from "../../../context/CartContext";
 import RazorpayPayment from "../../Payment/Rezorpay/RezorpayPayment";
 import { IoWarningOutline } from "react-icons/io5";
@@ -51,6 +52,8 @@ const Wallet = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoggedIn } = useAuth();
+  const { feature } = useFeatureTheme();
+  const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
   const [customAmount, setCustomAmount] = useState<string>("500");
   const [balance, setBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<TransactionType[]>([]);
@@ -262,7 +265,8 @@ const Wallet = () => {
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate(-1)}
+              type="button"
+              onClick={() => navigate(`${basePath}/account`)}
               className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
             >
               <IoArrowBack size={24} />

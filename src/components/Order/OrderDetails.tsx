@@ -191,7 +191,8 @@ const OrderDetails: React.FC = () => {
         <div className="text-center">
           <p className="text-gray-600 mb-4">{error || 'Order not found'}</p>
           <button
-            onClick={() => navigate(-1)}
+            type="button"
+            onClick={() => navigate(`${basePath}/orders`)}
             className="px-4 py-2 bg-[#166534] text-white rounded-lg"
           >
             Go Back
@@ -271,7 +272,8 @@ const OrderDetails: React.FC = () => {
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate(-1)}
+              type="button"
+              onClick={() => navigate(`${basePath}/orders`)}
               className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
             >
               <IoArrowBack size={24} />

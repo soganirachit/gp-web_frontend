@@ -12,6 +12,8 @@ import Spinner from "../common/Spinner";
 import { SearchBar } from "../common/SearchBar";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { getApiUrl } from "../../config/api.config";
+import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
+import { ProductImageTag } from "../common/ProductImageTag";
 
 const StoreProductsPages: React.FC = () => {
   const navigate = useNavigate();
@@ -336,27 +338,29 @@ const StoreProductsPages: React.FC = () => {
             />
           </div>
 
-          {/* Category Filter Buttons */}
+          {/* Category chips — sizing matches Sort/Filter below */}
           <div className="px-4 pb-3">
-            <div className="flex gap-2 overflow-x-auto no-scrollbar">
+            <div className="flex gap-2.5 overflow-x-auto no-scrollbar">
               <button
+                type="button"
                 onClick={() => handleCategoryClick(null)}
-                className={`flex h-7 flex-shrink-0 items-center px-3 rounded-2xl text-xs leading-none font-medium transition-colors ${
+                className={`touch-target-compact inline-flex flex-shrink-0 items-center rounded-lg px-3.5 py-2 text-xs leading-snug font-medium transition-colors ${
                   !selectedCategorySlug
                     ? 'bg-[#19411f] text-white'
-                    : ' text-[#222222]'
+                    : 'bg-transparent text-[#222222]'
                 }`}
               >
                 All
               </button>
               {categories.map((category) => (
                 <button
+                  type="button"
                   key={category.id}
                   onClick={() => handleCategoryClick(category.slug)}
-                  className={`flex h-7 flex-shrink-0 items-center px-3 rounded-2xl text-xs leading-none font-medium transition-colors whitespace-nowrap ${
+                  className={`touch-target-compact inline-flex flex-shrink-0 items-center rounded-lg px-3.5 py-2 text-xs leading-snug font-medium transition-colors whitespace-nowrap ${
                     selectedCategorySlug === category.slug
                       ? 'bg-[#19411f] text-white'
-                      : ' text-[#222222]'
+                      : 'bg-transparent text-[#222222]'
                   }`}
                 >
                   {category.name}
@@ -364,17 +368,21 @@ const StoreProductsPages: React.FC = () => {
               ))}
             </div>
 
-            {/* Sort and Filter Buttons */}
-            <div className="mt-2.5 flex items-center gap-2">
+            {/* Sort and Filter — same padding/typography as category chips */}
+            <div className="mt-2.5 flex items-center gap-2.5">
               <button
+                type="button"
                 onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-                className="flex h-7 items-center gap-1.5 rounded-2xl border border-[#D8D3CD] bg-[#f8f6f1] px-2.5 text-[11px] leading-none font-medium text-gray-700 shadow-[0_1px_0_rgba(0,0,0,0.03)] transition-colors hover:bg-[#f1eee7]"
+                className="touch-target-compact inline-flex items-center gap-1.5 rounded-lg border border-[#D8D3CD] bg-[#f8f6f1] px-3.5 py-2 text-xs leading-snug font-medium text-gray-700 shadow-[0_1px_0_rgba(0,0,0,0.03)] transition-colors hover:bg-[#f1eee7]"
               >
-                <IoSwapVerticalOutline className="h-3 w-3" />
+                <IoSwapVerticalOutline className="h-4 w-4 shrink-0" />
                 <span>Sort</span>
               </button>
-              <button className="flex h-7 items-center gap-1.5 rounded-2xl border border-[#D8D3CD] bg-[#f8f6f1] px-2.5 text-[11px] leading-none font-medium text-gray-700 shadow-[0_1px_0_rgba(0,0,0,0.03)] transition-colors hover:bg-[#f1eee7]">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+              <button
+                type="button"
+                className="touch-target-compact inline-flex items-center gap-1.5 rounded-lg border border-[#D8D3CD] bg-[#f8f6f1] px-3.5 py-2 text-xs leading-snug font-medium text-gray-700 shadow-[0_1px_0_rgba(0,0,0,0.03)] transition-colors hover:bg-[#f1eee7]"
+              >
+                <svg className="h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
                   <g clipPath="url(#clip0_store_filter)">
                     <path d="M13.9997 2.66699H9.33301" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M6.66667 2.66699H2" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
@@ -455,15 +463,16 @@ const StoreProductsPages: React.FC = () => {
                   <p>No products found in this category.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2 xs:gap-4 mb-6 items-start">
+                <div className="grid grid-cols-2 gap-2 xs:gap-4 mb-6 items-stretch">
                   {visibleProducts.map((item) => (
                     <div
                       key={item.id || item.slug}
-                      className="relative min-w-0 overflow-hidden rounded-2xl bg-white shadow-sm transition-shadow hover:shadow-md cursor-pointer flex h-full flex-col"
+                      className="relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-shadow hover:shadow-md cursor-pointer"
                       onClick={() => handleProductClick(item)}
                     >
                     {/* Product Image */}
                     <div className="aspect-square bg-white overflow-hidden relative">
+                      <ProductImageTag labels={item.labels} />
                       <img
                         src={getProductImageUrl(item)}
                         alt={item.name}
@@ -494,29 +503,25 @@ const StoreProductsPages: React.FC = () => {
                       />
                     </div>
 
-                    {/* Product Info */}
-                    <div className="p-3 flex min-h-[6.5rem] flex-col">
-                      <div className="flex items-start justify-between mb-1">
-                        <h3 className="text-xs xs:text-sm font-semibold text-gray-900 flex-1 min-w-0 pr-1 line-clamp-2 leading-snug">
-                          {item.name}
+                    {/* Product Info — flex-1 + row stretch so price row aligns across the grid */}
+                    <div className="flex min-h-0 flex-1 flex-col p-3">
+                      <div className="mb-1 flex min-h-[2.75rem] items-start justify-between gap-1">
+                        <h3 className="min-w-0 flex-1 pr-1 text-xs font-semibold leading-snug text-gray-900 line-clamp-2 xs:text-sm">
+                          {formatProductTitleCase(item.name)}
                         </h3>
-                        {/* Bestseller Badge */}
-                        {item.labels && item.labels.some((label: any) => label.slug === 'best-seller') && (
-                          <span className="bg-[#19411f] text-white text-[10px] font-semibold px-2 py-0.5 rounded flex-shrink-0">
-                            Bestseller
-                          </span>
-                        )}
                       </div>
-                      <p className="mb-1 min-h-[1rem] truncate text-xs text-gray-500">
-                        {item.short_description || ""}
-                      </p>
+                      <div className="mb-1 min-h-[1.25rem] shrink-0">
+                        {item.short_description ? (
+                          <p className="truncate text-xs text-gray-500">{formatProductTitleCase(item.short_description)}</p>
+                        ) : null}
+                      </div>
                       {/* Price and Arrow — effective_price only; show struck base when effective < base */}
                       <div className="mt-auto flex items-center justify-between gap-2">
                         <p className="text-gray-900 text-base font-bold">
+                          <span>₹{getItemPrice(item)}</span>
                           {showStrikeBase(item) && (
-                            <span className="text-gray-500 font-medium line-through mr-1">₹{getBasePrice(item)}</span>
+                            <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(item)}</span>
                           )}
-                          ₹{getItemPrice(item)}/
                         </p>
                         <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
                       </div>

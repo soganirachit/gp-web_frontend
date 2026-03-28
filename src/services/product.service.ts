@@ -234,8 +234,7 @@ export const productService = {
   },
 
   // Calls GET api/v1/products/ with optional ordering param
-  // ordering="-order_count" → Premium Packs (descending by order count)
-  // ordering=undefined      → All Packs (no ordering, plain list)
+  // ordering=undefined → All Packs (no ordering, plain list)
   async getProductsByOrdering(ordering?: string, storeId?: number, signal?: AbortSignal): Promise<BestSeller[]> {
     try {
       const params: Record<string, any> = {};
@@ -262,6 +261,69 @@ export const productService = {
     } catch (error: unknown) {
       console.error("Error fetching products by ordering:", error);
       if (error instanceof AxiosError && (error.code === 'ERR_CANCELED' || error.name === 'AbortError')) {
+        return [];
+      }
+      if (error instanceof Error || error instanceof AxiosError) {
+        throw error;
+      }
+      throw new Error("An unknown error occurred");
+    }
+  },
+
+  /** GET /products/labels/ — active label definitions (slug, name, …). */
+  async listProductLabels(signal?: AbortSignal): Promise<ProductLabel[]> {
+    try {
+      const response = await api.get(`${PRODUCTS_BASE}/labels/`, { signal });
+      const d = response.data;
+      if (d?.success && Array.isArray(d.data)) return d.data;
+      if (Array.isArray(d?.data)) return d.data;
+      if (Array.isArray(d)) return d;
+      console.error("Unexpected labels response format:", d);
+      return [];
+    } catch (error: unknown) {
+      console.error("Error fetching product labels:", error);
+      if (error instanceof AxiosError && (error.code === "ERR_CANCELED" || error.name === "AbortError")) {
+        return [];
+      }
+      if (error instanceof Error || error instanceof AxiosError) {
+        throw error;
+      }
+      throw new Error("An unknown error occurred");
+    }
+  },
+
+  /**
+   * GET /products/?label=<slug> — products with that label (Postman: List Products, query `label`).
+   * e.g. labelSlug `premium` for Premium Packs.
+   */
+  async getProductsByLabel(
+    labelSlug: string,
+    storeId?: number,
+    signal?: AbortSignal,
+    ordering?: string
+  ): Promise<BestSeller[]> {
+    try {
+      const params: Record<string, string | number> = { label: labelSlug };
+      if (storeId) params.store_id = storeId;
+      if (ordering) params.ordering = ordering;
+
+      const response = await api.get(`${PRODUCTS_BASE}/`, { params, signal });
+
+      if (response.data && response.data.results && Array.isArray(response.data.results)) {
+        return response.data.results;
+      }
+      if (response.data && response.data.success && Array.isArray(response.data.data)) {
+        return response.data.data;
+      }
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+
+      console.error("Unexpected response format:", response.data);
+      return [];
+    } catch (error: unknown) {
+      console.error("Error fetching products by label:", error);
+      if (error instanceof AxiosError && (error.code === "ERR_CANCELED" || error.name === "AbortError")) {
         return [];
       }
       if (error instanceof Error || error instanceof AxiosError) {

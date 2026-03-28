@@ -16,6 +16,8 @@ import { storeService, Store } from '../../services/store.service';
 import { addressService } from '../../services/address.service';
 import Spinner from '../../components/common/Spinner';
 import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
+import { cartService, CartSwitchStoreResponse } from '../../services/cart.service';
 import { toast } from 'react-hot-toast';
 import { editCustomerService } from '../../services/editcustomer.service';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
@@ -39,6 +41,7 @@ const Settings: React.FC = () => {
   const location = useLocation();
   const { theme, feature } = useFeatureTheme();
   const { isLoggedIn, logout } = useAuth();
+  const { loadCartFromAPI } = useCart();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const showAsLoggedOut = !isLoggedIn || !localStorage.getItem('access_token');
   const [userName, setUserName] = useState('');
@@ -176,19 +179,24 @@ const Settings: React.FC = () => {
     return parseStoredUserCoordinates();
   };
 
-  const fetchStores = async () => {
+  const fetchStores = async (opts?: { refreshListOnly?: boolean }) => {
+    const refreshListOnly = opts?.refreshListOnly === true;
     try {
-      setIsLoadingStores(true);
+      if (!refreshListOnly) setIsLoadingStores(true);
       const addresses = await addressService.getAllAddresses();
       const loc = resolveLatLngForStores(addresses);
 
-      // Always load stores: API returns all active stores when lat/lng are omitted (sorted by distance when provided).
+      // GET /stores/ includes is_online per store (online vs offline for ordering)
       const [storesList, nearestStore] = await Promise.all([
         loc ? storeService.getAllStores(loc.lat, loc.lng) : storeService.getAllStores(),
         loc ? storeService.getNearestStore(loc.lat, loc.lng) : Promise.resolve(null as Store | null),
       ]);
 
       setStores(storesList);
+
+      if (refreshListOnly) {
+        return;
+      }
 
       // Check if there's a previously selected store in localStorage FIRST
       // Only use nearest store if user hasn't selected a store before
@@ -228,11 +236,18 @@ const Settings: React.FC = () => {
       }
     } catch (err: any) {
       console.error("Error fetching stores:", err);
-      setError(err.message || "Failed to fetch stores.");
+      if (!refreshListOnly) setError(err.message || "Failed to fetch stores.");
     } finally {
-      setIsLoadingStores(false);
+      if (!refreshListOnly) setIsLoadingStores(false);
     }
   };
+
+  /** Refresh store list (and is_online) when opening the dropdown */
+  useEffect(() => {
+    if (!isStoreDropdownOpen) return;
+    fetchStores({ refreshListOnly: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only refetch when dropdown opens
+  }, [isStoreDropdownOpen]);
 
   // GP Store menu items (6 options only)
   const gpStoreMenuItems = [
@@ -407,11 +422,38 @@ const Settings: React.FC = () => {
     setShowDeleteAccountDialog(false);
   };
 
+  /** Backend GET /stores/ sets is_online; missing field treated as online */
+  const storeIsOnline = (store: Store) => store.is_online !== false;
+
+  const countRemovedCartItems = (res: CartSwitchStoreResponse) => {
+    const arr = res?.data?.removed_items ?? res?.removed_items;
+    return Array.isArray(arr) ? arr.length : 0;
+  };
+
   const handleStoreSwitchConfirm = async () => {
     try {
       if (pendingStoreId !== null) {
-        // Switching to a specific store
-        await storeService.switchStore(pendingStoreId);
+        // Cart switch-store migrates the basket and switches the active store on the backend
+        try {
+          const cartRes = await cartService.switchCartStore(pendingStoreId);
+          await loadCartFromAPI();
+          const removed = countRemovedCartItems(cartRes);
+          if (removed > 0) {
+            toast.success(
+              `Store updated. ${removed} item${removed === 1 ? '' : 's'} not sold at this store ${removed === 1 ? 'was' : 'were'} removed from your basket.`
+            );
+          }
+        } catch (cartErr: unknown) {
+          console.error('Cart switch-store:', cartErr);
+          const msg =
+            cartErr instanceof Error ? cartErr.message : 'Cart could not be updated for this store.';
+          toast.error(`${msg} Try opening your basket to refresh.`);
+          await loadCartFromAPI().catch(() => {});
+          setShowStoreSwitchWarning(false);
+          setPendingStoreId(null);
+          setPendingStoreName('');
+          return;
+        }
         setSelectedStore(pendingStoreName);
         setSelectedStoreId(pendingStoreId);
         localStorage.setItem("selectedStoreId", pendingStoreId.toString());
@@ -547,11 +589,23 @@ const Settings: React.FC = () => {
                 disabled={isLoadingStores || stores.length === 0}
                 className="w-full bg-gray-50 border border-gray-200 text-gray-700 py-3 pl-3 sm:pl-4 pr-8 sm:pr-10 rounded-lg text-left text-sm sm:text-base focus:outline-none focus:bg-white focus:border-gray-500 transition-colors flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span className="truncate">
-                  {isLoadingStores
-                    ? 'Loading stores...'
-                    : selectedStore || (stores.length === 0 ? 'No stores available' : 'Choose a store')
-                  }
+                <span className="flex min-w-0 flex-1 items-center gap-2 truncate">
+                  <span className="truncate">
+                    {isLoadingStores
+                      ? 'Loading stores...'
+                      : selectedStore || (stores.length === 0 ? 'No stores available' : 'Choose a store')
+                    }
+                  </span>
+                  {selectedStoreId != null &&
+                    (() => {
+                      const sel = stores.find((s) => s.id === selectedStoreId);
+                      if (!sel || storeIsOnline(sel)) return null;
+                      return (
+                        <span className="shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
+                          Offline
+                        </span>
+                      );
+                    })()}
                 </span>
                 <FaChevronRight
                   className={`transform transition-transform flex-shrink-0 text-xs text-gray-400 ${isStoreDropdownOpen ? 'rotate-180' : 'rotate-90'}`}
@@ -590,11 +644,17 @@ const Settings: React.FC = () => {
                     >
                       Choose a store
                     </button>
-                    {stores.map((store) => (
+                    {stores.map((store) => {
+                      const online = storeIsOnline(store);
+                      return (
                       <button
                         key={store.id}
                         type="button"
                         onClick={() => {
+                          if (!online) {
+                            toast.error('This store is offline. Please choose another store.');
+                            return;
+                          }
                           // If switching to a different store, show warning modal
                           if (selectedStoreId !== null && selectedStoreId !== store.id) {
                             setPendingStoreId(store.id);
@@ -602,23 +662,36 @@ const Settings: React.FC = () => {
                             setShowStoreSwitchWarning(true);
                             setIsStoreDropdownOpen(false);
                           } else {
-                            // Same store or no store selected - just close dropdown
                             setIsStoreDropdownOpen(false);
                           }
                         }}
-                        className={`w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base transition-colors ${selectedStoreId === store.id
+                        className={`w-full px-3 sm:px-4 py-3 text-left text-sm sm:text-base transition-colors ${!online ? 'cursor-not-allowed opacity-55' : ''} ${selectedStoreId === store.id
                             ? 'bg-gray-100 text-gray-900 font-medium'
                             : 'text-gray-700 hover:bg-gray-50'
                           }`}
                       >
-                        <div className="truncate">{store.name}</div>
-                        {store.distance_km && (
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            {store.distance_km.toFixed(1)} km away
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate">{store.name}</div>
+                            {store.distance_km != null && (
+                              <div className="mt-0.5 text-xs text-gray-500">
+                                {store.distance_km.toFixed(1)} km away
+                              </div>
+                            )}
                           </div>
-                        )}
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                              online
+                                ? 'bg-emerald-50 text-emerald-800'
+                                : 'bg-red-50 text-red-700'
+                            }`}
+                          >
+                            {online ? 'Online' : 'Offline'}
+                          </span>
+                        </div>
                       </button>
-                    ))}
+                    );
+                    })}
                   </div>
                 </>
               )}
