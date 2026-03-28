@@ -201,8 +201,8 @@ const Addresses: React.FC = () => {
 
                             </div>
 
-                            {/* Address Text */}
-                            <p className="text-gray-500 text-sm leading-relaxed mb-1 pr-2 break-words">
+                            {/* Address Text — max 2 lines, then ellipsis */}
+                            <p className="text-gray-500 text-sm leading-relaxed mb-1 pr-2 break-words line-clamp-2 [overflow-wrap:anywhere]">
                               {[
                                 address.houseNo,
                                 address.streetName,

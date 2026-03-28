@@ -151,9 +151,11 @@ const Profile: React.FC = () => {
               <input
                 type="tel"
                 value={userDetails.phone}
-                onChange={(e) => setUserDetails(prev => ({...prev, phone: e.target.value.replace(/\D/g, '')}))}
+                disabled
+                autoComplete="tel"
+                title="Phone number cannot be changed"
                 placeholder="+91 00000 00000"
-                className="w-full p-3 bg-gray-100 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-orange-200"
+                className="w-full p-3 rounded-lg text-base cursor-not-allowed bg-gray-200/90 text-gray-600 border border-gray-200/80 focus:outline-none focus:ring-0"
               />
             </div>
           </div>

@@ -481,7 +481,7 @@ const GpStore_Homepage: React.FC = () => {
                     </div>
 
                     {/* all Packs Section */}
-                    <div className="px-4 py-4">
+                    <div className="px-4 py-2">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="font-ibm-plex-serif text-lg xs:text-[22px] font-semibold leading-tight xs:leading-[28px] tracking-normal text-gray-800 min-w-0 pr-2">All Packs</h2>
                             <button
@@ -537,7 +537,7 @@ const GpStore_Homepage: React.FC = () => {
                     </div>
 
                     {/* Best Section */}
-                    <div className="px-4 py-4">
+                    <div className="px-4 py-2">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="font-ibm-plex-serif text-lg xs:text-[22px] font-semibold leading-tight xs:leading-[28px] tracking-normal text-gray-800 min-w-0 pr-2">Best Sellers</h2>
                             <button
@@ -600,7 +600,7 @@ const GpStore_Homepage: React.FC = () => {
                     </div>
 
                     {/* Premium Packs Section */}
-                    <div className="px-4 py-4">
+                    <div className="px-4 py-2">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="font-ibm-plex-serif text-lg xs:text-[22px] font-semibold leading-tight xs:leading-[28px] tracking-normal text-gray-800 min-w-0 pr-2">Premium Packs</h2>
                             <button

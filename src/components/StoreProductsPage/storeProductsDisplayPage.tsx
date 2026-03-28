@@ -169,25 +169,23 @@ const StorePage: React.FC = () => {
         setSelectedVariant(null);
       }
 
-      // Fetch related products from the same category
-      if (productData.category_slug) {
-        try {
-          const { storeService } = await import("../../services/store.service");
-          const storeId = storeService.getStoreIdForProducts() || productData.store_info?.store_id;
-          const related = await productService.getProductsByCategory(
-            productData.category_slug,
-            storeId || undefined,
-            "store"
-          );
-          // Filter out current product and limit to 3
-          const filtered = related
-            .filter((p: any) => p.slug !== slug && p.id !== productData.id)
-            .slice(0, 3);
-          setRelatedProducts(filtered);
-        } catch (err) {
-          console.error("Error fetching related products:", err);
-          setRelatedProducts([]);
-        }
+      // Best Sellers — same as homepage: GET /products/?label=best-seller&ordering=-order_count
+      try {
+        const { storeService } = await import("../../services/store.service");
+        const storeId = storeService.getStoreIdForProducts() || productData.store_info?.store_id;
+        const bestSellerList = await productService.getProductsByLabel(
+          "best-seller",
+          storeId || undefined,
+          undefined,
+          "-order_count"
+        );
+        const filtered = bestSellerList
+          .filter((p: any) => p.slug !== slug && p.id !== productData.id)
+          .slice(0, 12);
+        setRelatedProducts(filtered);
+      } catch (err) {
+        console.error("Error fetching best sellers:", err);
+        setRelatedProducts([]);
       }
     } catch (error: any) {
       console.error("Error fetching product:", error);

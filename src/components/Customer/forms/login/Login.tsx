@@ -165,13 +165,8 @@ const Login = () => {
 
                     <p className="text-xs sm:text-sm text-center text-gray-500 mt-4 sm:mt-6 px-2">
                         By continuing, you agree to our{" "}
-                        <a href="#" className="text-gray-700 underline">
-                            Terms of Service
-                        </a>{" "}
-                        and{" "}
-                        <a href="#" className="text-gray-700 underline">
-                            Privacy Policy
-                        </a>
+                        <span className="text-gray-700 underline">Terms of Service</span> and{" "}
+                        <span className="text-gray-700 underline">Privacy Policy</span>
                     </p>
                 </div>
             </motion.div>

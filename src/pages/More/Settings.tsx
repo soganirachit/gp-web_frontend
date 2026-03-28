@@ -352,20 +352,7 @@ const Settings: React.FC = () => {
   // Select menu items based on feature
   const menuItems = feature === 'gpStore' ? gpStoreMenuItems : gpDailyMenuItems;
 
-  const socialLinks = [
-    {
-      icon: facebookIcon,
-      url: '#'
-    },
-    {
-      icon: instagramIcon,
-      url: '#'
-    },
-    {
-      icon: whatsappIcon,
-      url: '#'
-    }
-  ];
+  const socialIcons = [facebookIcon, instagramIcon, whatsappIcon];
 
   const handleLogoutClick = () => {
     setShowLogoutDialog(true);
@@ -499,7 +486,7 @@ const Settings: React.FC = () => {
   // When not logged in (or no token), show minimal account page with Login button only
   if (showAsLoggedOut) {
     return (
-      <div className="min-h-screen bg-[#f8f6f1]">
+      <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
         <div className="w-full max-w-[800px] mx-auto">
           <div className="w-full px-4 pt-6">
             <p className="text-gray-600 text-center mb-6">Login to access your account</p>
@@ -514,11 +501,11 @@ const Settings: React.FC = () => {
               <IoLogInOutline className="text-xl" />
               <span className="text-[15px]">Login</span>
             </button>
-            <div className="mb-20 mt-8 text-center">
-              <p className="text-xs text-gray-400">
+            <div className="mt-8 text-center pb-0">
+              <p className="text-xs text-gray-400 leading-snug px-1">
                 By continuing, you agree to our{' '}
-                <a href="/terms" className="text-gray-500 underline">Terms of Service</a> and{' '}
-                <a href="/privacy" className="text-gray-500 underline">Privacy Policy</a>
+                <span className="text-gray-500 underline">Terms of Service</span> and{' '}
+                <span className="text-gray-500 underline">Privacy Policy</span>
               </p>
             </div>
           </div>
@@ -538,7 +525,7 @@ const Settings: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f6f1]">
+    <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
       <SEO
         title="My Account — Genda Phool"
         description="Manage your Genda Phool account"
@@ -726,21 +713,17 @@ const Settings: React.FC = () => {
             <p className="text-[15px] text-gray-500 mb-4">
               Follow us on social media for daily flowers inspiration, puja tips, & exclusive offers.
             </p>
-            <div className="flex items-center justify-center gap-6">
-              {socialLinks.map((link, index) => (
-                <button
-                  key={index}
-                  onClick={() => window.open(link.url, '_blank')}
-                  className="transition-opacity hover:opacity-80"
-                >
-                  <img src={link.icon} alt="" className="w-6 h-6" />
-                </button>
+            <div className="flex items-center justify-center gap-6" aria-hidden="true">
+              {socialIcons.map((icon, index) => (
+                <span key={index} className="inline-flex opacity-90">
+                  <img src={icon} alt="" className="w-6 h-6 pointer-events-none select-none" draggable={false} />
+                </span>
               ))}
             </div>
           </div>
 
           {/* Login/Logout Button */}
-          <div className="mt-6 mb-4">
+          <div className="mt-6 mb-3">
             {isLoggedIn ? (
               <button
                 onClick={handleLogoutClick}
@@ -770,7 +753,7 @@ const Settings: React.FC = () => {
 
           {/* Delete Account Link - Show only when logged in */}
           {isLoggedIn && (
-            <div className="mb-4 text-center">
+            <div className="mb-2 text-center">
               <button
                 onClick={handleDeleteAccountClick}
                 className="text-red-500 text-[15px] hover:text-red-700 transition-colors underline"
@@ -780,17 +763,12 @@ const Settings: React.FC = () => {
             </div>
           )}
 
-          {/* Legal Disclaimer */}
-          <div className="mb-20 text-center">
-            <p className="text-xs text-gray-400">
+          {/* Legal disclaimer — text only; spans keep link styling without navigation */}
+          <div className="mt-1 text-center pb-0">
+            <p className="text-xs text-gray-400 leading-snug px-1">
               By continuing, you agree to our{' '}
-              <a href="/terms" className="text-gray-500 underline">
-                Terms of Service
-              </a>{' '}
-              and{' '}
-              <a href="/privacy" className="text-gray-500 underline">
-                Privacy Policy
-              </a>
+              <span className="text-gray-500 underline">Terms of Service</span> and{' '}
+              <span className="text-gray-500 underline">Privacy Policy</span>
             </p>
           </div>
         </div>

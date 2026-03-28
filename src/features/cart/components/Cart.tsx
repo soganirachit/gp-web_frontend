@@ -27,6 +27,12 @@ import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
 
+/**
+ * Survives component remounts (e.g. React Strict Mode) so we only show one toast per
+ * navigation that includes `addressUpdated`, then still clear location.state.
+ */
+let addressUpdatedToastConsumed = false;
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface DeliverySlot {
@@ -407,8 +413,6 @@ const Cart: React.FC = () => {
   /** After first successful address + totals + sync idle, checkout must not full-screen when sync runs again */
   const [basketHydratedOnce, setBasketHydratedOnce] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [showAddressSavedBanner, setShowAddressSavedBanner] = useState(false);
-
   const isSlotSelectable = (slot: DeliverySlot, date: Date) => {
     // For non-today dates, all API-available slots stay selectable.
     if (!isToday(date)) return true;
@@ -439,10 +443,18 @@ const Cart: React.FC = () => {
   }, [availableSlots]);
 
   useEffect(() => {
-    if ((location.state as { addressUpdated?: boolean } | null)?.addressUpdated) {
-      setShowAddressSavedBanner(true);
-      navigate('.', { replace: true, state: {} });
+    const state = location.state as { addressUpdated?: boolean } | null;
+    if (!state?.addressUpdated) {
+      addressUpdatedToastConsumed = false;
+      return;
     }
+    if (addressUpdatedToastConsumed) {
+      navigate('.', { replace: true, state: {} });
+      return;
+    }
+    addressUpdatedToastConsumed = true;
+    toast.success('Delivery address updated. We deliver to this location.', { duration: 4000 });
+    navigate('.', { replace: true, state: {} });
   }, [location.state, navigate]);
 
   useEffect(() => {
@@ -1188,26 +1200,6 @@ const Cart: React.FC = () => {
         </div>
 
         <div className="px-4 py-4 space-y-4">
-          {showAddressSavedBanner && (
-            <div
-              className="flex items-start gap-3 rounded-2xl border border-[#19411F]/20 bg-[#E6F4EA] px-4 py-3"
-              role="status"
-            >
-              <FaCheck className="mt-0.5 flex-shrink-0 text-[#19411F]" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-gray-900">Delivery address updated</p>
-                <p className="text-xs text-gray-600 mt-0.5">We deliver to this location.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddressSavedBanner(false)}
-                className="flex-shrink-0 rounded-full p-1 text-gray-500 hover:bg-black/5"
-                aria-label="Dismiss"
-              >
-                <FaTimes className="text-sm" />
-              </button>
-            </div>
-          )}
           {items.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500 text-lg">Your cart is empty</p>

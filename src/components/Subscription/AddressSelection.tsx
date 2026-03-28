@@ -1097,7 +1097,7 @@ const AddressSelection: React.FC = () => {
         ) : (
           <div className="flex flex-col">
             {/* Header — aligned with My Addresses / reference */}
-            <div className="-mx-4 mb-4 flex items-center gap-3 border-b border-gray-200 bg-[#f8f6f1] px-4 py-4 pt-6 sticky top-0 z-10">
+            <div className="-mx-4 mb-4 flex items-center gap-3 border-b border-gray-200 bg-[#f8f6f1] px-4 py-4 sticky top-0 z-10">
               <button
                 type="button"
                 onClick={() => navigate(-1)}
@@ -1173,7 +1173,7 @@ const AddressSelection: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        <p className="mb-1 break-words pr-2 text-sm leading-relaxed text-gray-500">
+                        <p className="mb-1 min-w-0 max-w-full break-words pr-2 text-sm leading-relaxed text-gray-500 line-clamp-2 [overflow-wrap:anywhere]">
                           {[
                             address.houseNo,
                             address.streetName,

@@ -16,12 +16,21 @@ export function AppToaster() {
       gutter={10}
       toastOptions={{
         duration: 2800,
-        className: '!max-w-[min(92vw,22rem)] !text-left',
+        /**
+         * Library default ToastBar uses max-width: 350px — override with !important so
+         * long copy can use nearly full width on phones (98vw) up to 44rem on large screens.
+         * Never use `w-max` here (width: max-content shrinks the bar).
+         */
+        className:
+          '!box-border !text-left !whitespace-normal !w-[min(98vw,44rem)] !max-w-[min(98vw,44rem)] !min-w-0',
         style: {
+          width: 'min(98vw, 44rem)',
+          maxWidth: 'min(98vw, 44rem)',
           borderRadius: '9999px',
-          padding: '11px 18px',
+          padding: '12px 20px',
           fontSize: '14px',
           fontWeight: 500,
+          lineHeight: 1.45,
           background: 'rgba(17, 24, 39, 0.94)',
           color: '#f9fafb',
           boxShadow: '0 12px 40px rgba(0, 0, 0, 0.18)',
