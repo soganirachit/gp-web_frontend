@@ -317,10 +317,10 @@ const GpStore_Homepage: React.FC = () => {
               description="Shop fresh loose flowers, bouquets, garlands, pooja kits, diyas and incense online. Same-day delivery in Jaipur."
               canonical="https://customerapp.mygendaphool.com/gp-store"
             />
-            <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
-                <div className="mx-auto w-full max-w-[min(800px,100vw)]">
+            <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom overflow-x-hidden">
+                <div className="mx-auto w-full min-w-0 max-w-[min(800px,100vw)]">
                     {/* Top Header with Green Background */}
-                    <div className="relative px-3 sm:px-4 pt-0 pb-6 xs:pb-8 sm:pb-12" style={{
+                    <div className="relative px-4 pt-0 pb-8" style={{
                         background: 'linear-gradient(to bottom, #DAFFD9, #D8F0D7)',
                         minHeight: 'clamp(220px, 42vw, 280px)'
                     }}>
@@ -418,19 +418,18 @@ const GpStore_Homepage: React.FC = () => {
                         </motion.div>
                     </div>
 
-                    {/* Pick your Blooms Section */}
+                    {/* Pick your Blooms — 4 columns; square tiles = same aspect ratio at every phone width (360–420px+) */}
                     <div className="px-4 py-4">
-                        <h2 className="font-ibm-plex-serif text-lg xs:text-[22px] font-semibold leading-tight xs:leading-[28px] tracking-normal text-gray-800 mb-4 xs:mb-6">Pick your Blooms</h2>
-                        {/* Fixed tile size (≈4× per row on phone) — does not stretch when there are few categories */}
-                        <div className="flex flex-wrap gap-x-2.5 gap-y-5 xs:gap-x-3">
+                        <h2 className="font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-gray-800 mb-4">Pick your Blooms</h2>
+                        <div className="grid grid-cols-4 gap-x-2 gap-y-5 xs:gap-x-2.5 sm:gap-x-3">
                             {categories.map((category) => (
                                 <div
                                     key={category.id}
-                                    className="flex w-[4.5rem] xs:w-[5rem] shrink-0 flex-col items-center cursor-pointer"
+                                    className="flex min-w-0 flex-col items-stretch cursor-pointer"
                                     onClick={() => navigate(`${basePath}/products?category=${category.slug}`, { state: { categoryName: category.name, categorySlug: category.slug } })}
                                 >
-                                    <div 
-                                        className="aspect-square w-full rounded-2xl overflow-hidden mb-2 shadow-sm flex items-center justify-center"
+                                    <div
+                                        className="aspect-square w-full rounded-2xl overflow-hidden mb-1.5 shadow-sm flex items-center justify-center shrink-0"
                                         style={{ backgroundColor: category.color_code || '#ffffff' }}
                                     >
                                         {category.icon ? (
@@ -444,12 +443,12 @@ const GpStore_Homepage: React.FC = () => {
                                                 }}
                                             />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                                            <div className="w-full h-full flex items-center justify-center text-gray-400 text-[0.65rem] xs:text-xs">
                                                 {category.name.charAt(0)}
                                             </div>
                                         )}
                                     </div>
-                                    <span className="w-full px-0.5 text-center text-[10px] xs:text-xs text-gray-700 font-medium leading-tight line-clamp-2 [overflow-wrap:anywhere]">
+                                    <span className="block w-full min-h-[2.75rem] px-0.5 text-center text-[10px] xs:text-xs text-gray-700 font-medium leading-snug line-clamp-2 [overflow-wrap:anywhere]">
                                         {category.name}
                                     </span>
                                 </div>
@@ -472,7 +471,7 @@ const GpStore_Homepage: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => navigate(`${basePath}/products`)}
-                                    className="mt-3 w-fit rounded-full bg-[#19411F] px-2 py-1 text-center text-[6px] font-base tracking-wide text-white shadow-sm transition-colors hover:bg-[#1e4d1c] sm:mt-4 sm:px-4 sm:py-2 sm:text-base"
+                                    className="gp-cta-pill-dark mt-3 w-fit"
                                 >
                                     SHOP NOW
                                 </button>
@@ -483,21 +482,22 @@ const GpStore_Homepage: React.FC = () => {
                     {/* all Packs Section */}
                     <div className="px-4 py-2">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-ibm-plex-serif text-lg xs:text-[22px] font-semibold leading-tight xs:leading-[28px] tracking-normal text-gray-800 min-w-0 pr-2">All Packs</h2>
+                            <h2 className="font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-gray-800 min-w-0 pr-2">All Packs</h2>
                             <button
+                                type="button"
                                 onClick={() => navigate(`${basePath}/products`)}
-                                className="flex items-center gap-1 text-gray-500 text-sm font-medium"
+                                className="gp-link-row shrink-0"
                             >
                                 <span>Explore More</span>
                                 <FaChevronRight className="text-xs" />
                             </button>
                         </div>
-                        <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
+                        <div className="gp-h-scroll-track">
                             {products.length > 0 ? (
                                 products.map((product) => (
                                     <div
                                         key={product.id}
-                                        className="flex flex-shrink-0 flex-col w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
+                                        className="gp-store-card-scroll"
                                         onClick={() => handleProductClick(product)}
                                     >
                                         <div className="aspect-square bg-[#f8f6f1] overflow-hidden">
@@ -507,7 +507,7 @@ const GpStore_Homepage: React.FC = () => {
                                                 className="w-full h-full object-cover"
                                             />
                                         </div>
-                                        <div className="flex flex-1 flex-col p-3">
+                                        <div className="gp-store-card-scroll-inner">
                                             <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
                                                 {formatProductTitleCase(product.name)}
                                             </h3>
@@ -539,21 +539,22 @@ const GpStore_Homepage: React.FC = () => {
                     {/* Best Section */}
                     <div className="px-4 py-2">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-ibm-plex-serif text-lg xs:text-[22px] font-semibold leading-tight xs:leading-[28px] tracking-normal text-gray-800 min-w-0 pr-2">Best Sellers</h2>
+                            <h2 className="font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-gray-800 min-w-0 pr-2">Best Sellers</h2>
                             <button
+                                type="button"
                                onClick={() => navigate(`${basePath}/products`)}
-                                className="flex items-center gap-1 text-gray-500 text-sm font-medium"
+                                className="gp-link-row shrink-0"
                             >
                                 <span>Explore More</span>
                                 <FaChevronRight className="text-xs" />
                             </button>
                         </div>
-                        <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
+                        <div className="gp-h-scroll-track">
                             {filteredBestSellers.length > 0 ? (
                                 filteredBestSellers.map((bestSeller) => (
                                     <div
                                         key={bestSeller.id}
-                                        className="relative flex flex-shrink-0 flex-col w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
+                                        className="relative gp-store-card-scroll"
                                         onClick={() => handleBestSellerClick(bestSeller)}
                                     >
                                         <div className="relative aspect-square bg-[#f8f6f1] overflow-hidden">
@@ -568,7 +569,7 @@ const GpStore_Homepage: React.FC = () => {
                                                 }}
                                             />
                                         </div>
-                                        <div className="flex flex-1 flex-col p-3">
+                                        <div className="gp-store-card-scroll-inner">
                                             <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
                                                 {formatProductTitleCase(bestSeller.name)}
                                             </h3>
@@ -602,21 +603,22 @@ const GpStore_Homepage: React.FC = () => {
                     {/* Premium Packs Section */}
                     <div className="px-4 py-2">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-ibm-plex-serif text-lg xs:text-[22px] font-semibold leading-tight xs:leading-[28px] tracking-normal text-gray-800 min-w-0 pr-2">Premium Packs</h2>
+                            <h2 className="font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-gray-800 min-w-0 pr-2">Premium Packs</h2>
                             <button
+                                type="button"
                                 onClick={() => navigate(`${basePath}/products`)}
-                                className="flex items-center gap-1 text-gray-500 text-sm font-medium"
+                                className="gp-link-row shrink-0"
                             >
                                 <span>Explore More</span>
                                 <FaChevronRight className="text-xs" />
                             </button>
                         </div>
-                        <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
+                        <div className="gp-h-scroll-track">
                             {premiumProducts.length > 0 ? (
                                 premiumProducts.map((product) => (
                                 <div
                                     key={product.id}
-                                    className="flex flex-shrink-0 flex-col w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
+                                    className="gp-store-card-scroll"
                                     onClick={() => handleProductClick(product)}
                                 >
                                     <div className="relative aspect-square bg-[#f8f6f1] overflow-hidden">
@@ -627,7 +629,7 @@ const GpStore_Homepage: React.FC = () => {
                                             className="w-full h-full object-cover"
                                         />
                                     </div>
-                                    <div className="flex flex-1 flex-col p-3">
+                                    <div className="gp-store-card-scroll-inner">
                                         <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
                                             {formatProductTitleCase(product.name)}
                                         </h3>

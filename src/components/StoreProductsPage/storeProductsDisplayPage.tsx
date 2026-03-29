@@ -508,7 +508,7 @@ const StorePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f6f1]">
+    <div className="min-h-screen overflow-x-hidden bg-[#f8f6f1]">
       {/* SEO — dynamic per product, works for all current and future products */}
       {product && (
         <SEO
@@ -522,7 +522,7 @@ const StorePage: React.FC = () => {
           structuredData={productStructuredData ?? undefined}
         />
       )}
-      <div className="relative mx-auto w-full max-w-[min(800px,100vw)] pb-nav-bottom">
+      <div className="relative mx-auto w-full min-w-0 max-w-[min(800px,100vw)] pb-nav-bottom">
         {/* Header */}
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -875,20 +875,21 @@ const StorePage: React.FC = () => {
           {relatedProducts.length > 0 && (
             <div className="mt-10 mb-8">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">Best Sellers</h2>
+                <h2 className="font-ibm-plex-serif text-gp-section font-semibold text-gray-900">Best Sellers</h2>
                 <button
+                  type="button"
                   onClick={() => navigate("/gp-store/products")}
-                  className="flex items-center gap-1 text-gray-600 text-sm font-medium hover:text-gray-900"
+                  className="gp-link-row shrink-0 text-gray-600 hover:text-gray-900"
                 >
                   <span>Explore More</span>
                   <FaChevronRight className="text-xs" />
                 </button>
               </div>
-              <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
+              <div className="gp-h-scroll-track">
                 {relatedProducts.map((item) => (
                   <div
                     key={item.id || item.slug}
-                    className="flex-shrink-0 w-[min(42vw,9.5rem)] xs:w-[150px] sm:w-[160px] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                    className="gp-store-card-scroll hover:shadow-md transition-shadow"
                     onClick={() => handleProductClick(item)}
                   >
                     <div className="relative aspect-square bg-[#f8f6f1] overflow-hidden">
@@ -908,16 +909,18 @@ const StorePage: React.FC = () => {
                         }}
                       />
                     </div>
-                    <div className="p-3">
+                    <div className="gp-store-card-scroll-inner">
                       <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
                         {formatProductTitleCase(item.name)}
                       </h3>
-                      {item.short_description && (
-                        <p className="text-xs text-gray-500 mb-2 truncate">
-                          {formatProductTitleCase(item.short_description)}
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="mb-1 min-h-[1.25rem] shrink-0">
+                        {item.short_description ? (
+                          <p className="truncate text-xs text-gray-500">
+                            {formatProductTitleCase(item.short_description)}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="mt-auto flex items-center justify-between gap-2">
                         <p className="text-base font-bold text-gray-900">
                           <span>₹{getEffectivePrice(item)}</span>
                           {showStrikeBase(item) && (

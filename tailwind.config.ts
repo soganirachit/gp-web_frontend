@@ -21,6 +21,11 @@ const config: Config = {
       '2xl':    '1024px',  // Tablet landscape / desktop
     },
     extend: {
+      /** Fluid type for section titles — ~17–22px across 360–420px without per-breakpoint classes */
+      fontSize: {
+        'gp-section': ['clamp(1.0625rem, 2.85vw, 1.375rem)', { lineHeight: '1.28' }],
+        'gp-body-sm': ['0.8125rem', { lineHeight: '1.45' }],
+      },
       colors: {
         background: '#f8f6f1',
       },

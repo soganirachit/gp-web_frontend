@@ -302,7 +302,7 @@ const StoreProductsPages: React.FC = () => {
         description={seoDescription}
         canonical={canonicalUrl}
       />
-      <div className="mx-auto min-h-screen w-full max-w-[min(800px,100vw)] bg-[#f8f6f1] pb-nav-bottom">
+      <div className="mx-auto min-h-screen w-full min-w-0 max-w-[min(800px,100vw)] overflow-x-hidden bg-[#f8f6f1] pb-nav-bottom">
         {/* Top Header with Location and Search */}
         <div className="sticky top-0 z-20 bg-[#f8f6f1] border-b border-gray-200">
           <div className="px-4 pt-6 pb-3">
@@ -445,7 +445,7 @@ const StoreProductsPages: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="px-3 xs:px-4 py-4 xs:py-6">
+        <div className="px-4 py-5">
           {error ? (
             <div className="text-red-500 text-center py-4 text-base">
               {error}
@@ -453,7 +453,7 @@ const StoreProductsPages: React.FC = () => {
           ) : (
             <>
               {/* Category Title */}
-              <h1 className="text-xl xs:text-2xl font-bold text-gray-900 mb-3 xs:mb-4 leading-tight [overflow-wrap:anywhere]">
+              <h1 className="text-[clamp(1.125rem,4vw,1.5rem)] font-bold text-gray-900 mb-4 leading-tight [overflow-wrap:anywhere]">
                 {categoryName}
               </h1>
 
@@ -463,11 +463,11 @@ const StoreProductsPages: React.FC = () => {
                   <p>No products found in this category.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2 xs:gap-4 mb-6 items-stretch">
+                <div className="gp-store-grid-2 mb-6">
                   {visibleProducts.map((item) => (
                     <div
                       key={item.id || item.slug}
-                      className="relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-shadow hover:shadow-md cursor-pointer"
+                      className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-shadow hover:shadow-md cursor-pointer"
                       onClick={() => handleProductClick(item)}
                     >
                     {/* Product Image */}
@@ -506,7 +506,7 @@ const StoreProductsPages: React.FC = () => {
                     {/* Product Info — flex-1 + row stretch so price row aligns across the grid */}
                     <div className="flex min-h-0 flex-1 flex-col p-3">
                       <div className="mb-1 flex min-h-[2.75rem] items-start justify-between gap-1">
-                        <h3 className="min-w-0 flex-1 pr-1 text-xs font-semibold leading-snug text-gray-900 line-clamp-2 xs:text-sm">
+                        <h3 className="min-w-0 flex-1 pr-1 text-sm font-semibold leading-snug text-gray-900 line-clamp-2">
                           {formatProductTitleCase(item.name)}
                         </h3>
                       </div>
@@ -535,8 +535,9 @@ const StoreProductsPages: React.FC = () => {
               {hasMoreProducts && (
                 <div className="flex justify-center mb-6">
                   <button
+                    type="button"
                     onClick={handleLoadMore}
-                    className="px-6 py-2.5 underline text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                    className="inline-flex min-h-[44px] items-center justify-center px-6 py-2.5 text-sm font-medium text-gray-700 underline rounded-lg transition-colors hover:bg-gray-200"
                   >
                     Load More
                   </button>

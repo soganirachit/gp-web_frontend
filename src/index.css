@@ -4,6 +4,11 @@
 
 /* ── Responsive globals ──────────────────────────────────────────────────── */
 @layer base {
+  /* 1rem = user/browser default (typically 16px); scales with accessibility settings */
+  html {
+    font-size: 100%;
+  }
+
   /* Prevent horizontal overflow on all Indian phone widths (360px+) */
   html, body {
     overflow-x: hidden;
@@ -62,6 +67,37 @@
     margin-right: auto;
     padding-left: max(1rem, env(safe-area-inset-left));
     padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
+  /**
+   * GP Store — mobile-first (360–420px): one fluid card width for horizontal carousels.
+   * No xs/sm width jumps; avoids layout shift between Pixel models.
+   */
+  .gp-store-card-scroll {
+    @apply flex h-full min-h-0 shrink-0 flex-col self-stretch w-[min(42vw,9.5rem)] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer;
+  }
+
+  .gp-store-card-scroll-inner {
+    @apply flex min-h-0 flex-1 flex-col p-3;
+  }
+
+  .gp-h-scroll-track {
+    @apply flex items-stretch snap-x snap-mandatory overflow-x-auto gap-3 no-scrollbar pb-4 -mx-1 px-1;
+  }
+
+  /** Two-column product grid — equal row heights, 12px (3×4px) gap */
+  .gp-store-grid-2 {
+    @apply grid grid-cols-2 gap-3 items-stretch;
+  }
+
+  /** Primary pill CTA — fixed sizing (no breakpoint variants) + 44px min tap height */
+  .gp-cta-pill-dark {
+    @apply inline-flex min-h-[44px] min-w-0 items-center justify-center rounded-full bg-[#19411F] px-4 py-2 text-sm font-semibold tracking-wide text-white shadow-sm transition-colors hover:bg-[#1e4d1c];
+  }
+
+  /** Text “Explore More” row — tap-friendly, same size on all phone widths */
+  .gp-link-row {
+    @apply inline-flex min-h-[44px] items-center gap-1 px-0 py-1 text-gray-500 text-sm font-medium;
   }
 }
 

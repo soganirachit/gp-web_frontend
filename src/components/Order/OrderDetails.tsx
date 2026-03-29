@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { IoArrowBack } from 'react-icons/io5';
+import { IoArrowBack, IoDownloadOutline } from 'react-icons/io5';
 import { FaCopy } from 'react-icons/fa';
 import BottomNavigation from '../layout/BottomNav';
 import { orderService } from '../../services/order.service';
@@ -15,6 +15,8 @@ import deliveryIcon from '../../assets/svg/gp_store_svg/delivery.svg';
 import detailshomeIcon from '../../assets/svg/gp_store_svg/detailshome.svg';
 import detailsuserIcon from '../../assets/svg/gp_store_svg/detailsuser.svg';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
+import { invoiceService, type OrderInvoicePayload } from '../../services/invoice.service';
+import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
 
 interface OrderItem {
   id: number;
@@ -94,6 +96,30 @@ interface OrderDetails {
   created_at: string;
 }
 
+const INVOICE_VISIBLE_AFTER_DELIVERY_MS = 45 * 60 * 1000;
+
+/** Latest `created_at` from timeline rows with status `delivered`, else `order.delivered_at`. */
+function getDeliveredAt(order: OrderDetails): Date | null {
+  const timeline = order.timeline;
+  if (Array.isArray(timeline) && timeline.length > 0) {
+    const delivered = timeline.filter((e) => e?.status?.toLowerCase() === 'delivered');
+    if (delivered.length > 0) {
+      const times = delivered
+        .map((e) => new Date(e.created_at).getTime())
+        .filter((t) => !Number.isNaN(t));
+      if (times.length > 0) {
+        const d = new Date(Math.max(...times));
+        if (!Number.isNaN(d.getTime())) return d;
+      }
+    }
+  }
+  if (order.delivered_at) {
+    const d = new Date(order.delivered_at);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
 const OrderDetails: React.FC = () => {
   const { orderNumber } = useParams<{ orderNumber: string }>();
   const navigate = useNavigate();
@@ -102,12 +128,43 @@ const OrderDetails: React.FC = () => {
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [invoiceInfo, setInvoiceInfo] = useState<OrderInvoicePayload | null>(null);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
 
   useEffect(() => {
     if (orderNumber) {
       fetchOrderDetails();
     }
   }, [orderNumber]);
+
+  const isEligibleForInvoiceUi = useMemo(() => {
+    if (!order) return false;
+    const deliveredAt = getDeliveredAt(order);
+    if (!deliveredAt) return false;
+    return Date.now() - deliveredAt.getTime() >= INVOICE_VISIBLE_AFTER_DELIVERY_MS;
+  }, [order]);
+
+  useEffect(() => {
+    if (!orderNumber || !order) return;
+    if (!isEligibleForInvoiceUi) {
+      setInvoiceInfo(null);
+      setInvoiceLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setInvoiceLoading(true);
+      try {
+        const inv = await invoiceService.getInvoiceByOrderNumber(orderNumber);
+        if (!cancelled) setInvoiceInfo(inv);
+      } finally {
+        if (!cancelled) setInvoiceLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orderNumber, order, isEligibleForInvoiceUi]);
 
   const fetchOrderDetails = async () => {
     try {
@@ -444,7 +501,46 @@ const OrderDetails: React.FC = () => {
 
             {/* Order Information */}
             <div className="bg-white rounded-2xl p-4 shadow-sm">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Order Information</h2>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="shrink-0 text-lg font-bold leading-tight text-gray-900">Order Information</h2>
+                <div className="flex min-w-0 flex-1 items-center justify-end text-right">
+                  {isEligibleForInvoiceUi && (
+                    <>
+                      {invoiceLoading && (
+                        <span className="text-xs text-gray-400">Loading…</span>
+                      )}
+                      {!invoiceLoading && invoiceInfo && invoiceInfo.is_generated && invoiceInfo.pdf_file && (
+                        <div className="inline-flex max-w-full items-center justify-end gap-1">
+                          <span className="text-sm font-medium leading-none text-[#19411f] underline decoration-[#19411f] underline-offset-[3px]">
+                            Invoice
+                          </span>
+                          <button
+                            type="button"
+                            aria-label="Download invoice"
+                            onClick={() => {
+                              const href = resolveMediaUrl(invoiceInfo.pdf_file);
+                              if (href) window.open(href, '_blank', 'noopener,noreferrer');
+                            }}
+                            className="touch-target-compact inline-flex h-[1em] shrink-0 items-center justify-center rounded-sm p-0 text-[#19411f] transition-colors hover:text-[#145028] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#19411f]/30"
+                          >
+                            <IoDownloadOutline
+                              className="block h-[0.95em] w-[0.95em] -translate-y-[0.06em] text-current"
+                              aria-hidden
+                            />
+                          </button>
+                        </div>
+                      )}
+                      {!invoiceLoading &&
+                        invoiceInfo &&
+                        !(invoiceInfo.is_generated && invoiceInfo.pdf_file) && (
+                          <span className="text-xs font-medium leading-snug text-gray-500">
+                            Invoice being prepared
+                          </span>
+                        )}
+                    </>
+                  )}
+                </div>
+              </div>
               <div className="grid grid-cols-1 gap-3">
                 <div className="grid grid-cols-[6.25rem_minmax(0,1fr)] items-center gap-x-2 sm:grid-cols-[8.5rem_minmax(0,1fr)]">
                   <span className="text-sm text-gray-600">Order ID</span>

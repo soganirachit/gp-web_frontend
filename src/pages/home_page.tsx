@@ -212,8 +212,8 @@ const HomePage: React.FC = () => {
             </div>
           </motion.div>
 
-          {/* Service Cards — proportional height (clamp + aspect), items-start so copy doesn’t stretch vertically */}
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-5 items-start">
+          {/* Service Cards — 1 col below xs (360px), 2 cols from xs up; min-w-0 avoids grid overflow */}
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-3 mb-5 items-start w-full min-w-0">
             {/* Genda Phool Daily Card */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
@@ -245,7 +245,7 @@ const HomePage: React.FC = () => {
                   <img src={dailyLogoSvg} alt="Genda Phool Daily" className="h-auto w-full object-contain object-right drop-shadow-sm" />
                 </div>
               </div>
-              <p className="mt-1 min-w-0 px-0.5 text-left text-[10px] font-medium leading-snug text-[#DD7600] sm:mt-1.5 sm:px-1 sm:text-[11px] md:text-xs md:leading-snug">
+              <p className="mt-1 min-w-0 px-0.5 text-left text-[10px] font-medium leading-snug text-[#DD7600] [overflow-wrap:anywhere] sm:mt-1.5 sm:px-1 sm:text-[11px] md:text-xs md:leading-snug">
                 Everyday delivery of fresh flowers for Puja or Home Decor.
               </p>
             </motion.div>
@@ -277,7 +277,7 @@ const HomePage: React.FC = () => {
                   <img src={storeLogoSvg} alt="Genda Phool Store" className="h-auto w-full object-contain object-right drop-shadow-sm" />
                 </div>
               </div>
-              <p className="mt-1 min-w-0 px-0.5 text-left text-[10px] font-medium leading-snug text-[#19411F] sm:mt-1.5 sm:px-1 sm:text-[11px] md:text-xs md:leading-snug">
+              <p className="mt-1 min-w-0 px-0.5 text-left text-[10px] font-medium leading-snug text-[#19411F] [overflow-wrap:anywhere] sm:mt-1.5 sm:px-1 sm:text-[11px] md:text-xs md:leading-snug">
                 From last minute floral needs to grand bouquets, we got it all!
               </p>
             </motion.div>
@@ -290,7 +290,7 @@ const HomePage: React.FC = () => {
             transition={{ duration: 0.4, delay: 0.3 }}
             className="mb-6 cursor-pointer rounded-2xl bg-[#FFF5F5] p-3 transition-shadow hover:shadow-lg sm:p-5 relative overflow-hidden"
           >
-            <div className="flex flex-row items-start gap-2.5 sm:gap-5">
+            <div className="flex flex-col xs:flex-row items-stretch xs:items-start gap-3 sm:gap-5 min-w-0">
               <div className="min-w-0 flex-1 pt-0.5">
                 <img
                   src={sajawatLogoSvg}
@@ -310,11 +310,11 @@ const HomePage: React.FC = () => {
                   </span>
                 </button>
               </div>
-              <div className="pointer-events-none flex shrink-0 self-center">
+              <div className="pointer-events-none flex shrink-0 justify-center xs:justify-end self-center xs:self-center w-full xs:w-auto">
                 <img
                   src={garlandSvg}
                   alt=""
-                  className="h-[4.5rem] w-auto max-h-[22vw] object-contain xs:h-[5rem] sm:h-28 md:h-36"
+                  className="h-[4.5rem] w-auto max-h-[min(22vw,8rem)] max-w-full object-contain xs:h-[5rem] sm:h-28 md:h-36"
                 />
               </div>
             </div>
@@ -337,23 +337,23 @@ const HomePage: React.FC = () => {
             className="mb-8 sm:mb-10"
           >
             <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">WHY CHOOSE US</h2>
-            <div className="grid grid-cols-2 gap-2 sm:gap-4 items-start">
-              <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center">
+            <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-4 items-stretch w-full min-w-0">
+              <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center min-w-0 [overflow-wrap:anywhere]">
                 <FaLeaf className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-gray-800" />
                 <div className="text-lg sm:text-2xl font-bold text-gray-800 mb-1">100,000+</div>
                 <div className="text-xs sm:text-sm text-gray-600">Orders Delivered</div>
               </div>
-              <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center">
+              <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center min-w-0 [overflow-wrap:anywhere]">
                 <FaUsers className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-gray-800" />
                 <div className="text-lg sm:text-2xl font-bold text-gray-800 mb-1">40%</div>
                 <div className="text-xs sm:text-sm text-gray-600">Women Employees</div>
               </div>
-              <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center">
+              <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center min-w-0 [overflow-wrap:anywhere]">
                 <FaBox className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-gray-800" />
                 <div className="text-base sm:text-xl font-bold text-gray-800 mb-1">Eco-Friendly</div>
                 <div className="text-xs sm:text-sm text-gray-600">Packaging</div>
               </div>
-              <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center">
+              <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center min-w-0 [overflow-wrap:anywhere]">
                 <MdAccessTime className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-gray-800" />
                 <div className="text-base sm:text-xl font-bold text-gray-800 mb-1">Freshly Plucked</div>
                 <div className="text-xs sm:text-sm text-gray-600">by 5:00 AM</div>
@@ -373,7 +373,7 @@ const HomePage: React.FC = () => {
               <img
                 src={storyImage}
                 alt="Our Story"
-                className="w-full h-auto object-cover"
+                className="w-full max-w-full h-auto object-cover"
               />
               <div className="p-4 sm:p-6">
                 <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2 sm:mb-3">The Blooming</h3>
@@ -422,7 +422,7 @@ const HomePage: React.FC = () => {
             className="mb-8 sm:mb-10"
           >
             <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">WE ARE LOVED</h2>
-            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:gap-4 -mx-1 px-1">
+            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain touch-pan-x pb-2 sm:gap-4 -mx-1 px-1 min-w-0">
               {[
                 {
                   name: "Priya S.",
@@ -452,7 +452,7 @@ const HomePage: React.FC = () => {
               ].map((review, index) => (
                 <div
                   key={index}
-                  className="w-[min(72vw,11rem)] xs:w-[180px] sm:w-[200px] min-h-[140px] sm:min-h-[160px] snap-start bg-white rounded-xl p-3 sm:p-4 shadow-md flex-shrink-0"
+                  className="w-[min(85vw,11rem)] xs:w-[min(180px,42vw)] sm:w-[200px] min-h-[140px] sm:min-h-[160px] snap-start bg-white rounded-xl p-3 sm:p-4 shadow-md flex-shrink-0 min-w-0 max-w-[100%] [overflow-wrap:anywhere]"
                 >
                   <div className="flex items-center justify-between mb-2 sm:mb-3">
                     <span className="font-bold text-gray-800 text-sm sm:text-base">{review.name}</span>
@@ -541,7 +541,7 @@ const HomePage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div >
+    </div>
   );
 };
 
