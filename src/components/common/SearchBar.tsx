@@ -72,6 +72,7 @@ export function SearchBar({
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blurCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchProductSuggestions = useCallback(async (q: string) => {
     if (!q.trim()) {
@@ -129,6 +130,18 @@ export function SearchBar({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const close = () => setShowSuggestions(false);
+    window.addEventListener('scroll', close, true);
+    return () => window.removeEventListener('scroll', close, true);
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (blurCloseRef.current) clearTimeout(blurCloseRef.current);
+    };
+  }, []);
+
+
   const handleProductSuggestionClick = (item: ProductSuggestion) => {
     setShowSuggestions(false);
     setQuery('');
@@ -168,7 +181,16 @@ export function SearchBar({
             setQuery(e.target.value);
             setShowSuggestions(true);
           }}
-          onFocus={() => query.trim() && setShowSuggestions(true)}
+          onFocus={() => {
+            if (blurCloseRef.current) {
+              clearTimeout(blurCloseRef.current);
+              blurCloseRef.current = null;
+            }
+            if (query.trim()) setShowSuggestions(true);
+          }}
+          onBlur={() => {
+            blurCloseRef.current = setTimeout(() => setShowSuggestions(false), 180);
+          }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className="flex-1 bg-transparent text-gray-900 text-sm sm:text-base font-medium placeholder:text-[#808080] focus:outline-none min-w-0 text-left"
@@ -178,7 +200,7 @@ export function SearchBar({
       </div>
 
       {showSuggestions && hasSuggestions && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50 max-h-64 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[60] max-h-64 overflow-y-auto">
           {loading && mode === 'product' ? (
             <div className="px-4 py-6 text-center text-sm text-gray-500">Searching...</div>
           ) : mode === 'product' ? (
@@ -186,6 +208,7 @@ export function SearchBar({
               <button
                 key={item.id}
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleProductSuggestionClick(item)}
                 className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 text-left"
               >
@@ -209,6 +232,7 @@ export function SearchBar({
               <button
                 key={order.id}
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleOrderSuggestionClick(order)}
                 className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 text-left"
               >

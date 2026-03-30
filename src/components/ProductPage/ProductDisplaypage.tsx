@@ -484,7 +484,7 @@ const ProductPage: React.FC = () => {
 
       // Validate CUSTOM subscription has at least one delivery day
       if (selectedType === "CUSTOM" && (!selectedDays || selectedDays.length === 0)) {
-        toast.error("Please select at least one delivery day for custom subscription");
+        toast.error("Select at least one delivery day");
         setIsCheckingBalance(false);
         return;
       }

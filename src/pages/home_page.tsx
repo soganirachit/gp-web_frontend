@@ -39,6 +39,7 @@ const HomePage: React.FC = () => {
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
   const [isStoryExpanded, setIsStoryExpanded] = useState(false);
+  const [offersStoreId] = useState(() => storeService.getStoreIdForProducts() ?? 4);
 
   // Function to fetch the latest address from API (only when logged in — avoids wrong JWT for guests)
   const fetchLatestAddress = useCallback(async () => {
@@ -138,7 +139,7 @@ const HomePage: React.FC = () => {
       />
       <div className="mx-auto min-h-screen w-full max-w-[min(800px,100vw)] bg-white pb-safe-bottom">
         {/* Top Navigation Bar */}
-        <div className="bg-white sticky top-0 z-20 px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200">
+        <div className="bg-white sticky top-0 z-20 isolate px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
             {/* Location Section */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
@@ -185,6 +186,7 @@ const HomePage: React.FC = () => {
           <div className="mt-2 sm:mt-3">
             <SearchBar
               mode="product"
+              storeId={offersStoreId}
               searchPagePath="/search"
               productBasePath={feature === 'gpStore' ? '/gp-store' : '/gp-daily'}
             />
@@ -192,7 +194,7 @@ const HomePage: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="px-3 sm:px-4 pb-8">
+        <div className="relative z-0 px-3 sm:px-4 pb-8">
           {/* Greeting Section with Namaste SVG */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -326,7 +328,7 @@ const HomePage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.4 }}
           >
-            <OffersBannerCarousel storeId={storeService.getStoreIdForProducts() ?? 4} />
+            <OffersBannerCarousel storeId={offersStoreId} />
           </motion.div>
 
           {/* Why Choose Us Section */}

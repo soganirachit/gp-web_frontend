@@ -412,6 +412,27 @@ const Settings: React.FC = () => {
   /** Backend GET /stores/ sets is_online; missing field treated as online */
   const storeIsOnline = (store: Store) => store.is_online !== false;
 
+  /** Parse store max radius (API may return string e.g. "10.00"). */
+  const parseMaxDeliveryRadiusKm = (store: Store): number | null => {
+    const raw = store.max_delivery_radius_km;
+    if (raw == null || raw === "") return null;
+    const n = parseFloat(String(raw));
+    return Number.isFinite(n) ? n : null;
+  };
+
+  /**
+   * With lat/lng, API includes distance_km. Only selectable if within store max radius (inclusive, matches backend).
+   * If distance or radius is missing, do not block (same as listing without location).
+   */
+  const storeIsWithinDeliveryRadius = (store: Store): boolean => {
+    const maxR = parseMaxDeliveryRadiusKm(store);
+    const d = store.distance_km;
+    if (maxR == null || d == null || Number.isNaN(d)) return true;
+    return d <= maxR;
+  };
+
+  const storeIsSelectable = (store: Store) => storeIsOnline(store) && storeIsWithinDeliveryRadius(store);
+
   const countRemovedCartItems = (res: CartSwitchStoreResponse) => {
     const arr = res?.data?.removed_items ?? res?.removed_items;
     return Array.isArray(arr) ? arr.length : 0;
@@ -586,12 +607,22 @@ const Settings: React.FC = () => {
                   {selectedStoreId != null &&
                     (() => {
                       const sel = stores.find((s) => s.id === selectedStoreId);
-                      if (!sel || storeIsOnline(sel)) return null;
-                      return (
-                        <span className="shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
-                          Offline
-                        </span>
-                      );
+                      if (!sel) return null;
+                      if (!storeIsOnline(sel)) {
+                        return (
+                          <span className="shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
+                            Offline
+                          </span>
+                        );
+                      }
+                      if (!storeIsWithinDeliveryRadius(sel)) {
+                        return (
+                          <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                            Outside delivery area
+                          </span>
+                        );
+                      }
+                      return null;
                     })()}
                 </span>
                 <FaChevronRight
@@ -633,28 +664,49 @@ const Settings: React.FC = () => {
                     </button>
                     {stores.map((store) => {
                       const online = storeIsOnline(store);
+                      const withinRadius = storeIsWithinDeliveryRadius(store);
+                      const selectable = storeIsSelectable(store);
                       return (
                       <button
                         key={store.id}
                         type="button"
+                        aria-disabled={!selectable && selectedStoreId !== store.id}
                         onClick={() => {
+                          if (selectedStoreId === store.id) {
+                            setIsStoreDropdownOpen(false);
+                            return;
+                          }
                           if (!online) {
                             toast.error('This store is offline. Please choose another store.');
                             return;
                           }
-                          // If switching to a different store, show warning modal
-                          if (selectedStoreId !== null && selectedStoreId !== store.id) {
+                          if (!withinRadius) {
+                            toast.error(
+                              'This store is outside the delivery range for your address. Update your address or choose a closer store.'
+                            );
+                            return;
+                          }
+                          if (selectedStoreId !== null) {
                             setPendingStoreId(store.id);
                             setPendingStoreName(store.name);
                             setShowStoreSwitchWarning(true);
                             setIsStoreDropdownOpen(false);
                           } else {
+                            setSelectedStore(store.name);
+                            setSelectedStoreId(store.id);
+                            localStorage.setItem('selectedStoreId', String(store.id));
                             setIsStoreDropdownOpen(false);
                           }
                         }}
-                        className={`w-full px-3 sm:px-4 py-3 text-left text-sm sm:text-base transition-colors ${!online ? 'cursor-not-allowed opacity-55' : ''} ${selectedStoreId === store.id
+                        className={`w-full px-3 sm:px-4 py-3 text-left text-sm sm:text-base transition-colors ${
+                          !selectable && selectedStoreId !== store.id
+                            ? 'cursor-not-allowed opacity-60'
+                            : ''
+                        } ${selectedStoreId === store.id
                             ? 'bg-gray-100 text-gray-900 font-medium'
-                            : 'text-gray-700 hover:bg-gray-50'
+                            : selectable
+                              ? 'text-gray-700 hover:bg-gray-50'
+                              : 'text-gray-700'
                           }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -663,18 +715,36 @@ const Settings: React.FC = () => {
                             {store.distance_km != null && (
                               <div className="mt-0.5 text-xs text-gray-500">
                                 {store.distance_km.toFixed(1)} km away
+                                {parseMaxDeliveryRadiusKm(store) != null && (
+                                  <span className="text-gray-400">
+                                    {' '}
+                                    · Delivers up to {parseMaxDeliveryRadiusKm(store)!.toFixed(1)} km
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {!withinRadius && store.distance_km != null && parseMaxDeliveryRadiusKm(store) != null && (
+                              <div className="mt-1 text-xs font-medium text-amber-700">
+                                Outside delivery area from your address
                               </div>
                             )}
                           </div>
-                          <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                              online
-                                ? 'bg-emerald-50 text-emerald-800'
-                                : 'bg-red-50 text-red-700'
-                            }`}
-                          >
-                            {online ? 'Online' : 'Offline'}
-                          </span>
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                                online
+                                  ? 'bg-emerald-50 text-emerald-800'
+                                  : 'bg-red-50 text-red-700'
+                              }`}
+                            >
+                              {online ? 'Online' : 'Offline'}
+                            </span>
+                            {online && !withinRadius && (
+                              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                                Too far
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </button>
                     );

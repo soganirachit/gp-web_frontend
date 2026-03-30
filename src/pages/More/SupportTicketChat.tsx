@@ -172,7 +172,7 @@ const SupportTicketChat: React.FC = () => {
       setRequestingAgent(true);
       const success = await supportService.requestAgent(ticketNumber);
       if (success) {
-        toast.success('Agent request sent successfully. An agent will contact you soon.');
+        toast.success('Agent requested. We’ll contact you soon.');
         // await fetchTicketDetails(); // Refresh to update agent_requested status
       } else {
         toast.error('Failed to request agent. Please try again.');

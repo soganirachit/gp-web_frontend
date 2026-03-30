@@ -165,7 +165,7 @@ export const productService = {
     } catch (error: unknown) {
       console.error("Error fetching categories:", error);
       if (error instanceof AxiosError && (error.code === 'ERR_CANCELED' || error.name === 'AbortError')) {
-        return [];
+        throw error;
       }
       if (error instanceof Error || error instanceof AxiosError) {
         throw error;
@@ -192,7 +192,7 @@ export const productService = {
     } catch (error: unknown) {
       console.error("Error fetching best sellers:", error);
       if (error instanceof AxiosError && (error.code === 'ERR_CANCELED' || error.name === 'AbortError')) {
-        return [];
+        throw error;
       }
       if (error instanceof Error || error instanceof AxiosError) {
         throw error;
@@ -223,7 +223,7 @@ export const productService = {
       return [];
     } catch (error: unknown) {
       if (error instanceof AxiosError && (error.code === 'ERR_CANCELED' || error.name === 'AbortError')) {
-        return [];
+        throw error;
       }
       console.error("Error fetching products by category:", error);
       if (error instanceof Error || error instanceof AxiosError) {
@@ -261,7 +261,7 @@ export const productService = {
     } catch (error: unknown) {
       console.error("Error fetching products by ordering:", error);
       if (error instanceof AxiosError && (error.code === 'ERR_CANCELED' || error.name === 'AbortError')) {
-        return [];
+        throw error;
       }
       if (error instanceof Error || error instanceof AxiosError) {
         throw error;
@@ -283,7 +283,7 @@ export const productService = {
     } catch (error: unknown) {
       console.error("Error fetching product labels:", error);
       if (error instanceof AxiosError && (error.code === "ERR_CANCELED" || error.name === "AbortError")) {
-        return [];
+        throw error;
       }
       if (error instanceof Error || error instanceof AxiosError) {
         throw error;
@@ -324,7 +324,7 @@ export const productService = {
     } catch (error: unknown) {
       console.error("Error fetching products by label:", error);
       if (error instanceof AxiosError && (error.code === "ERR_CANCELED" || error.name === "AbortError")) {
-        return [];
+        throw error;
       }
       if (error instanceof Error || error instanceof AxiosError) {
         throw error;

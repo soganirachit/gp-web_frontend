@@ -10,6 +10,18 @@ interface Props {
 const AUTO_SLIDE_INTERVAL = 4000;
 const MIN_SWIPE_DISTANCE = 50;
 
+function normalizeBannersFromResponse(body: unknown): Banner[] {
+  if (body == null) return [];
+  if (Array.isArray(body)) return body as Banner[];
+  const d = body as Record<string, unknown>;
+  if (Array.isArray(d.data)) return d.data as Banner[];
+  const inner = d.data as Record<string, unknown> | undefined;
+  if (inner && Array.isArray(inner.data)) return inner.data as Banner[];
+  if (d.success === true && Array.isArray(d.data)) return d.data as Banner[];
+  return [];
+}
+
+
 // Theme-aligned fallback gradients (cream, soft green, soft orange) — no harsh dark brown
 const FALLBACK_GRADIENTS_GP_STORE = [
   'linear-gradient(145deg, #19411f 0%, #2d5a2f 50%, #3d7a3f 100%)',
@@ -41,7 +53,7 @@ export function OffersBannerCarousel({ storeId }: Props) {
   useEffect(() => {
     setLoading(true);
     getStoreBanners(storeId)
-      .then(res => setBanners(res.data.data ?? []))
+      .then(res => setBanners(normalizeBannersFromResponse(res.data)))
       .catch(() => setBanners([]))
       .finally(() => setLoading(false));
   }, [storeId]);
@@ -102,14 +114,31 @@ export function OffersBannerCarousel({ storeId }: Props) {
     );
   }
 
-  if (banners.length === 0) return null;
+  if (banners.length === 0) {
+    return (
+      <div className="mb-6 sm:mb-8 relative z-0">
+        <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">
+          Offers for You
+        </h2>
+        <div
+          className="relative w-full aspect-[4/3] sm:aspect-video rounded-xl sm:rounded-2xl overflow-hidden shadow-md border border-gray-200/60 flex items-end"
+          style={{ background: fallbackGradients[0] }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent" />
+          <p className="relative z-10 p-3 sm:p-4 text-white font-semibold text-sm sm:text-base">
+            New offers coming soon — check back shortly.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const banner = banners[activeIndex];
   const hasImage = !!(banner.image_url && !imgErrors[banner.id]);
   const fallbackGradient = fallbackGradients[banner.id % fallbackGradients.length];
 
   return (
-    <div className="mb-6 sm:mb-8">
+    <div className="mb-6 sm:mb-8 relative z-0">
       {/* Section heading — matches home page sections */}
       <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">
         Offers for You

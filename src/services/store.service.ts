@@ -17,6 +17,8 @@ export interface Store {
   is_online?: boolean;
   opening_time: string;
   closing_time: string;
+  /** ₹ per km — billed as distance × rate (legacy flat `delivery_fee` may still appear on older payloads). */
+  delivery_fee_per_km?: string;
   delivery_fee: string;
   free_delivery_threshold: string;
   min_order_amount: string;

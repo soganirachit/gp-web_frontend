@@ -219,61 +219,52 @@ const GpStore_Homepage: React.FC = () => {
     useEffect(() => {
         let isMounted = true;
         const abortController = new AbortController();
-        
+        let fetchTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
         const initializeStore = async () => {
             if (isLoggedIn) {
-                // User is logged in
                 if (isMounted) {
                     fetchCustomerName();
                     fetchLatestAddress();
                 }
             } else {
-                // User is not logged in - set address loading to false immediately
                 if (isMounted) {
                     setDeliveryLocation("");
                     setAddressType("Home");
                     setIsLoadingAddress(false);
                 }
-                
-                // Get temporary store ID from location FIRST before fetching products
+
                 const existingTempStoreId = storeService.getTemporaryStoreId();
                 if (!existingTempStoreId) {
                     try {
                         await storeService.getStoreFromLocation();
-                        // Wait a bit to ensure store ID is set
-                        await new Promise(resolve => setTimeout(resolve, 100));
                     } catch (error: any) {
                         console.error("Error getting store from location:", error);
-                        // Continue without store ID - products might still load
                     }
                 }
             }
-            
-            // Only fetch if component is still mounted
-            if (isMounted) {
-                // Fetch data after store ID is available (especially important for non-logged-in users)
-                // Small delay to ensure store ID is set in localStorage
-                setTimeout(() => {
-                    if (isMounted) {
-                        fetchProducts(abortController.signal);
-                        fetchCategories(abortController.signal);
-                        fetchBestSellers(abortController.signal);
-                        
-                        const sid = storeService.getStoreIdForProducts();
-                        if (isMounted) setStoreId(sid ?? null);
-                    }
-                }, localStorage.getItem("phoneNumber") ? 0 : 200); // Small delay for non-logged-in users to ensure store ID is set
-            }
+
+            if (!isMounted) return;
+
+            const runCatalogFetch = () => {
+                if (!isMounted) return;
+                const sid = storeService.getStoreIdForProducts();
+                if (isMounted) setStoreId(sid ?? null);
+                fetchProducts(abortController.signal);
+                fetchCategories(abortController.signal);
+                fetchBestSellers(abortController.signal);
+            };
+
+            fetchTimeoutId = setTimeout(runCatalogFetch, 0);
         };
 
         initializeStore();
-        
-        // Cleanup function to cancel requests and prevent state updates if component unmounts
+
         return () => {
             isMounted = false;
+            if (fetchTimeoutId != null) clearTimeout(fetchTimeoutId);
             abortController.abort();
         };
-        // Only run once on mount, fetchLatestAddress is stable due to useCallback
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

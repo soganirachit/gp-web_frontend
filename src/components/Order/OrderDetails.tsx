@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { IoArrowBack, IoDownloadOutline } from 'react-icons/io5';
 import { FaCopy } from 'react-icons/fa';
@@ -80,6 +80,9 @@ interface OrderDetails {
   tax_amount: string;
   discount_amount: string;
   delivery_fee: string;
+  /** Packaging / surcharges — backend may use `total_surcharge` or `surcharge_amount`. */
+  total_surcharge?: string;
+  surcharge_amount?: string;
   total_amount: string;
   delivery_date: string | null;
   delivery_time_slot: string;
@@ -94,30 +97,6 @@ interface OrderDetails {
   cancelled_at: string | null;
   cancellation_reason: string;
   created_at: string;
-}
-
-const INVOICE_VISIBLE_AFTER_DELIVERY_MS = 45 * 60 * 1000;
-
-/** Latest `created_at` from timeline rows with status `delivered`, else `order.delivered_at`. */
-function getDeliveredAt(order: OrderDetails): Date | null {
-  const timeline = order.timeline;
-  if (Array.isArray(timeline) && timeline.length > 0) {
-    const delivered = timeline.filter((e) => e?.status?.toLowerCase() === 'delivered');
-    if (delivered.length > 0) {
-      const times = delivered
-        .map((e) => new Date(e.created_at).getTime())
-        .filter((t) => !Number.isNaN(t));
-      if (times.length > 0) {
-        const d = new Date(Math.max(...times));
-        if (!Number.isNaN(d.getTime())) return d;
-      }
-    }
-  }
-  if (order.delivered_at) {
-    const d = new Date(order.delivered_at);
-    if (!Number.isNaN(d.getTime())) return d;
-  }
-  return null;
 }
 
 const OrderDetails: React.FC = () => {
@@ -137,20 +116,9 @@ const OrderDetails: React.FC = () => {
     }
   }, [orderNumber]);
 
-  const isEligibleForInvoiceUi = useMemo(() => {
-    if (!order) return false;
-    const deliveredAt = getDeliveredAt(order);
-    if (!deliveredAt) return false;
-    return Date.now() - deliveredAt.getTime() >= INVOICE_VISIBLE_AFTER_DELIVERY_MS;
-  }, [order]);
-
+  /** GET /invoices/order/<order_number>/ whenever order is loaded (no post-delivery delay). */
   useEffect(() => {
     if (!orderNumber || !order) return;
-    if (!isEligibleForInvoiceUi) {
-      setInvoiceInfo(null);
-      setInvoiceLoading(false);
-      return;
-    }
     let cancelled = false;
     (async () => {
       setInvoiceLoading(true);
@@ -164,7 +132,21 @@ const OrderDetails: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [orderNumber, order, isEligibleForInvoiceUi]);
+  }, [orderNumber, order?.id]);
+
+  const openInvoicePdf = useCallback(() => {
+    if (!invoiceInfo?.pdf_file || !order) return;
+    const href = resolveMediaUrl(invoiceInfo.pdf_file);
+    if (!href) return;
+    const a = document.createElement('a');
+    a.href = href;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.download = `Invoice-${order.order_number}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }, [invoiceInfo, order]);
 
   const fetchOrderDetails = async () => {
     try {
@@ -469,10 +451,22 @@ const OrderDetails: React.FC = () => {
                   <span className="text-gray-600">Delivery Charges</span>
                   <span className="text-gray-900">{parseFloat(order.delivery_fee) === 0 ? 'Free' : `₹${order.delivery_fee}`}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Tax</span>
-                  <span className="text-gray-900">₹{order.tax_amount}</span>
-                </div>
+                {(() => {
+                  const sur =
+                    parseFloat(order.total_surcharge ?? order.surcharge_amount ?? '0') || 0;
+                  return sur > 0 ? (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Packaging & other fees</span>
+                      <span className="text-gray-900">₹{Number(sur).toLocaleString('en-IN')}</span>
+                    </div>
+                  ) : null;
+                })()}
+                {parseFloat(order.tax_amount || '0') > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">GST</span>
+                    <span className="text-gray-900">₹{order.tax_amount}</span>
+                  </div>
+                )}
                 {parseFloat(order.discount_amount) > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Discount</span>
@@ -501,44 +495,32 @@ const OrderDetails: React.FC = () => {
 
             {/* Order Information */}
             <div className="bg-white rounded-2xl p-4 shadow-sm">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <h2 className="shrink-0 text-lg font-bold leading-tight text-gray-900">Order Information</h2>
-                <div className="flex min-w-0 flex-1 items-center justify-end text-right">
-                  {isEligibleForInvoiceUi && (
-                    <>
-                      {invoiceLoading && (
-                        <span className="text-xs text-gray-400">Loading…</span>
-                      )}
-                      {!invoiceLoading && invoiceInfo && invoiceInfo.is_generated && invoiceInfo.pdf_file && (
-                        <div className="inline-flex max-w-full items-center justify-end gap-1">
-                          <span className="text-sm font-medium leading-none text-[#19411f] underline decoration-[#19411f] underline-offset-[3px]">
-                            Invoice
-                          </span>
-                          <button
-                            type="button"
-                            aria-label="Download invoice"
-                            onClick={() => {
-                              const href = resolveMediaUrl(invoiceInfo.pdf_file);
-                              if (href) window.open(href, '_blank', 'noopener,noreferrer');
-                            }}
-                            className="touch-target-compact inline-flex h-[1em] shrink-0 items-center justify-center rounded-sm p-0 text-[#19411f] transition-colors hover:text-[#145028] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#19411f]/30"
-                          >
-                            <IoDownloadOutline
-                              className="block h-[0.95em] w-[0.95em] -translate-y-[0.06em] text-current"
-                              aria-hidden
-                            />
-                          </button>
-                        </div>
-                      )}
-                      {!invoiceLoading &&
-                        invoiceInfo &&
-                        !(invoiceInfo.is_generated && invoiceInfo.pdf_file) && (
-                          <span className="text-xs font-medium leading-snug text-gray-500">
-                            Invoice being prepared
-                          </span>
-                        )}
-                    </>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+                <h2 className="min-w-0 text-lg font-bold leading-tight text-gray-900">Order Information</h2>
+                <div className="flex shrink-0 items-center justify-end">
+                  {invoiceLoading && (
+                    <span className="text-xs text-gray-500">Loading…</span>
                   )}
+                  {!invoiceLoading &&
+                    invoiceInfo &&
+                    invoiceInfo.is_generated &&
+                    invoiceInfo.pdf_file && (
+                      <button
+                        type="button"
+                        onClick={openInvoicePdf}
+                        className="inline-flex max-w-full items-center gap-1 border-0 bg-transparent p-0 text-xs font-semibold leading-tight text-[#19411f] underline decoration-[#19411f] underline-offset-[3px] transition-colors hover:text-[#145028] hover:decoration-[#145028] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#19411f]/30 focus-visible:ring-offset-2 sm:text-sm !min-w-0 min-h-[44px]"
+                      >
+                        <IoDownloadOutline className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden />
+                        <span className="truncate text-left">Download invoice</span>
+                      </button>
+                    )}
+                  {!invoiceLoading &&
+                    invoiceInfo &&
+                    !(invoiceInfo.is_generated && invoiceInfo.pdf_file) && (
+                      <span className="max-w-[11rem] text-right text-xs font-medium leading-snug text-gray-500 sm:max-w-none">
+                        Invoice being prepared
+                      </span>
+                    )}
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3">

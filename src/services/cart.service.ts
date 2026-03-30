@@ -36,6 +36,10 @@ export interface CartData {
   tax_amount: string;
   discount_amount: string;
   delivery_fee: string;
+  /** Packaging and other surcharges (non-tax line items). */
+  surcharge_amount?: string;
+  /** Cart address used for distance-based delivery_fee; null until set via POST /cart/delivery-address/. */
+  delivery_address_id?: number | null;
   total: string;
   coupon_code?: string;
   coupon_discount?: string;
@@ -80,6 +84,28 @@ class CartService {
   async getCartData(): Promise<CartData> {
     const response = await this.getCart();
     return response.data;
+  }
+
+  /**
+   * Set delivery address on the cart and recalculate distance-based delivery_fee.
+   * Returns the full cart payload (same shape as GET /cart/).
+   */
+  async setCartDeliveryAddress(addressId: number): Promise<CartData> {
+    try {
+      const headers = headerService.getHeaders();
+      const response = await api.post<CartResponse | CartData>(`${API_URL}/delivery-address/`, { address_id: addressId }, { headers });
+      const body = response.data as CartResponse | CartData;
+      if (body && typeof body === 'object' && 'data' in body && body.data && typeof body.data === 'object' && 'items' in body.data) {
+        return body.data as CartData;
+      }
+      if (body && typeof body === 'object' && 'items' in body && Array.isArray((body as CartData).items)) {
+        return body as CartData;
+      }
+      throw new Error('Unexpected delivery-address cart response shape');
+    } catch (error: any) {
+      headerService.handleError(error);
+      throw error;
+    }
   }
 
   /**

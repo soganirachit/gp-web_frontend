@@ -17,7 +17,7 @@ import CartRazorpayPayment from '../../../components/Payment/Rezorpay/CartRazorp
 import { paymentService } from '../../../services/payment.service';
 import { orderService } from '../../../services/order.service';
 import { customerService } from '../../../services/getcustomer.service';
-import { cartService } from '../../../services/cart.service';
+import { cartService, type CartData } from '../../../services/cart.service';
 import Spinner from '../../../components/common/Spinner';
 import api from '../../../services/api';
 import { getApiUrl } from '../../../config/api.config';
@@ -74,7 +74,51 @@ interface ApplyCouponResponse {
   total?: number | string;
   tax_amount?: number | string;
   delivery_fee?: number | string;
+  surcharge_amount?: number | string;
+  delivery_address_id?: number | null;
   [key: string]: any;
+}
+
+type CartTotalsState = {
+  subtotal: number;
+  taxAmount: number;
+  deliveryFee: number;
+  discountAmount: number;
+  surchargeAmount: number;
+  total: number;
+  deliveryAddressId: number | null;
+};
+
+function totalsFromCartData(cartData: CartData): CartTotalsState {
+  const id = cartData.delivery_address_id;
+  return {
+    subtotal: parseFloat(cartData.subtotal || '0') || 0,
+    taxAmount: parseFloat(cartData.tax_amount || '0') || 0,
+    deliveryFee: parseFloat(cartData.delivery_fee || '0') || 0,
+    discountAmount: parseFloat(cartData.discount_amount || '0') || 0,
+    surchargeAmount: parseFloat(cartData.surcharge_amount || '0') || 0,
+    total: parseFloat(cartData.total || '0') || 0,
+    deliveryAddressId: id === undefined || id === null ? null : Number(id),
+  };
+}
+
+function mergeTotalsFromApplyResponse(
+  response: ApplyCouponResponse,
+  prev: CartTotalsState | null,
+  discountAmt: number
+): CartTotalsState {
+  const safeDiscount = Number.isFinite(discountAmt) ? discountAmt : parseFloat(String(response.discount_amount ?? 0)) || 0;
+  const daid = response.delivery_address_id;
+  return {
+    subtotal: parseFloat(String(response.subtotal ?? prev?.subtotal ?? 0)) || 0,
+    taxAmount: parseFloat(String(response.tax_amount ?? prev?.taxAmount ?? 0)) || 0,
+    deliveryFee: parseFloat(String(response.delivery_fee ?? prev?.deliveryFee ?? 0)) || 0,
+    discountAmount: safeDiscount,
+    surchargeAmount: parseFloat(String(response.surcharge_amount ?? prev?.surchargeAmount ?? 0)) || 0,
+    total: parseFloat(String(response.total ?? prev?.total ?? 0)) || 0,
+    deliveryAddressId:
+      daid === undefined ? (prev?.deliveryAddressId ?? null) : daid === null ? null : Number(daid),
+  };
 }
 
 // Matches the exact shape returned by GET /api/v1/cart/coupons/
@@ -105,7 +149,8 @@ const fetchCoupons = async (): Promise<Coupon[]> => {
 const applyCouponAPI = async (couponCode: string): Promise<ApplyCouponResponse> => {
   try {
     const res = await api.post(`${getApiUrl()}/cart/apply-coupon/`, { coupon_code: couponCode });
-    return res.data;
+    const body = res.data as { data?: ApplyCouponResponse } | ApplyCouponResponse;
+    return (body as { data?: ApplyCouponResponse }).data ?? (body as ApplyCouponResponse);
   } catch (error: any) {
     const err = error?.response?.data || {};
     throw new Error(err?.message || err?.detail || 'Invalid or expired promo code');
@@ -125,7 +170,7 @@ const removeCouponAPI = async (): Promise<void> => {
 
 interface PromoCodeModalProps {
   onClose: () => void;
-  onApply: (code: string) => Promise<void>;
+  onApply: (code: string) => Promise<{ successMessage?: string } | void>;
   isApplying: boolean;
   appliedCode: string | null;
 }
@@ -135,6 +180,8 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [isFetchingCoupons, setIsFetchingCoupons] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  /** Inline feedback below manual entry (replaces toast for apply success/error) */
+  const [applyHint, setApplyHint] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   /** Lifts sheet above mobile keyboard (visualViewport shrinks when IME is open) */
   const [sheetInset, setSheetInset] = useState({ bottom: 0, maxHeight: '88dvh' as string });
   const manualInputRef = useRef<HTMLInputElement>(null);
@@ -172,8 +219,23 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
   // Fetch as soon as the modal mounts
   useEffect(() => { loadCoupons(); }, []);
 
+  const runApply = async (code: string) => {
+    setApplyHint(null);
+    try {
+      const result = await onApply(code);
+      const serverMsg = result && typeof result === 'object' && 'successMessage' in result ? result.successMessage : undefined;
+      setApplyHint({
+        kind: 'success',
+        text: (typeof serverMsg === 'string' && serverMsg.trim()) || `“${code}” applied successfully.`,
+      });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Could not apply this code.';
+      setApplyHint({ kind: 'error', text: msg });
+    }
+  };
+
   const handleManualApply = () => {
-    if (manualCode.trim()) onApply(manualCode.trim().toUpperCase());
+    if (manualCode.trim()) void runApply(manualCode.trim().toUpperCase());
   };
 
   return (
@@ -214,7 +276,10 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                 ref={manualInputRef}
                 type="text"
                 value={manualCode}
-                onChange={(e) => setManualCode(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  setManualCode(e.target.value.toUpperCase());
+                  setApplyHint(null);
+                }}
                 onKeyDown={(e) => e.key === 'Enter' && handleManualApply()}
                 onFocus={(e) => {
                   window.setTimeout(() => {
@@ -232,6 +297,16 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                 {isApplying ? '...' : 'Apply'}
               </button>
             </div>
+            {applyHint ? (
+              <p
+                role="status"
+                className={`mt-2.5 text-xs font-medium leading-snug sm:text-sm ${
+                  applyHint.kind === 'success' ? 'text-green-700' : 'text-red-600'
+                }`}
+              >
+                {applyHint.text}
+              </p>
+            ) : null}
           </div>
 
           {/* Divider */}
@@ -298,7 +373,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                       </div>
 
                       <button
-                        onClick={() => onApply(coupon.code)}
+                        onClick={() => void runApply(coupon.code)}
                         disabled={isApplying}
                         className={`ml-3 flex-shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
                           isApplied
@@ -400,13 +475,7 @@ const Cart: React.FC = () => {
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState<number>(0);
 
-  const [cartTotals, setCartTotals] = useState<{
-    subtotal: number;
-    taxAmount: number;
-    deliveryFee: number;
-    discountAmount: number;
-    total: number;
-  } | null>(null);
+  const [cartTotals, setCartTotals] = useState<CartTotalsState | null>(null);
   const [isLoadingCartTotals, setIsLoadingCartTotals] = useState(false);
   /** After first totals fetch, refreshes (e.g. during checkout) must not show the full-page loader */
   const [hasLoadedCartTotalsOnce, setHasLoadedCartTotalsOnce] = useState(false);
@@ -453,7 +522,7 @@ const Cart: React.FC = () => {
       return;
     }
     addressUpdatedToastConsumed = true;
-    toast.success('Delivery address updated. We deliver to this location.', { duration: 4000 });
+    toast.success('Address updated.', { duration: 2200 });
     navigate('.', { replace: true, state: {} });
   }, [location.state, navigate]);
 
@@ -467,43 +536,32 @@ const Cart: React.FC = () => {
   }, [showPromoModal]);
 
   // Apply promo code
-  const handleApplyPromoCode = async (code: string) => {
+  const handleApplyPromoCode = async (code: string): Promise<{ successMessage?: string } | void> => {
     if (!code) return;
     try {
       setIsApplyingPromo(true);
       const response = await applyCouponAPI(code);
 
       const discountAmt = parseFloat(String(response.discount_amount ?? 0));
-      setPromoDiscount(isNaN(discountAmt) ? 0 : discountAmt);
+      setPromoDiscount(Number.isFinite(discountAmt) ? discountAmt : 0);
 
       // If the response contains updated totals, use them directly
       if (response.total !== undefined || response.subtotal !== undefined) {
-        setCartTotals({
-          subtotal: parseFloat(String(response.subtotal ?? cartTotals?.subtotal ?? 0)),
-          taxAmount: parseFloat(String(response.tax_amount ?? cartTotals?.taxAmount ?? 0)),
-          deliveryFee: parseFloat(String(response.delivery_fee ?? cartTotals?.deliveryFee ?? 0)),
-          discountAmount: isNaN(discountAmt) ? 0 : discountAmt,
-          total: parseFloat(String(response.total ?? cartTotals?.total ?? 0)),
-        });
+        const d = Number.isFinite(discountAmt) ? discountAmt : 0;
+        setCartTotals((prev) => mergeTotalsFromApplyResponse(response, prev, d));
       } else {
-        // Otherwise re-fetch cart totals so the summary reflects the coupon
         try {
           const cartData = await cartService.getCartData();
-          setCartTotals({
-            subtotal: parseFloat(cartData.subtotal || '0'),
-            taxAmount: parseFloat(cartData.tax_amount || '0'),
-            deliveryFee: parseFloat(cartData.delivery_fee || '0'),
-            discountAmount: parseFloat(cartData.discount_amount || '0'),
-            total: parseFloat(cartData.total || '0'),
-          });
+          setCartTotals(totalsFromCartData(cartData));
         } catch (_) {}
       }
 
       setAppliedPromoCode(code);
-      setShowPromoModal(false);
-      toast.success(`Promo code "${code}" applied!`);
+      return {
+        successMessage: typeof response.message === 'string' ? response.message.trim() : undefined,
+      };
     } catch (error: any) {
-      toast.error(error.message || 'Failed to apply promo code');
+      throw new Error(error?.message || 'Failed to apply promo code');
     } finally {
       setIsApplyingPromo(false);
     }
@@ -516,13 +574,7 @@ const Cart: React.FC = () => {
       setAppliedPromoCode(null);
       setPromoDiscount(0);
       const cartData = await cartService.getCartData();
-      setCartTotals({
-        subtotal: parseFloat(cartData.subtotal || '0'),
-        taxAmount: parseFloat(cartData.tax_amount || '0'),
-        deliveryFee: parseFloat(cartData.delivery_fee || '0'),
-        discountAmount: parseFloat(cartData.discount_amount || '0'),
-        total: parseFloat(cartData.total || '0'),
-      });
+      setCartTotals(totalsFromCartData(cartData));
       toast.success('Promo code removed');
     } catch (error: any) {
       toast.error(error.message || 'Failed to remove promo code');
@@ -705,13 +757,7 @@ const Cart: React.FC = () => {
       try {
         setIsLoadingCartTotals(true);
         const cartData = await cartService.getCartData();
-        setCartTotals({
-          subtotal: parseFloat(cartData.subtotal || '0'),
-          taxAmount: parseFloat(cartData.tax_amount || '0'),
-          deliveryFee: parseFloat(cartData.delivery_fee || '0'),
-          discountAmount: parseFloat(cartData.discount_amount || '0'),
-          total: parseFloat(cartData.total || '0'),
-        });
+        setCartTotals(totalsFromCartData(cartData));
       } catch (_) {
         setCartTotals(null);
       } finally {
@@ -721,6 +767,25 @@ const Cart: React.FC = () => {
     };
     fetchCartTotals();
   }, [isLoggedIn, items]);
+
+  // Sync selected profile address to server cart so delivery_fee matches checkout (distance-based).
+  useEffect(() => {
+    if (!isLoggedIn || !defaultAddress?.id) return;
+    const id = parseInt(String(defaultAddress.id), 10);
+    if (!Number.isFinite(id) || id <= 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const cartData = await cartService.setCartDeliveryAddress(id);
+        if (!cancelled) setCartTotals(totalsFromCartData(cartData));
+      } catch (e) {
+        console.warn('cart delivery-address sync failed', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, defaultAddress?.id]);
 
   // Prefill Razorpay contact/name/email from profile (state was never set before → empty mobile on Razorpay)
   useEffect(() => {
@@ -950,13 +1015,7 @@ const Cart: React.FC = () => {
       try {
         setIsLoadingCartTotals(true);
         const cartData = await cartService.getCartData();
-        setCartTotals({
-          subtotal: parseFloat(cartData.subtotal || '0'),
-          taxAmount: parseFloat(cartData.tax_amount || '0'),
-          deliveryFee: parseFloat(cartData.delivery_fee || '0'),
-          discountAmount: parseFloat(cartData.discount_amount || '0'),
-          total: parseFloat(cartData.total || '0'),
-        });
+        setCartTotals(totalsFromCartData(cartData));
       } catch (_) {} finally { setIsLoadingCartTotals(false); }
     } catch (_) {
       toast.error("We couldn't update your basket. Check your connection and try checkout again.");
@@ -1089,7 +1148,7 @@ const Cart: React.FC = () => {
       if (!recovered) {
         // Payment was taken by Razorpay but we couldn't confirm the order.
         // Keep the pending payment in localStorage so it can be retried on next app load.
-        toast.error('We received your payment but could not confirm your order. Please check your orders or contact support.');
+        toast.error('Paid — order not confirmed. Check Orders or support.');
       }
     }
 
@@ -1146,7 +1205,11 @@ const Cart: React.FC = () => {
   const deliveryFee = cartTotals?.deliveryFee ?? 0;
   const tax = cartTotals?.taxAmount ?? 0;
   const discount = cartTotals?.discountAmount ?? 0;
-  const total = cartTotals?.total ?? (subtotal + deliveryFee + tax - discount);
+  const surcharge = cartTotals?.surchargeAmount ?? 0;
+  const deliveryAddressId = cartTotals?.deliveryAddressId ?? null;
+  const total =
+    cartTotals?.total ??
+    subtotal + deliveryFee + tax + surcharge - discount;
 
   const formatAddress = (address: Address | null): string => {
     if (!address) return '';
@@ -1527,18 +1590,35 @@ const Cart: React.FC = () => {
                     <span>Subtotal</span>
                     <span>₹{subtotal.toLocaleString('en-IN')}</span>
                   </div>
+                  {surcharge > 0 && (
+                    <div className="flex justify-between text-sm text-gray-700">
+                      <span>Packaging & other fees</span>
+                      <span>₹{surcharge.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm text-gray-700">
-                    <span>Delivery Fee</span>
-                    <span>₹{deliveryFee}</span>
+                    <span className="inline-flex flex-col gap-0.5">
+                      <span>Delivery fee</span>
+                      {deliveryFee === 0 && deliveryAddressId === null && (
+                        <span className="text-[11px] font-normal text-gray-400">
+                          Confirmed when your delivery address is set on this cart.
+                        </span>
+                      )}
+                    </span>
+                    <span>₹{deliveryFee.toLocaleString('en-IN')}</span>
                   </div>
-                  <div className="flex justify-between text-sm text-gray-700">
-                    <span>Tax</span>
-                    <span>₹{tax}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-gray-700">
-                    <span>Discount</span>
-                    <span>-₹{discount}</span>
-                  </div>
+                  {tax > 0 && (
+                    <div className="flex justify-between text-sm text-gray-700">
+                      <span>GST</span>
+                      <span>₹{tax.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  {discount > 0 && (
+                    <div className="flex justify-between text-sm text-gray-700">
+                      <span>Discount</span>
+                      <span>-₹{discount.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
                   {/* Show promo line only if backend hasn't merged it into discount already */}
                   {appliedPromoCode && promoDiscount > 0 && discount === 0 && (
                     <div className="flex justify-between text-sm text-[#19411F] font-medium">
