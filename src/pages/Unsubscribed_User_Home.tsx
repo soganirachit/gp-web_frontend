@@ -17,8 +17,7 @@ import searchImage from '../assets/icon/Search.png'
 import Eco from '../assets/icon/Eco.png'
 import wallet from '../assets/icon/Wallet.png'
 import Profile from '../assets/icon/Profile.png'
-import BottomNav from '../components/layout/BottomNav';
-import Spinner from '../components/common/Spinner';
+import { UnsubscribedHomeSkeleton } from '../components/common/PageSkeletons';
 
 
 interface Product {
@@ -73,11 +72,7 @@ function Unsubscribed_User_Home() {
   };
 
   if (isLoadingProducts) {
-    return (
-      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
-        <Spinner size={400} />
-      </div>
-    );
+    return <UnsubscribedHomeSkeleton />;
   }
 
   return (
@@ -404,11 +399,6 @@ function Unsubscribed_User_Home() {
         <div className='mt-[290px] mb-9 flex mr-[120px] justify-center'>
           <img src={logo} alt='' className='text-[#231F20] opacity-50 md:h-24' />
         </div>
-      </div>
-
-      {/* Navigation Bar - Hide on desktop */}
-      <div className='fixed overflow:hidden md:hidden'>
-        <BottomNav />
       </div>
 
     </div>

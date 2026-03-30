@@ -10,11 +10,10 @@ import {
   IoCreateOutline,
   IoLogInOutline,
 } from 'react-icons/io5';
-import BottomNav from '../../components/layout/BottomNav';
 import { customerService } from '@/services/getcustomer.service';
 import { storeService, Store } from '../../services/store.service';
 import { addressService } from '../../services/address.service';
-import Spinner from '../../components/common/Spinner';
+import { SettingsListSkeleton } from '../../components/common/PageSkeletons';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { cartService, CartSwitchStoreResponse } from '../../services/cart.service';
@@ -531,18 +530,13 @@ const Settings: React.FC = () => {
             </div>
           </div>
         </div>
-        <BottomNav />
       </div>
     );
   }
 
-  // Show full-page loader while data is loading
+  // Show skeleton while data is loading
   if (loading) {
-    return (
-      <div className={`fixed inset-0 flex items-center justify-center z-50 ${theme.classes.authPageBackground}`}>
-        <Spinner size={400} />
-      </div>
-    );
+    return <SettingsListSkeleton />;
   }
 
   return (
@@ -843,9 +837,6 @@ const Settings: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Bottom Navigation */}
-      <BottomNav />
 
       {/* Logout Confirmation Dialog */}
       {showLogoutDialog && (

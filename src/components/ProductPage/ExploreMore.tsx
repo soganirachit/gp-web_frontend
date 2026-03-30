@@ -7,8 +7,7 @@ import { basePackService, BasePack } from "../../services/basepack.service";
 import { storeService } from "../../services/store.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import ProductCard from "../common/ProductCard";
-import BottomNavigation from "../layout/BottomNav";
-import Spinner from "../common/Spinner";
+import { ProductBrowseSkeleton } from "../common/PageSkeletons";
 
 const ExploreMore: React.FC = () => {
   const navigate = useNavigate();
@@ -255,11 +254,7 @@ const ExploreMore: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-        <Spinner size={400} />
-      </div>
-    );
+    return <ProductBrowseSkeleton />;
   }
 
   return (
@@ -310,8 +305,6 @@ const ExploreMore: React.FC = () => {
           )}
         </div>
 
-        {/* Bottom Navigation */}
-        <BottomNavigation />
       </div>
     </div>
   );

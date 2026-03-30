@@ -1,77 +1,67 @@
 import React, { useContext } from 'react';
-import spinnerSvg from '../../assets/icon/Spinner@1x-1.0s-646px-646px 1.svg';
+import { motion } from 'framer-motion';
 import { FeatureThemeContext } from '../../context/FeatureThemeContext';
+import { PAGE_FADE_DURATION_SEC, PAGE_FADE_EASE } from './PageFade';
 
 interface SpinnerProps {
-  size?: number;   // <100 → exact px (inline use). >=100 → responsive (page-level use, size ignored).
+  size?: number;
   className?: string;
   isLoading?: boolean;
-  /** Use 'light' when spinner is on a dark background (e.g. inside colored buttons) */
+  /** Kept for API compatibility; inline loading uses a soft opacity pulse (no rotating spinner). */
   variant?: 'default' | 'light';
 }
 
-// Theme-aligned filter for GP Store green; no filter = default dark/black for GP Daily
-const GREEN_FILTER = 'brightness(0) saturate(100%) invert(53%) sepia(35%) saturate(735%) hue-rotate(76deg) brightness(95%) contrast(85%)';
-const LIGHT_FILTER = 'brightness(0) invert(1)'; // white for dark backgrounds
-const GP_STORE_GREEN = '#19411F';
-
-const Spinner: React.FC<SpinnerProps> = ({ size = 64, className = '', isLoading = true, variant = 'default' }) => {
+/**
+ * Page-level loading (size ≥ 100): empty fade surface — no spinner asset.
+ * Inline loading (size &lt; 100): subtle opacity pulse — no rotating spinner.
+ */
+const Spinner: React.FC<SpinnerProps> = ({
+  size = 64,
+  className = '',
+  isLoading = true,
+  variant = 'default',
+}) => {
   const themeContext = useContext(FeatureThemeContext);
 
   if (!isLoading) return null;
 
   const feature = themeContext?.feature;
-  const greenFilter = feature === 'gpStore' ? GREEN_FILTER : undefined;
-  const filter = variant === 'light' ? LIGHT_FILTER : greenFilter;
-
-  // Page-level spinner (size >= 100): responsive sizing — large and clearly visible.
-  // 44vmin gives ~158px on 360px phone, ~211px on 480px.
-  // Use global keyframes (defined in src/index.css) to avoid relying on Tailwind's animate utilities.
-  const spinAnimation = 'gpSpinnerSpin';
+  const pulseColor =
+    variant === 'light'
+      ? 'rgba(255,255,255,0.35)'
+      : feature === 'gpStore'
+        ? 'rgba(25, 65, 31, 0.2)'
+        : 'rgba(17, 24, 39, 0.15)';
 
   if (size >= 100) {
     return (
-      <div className={`flex items-center justify-center ${className}`}>
-        <img
-          src={spinnerSvg}
-          alt="Loading..."
-          className=""
-          style={{
-            width: 'clamp(140px, 44vmin, 260px)',
-            height: 'clamp(140px, 44vmin, 260px)',
-            filter,
-            animation: `${spinAnimation} 1s linear infinite`,
-          }}
-        />
-      </div>
+      <motion.div
+        className={`flex h-full min-h-[200px] w-full items-center justify-center bg-[#f8f6f1] ${className}`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: PAGE_FADE_DURATION_SEC, ease: PAGE_FADE_EASE }}
+        aria-hidden
+      />
     );
   }
 
-  // Inline spinner (size < 100): exact pixel size as specified.
-  // Use a CSS border spinner here (more visually obvious than rotating the image asset),
-  // especially for small sizes inside buttons.
-  const inlineColor =
-    variant === 'light'
-      ? '#FFFFFF'
-      : feature === 'gpStore'
-      ? GP_STORE_GREEN
-      : '#111827'; // gray-900
-
+  const s = Math.max(12, Math.min(size, 96));
   return (
     <div className={`flex items-center justify-center ${className}`}>
-      <div
-        aria-label="Loading..."
+      <motion.div
+        aria-label="Loading"
         role="status"
         style={{
-          width: `${size}px`,
-          height: `${size}px`,
-          borderRadius: '9999px',
-          borderWidth: Math.max(2, Math.round(size / 8)),
-          borderStyle: 'solid',
-          borderColor: `${inlineColor}33`,
-          borderTopColor: inlineColor,
-          animation: `${spinAnimation} 0.9s linear infinite`,
-          boxSizing: 'border-box',
+          width: s,
+          height: s,
+          borderRadius: 9999,
+          backgroundColor: pulseColor,
+        }}
+        animate={{ opacity: [0.35, 0.85, 0.35] }}
+        transition={{
+          duration: 1.15,
+          repeat: Infinity,
+          ease: 'easeInOut',
         }}
       />
     </div>

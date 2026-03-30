@@ -2,14 +2,13 @@ import { Suspense } from 'react';
 import { lazyWithRetry as lazy } from '../utils/lazyWithRetry';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
-import Spinner from '../components/common/Spinner';
+import { PageFadeFallback } from '../components/common/PageFade';
 import ProtectedRoute from '../components/common/ProtectedRoute';
 import { FEATURE_FLAGS } from '../config/features';
 import RouteErrorPage from '../components/common/RouteErrorPage';
 
 // Context
 import { StoreProvider } from '../context/StoreContext';
-import { FeatureThemeProvider } from '../context/FeatureThemeContext';
 
 // ================== LAZY LOADED COMPONENTS ==================
 const Unsubscribed_User_Home = lazy(() => import('../pages/Unsubscribed_User_Home'));
@@ -62,11 +61,7 @@ const Cart = lazy(() => import('../features/cart/components/Cart'));
 const Terms = lazy(() => import('../pages/Terms'));
 const Privacy = lazy(() => import('../pages/Privacy'));
 
-const PageLoader = () => (
-  <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-    <Spinner size={400} />
-  </div>
-);
+const PageLoader = () => <PageFadeFallback />;
 
 const router = createBrowserRouter([
   {
@@ -78,6 +73,7 @@ const router = createBrowserRouter([
       { path: '/startup', element: <Startup /> },
       { path: '/search', element: <Search /> },
       { path: '/explore-more', element: <ExploreMore /> },
+      { path: '/home', element: <HomePage /> },
       {
         path: '/gp-daily',
         element: FEATURE_FLAGS.gpDailyEnabled ? <Gp_daily_Homepage /> : <Navigate to="/gp-store" replace />
@@ -169,17 +165,6 @@ const router = createBrowserRouter([
       { path: '/terms', element: <Terms /> },
       { path: '/privacy', element: <Privacy /> },
     ],
-  },
-  {
-    path: '/home',
-    element: (
-      <FeatureThemeProvider>
-        <Suspense fallback={<PageLoader />}>
-          <HomePage />
-        </Suspense>
-      </FeatureThemeProvider>
-    ),
-    errorElement: <RouteErrorPage />,
   },
 ]);
 

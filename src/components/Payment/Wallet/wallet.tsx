@@ -21,6 +21,7 @@ import lowbalanceIcon from "../../../assets/svg/gp_daily svg/lowbalance.svg";
 import depositIcon from "../../../assets/svg/gp_daily svg/deposit.svg";
 import enableIcon from "../../../assets/svg/gp_daily svg/enable.svg";
 import Spinner from "../../common/Spinner";
+import { WalletPageSkeleton } from "../../common/PageSkeletons";
 import { orderService } from "../../../services/order.service";
 import { addressService, Address } from "../../../services/address.service";
 
@@ -237,11 +238,7 @@ const Wallet = () => {
   }, []);
 
   if (isLoadingBalance) {
-    return (
-      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
-        <Spinner size={400} />
-      </div>
-    );
+    return <WalletPageSkeleton />;
   }
 
   return (

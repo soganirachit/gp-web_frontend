@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import BottomNavigation from '../../layout/BottomNav';
 import { format } from 'date-fns';
 // Importing assets
 import vectorBadge from '../../../assets/All/Vector (1).png';
@@ -102,8 +101,6 @@ const CancelSubscriptionSuccess: React.FC = () => {
                 </div>
 
             </div>
-
-            <BottomNavigation />
         </div>
     );
 };

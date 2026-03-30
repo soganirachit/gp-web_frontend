@@ -4,7 +4,7 @@ import { FaPen, FaTrash } from 'react-icons/fa';
 import { IoArrowBack } from 'react-icons/io5';
 import { BsCheckSquareFill } from 'react-icons/bs';
 import { addressService, type Address } from '../../services/address.service';
-import Spinner from '../../components/common/Spinner';
+import { SettingsListSkeleton } from '../../components/common/PageSkeletons';
 import { GoogleMap, useJsApiLoader } from '@react-google-maps/api';
 
 // Import SVG icons
@@ -118,11 +118,7 @@ const Addresses: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-        <Spinner size={400} />
-      </div>
-    );
+    return <SettingsListSkeleton />;
   }
 
   return (

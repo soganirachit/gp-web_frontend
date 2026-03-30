@@ -5,7 +5,7 @@ import { FaPaperPlane } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { supportService, TicketQuestion, PredefinedAnswers } from '../../services/support.service';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
-import Spinner from '../../components/common/Spinner';
+import { SettingsListSkeleton } from '../../components/common/PageSkeletons';
 
 interface ChatMessage {
   id: string;
@@ -204,11 +204,7 @@ const TicketQuestionForm: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-        <Spinner size={400} />
-      </div>
-    );
+    return <SettingsListSkeleton />;
   }
 
   if (!orderId || !orderNumber) {

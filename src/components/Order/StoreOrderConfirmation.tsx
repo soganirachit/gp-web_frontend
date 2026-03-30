@@ -6,7 +6,7 @@ import { FaBox, FaClock, FaMapMarkerAlt, FaRupeeSign } from 'react-icons/fa';
 import { MdLocationOn } from 'react-icons/md';
 import { useGoogleMaps } from '../../hooks/useGoogleMaps';
 import Spinner from '../common/Spinner';
-import BottomNavigation from '../layout/BottomNav';
+import { OrderConfirmationSkeleton } from '../common/PageSkeletons';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { orderService } from '../../services/order.service';
 import { format } from 'date-fns';
@@ -213,11 +213,7 @@ const StoreOrderConfirmation: React.FC = () => {
   const firstItem = order?.items?.[0];
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
-        <Spinner size={400} />
-      </div>
-    );
+    return <OrderConfirmationSkeleton />;
   }
 
   if (error || !order) {
@@ -364,10 +360,6 @@ const StoreOrderConfirmation: React.FC = () => {
           Our customer care is available 24/7
         </p>
 
-        {/* Bottom Navigation */}
-        <div className="fixed bottom-0 left-0 right-0">
-          <BottomNavigation />
-        </div>
       </div>
     </div>
   );

@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import BottomNavigation from '../../layout/BottomNav';
 import pauseSvg from '../../../assets/svg/cancelpage/pause.svg';
 import vectorBadge from '../../../assets/All/Vector (1).png';
 import { format } from 'date-fns';
@@ -89,8 +88,6 @@ const PausedSubscriptionLanding: React.FC = () => {
           </button>
         </motion.div>
       </div>
-
-      <BottomNavigation />
     </div>
   );
 };

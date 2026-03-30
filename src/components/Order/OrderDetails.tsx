@@ -2,16 +2,13 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { IoArrowBack, IoDownloadOutline } from 'react-icons/io5';
 import { FaCopy } from 'react-icons/fa';
-import BottomNavigation from '../layout/BottomNav';
 import { orderService } from '../../services/order.service';
 import { format } from 'date-fns';
-import Spinner from '../common/Spinner';
+import { OrderDetailSkeleton } from '../common/PageSkeletons';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import supportIcon from '../../assets/svg/gp_store_svg/support.svg';
 import orderTickIcon from '../../assets/svg/gp_store_svg/ordertick.svg';
-import orderCnfIcon from '../../assets/svg/gp_daily svg/ordercnf.svg';
 import orderDeliveredIcon from '../../assets/svg/gp_store_svg/orderdelivered.svg';
-import deliveryIcon from '../../assets/svg/gp_store_svg/delivery.svg';
 import detailshomeIcon from '../../assets/svg/gp_store_svg/detailshome.svg';
 import detailsuserIcon from '../../assets/svg/gp_store_svg/detailsuser.svg';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
@@ -97,6 +94,25 @@ interface OrderDetails {
   cancelled_at: string | null;
   cancellation_reason: string;
   created_at: string;
+  /** Optional — when API returns invoice metadata for footer line */
+  invoice_number?: string;
+  invoice_date?: string;
+}
+
+function formatRupee(amount: string | number | undefined | null): string {
+  const n = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
+  if (Number.isNaN(n)) return '0.00';
+  return n.toFixed(2);
+}
+
+function formatPaymentMethodLabel(raw: string | undefined): string {
+  if (!raw || raw.trim() === '') return 'N/A';
+  const normalized = raw.toLowerCase().replace(/\s+/g, '_');
+  if (normalized === 'pos_cash') return 'Cash';
+  if (normalized === 'wallet') return 'Wallet';
+  if (normalized === 'razorpay') return 'Razor Pay';
+  if (normalized === 'cod') return 'Cod';
+  return raw;
 }
 
 const OrderDetails: React.FC = () => {
@@ -209,19 +225,8 @@ const OrderDetails: React.FC = () => {
     // You can add a toast notification here
   };
 
-  const calculateListingPrice = () => {
-    if (!order) return '0.00';
-    const subtotal = parseFloat(order.subtotal || '0');
-    const discount = parseFloat(order.discount_amount || '0');
-    return (subtotal + discount).toFixed(2);
-  };
-
   if (loading) {
-    return (
-      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-        <Spinner size={400} />
-      </div>
-    );
+    return <OrderDetailSkeleton />;
   }
 
   if (error || !order) {
@@ -241,14 +246,9 @@ const OrderDetails: React.FC = () => {
     );
   }
 
-  // Get the first item for the main display image
-  const mainItem = order.items[0];
-  const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-
   // Get timeline events
   const confirmedEvent = order.timeline.find(e => e.status === 'confirmed' || e.status === 'order_confirmed');
   const deliveredEvent = order.timeline.find(e => e.status === 'delivered');
-  const outForDeliveryEvent = order.timeline.find(e => e.status === 'out_for_delivery');
   const cancelledEvent = order.timeline.find(e => e.status === 'cancelled' || e.status === 'canceled');
 
   // Determine timeline points to show
@@ -317,7 +317,7 @@ const OrderDetails: React.FC = () => {
             >
               <IoArrowBack size={24} />
             </button>
-            <h1 className="text-2xl font-bold font-serif text-gray-900">Order Details</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Order Details</h1>
           </div>
         </div>
 
@@ -435,71 +435,96 @@ const OrderDetails: React.FC = () => {
               </div>
             )}
 
-            {/* Price Details */}
+            {/* Price breakdown — labels left, values right (matches mobile reference) */}
             <div className="bg-white rounded-2xl p-4 shadow-sm">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Price Details</h2>
-              <div className="space-y-2 mb-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Listing Price</span>
-                  <span className="text-gray-600 line-through">₹{calculateListingPrice()}</span>
+              <div className="space-y-2.5 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="shrink-0 text-gray-600">Selling Price</span>
+                  <span className="text-right font-medium text-gray-900 tabular-nums">
+                    ₹{formatRupee(order.subtotal)}
+                  </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Selling Price</span>
-                  <span className="text-gray-900">₹{order.subtotal}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Delivery Charges</span>
-                  <span className="text-gray-900">{parseFloat(order.delivery_fee) === 0 ? 'Free' : `₹${order.delivery_fee}`}</span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="shrink-0 text-gray-600">Delivery Charges</span>
+                  <span
+                    className={`text-right font-medium tabular-nums ${
+                      parseFloat(order.delivery_fee || '0') === 0
+                        ? 'text-[#19411F]'
+                        : 'text-gray-900'
+                    }`}
+                  >
+                    {parseFloat(order.delivery_fee || '0') === 0
+                      ? 'Free'
+                      : `₹${formatRupee(order.delivery_fee)}`}
+                  </span>
                 </div>
                 {(() => {
                   const sur =
                     parseFloat(order.total_surcharge ?? order.surcharge_amount ?? '0') || 0;
                   return sur > 0 ? (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Packaging & other fees</span>
-                      <span className="text-gray-900">₹{Number(sur).toLocaleString('en-IN')}</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="shrink-0 text-gray-600">Packaging & other fees</span>
+                      <span className="text-right font-medium text-gray-900 tabular-nums">
+                        ₹{formatRupee(sur)}
+                      </span>
                     </div>
                   ) : null;
                 })()}
-                {parseFloat(order.tax_amount || '0') > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">GST</span>
-                    <span className="text-gray-900">₹{order.tax_amount}</span>
-                  </div>
-                )}
-                {parseFloat(order.discount_amount) > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Discount</span>
-                    <span className="text-green-600">-₹{order.discount_amount}</span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="shrink-0 text-gray-600">Tax</span>
+                  <span className="text-right font-medium text-gray-900 tabular-nums">
+                    ₹{formatRupee(order.tax_amount)}
+                  </span>
+                </div>
+                {parseFloat(order.discount_amount || '0') > 0 && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="shrink-0 text-gray-600">Discount</span>
+                    <span className="text-right font-medium text-green-600 tabular-nums">
+                      -₹{formatRupee(order.discount_amount)}
+                    </span>
                   </div>
                 )}
               </div>
-              <div className="border-t border-gray-200 pt-2 mt-2">
-                <div className="flex justify-between">
-                  <span className="font-bold text-gray-900">Total Amount</span>
-                  <span className="font-bold text-gray-900">₹{order.total_amount}</span>
+              <div className="mt-3 border-t border-gray-200 pt-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-base font-bold text-gray-900">Total Amount</span>
+                  <span className="text-base font-bold text-gray-900 tabular-nums">
+                    ₹{formatRupee(order.total_amount)}
+                  </span>
                 </div>
               </div>
-              <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t border-gray-100">
-                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                </svg>
-                <span className="text-sm text-gray-600">
-                  Payment Method: {order.payment_method === 'wallet' ? 'Wallet' :
-                    order.payment_method === 'razorpay' ? 'Razor Pay' :
-                      order.payment_method === 'cod' ? 'Cod' :
-                        order.payment_method?.charAt(0).toUpperCase() + order.payment_method?.slice(1) || 'N/A'}
-                </span>
+              <div className="mt-3 px-3 py-2.5 border-t border-gray-200 text-center">
+                <div className="flex items-center gap-2">
+                  <svg
+                    className="h-4 w-4 shrink-0 text-gray-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                    />
+                  </svg>
+                  <span className="text-sm text-gray-600">
+                    Payment Method: {formatPaymentMethodLabel(order.payment_method)}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Order Information */}
+            {/* Order Information — label left / value right, values bold */}
             <div className="bg-white rounded-2xl p-4 shadow-sm">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-                <h2 className="min-w-0 text-lg font-bold leading-tight text-gray-900">Order Information</h2>
-                <div className="flex shrink-0 items-center justify-end">
+              <div className="mb-4 flex flex-nowrap items-center justify-between gap-3">
+                <h2 className="min-w-0 flex-1 truncate text-lg font-bold leading-none text-gray-900">
+                  Order Information
+                </h2>
+                <div className="flex shrink-0 items-center">
                   {invoiceLoading && (
-                    <span className="text-xs text-gray-500">Loading…</span>
+                    <span className="text-xs leading-none text-gray-500">Loading…</span>
                   )}
                   {!invoiceLoading &&
                     invoiceInfo &&
@@ -508,26 +533,27 @@ const OrderDetails: React.FC = () => {
                       <button
                         type="button"
                         onClick={openInvoicePdf}
-                        className="inline-flex max-w-full items-center gap-1 border-0 bg-transparent p-0 text-xs font-semibold leading-tight text-[#19411f] underline decoration-[#19411f] underline-offset-[3px] transition-colors hover:text-[#145028] hover:decoration-[#145028] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#19411f]/30 focus-visible:ring-offset-2 sm:text-sm !min-w-0 min-h-[44px]"
+                        className="inline-flex max-w-full items-center gap-1 border-0 bg-transparent p-0 text-sm font-semibold leading-none text-[#19411f] underline decoration-[#19411f] underline-offset-[3px] transition-colors hover:text-[#145028] hover:decoration-[#145028] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#19411f]/30 focus-visible:ring-offset-2"
                       >
-                        <IoDownloadOutline className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden />
-                        <span className="truncate text-left">Download invoice</span>
+                        <IoDownloadOutline className="h-4 w-4 shrink-0" aria-hidden />
+                        <span className="truncate text-decoration-underline">Invoice</span>
                       </button>
                     )}
                   {!invoiceLoading &&
                     invoiceInfo &&
                     !(invoiceInfo.is_generated && invoiceInfo.pdf_file) && (
-                      <span className="max-w-[11rem] text-right text-xs font-medium leading-snug text-gray-500 sm:max-w-none">
+                      <span className="max-w-[11rem] text-right text-xs font-medium leading-none text-gray-500 sm:max-w-none">
                         Invoice being prepared
                       </span>
                     )}
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-3">
-                <div className="grid grid-cols-[6.25rem_minmax(0,1fr)] items-center gap-x-2 sm:grid-cols-[8.5rem_minmax(0,1fr)]">
-                  <span className="text-sm text-gray-600">Order ID</span>
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate text-sm font-medium text-gray-900">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="shrink-0 text-sm text-gray-600">Order ID</span>
+                  {/* Pull past card p-4 so value + copy sit flush to the card’s right edge */}
+                  <div className="flex min-w-0 flex-1 items-center justify-end gap-0 -mr-4 pr-0">
+                    <span className="min-w-0 truncate text-right text-sm font-semibold text-gray-900">
                       {order.order_number}
                     </span>
                     <button
@@ -541,9 +567,9 @@ const OrderDetails: React.FC = () => {
                   </div>
                 </div>
                 {(order.order_type_label || order.order_type) && (
-                  <div className="grid grid-cols-[6.25rem_minmax(0,1fr)] items-center gap-x-2 sm:grid-cols-[8.5rem_minmax(0,1fr)]">
-                    <span className="text-sm text-gray-600">Order Type</span>
-                    <span className="break-words text-sm font-medium text-gray-900">
+                  <div className="flex items-center gap-3">
+                    <span className="shrink-0 text-sm text-gray-600">Order Type</span>
+                    <span className="min-w-0 flex-1 pl-2 text-right text-sm font-semibold text-gray-900">
                       {order.order_type_label ||
                         (order.order_type === 'online'
                           ? 'Store Order'
@@ -555,13 +581,20 @@ const OrderDetails: React.FC = () => {
                     </span>
                   </div>
                 )}
-                <div className="grid grid-cols-[6.25rem_minmax(0,1fr)] items-center gap-x-2 sm:grid-cols-[8.5rem_minmax(0,1fr)]">
-                  <span className="text-sm text-gray-600">Placed On</span>
-                  <span className="break-words text-sm font-medium text-gray-900">
+                <div className="flex items-center gap-3">
+                  <span className="shrink-0 text-sm text-gray-600">Placed On</span>
+                  <span className="min-w-0 flex-1 pl-2 text-right text-sm font-semibold text-gray-900">
                     {formatDate(order.created_at)}
                   </span>
                 </div>
               </div>
+              {(order.invoice_number || order.invoice_date) && (
+                <p className="mt-4 text-xs leading-relaxed text-gray-400">
+                  {order.invoice_number}
+                  {order.invoice_number && order.invoice_date ? ' · ' : ''}
+                  {order.invoice_date ? formatDate(order.invoice_date) : ''}
+                </p>
+              )}
             </div>
 
             {/* Subscription Info - only for subscription orders */}
@@ -597,7 +630,8 @@ const OrderDetails: React.FC = () => {
             <div className="flex justify-center">
               <button
                 onClick={() => navigate(`${basePath}`)}
-                className="px-8 py-3 bg-[#19411f] text-white rounded-xl font-semibold hover:bg-[#145028] transition-colors"
+                type="button"
+                className="min-w-[200px] rounded-full bg-[#19411f] px-10 py-3 text-base font-semibold text-white transition-colors hover:bg-[#145028]"
               >
                 Shop More
               </button>
@@ -606,20 +640,21 @@ const OrderDetails: React.FC = () => {
             {/* Support Section */}
             {order.status === 'delivered' && (
               <div className="bg-white rounded-2xl p-4 shadow-sm">
-                <div className="flex items-start gap-3 mb-3">
+                <div className="mb-3 flex items-start gap-3">
                   <img
                     src={supportIcon}
-                    alt="Support"
-                    className="w-5 h-5 mt-0.5 flex-shrink-0"
+                    alt=""
+                    className="mt-0.5 h-5 w-5 shrink-0"
                   />
-                  <p className="text-lg text-[#19411F] flex-1">
+                  <p className="flex-1 text-left text-sm leading-relaxed text-gray-600">
                     Support requests can only be raised within 4 hours after delivery.
                   </p>
                 </div>
                 <div className="text-center">
                   <button
+                    type="button"
                     onClick={() => navigate(`${basePath}/customer-support`)}
-                    className="text-base text-[#19411F] underline"
+                    className="text-base font-medium text-[#19411F] underline decoration-[#19411F] underline-offset-2"
                   >
                     Raise a Support Ticket
                   </button>
@@ -629,10 +664,6 @@ const OrderDetails: React.FC = () => {
           </div>
         </div>
 
-        {/* Bottom Nav */}
-        <div className="sticky bottom-0 z-20">
-          <BottomNavigation />
-        </div>
       </div>
     </div>
   );

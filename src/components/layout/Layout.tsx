@@ -1,9 +1,8 @@
-import React, { Suspense, useEffect } from "react";
-import { Outlet, useLocation } from "react-router-dom";
-import FixedHeader from "./FixedHeader";
+import React, { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import BottomNav from "./BottomNav";
 import { FeatureThemeProvider } from "../../context/FeatureThemeContext";
-import Spinner from "../common/Spinner";
+import { FadingOutlet } from "../common/PageFade";
 import { trackPageView } from "../../lib/metaPixel";
 
 const Layout: React.FC = () => {
@@ -79,17 +78,12 @@ const Layout: React.FC = () => {
                 : "pb-layout-pb"
             }
           >
-          <Suspense fallback={<div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50"><Spinner size={400} /></div>}>
-            <Outlet />
-          </Suspense>
+          <FadingOutlet />
         </div>
       </main>
 
-      {/* Bottom navigation */}
-      {/* <BottomNav /> */}
-        {!isAuthRoute && !shouldHideBottomNav && (
-          <BottomNav />
-        )}
+      {/* Single global bottom nav (do not mount BottomNav inside page components — duplicates stack) */}
+      {!isAuthRoute && !shouldHideBottomNav && <BottomNav />}
     </div>
     </FeatureThemeProvider>
   );

@@ -13,12 +13,12 @@ import { GoogleMap } from "@react-google-maps/api";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import { MdLocationOn } from "react-icons/md";
 import { subscriptionService } from "../../services/subscription.service";
-import BottomNavigation from "../layout/BottomNav";
 import { customerService } from "@/services/getcustomer.service";
 import { orderService } from "@/services/order.service";
 import RazorpayPayment from "../Payment/Rezorpay/RezorpayPayment";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import Spinner from "../common/Spinner";
+import { SubscriptionFlowSkeleton } from "../common/PageSkeletons";
 
 interface SubscriptionDetails {
   basePackId: string;
@@ -998,11 +998,7 @@ const ConfirmSubscription: React.FC = () => {
   //   );
   // };
   if (!subscriptionDetails || !selectedAddress) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Spinner size={400} />
-      </div>
-    );
+    return <SubscriptionFlowSkeleton />;
   }
   return (
     <div className="min-h-screen bg-[#f8f6f1] flex justify-center items-center px-4">
@@ -1266,10 +1262,6 @@ const ConfirmSubscription: React.FC = () => {
               Our customer care is available 24/7
             </motion.p>
 
-            {/* Bottom Navigation */}
-            <div className="fixed bottom-0 left-0 right-0">
-              <BottomNavigation />
-            </div>
           </>
         )}
       </div>

@@ -8,7 +8,6 @@ import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from 'date-fns';
 import { subscriptionService } from '../../../services/subscription.service';
-import BottomNavigation from '../../layout/BottomNav';
 import pausebell from '../../../assets/svg/cancelpage/pausebell.svg';
 
 const PauseSubscription: React.FC = () => {
@@ -163,7 +162,6 @@ const PauseSubscription: React.FC = () => {
                         </button>
                     </div>
                 </div>
-                <BottomNavigation />
             </div>
         </div>
     );

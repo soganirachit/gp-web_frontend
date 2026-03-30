@@ -2,7 +2,10 @@ import React, { useState, KeyboardEvent, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { MdMyLocation, MdSearch } from 'react-icons/md';
 import { toast } from 'react-hot-toast';
-import Spinner from '../../components/common/Spinner';
+import {
+  LocationFinderSkeleton,
+  MapPanelSkeleton,
+} from '../../components/common/PageSkeletons';
 
 // Google Maps API key from environment variables (Vite syntax)
 const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -200,11 +203,7 @@ const Location: React.FC = () => {
   }
 
   if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-4 flex items-center justify-center">
-        <Spinner size={400} />
-      </div>
-    );
+    return <LocationFinderSkeleton />;
   }
 
   return (
@@ -276,8 +275,8 @@ const Location: React.FC = () => {
 
           {/* Loading State */}
           {isLoading ? (
-            <div className="h-[400px] bg-gray-100 rounded-lg flex items-center justify-center">
-              <Spinner size={400} />
+            <div className="h-[400px] bg-gray-100 rounded-lg overflow-hidden">
+              <MapPanelSkeleton className="h-full min-h-[400px]" />
             </div>
           ) : error ? (
             <div className="h-[400px] bg-gray-100 rounded-lg flex items-center justify-center text-red-500 p-4 text-center">

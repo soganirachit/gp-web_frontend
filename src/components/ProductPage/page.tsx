@@ -7,8 +7,7 @@ import { productService } from "../../services/product.service";
 import type { Product } from "../../services/product.service";
 import { basePackService, BasePack } from "../../services/basepack.service";
 import ProductCard from "../common/ProductCard";
-import BottomNavigation from "../layout/BottomNav";
-import Spinner from "../common/Spinner";
+import { ProductBrowseSkeleton } from "../common/PageSkeletons";
 import SearchIcon from "../../assets/icon/Search.png";
 import ProfileIcon from "../../assets/icon/Profile.png";
 import walletImage from "../../assets/icon/Wallet.png";
@@ -177,11 +176,7 @@ const ProductPage: React.FC = () => {
   const filteredProducts = getFilteredProducts();
 
   if (isLoading || isLoadingAddress) {
-    return (
-      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-        <Spinner size={400} />
-      </div>
-    );
+    return <ProductBrowseSkeleton />;
   }
 
   return (
@@ -578,8 +573,6 @@ const ProductPage: React.FC = () => {
           )}
         </div>
 
-        {/* Bottom Navigation */}
-        <BottomNavigation />
       </div>
     </div>
   );

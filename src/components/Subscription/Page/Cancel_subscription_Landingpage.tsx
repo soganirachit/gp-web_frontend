@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import BottomNavigation from '../../layout/BottomNav';
 import sadSvg from '../../../assets/svg/cancelpage/sad.svg';
 import modifySvg from '../../../assets/svg/cancelpage/modify.svg';
 import vectorBadge from '../../../assets/All/Vector (1).png';
@@ -150,9 +149,6 @@ const CancelSubscriptionLanding: React.FC = () => {
           </button>
         </motion.div>
       </div>
-
-      {/* Bottom Navigation */}
-      <BottomNavigation />
     </div>
   );
 };

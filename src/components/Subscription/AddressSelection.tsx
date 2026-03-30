@@ -12,7 +12,7 @@ import { orderService } from "../../services/order.service";
 import { subscriptionService } from "../../services/subscription.service";
 import { customerService } from "../../services/getcustomer.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
-import Spinner from "../common/Spinner";
+import { AddressSelectionSkeleton } from "../common/PageSkeletons";
 import { formatPhoneForDisplay } from "../../utils/phoneDisplay";
 import homeIcon from "../../assets/svg/adressbook/home.svg";
 import workIcon from "../../assets/svg/adressbook/office.svg";
@@ -913,11 +913,7 @@ const AddressSelection: React.FC = () => {
 
 
   if (loading && addresses.length === 0 && !showAddForm) {
-    return (
-      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-        <Spinner size={400} />
-      </div>
-    );
+    return <AddressSelectionSkeleton />;
   }
 
   return (

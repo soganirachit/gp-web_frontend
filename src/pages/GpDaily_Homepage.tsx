@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaChevronRight } from "react-icons/fa";
 import { MdKeyboardArrowDown } from "react-icons/md";
@@ -19,7 +19,7 @@ import { addressService } from "../services/address.service";
 import { customerService } from "../services/getcustomer.service";
 import { toast } from "react-hot-toast";
 import ProductCard from "../components/common/ProductCard";
-import BottomNavigation from "./../components/layout/BottomNav";
+import { GpDailyHomeSkeleton } from "../components/common/PageSkeletons";
 import Spinner from "../components/common/Spinner";
 import ProfileIcon from "../assets/icon/Profile.png";
 import { SearchBar } from "../components/common/SearchBar";
@@ -429,12 +429,19 @@ const Home2: React.FC = () => {
 
   const isPageLoading = isLoadingAddress || isLoadingBalance || isLoadingPacks || isLoadingProducts;
 
+  const exoticPacksForHome = useMemo(
+    () =>
+      products.filter(
+        (item) => item.category === "EXOTIC" && item.isAvailable,
+      ),
+    [products],
+  );
+
+  const hasAnyDailyHomePacks =
+    basePacks.length > 0 || exoticPacksForHome.length > 0;
+
   if (isPageLoading) {
-    return (
-      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
-        <Spinner size={400} />
-      </div>
-    );
+    return <GpDailyHomeSkeleton />;
   }
 
   return (
@@ -597,6 +604,7 @@ const Home2: React.FC = () => {
             <div>
               <div className="flex items-center justify-between gap-2 mb-4">
                 <h2 className="text-lg xs:text-xl sm:text-2xl font-semibold text-gray-800 min-w-0 pr-2">Puja Packs</h2>
+                {basePacks.length > 0 && (
                 <button
                   onClick={() => navigate("/explore-more?category=Puja Flowers&section=Puja Packs")}
                   className="flex items-center gap-1 text-gray-900 text-sm font-medium"
@@ -604,6 +612,7 @@ const Home2: React.FC = () => {
                   <span>Explore More</span>
                   <FaChevronRight className="text-xs" />
                 </button>
+                )}
               </div>
 
               {isLoadingPacks ? (
@@ -635,6 +644,7 @@ const Home2: React.FC = () => {
             <div>
               <div className="flex items-center justify-between gap-2 mb-4">
                 <h2 className="text-lg xs:text-xl sm:text-2xl font-semibold text-gray-800 min-w-0 pr-2">Exotic Packs</h2>
+                {exoticPacksForHome.length > 0 && (
                 <button
                   onClick={() => navigate("/explore-more?category=Exotic Flowers&section=Exotic Packs")}
                   className="flex items-center gap-1 text-gray-900 text-sm font-medium"
@@ -642,11 +652,11 @@ const Home2: React.FC = () => {
                   <span>Explore More</span>
                   <FaChevronRight className="text-xs" />
                 </button>
+                )}
               </div>
 
               <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
-                  {products
-                  .filter((item) => item.category === "EXOTIC" && item.isAvailable)
+                  {exoticPacksForHome
                   .slice(0, 6)
                   .map((item, index) => (
                     <div key={item.id} className="w-[min(46vw,10.75rem)] xs:w-[11rem] flex-shrink-0 snap-start">
@@ -664,7 +674,8 @@ const Home2: React.FC = () => {
               </div>
             </div>
 
-            {/* View All Category Button */}
+            {/* View All Category — only when at least one pack strip has items */}
+            {hasAnyDailyHomePacks && (
             <div className="flex justify-center pt-4">
               <button
                 onClick={() => navigate(`${basePath}/Products`)}
@@ -673,6 +684,7 @@ const Home2: React.FC = () => {
                 View All Category
               </button>
             </div>
+            )}
 
             {/* Quote of the Day Section */}
             <div>
@@ -685,8 +697,6 @@ const Home2: React.FC = () => {
           </div>
         </div>
 
-        {/* Bottom Navigation */}
-        <BottomNavigation />
       </div>
     </ErrorBoundary >
   );

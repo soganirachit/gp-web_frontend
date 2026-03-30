@@ -5,7 +5,7 @@ import { IoArrowBack } from 'react-icons/io5';
 
 import { basePackService, BasePack } from '../../../services/basepack.service';
 import { subscriptionService } from '../../../services/subscription.service';
-import Spinner from '../../../components/common/Spinner';
+import { SubscriptionFlowSkeleton } from '../../../components/common/PageSkeletons';
 
 
 interface Subscription {
@@ -181,11 +181,7 @@ const ModifySubscription: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-[#f8f6f1]">
-        <Spinner size={400} />
-      </div>
-    );
+    return <SubscriptionFlowSkeleton />;
   }
 
   if (!subscription) {

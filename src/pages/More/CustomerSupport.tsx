@@ -6,7 +6,7 @@ import { orderService } from "@/services/order.service";
 import { supportService, SupportTicket } from "@/services/support.service";
 import { format } from "date-fns";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
-import Spinner from "../../components/common/Spinner";
+import { SettingsListSkeleton } from "../../components/common/PageSkeletons";
 
 const CustomerSupport: React.FC = () => {
   const navigate = useNavigate();
@@ -94,11 +94,7 @@ const CustomerSupport: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className="bg-[#f8f6f1] min-h-screen flex items-center justify-center">
-        <Spinner size={400} />
-      </div>
-    );
+    return <SettingsListSkeleton />;
   }
 
   return (

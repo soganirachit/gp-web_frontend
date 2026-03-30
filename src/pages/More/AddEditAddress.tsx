@@ -9,7 +9,7 @@ import { useGoogleMaps } from '../../hooks/useGoogleMaps';
 
 import { customerService } from '../../services/getcustomer.service';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
-import Spinner from '../../components/common/Spinner';
+import { MapLoadingPlaceholder } from '../../components/common/PageSkeletons';
 
 const AddEditAddress: React.FC = () => {
   const navigate = useNavigate();
@@ -447,11 +447,8 @@ const AddEditAddress: React.FC = () => {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <Spinner size={400} className="mb-4" />
-          <p className="text-gray-600">Loading map...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+        <MapLoadingPlaceholder />
       </div>
     );
   }

@@ -8,10 +8,10 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import walletImage from "../../assets/icon/Wallet.png";
 import profileImage from "../../assets/icon/Profile.png";
-import BottomNavigation from "../layout/BottomNav";
 import Low_Balance from "../../assets/icon/LowBalance.png";
 import { IoArrowBack } from "react-icons/io5";
 import Spinner from "../../components/common/Spinner";
+import { SubscriptionFlowSkeleton } from "../common/PageSkeletons";
 import { format } from "date-fns";
 import orangeCover from "../../assets/svg/gp_daily svg/orange_cover.svg";
 import redBox from "../../assets/svg/gp_daily svg/redbox.svg";
@@ -747,11 +747,7 @@ const ManageMySubscription: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#f8f6f1] flex items-center justify-center">
-        <Spinner size={400} />
-      </div>
-    );
+    return <SubscriptionFlowSkeleton />;
   }
 
   if (subscriptions.length === 0) {
@@ -929,13 +925,6 @@ const ManageMySubscription: React.FC = () => {
             </div>
           )}
         </div>
-
-        {/* Bottom Navigation */}
-        <div className="mb-10 md:mb-10">
-          <BottomNavigation />
-        </div>
-
-
 
         {/* Details Modal - Updated to include the same functionality as edit modal */}
         {/* <AnimatePresence>

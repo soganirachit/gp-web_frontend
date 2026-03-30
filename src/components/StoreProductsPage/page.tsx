@@ -8,7 +8,7 @@ import locationhomeIcon from "../../assets/svg/gp_daily svg/locationhome.svg";
 import { productService, Category, getEffectivePrice, getBasePrice, showStrikeBase } from "../../services/product.service";
 import { storeService } from "../../services/store.service";
 import { addressService } from "../../services/address.service";
-import Spinner from "../common/Spinner";
+import { ProductBrowseSkeleton } from "../common/PageSkeletons";
 import { SearchBar } from "../common/SearchBar";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { getApiUrl } from "../../config/api.config";
@@ -278,13 +278,9 @@ const StoreProductsPages: React.FC = () => {
     return `Shop ${catLabel} online — fresh quality products delivered same-day in Jaipur by Genda Phool.`;
   }, [categorySlug, categories, categoryName]);
 
-  // Show full-screen loader while initial data is loading
+  // Show skeleton while initial data is loading
   if (isPageLoading) {
-    return (
-      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-        <Spinner size={400} />
-      </div>
-    );
+    return <ProductBrowseSkeleton />;
   }
 
   const seoTitle = categoryName && categoryName !== 'All Products'

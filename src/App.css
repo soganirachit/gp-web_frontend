@@ -2,9 +2,16 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* Match Layout shell + Tailwind theme `colors.background` — avoids white seams on overscroll */
+  background-color: #f8f6f1;
+}
+
+body {
+  background-color: #f8f6f1;
 }
 
 #root {
   overflow-x: clip;
   min-height: 100dvh;
+  background-color: #f8f6f1;
 }

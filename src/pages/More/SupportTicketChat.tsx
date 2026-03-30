@@ -3,10 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
 import { FaPaperPlane, FaImage, FaPhone, FaUser } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
-import BottomNavigation from '../../components/layout/BottomNav';
 import { supportService, SupportTicketDetail, SupportMessage } from '../../services/support.service';
 import { format } from 'date-fns';
-import Spinner from '../../components/common/Spinner';
+import { SettingsListSkeleton } from '../../components/common/PageSkeletons';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 
@@ -243,11 +242,7 @@ const SupportTicketChat: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-        <Spinner size={400} />
-      </div>
-    );
+    return <SettingsListSkeleton />;
   }
 
   if (!ticket) {
@@ -524,11 +519,6 @@ const SupportTicketChat: React.FC = () => {
             </p>
           </div>
         )}
-
-        {/* Bottom Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 z-20">
-          <BottomNavigation />
-        </div>
       </div>
 
       {/* Close Ticket Confirmation Modal */}

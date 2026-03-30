@@ -12,7 +12,7 @@ import { Product } from "../../services/product.service";
 import WalletImage from "../../assets/icon/Wallet.png";
 import ProfileImage from "../../assets/icon/Profile.png";
 import logo from "../../assets/All/logo.png";
-import Spinner from "../common/Spinner";
+import { ProductDetailSkeleton } from "../common/PageSkeletons";
 import { IoArrowBack } from "react-icons/io5";
 import cautionIcon from "../../assets/svg/gp_daily svg/caution.svg";
 import deliveryTruckIcon from "../../assets/svg/gp_daily svg/delivery_truck.svg";
@@ -577,11 +577,7 @@ const ProductPage: React.FC = () => {
   }, []);
 
   if (loading || isCheckingBalance) {
-    return (
-      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-        <Spinner size={400} />
-      </div>
-    );
+    return <ProductDetailSkeleton />;
   }
 
   if (error || (!basePack && !product)) {

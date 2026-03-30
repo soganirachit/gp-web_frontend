@@ -5,7 +5,7 @@ import { FaFilter, FaSearch, FaChevronRight } from 'react-icons/fa';
 import { IoArrowBack } from "react-icons/io5";
 import { orderService } from '../../services/order.service';
 import { format } from 'date-fns';
-import Spinner from '../common/Spinner';
+import { OrdersListSkeleton } from '../common/PageSkeletons';
 import { SearchBar } from '../common/SearchBar';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 
@@ -182,9 +182,7 @@ const MyOrders: React.FC = () => {
         {/* Content */}
         <div className="flex-1 px-4 pb-nav-bottom relative bg-[#f8f6f1]">
           {loading ? (
-            <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-              <Spinner size={400} />
-            </div>
+            <OrdersListSkeleton />
           ) : filteredOrders.length > 0 ? (
             <div className="space-y-4">
               {visibleOrders.map((order, index) => {

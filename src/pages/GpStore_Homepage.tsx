@@ -10,7 +10,7 @@ import { customerService } from "../services/getcustomer.service";
 import { productService, Category, BestSeller, getEffectivePrice, getBasePrice, showStrikeBase } from "../services/product.service";
 import { storeService } from "../services/store.service";
 import { toast } from "react-hot-toast";
-import Spinner from "../components/common/Spinner";
+import { StoreHomeSkeleton } from "../components/common/PageSkeletons";
 import { SearchBar } from "../components/common/SearchBar";
 import ErrorBoundary from "../components/ErrorBoundary";
 import SearchIcon from "../assets/icon/Search.png";
@@ -25,7 +25,6 @@ import profilelogoIcon from "../assets/svg/gp_daily svg/profilelogo.svg";
 import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
 // Large banner served from public/ for better caching
 const bannerSvg = '/gp_store_banner.svg';
-import BottomNavigation from "../components/layout/BottomNav";
 import { formatProductTitleCase } from "../lib/formatProductTitleCase";
 import { ProductImageTag } from "../components/common/ProductImageTag";
 import namasteSvg from '../assets/svg/namaste.svg';
@@ -292,11 +291,7 @@ const GpStore_Homepage: React.FC = () => {
     const isPageLoading = isLoadingAddress || isLoadingProducts || isLoadingCategories || isLoadingBestSellers;
 
     if (isPageLoading) {
-        return (
-            <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-                <Spinner size={400} />
-            </div>
-        );
+        return <StoreHomeSkeleton />;
     }
 
     const filteredBestSellers = bestSellers;
@@ -474,6 +469,7 @@ const GpStore_Homepage: React.FC = () => {
                     <div className="px-4 py-2">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-gray-800 min-w-0 pr-2">All Packs</h2>
+                            {products.length > 0 && (
                             <button
                                 type="button"
                                 onClick={() => navigate(`${basePath}/products`)}
@@ -482,6 +478,7 @@ const GpStore_Homepage: React.FC = () => {
                                 <span>Explore More</span>
                                 <FaChevronRight className="text-xs" />
                             </button>
+                            )}
                         </div>
                         <div className="gp-h-scroll-track">
                             {products.length > 0 ? (
@@ -531,6 +528,7 @@ const GpStore_Homepage: React.FC = () => {
                     <div className="px-4 py-2">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-gray-800 min-w-0 pr-2">Best Sellers</h2>
+                            {filteredBestSellers.length > 0 && (
                             <button
                                 type="button"
                                onClick={() => navigate(`${basePath}/products`)}
@@ -539,6 +537,7 @@ const GpStore_Homepage: React.FC = () => {
                                 <span>Explore More</span>
                                 <FaChevronRight className="text-xs" />
                             </button>
+                            )}
                         </div>
                         <div className="gp-h-scroll-track">
                             {filteredBestSellers.length > 0 ? (
@@ -595,6 +594,7 @@ const GpStore_Homepage: React.FC = () => {
                     <div className="px-4 py-2">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-gray-800 min-w-0 pr-2">Premium Packs</h2>
+                            {premiumProducts.length > 0 && (
                             <button
                                 type="button"
                                 onClick={() => navigate(`${basePath}/products`)}
@@ -603,6 +603,7 @@ const GpStore_Homepage: React.FC = () => {
                                 <span>Explore More</span>
                                 <FaChevronRight className="text-xs" />
                             </button>
+                            )}
                         </div>
                         <div className="gp-h-scroll-track">
                             {premiumProducts.length > 0 ? (
@@ -661,8 +662,6 @@ const GpStore_Homepage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Bottom Navigation */}
-                <BottomNavigation />
             </div>
         </ErrorBoundary>
     );

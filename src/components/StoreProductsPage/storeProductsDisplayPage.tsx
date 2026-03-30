@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import WalletImage from "../../assets/icon/Wallet.png";
 import ProfileImage from "../../assets/icon/Profile.png";
 import logo from "../../assets/All/logo.png";
-import Spinner from "../common/Spinner";
+import { ProductDetailSkeleton } from "../common/PageSkeletons";
 import { IoArrowBack } from "react-icons/io5";
 import { FaChevronRight, FaMinus, FaPlus } from "react-icons/fa";
 import { productService, getEffectivePrice, getBasePrice, showStrikeBase } from "../../services/product.service";
@@ -94,9 +94,8 @@ const StorePage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { addToCart } = useCart();
+  const { items, addToCart, updateQuantity, removeFromCart } = useCart();
   const { isLoggedIn } = useAuth();
-  const [quantity, setQuantity] = useState(1);
   const [selectedType] = useState<SubscriptionType>("Daily");
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
@@ -116,6 +115,8 @@ const StorePage: React.FC = () => {
   const [deliveryTime, setDeliveryTime] = useState<Date | null>(new Date(new Date().setHours(12, 0, 0, 0)));
   const [activeTab, setActiveTab] = useState<"Description" | "Details" | "More">("Description");
   const [customMessage, setCustomMessage] = useState<string>("");
+  const [isUpdatingBasket, setIsUpdatingBasket] = useState(false);
+  const [stockLimitMessage, setStockLimitMessage] = useState<string | null>(null);
 
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -127,6 +128,19 @@ const StorePage: React.FC = () => {
   useEffect(() => {
     selectedImageIndexRef.current = selectedImageIndex;
   }, [selectedImageIndex]);
+
+  const activeCartLine = useMemo(() => {
+    if (!product) return null;
+    const selectedVariantId = selectedVariant?.id ?? null;
+    return (
+      items.find(
+        (item) =>
+          item.productId === product.id &&
+          (item.variant?.id ?? null) === selectedVariantId,
+      ) ?? null
+    );
+  }, [items, product, selectedVariant?.id]);
+  const basketQuantity = activeCartLine?.quantity ?? 0;
 
   const fetchProductBySlug = async () => {
     try {
@@ -267,6 +281,12 @@ const StorePage: React.FC = () => {
         return;
       }
       
+      if (!isLoggedIn) {
+        toast.error("Please login to continue");
+        navigate("/login", { state: { returnUrl: `/gp-store/product/${slug}` } });
+        return;
+      }
+
       const { price } = getPriceDisplay();
       
       // Get product image
@@ -281,7 +301,7 @@ const StorePage: React.FC = () => {
           name: product.name,
           image: productImage,
           price: price,
-          quantity: quantity,
+          quantity: 1,
           variant: selectedVariant ? {
             id: selectedVariant.id,
             name: selectedVariant.name,
@@ -292,7 +312,7 @@ const StorePage: React.FC = () => {
         });
         
         toast.success("Product added to basket!");
-        trackAddToCart({ id: product.id, name: product.name, price, quantity });
+        trackAddToCart({ id: product.id, name: product.name, price, quantity: 1 });
       } catch (error) {
         console.error("Error adding to cart:", error);
         toast.error("Failed to add product to basket. Please try again.");
@@ -300,6 +320,42 @@ const StorePage: React.FC = () => {
     } catch (error) {
       console.error("Error adding to cart:", error);
       toast.error("Failed to add product to basket. Please try again.");
+    }
+  };
+
+  const handleAdjustBasketQuantity = async (nextQty: number) => {
+    if (!activeCartLine || isUpdatingBasket) return;
+    setIsUpdatingBasket(true);
+    setStockLimitMessage(null);
+    try {
+      if (nextQty < 1) {
+        await removeFromCart(activeCartLine.id);
+      } else {
+        await updateQuantity(activeCartLine.id, nextQty, activeCartLine.customizedMessage);
+      }
+    } catch (error: any) {
+      console.error("Error updating basket quantity:", error);
+      const rawMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.detail ||
+        error?.message ||
+        "";
+      const msg = String(rawMessage).toLowerCase();
+      const isStockError =
+        msg.includes("stock") ||
+        msg.includes("insufficient") ||
+        msg.includes("available quantity") ||
+        msg.includes("only") ||
+        msg.includes("out of stock");
+      if (isStockError) {
+        setStockLimitMessage(
+          "Exceeded item limit",
+        );
+      } else {
+        toast.error("Failed to update basket quantity. Please try again.");
+      }
+    } finally {
+      setIsUpdatingBasket(false);
     }
   };
 
@@ -317,7 +373,8 @@ const StorePage: React.FC = () => {
       setIsCheckingBalance(true);
       const minDays = 7;
       const pricePerPack = parseFloat(product.effective_price) || product.current_price;
-      const totalPrice = pricePerPack * minDays * quantity;
+      const checkoutQuantity = basketQuantity > 0 ? basketQuantity : 1;
+      const totalPrice = pricePerPack * minDays * checkoutQuantity;
       const { balance } = (await walletService.getWalletBalance()) || {};
       if (balance < totalPrice) {
         setBalanceDetails({
@@ -483,12 +540,60 @@ const StorePage: React.FC = () => {
     };
   }, [product, orderedImages]);
 
+  const bomDisplayRows = useMemo(() => {
+    if (!product) return [];
+    const variantOverrides = Array.isArray(selectedVariant?.bom_overrides)
+      ? selectedVariant.bom_overrides
+      : [];
+    if (variantOverrides.length > 0) {
+      const baseItems = Array.isArray((product as any).bom_items)
+        ? (product as any).bom_items
+        : [];
+      return variantOverrides.map((row: any, index: number) => {
+        const invId = row?.inventory_item_id;
+        const base = baseItems.find(
+          (b: any) =>
+            b?.inventory_item === invId || b?.inventory_item_id === invId,
+        );
+        return {
+          id: row?.id ?? invId ?? `bom-ov-${index}`,
+          name:
+            row?.inventory_item_name ??
+            base?.inventory_item_name ??
+            row?.name ??
+            "Item",
+          quantity: row?.quantity ?? base?.quantity ?? 1,
+          unit:
+            row?.inventory_item_unit ??
+            base?.inventory_item_unit ??
+            row?.unit ??
+            "",
+          isPerishable:
+            row?.is_perishable !== undefined
+              ? row.is_perishable
+              : base?.is_perishable,
+        };
+      });
+    }
+    const fallbackItems = Array.isArray((product as any).bom_items)
+      ? (product as any).bom_items
+      : [];
+    return fallbackItems.map((row: any, index: number) => ({
+      id: row?.id ?? row?.inventory_item_id ?? `bom-${index}`,
+      name:
+        row?.inventory_item_name ??
+        row?.name ??
+        row?.item_name ??
+        row?.title ??
+        "Item",
+      quantity: row?.quantity ?? row?.qty ?? row?.count ?? 1,
+      unit: row?.inventory_item_unit ?? row?.unit ?? "",
+      isPerishable: row?.is_perishable,
+    }));
+  }, [product, selectedVariant]);
+
   if (loading || isCheckingBalance) {
-    return (
-      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-        <Spinner size={400} />
-      </div>
-    );
+    return <ProductDetailSkeleton />;
   }
 
   if (error || !product) {
@@ -677,32 +782,6 @@ const StorePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Quantity Selector */}
-          <div className="flex items-center justify-between gap-3 py-4">
-            <span className="shrink-0 text-base font-medium text-gray-900">Quantity</span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200"
-                onClick={() => setQuantity(Math.max(0, quantity - 1))}
-                aria-label="Decrease quantity"
-              >
-                <FaMinus className="block text-[9px] leading-none" aria-hidden />
-              </button>
-              <span className="min-w-[1.125rem] px-0.5 text-center text-base font-semibold tabular-nums leading-none text-gray-900">
-                {quantity}
-              </span>
-              <button
-                type="button"
-                className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#19411F] text-white transition-colors hover:bg-[#1e5a1c]"
-                onClick={() => setQuantity(quantity + 1)}
-                aria-label="Increase quantity"
-              >
-                <FaPlus className="block text-[9px] leading-none" aria-hidden />
-              </button>
-            </div>
-          </div>
-
           {/* Select Size Section */}
           {getActiveVariants().length > 0 && (
             <div>
@@ -714,7 +793,10 @@ const StorePage: React.FC = () => {
                 {getActiveVariants().map((variant: any) => (
                   <button
                     key={variant.id}
-                    onClick={() => setSelectedVariant(variant)}
+                    onClick={() => {
+                      setStockLimitMessage(null);
+                      setSelectedVariant(variant);
+                    }}
                     className={`flex min-h-0 flex-col items-center justify-center gap-1 px-3 py-2 text-center rounded-xl border-2 transition-all flex-shrink-0 ${
                       selectedVariant?.id === variant.id
                         ? 'bg-[#E6F4EA] border-[#19411F]'
@@ -766,14 +848,56 @@ const StorePage: React.FC = () => {
           </div>
           )}
 
-          {/* Add to Basket Button */}
-          <button
-            onClick={createStoreOrder}
-            className="w-full bg-[#19411F] text-white py-3.5 rounded-[25px] text-base font-semibold mb-6 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-            disabled={!product || (isLoggedIn && (product.in_stock === false || product.is_available === false))}
-          >
-            {!isLoggedIn || (product?.in_stock !== false && product?.is_available !== false) ? "Add to Basket" : "Out of Stock"}
-          </button>
+          {/* Add to Basket / Quantity Controls */}
+          {basketQuantity > 0 ? (
+            <div className="mb-4 mt-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="shrink-0 text-base font-medium text-gray-900">Quantity</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-60"
+                    onClick={() => handleAdjustBasketQuantity(basketQuantity - 1)}
+                    aria-label="Decrease quantity"
+                    disabled={isUpdatingBasket}
+                  >
+                    <FaMinus className="block text-[9px] leading-none" aria-hidden />
+                  </button>
+                  <span className="min-w-[1.125rem] px-0.5 text-center text-base font-semibold tabular-nums leading-none text-gray-900">
+                    {basketQuantity}
+                  </span>
+                  <button
+                    type="button"
+                    className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#19411F] text-white transition-colors hover:bg-[#1e5a1c] disabled:opacity-60"
+                    onClick={() => handleAdjustBasketQuantity(basketQuantity + 1)}
+                    aria-label="Increase quantity"
+                    disabled={isUpdatingBasket}
+                  >
+                    <FaPlus className="block text-[9px] leading-none" aria-hidden />
+                  </button>
+                </div>
+              </div>
+              {stockLimitMessage && (
+                <p className="mt-2 text-sm font-medium text-red-600">
+                  {stockLimitMessage}
+                </p>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={createStoreOrder}
+              className="w-full bg-[#19411F] mt-6 text-white py-3.5 rounded-[25px] text-base font-semibold mb-6 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              disabled={
+                !product ||
+                product.in_stock === false ||
+                product.is_available === false
+              }
+            >
+              {product?.in_stock !== false && product?.is_available !== false
+                ? "Add to Basket"
+                : "Out of Stock"}
+            </button>
+          )}
 
           {/* Tabs and Content Card */}
           <div className="bg-white rounded-xl p-4 shadow-sm mb-8">
@@ -798,75 +922,44 @@ const StorePage: React.FC = () => {
             <div>
               {activeTab === "Description" && (
                 <div className="text-sm text-gray-700 leading-relaxed">
-                  {product.description || product.short_description || "No description available."}
+                  {product.short_description?.trim() || "No short description available."}
                 </div>
               )}
               {activeTab === "Details" && (
                 <div className="space-y-3 text-sm text-gray-700">
-                  {product.category_name && (
-                    <div>
-                      <span className="font-semibold">Category: </span>
-                      <span>{product.category_name}</span>
-                    </div>
-                  )}
-                  {product.sku && (
-                    <div>
-                      <span className="font-semibold">SKU: </span>
-                      <span>{product.sku}</span>
-                    </div>
-                  )}
-                  {product.unit && (
-                    <div>
-                      <span className="font-semibold">Unit: </span>
-                      <span>{product.unit_value || "1"} {product.unit}</span>
-                    </div>
-                  )}
-                  {product.is_perishable !== undefined && (
-                    <div>
-                      <span className="font-semibold">Perishable: </span>
-                      <span>{product.is_perishable ? "Yes" : "No"}</span>
-                    </div>
-                  )}
-                  {product.shelf_life_days && (
-                    <div>
-                      <span className="font-semibold">Shelf Life: </span>
-                      <span>{product.shelf_life_days} days</span>
-                    </div>
-                  )}
-                  {isLoggedIn && product.available_quantity !== undefined && product.available_quantity !== null && (
-                    <div>
-                      <span className="font-semibold">Available Quantity: </span>
-                      <span>{product.available_quantity}</span>
-                    </div>
+                  {bomDisplayRows.length > 0 ? (
+                    bomDisplayRows.map((row: any) => {
+                      const parsedQty = parseFloat(String(row.quantity).replace(/,/g, ""));
+                      const qtyStr = Number.isFinite(parsedQty)
+                        ? Math.abs(parsedQty % 1) < 1e-6
+                          ? String(Math.round(parsedQty))
+                          : String(parsedQty)
+                        : String(row.quantity);
+                      const unit = String(row.unit ?? "").trim();
+                      const qtyDisplay = unit ? `${qtyStr} ${unit}` : qtyStr;
+                      return (
+                        <div key={row.id} className="border-b border-gray-100 pb-2">
+                          <div>
+                            <span className="font-semibold">{row.name}</span>
+                            <span> · {qtyDisplay}</span>
+                          </div>
+                          {row.isPerishable === true && (
+                            <p className="text-xs text-gray-500 mt-1">Perishable</p>
+                          )}
+                          {row.isPerishable === false && (
+                            <p className="text-xs text-gray-500 mt-1">Non-perishable</p>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p>No ingredient list for this product.</p>
                   )}
                 </div>
               )}
               {activeTab === "More" && (
-                <div className="space-y-3 text-sm text-gray-700">
-                  {product.store_info && (
-                    <div>
-                      <span className="font-semibold">Store: </span>
-                      <span>{product.store_info.store_name}</span>
-                    </div>
-                  )}
-                  {product.average_rating > 0 && (
-                    <div>
-                      <span className="font-semibold">Rating: </span>
-                      <span>{product.average_rating.toFixed(1)} ({product.review_count} reviews)</span>
-                    </div>
-                  )}
-                  {product.view_count !== undefined && (
-                    <div>
-                      <span className="font-semibold">Views: </span>
-                      <span>{product.view_count}</span>
-                    </div>
-                  )}
-                  {product.order_count !== undefined && (
-                    <div>
-                      <span className="font-semibold">Orders: </span>
-                      <span>{product.order_count}</span>
-                    </div>
-                  )}
+                <div className="text-sm text-gray-700 leading-relaxed">
+                  {product.description?.trim() || "No additional description."}
                 </div>
               )}
             </div>

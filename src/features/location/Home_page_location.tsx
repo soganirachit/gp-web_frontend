@@ -7,6 +7,10 @@ import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import { addressService } from "../../services/address.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import Spinner from "../../components/common/Spinner";
+import {
+  MapLoadingPlaceholder,
+  MapPanelSkeleton,
+} from "../../components/common/PageSkeletons";
 
 // List of cities where delivery is available
 const SERVICED_CITIES = [
@@ -440,11 +444,8 @@ const HomePageLocation: React.FC = () => {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <Spinner size={400} className="mb-4" />
-          <p className="text-gray-600">Loading map...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+        <MapLoadingPlaceholder />
       </div>
     );
   }
@@ -707,8 +708,8 @@ const HomePageLocation: React.FC = () => {
               </button>
             </GoogleMap>
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Spinner size={400} />
+            <div className="w-full h-full min-h-[200px]">
+              <MapPanelSkeleton className="h-full min-h-full" />
             </div>
           )}
         </div>

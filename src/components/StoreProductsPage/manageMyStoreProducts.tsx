@@ -8,10 +8,9 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import walletImage from "../../assets/icon/Wallet.png";
 import profileImage from "../../assets/icon/Profile.png";
-import BottomNavigation from "../layout/BottomNav";
 import Low_Balance from "../../assets/icon/LowBalance.png";
 import { IoArrowBack } from "react-icons/io5";
-import Spinner from "../../components/common/Spinner";
+import { ManageStoreSkeleton } from "../common/PageSkeletons";
 import { format } from "date-fns";
 import { orderService } from "@/services/order.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
@@ -391,11 +390,7 @@ const ManageMyStoreProducts: React.FC = () => {
   );
 
   if (isLoading) {
-    return (
-      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-        <Spinner size={400} />
-      </div>
-    );
+    return <ManageStoreSkeleton />;
   }
 
   if (orders.length === 0) {
@@ -554,11 +549,6 @@ const ManageMyStoreProducts: React.FC = () => {
             </div>
           )}
 
-        </div>
-
-        {/* Bottom Navigation */}
-        <div className="mb-10 md:mb-10">
-          <BottomNavigation />
         </div>
 
         {/* Pause Modal */}

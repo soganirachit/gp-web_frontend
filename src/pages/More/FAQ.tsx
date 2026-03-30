@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { faqService, FAQ as FAQItem } from '../../services/faq.service';
-import Spinner from '../../components/common/Spinner';
+import { ContentRowsSkeleton } from '../../components/common/PageSkeletons';
 
 interface FAQSection {
   title: string;
@@ -83,9 +83,7 @@ const FAQ: React.FC = () => {
         {/* FAQ Sections */}
         <div className="px-4 py-6 space-y-8">
           {isLoading ? (
-            <div className="min-h-[400px] flex items-center justify-center bg-[#f8f6f1]">
-              <Spinner size={400} />
-            </div>
+            <ContentRowsSkeleton rows={10} />
           ) : faqSections.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-600">No FAQs available at the moment.</p>

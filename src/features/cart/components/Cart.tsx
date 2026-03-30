@@ -19,6 +19,7 @@ import { orderService } from '../../../services/order.service';
 import { customerService } from '../../../services/getcustomer.service';
 import { cartService, type CartData } from '../../../services/cart.service';
 import Spinner from '../../../components/common/Spinner';
+import { CartPageSkeleton } from '../../../components/common/PageSkeletons';
 import api from '../../../services/api';
 import { getApiUrl } from '../../../config/api.config';
 import { useNetworkRecovery } from '../../../hooks/useNetworkRecovery';
@@ -59,6 +60,18 @@ const formatSlotTimeRange = (start: string, end: string): string => {
 
 const getSlotDisplayLabel = (slot: DeliverySlot): string =>
   slot.start_time && slot.end_time ? formatSlotTimeRange(slot.start_time, slot.end_time) : slot.slot_name || '';
+
+/** Same heuristics as StoreProductsDisplayPage — cart update API stock errors. */
+const isStockLimitError = (raw: unknown): boolean => {
+  const msg = String(raw ?? '').toLowerCase();
+  return (
+    msg.includes('stock') ||
+    msg.includes('insufficient') ||
+    msg.includes('available quantity') ||
+    msg.includes('only') ||
+    msg.includes('out of stock')
+  );
+};
 
 // Parse "HH:mm:ss" / "HH:mm" into minutes from midnight
 const toMinutes = (timeStr: string): number => {
@@ -482,6 +495,30 @@ const Cart: React.FC = () => {
   /** After first successful address + totals + sync idle, checkout must not full-screen when sync runs again */
   const [basketHydratedOnce, setBasketHydratedOnce] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  /** Inline stock message per line item (e.g. after insufficient stock). */
+  const [lineStockErrorByItemId, setLineStockErrorByItemId] = useState<Record<string, string>>({});
+  /** Remount key so the shake animation restarts on every repeat tap at limit. */
+  const [stockShakeVersionByItemId, setStockShakeVersionByItemId] = useState<Record<string, number>>({});
+
+  const triggerStockMessageShake = (itemId: string) => {
+    setStockShakeVersionByItemId((prev) => ({
+      ...prev,
+      [itemId]: (prev[itemId] ?? 0) + 1,
+    }));
+  };
+
+  const navigateToProductDetail = (item: (typeof items)[number]) => {
+    const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+    if (feature === 'gpStore') {
+      const slug = item.productSlug?.trim();
+      if (!slug) return;
+      navigate(`${basePath}/product/${encodeURIComponent(slug)}`);
+      return;
+    }
+    if (!item.productId) return;
+    navigate(`${basePath}/product/${item.productId}`);
+  };
+
   const isSlotSelectable = (slot: DeliverySlot, date: Date) => {
     // For non-today dates, all API-available slots stay selectable.
     if (!isToday(date)) return true;
@@ -933,13 +970,10 @@ const Cart: React.FC = () => {
     if (deliveryInfo) updateDeliveryInfo({ ...deliveryInfo, timeSlot: getSlotDisplayLabel(slot), slotId: slot.id });
   };
 
+  /** Must match StoreProductsDisplayPage: only category "bouquet" lines get custom messages on PDP. */
   const isBouquetItem = (item: (typeof items)[number]) => {
     const categorySlug = item.categorySlug?.toLowerCase() ?? '';
-    const productSlug = item.productSlug?.toLowerCase() ?? '';
-    const name = item.name?.toLowerCase() ?? '';
-    if (categorySlug.includes('bouquet')) return true;
-    if (productSlug.includes('bouquet')) return true;
-    return name.includes('bouquet');
+    return categorySlug.includes('bouquet');
   };
 
   const handleEditItem = (itemId: string) => {
@@ -973,16 +1007,37 @@ const Cart: React.FC = () => {
   const handleQuantityDelta = async (itemId: string, delta: number) => {
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
+    if (delta > 0 && lineStockErrorByItemId[itemId]) {
+      triggerStockMessageShake(itemId);
+      return;
+    }
     const next = Math.max(1, item.quantity + delta);
     if (next === item.quantity && delta < 0) return;
     try {
       await updateQuantity(itemId, next, item.customizedMessage || '');
+      setLineStockErrorByItemId((prev) => {
+        const n = { ...prev };
+        delete n[itemId];
+        return n;
+      });
+      setStockShakeVersionByItemId((prev) => {
+        const n = { ...prev };
+        delete n[itemId];
+        return n;
+      });
     } catch (error: any) {
       const apiMessage =
         error?.response?.data?.message ||
         error?.response?.data?.detail ||
         error?.message;
-      toast.error(apiMessage || 'Could not update quantity.');
+      if (isStockLimitError(apiMessage)) {
+        setLineStockErrorByItemId((prev) => ({
+          ...prev,
+          [itemId]: 'Exceeded item limit',
+        }));
+      } else {
+        toast.error(apiMessage || 'Could not update quantity.');
+      }
     }
   };
 
@@ -1236,15 +1291,24 @@ const Cart: React.FC = () => {
         (isSyncing && !basketHydratedOnce)));
   
   if (isPageLoading) {
-    return (
-      <div className="fixed inset-0 bg-[#f8f6f1] flex items-center justify-center z-50">
-        <Spinner size={400} />
-      </div>
-    );
+    return <CartPageSkeleton />;
   }
 
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
+      <style>{`
+        @keyframes gp-cart-stock-shake {
+          0%, 100% { transform: translateX(0); }
+          15% { transform: translateX(-7px); }
+          30% { transform: translateX(7px); }
+          45% { transform: translateX(-5px); }
+          60% { transform: translateX(5px); }
+          75% { transform: translateX(-3px); }
+        }
+        .gp-cart-stock-shake {
+          animation: gp-cart-stock-shake 0.45s ease-in-out;
+        }
+      `}</style>
       <SEO
         title="My Basket — Genda Phool"
         description="Your Genda Phool basket"
@@ -1279,16 +1343,27 @@ const Cart: React.FC = () => {
               {items.map((item) => (
                 <div key={item.id} className="relative rounded-[24px] border border-[#e9e5de] bg-white p-4 shadow-sm">
                   <div className="flex items-start gap-3">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      loading="lazy"
-                      className="h-[5.25rem] w-[5.25rem] flex-shrink-0 rounded-2xl object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
-                    />
+                    <button
+                      type="button"
+                      onClick={() => navigateToProductDetail(item)}
+                      className="h-[5.25rem] w-[5.25rem] flex-shrink-0 overflow-hidden rounded-2xl p-0"
+                      aria-label={`View ${item.name}`}
+                    >
+                      <img
+                        src={item.image}
+                        alt=""
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
+                      />
+                    </button>
                     <div className="flex min-w-0 flex-1 flex-col">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={() => navigateToProductDetail(item)}
+                          className="min-w-0 flex-1 text-left"
+                        >
                           <h3 className="text-sm font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere]">
                             {item.name} x {item.quantity}
                             {item.variant?.name && (
@@ -1301,7 +1376,7 @@ const Cart: React.FC = () => {
                               <div>Time Slot: {deliveryInfo.timeSlot}</div>
                             </div>
                           )}
-                        </div>
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteItem(item.id)}
@@ -1312,9 +1387,13 @@ const Cart: React.FC = () => {
                         </button>
                       </div>
                       <div className="mt-1 flex min-h-[1.75rem] items-center justify-between gap-2">
-                        <span className="text-base font-semibold leading-tight text-gray-900">
+                        <button
+                          type="button"
+                          onClick={() => navigateToProductDetail(item)}
+                          className="text-base font-semibold leading-tight text-gray-900"
+                        >
                           ₹{Number(item.price).toFixed(2)} each
-                        </span>
+                        </button>
                         <div className="flex shrink-0 items-center gap-1">
                           <button
                             type="button"
@@ -1340,6 +1419,16 @@ const Cart: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                  {lineStockErrorByItemId[item.id] ? (
+                    <p
+                      key={stockShakeVersionByItemId[item.id] ?? 0}
+                      className={`mt-2 pl-1 text-xs font-medium text-red-600 ${
+                        (stockShakeVersionByItemId[item.id] ?? 0) > 0 ? 'gp-cart-stock-shake' : ''
+                      }`}
+                    >
+                      {lineStockErrorByItemId[item.id]}
+                    </p>
+                  ) : null}
 
                   {/* Bouquet: custom message */}
                   {isBouquetItem(item) && editingItemId !== item.id && (

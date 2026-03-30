@@ -36,6 +36,10 @@ const FALLBACK_GRADIENTS_GP_DAILY = [
   'linear-gradient(145deg, #e8931f 0%, #FAA222 100%)',
 ];
 
+/** Same height for every slide so banners do not jump by image aspect ratio. */
+const OFFERS_BANNER_HEIGHT =
+  'h-[130px] min-h-[130px] sm:h-[118px] sm:min-h-[118px] md:h-[128px] md:min-h-[128px]';
+
 export function OffersBannerCarousel({ storeId }: Props) {
   const { theme } = useFeatureTheme();
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -109,7 +113,7 @@ export function OffersBannerCarousel({ storeId }: Props) {
     return (
       <div className="mb-6 sm:mb-8">
         <div className="h-5 w-32 bg-gray-200 rounded animate-pulse mb-3 sm:mb-4" />
-        <div className="w-full aspect-[4/3] sm:aspect-video rounded-xl sm:rounded-2xl bg-gray-200 animate-pulse" />
+        <div className={`w-full ${OFFERS_BANNER_HEIGHT} rounded-xl sm:rounded-2xl bg-gray-200 animate-pulse`} />
       </div>
     );
   }
@@ -121,7 +125,7 @@ export function OffersBannerCarousel({ storeId }: Props) {
           Offers for You
         </h2>
         <div
-          className="relative w-full aspect-[4/3] sm:aspect-video rounded-xl sm:rounded-2xl overflow-hidden shadow-md border border-gray-200/60 flex items-end"
+          className={`relative w-full ${OFFERS_BANNER_HEIGHT} rounded-xl sm:rounded-2xl overflow-hidden shadow-md border border-gray-200/60 flex items-end`}
           style={{ background: fallbackGradients[0] }}
         >
           <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent" />
@@ -147,7 +151,7 @@ export function OffersBannerCarousel({ storeId }: Props) {
       {/* Banner card — theme-aligned, responsive (4/3 mobile, 16/9 tablet+), key triggers animation */}
       <div
         key={banner.id}
-        className="relative w-full aspect-[4/3] sm:aspect-video rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer select-none shadow-md border border-gray-200/60"
+        className={`relative w-full ${OFFERS_BANNER_HEIGHT} rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer select-none shadow-md border border-gray-200/60`}
         style={{ animation: 'bannerFadeIn 0.4s ease-out' }}
         onClick={() => handleNavigate(banner.cta_link)}
         role="button"
@@ -161,7 +165,7 @@ export function OffersBannerCarousel({ storeId }: Props) {
           <img
             src={banner.image_url!}
             alt={banner.title}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover object-center"
             loading="lazy"
             onError={() => setImgErrors(prev => ({ ...prev, [banner.id]: true }))}
           />
