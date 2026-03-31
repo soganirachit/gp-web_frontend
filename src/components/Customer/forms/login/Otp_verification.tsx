@@ -1,7 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { authService } from '../../../../services/auth.service';
+import {
+  authService,
+  shouldBlockOtpEntryAfterSendOtp,
+  whatsappOtpLikelyDelivered,
+  startOtpDeliveryPolling,
+} from '../../../../services/auth.service';
 import { addressService } from '../../../../services/address.service';
 import { useAuth } from '../../../../context/AuthContext';
 import { useCart } from '../../../../context/CartContext';
@@ -15,6 +20,12 @@ interface LocationState {
   phoneNumber: string;
   returnUrl?: string;
   fromCart?: boolean;
+  /** From Login after send-otp; when false, WhatsApp delivery failed or unconfigured. */
+  whatsappOtpLikelyDelivered?: boolean;
+  /** Same phone key as send-otp / status API (often E.164 from backend). */
+  deliveryPollPhone?: string;
+  /** When true, poll GET otp-delivery-status after send (Login sets this). */
+  startDeliveryPoll?: boolean;
 }
 
 const OTPVerification: React.FC = () => {
@@ -22,9 +33,10 @@ const OTPVerification: React.FC = () => {
   const location = useLocation();
   const { login } = useAuth();
   const { syncCartToAPI, items } = useCart();
-  const phoneNumber = (location.state as LocationState)?.phoneNumber;
-  const returnUrl = (location.state as LocationState)?.returnUrl;
-  const fromCart = (location.state as LocationState)?.fromCart;
+  const locState = (location.state as LocationState) || ({} as LocationState);
+  const phoneNumber = locState.phoneNumber;
+  const returnUrl = locState.returnUrl;
+  const fromCart = locState.fromCart;
   const { theme, feature } = useFeatureTheme();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
 
@@ -32,6 +44,48 @@ const OTPVerification: React.FC = () => {
   const [countdown, setCountdown] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [whatsappDeliveryOk, setWhatsappDeliveryOk] = useState(
+    locState.whatsappOtpLikelyDelivered !== false
+  );
+
+  const stopDeliveryPollRef = useRef<(() => void) | null>(null);
+  const deliveryPollPhone = locState.deliveryPollPhone ?? phoneNumber;
+  const startDeliveryPollFlag = locState.startDeliveryPoll === true;
+
+  const beginOtpDeliveryPoll = useCallback(
+    (pollPhone: string) => {
+      if (!pollPhone) return;
+      stopDeliveryPollRef.current?.();
+      stopDeliveryPollRef.current = startOtpDeliveryPolling(pollPhone, {
+        onNotOnWhatsapp: (msg) => {
+          stopDeliveryPollRef.current = null;
+          setWhatsappDeliveryOk(false);
+          toast.error(
+            msg ||
+              'This number is not registered on WhatsApp. Please use a WhatsApp-enabled number to log in.'
+          );
+          navigate(`${basePath}/login`, { state: { returnUrl, fromCart } });
+        },
+        onDelivered: () => {
+          stopDeliveryPollRef.current = null;
+          setWhatsappDeliveryOk(true);
+        },
+        onGiveUp: () => {
+          stopDeliveryPollRef.current = null;
+        },
+      });
+    },
+    [basePath, navigate, returnUrl, fromCart]
+  );
+
+  useEffect(() => {
+    if (!phoneNumber || !startDeliveryPollFlag) return;
+    beginOtpDeliveryPoll(deliveryPollPhone || phoneNumber);
+    return () => {
+      stopDeliveryPollRef.current?.();
+      stopDeliveryPollRef.current = null;
+    };
+  }, [phoneNumber, startDeliveryPollFlag, deliveryPollPhone, beginOtpDeliveryPoll]);
 
   // Array of images to cycle through
   const images = [theme.assets.otpHero, theme.assets.loginHero];
@@ -130,6 +184,9 @@ const OTPVerification: React.FC = () => {
 
       // Handle new Django API response structure
       if (response.success && response.message) {
+        stopDeliveryPollRef.current?.();
+        stopDeliveryPollRef.current = null;
+
         toast.success(response.message || 'OTP verified successfully!');
 
         // Login — tokens are in HttpOnly cookies set by server
@@ -205,8 +262,39 @@ const OTPVerification: React.FC = () => {
     if (countdown > 0 || !phoneNumber) return;
 
     try {
-      await authService.sendOTP(phoneNumber);
+      const result = await authService.sendOTP(phoneNumber);
+      if (!result.success) {
+        toast.error(result.message || 'Failed to resend OTP');
+        return;
+      }
+      if (shouldBlockOtpEntryAfterSendOtp(result)) {
+        toast.error(
+          result.message ||
+            'This number is not registered on WhatsApp. Please go back and use a WhatsApp-enabled number.'
+        );
+        return;
+      }
+
+      const warnStyle = { background: '#fffbeb', color: '#92400e' } as const;
+      if (result.whatsapp_status === 'failed') {
+        toast(result.message || 'OTP delivery failed. Please try again in a moment.', {
+          icon: '⚠️',
+          duration: 5000,
+          style: warnStyle,
+        });
+      } else if (result.whatsapp_status === 'not_configured') {
+        toast(
+          result.message ||
+            'WhatsApp is not configured. If you still do not receive a code, edit your number and try again.',
+          { icon: '⚠️', duration: 5000, style: warnStyle }
+        );
+      } else {
+        toast.success(result.message || 'OTP sent to your WhatsApp');
+      }
+
+      setWhatsappDeliveryOk(whatsappOtpLikelyDelivered(result));
       setCountdown(30);
+      beginOtpDeliveryPoll(result.phone ?? phoneNumber);
     } catch (err: any) {
       let errorMessage = err?.response?.data?.message || err?.message || 'Failed to resend OTP';
       
@@ -232,7 +320,7 @@ const OTPVerification: React.FC = () => {
   };
 
   const handleEditNumber = () => {
-    navigate(`${basePath}/login`);
+    navigate(`${basePath}/login`, { state: { returnUrl, fromCart } });
   };
 
   return (
@@ -278,10 +366,19 @@ const OTPVerification: React.FC = () => {
               Enter 6-digit code sent to {formatPhoneNumber(phoneNumber || '')}
             </p>
 
-            {/* WhatsApp Notification */}
-            <div className="flex items-center justify-center gap-2 mb-2 sm:mb-2.5">
-              <FaWhatsapp className="text-green-500 text-sm sm:text-base" />
-              <p className="text-xs sm:text-sm text-gray-500">Code sent to WhatsApp</p>
+            {/* WhatsApp delivery note */}
+            <div className="flex flex-col items-center gap-1 mb-2 sm:mb-2.5 px-1">
+              <div className="flex items-center justify-center gap-2">
+                <FaWhatsapp className="text-green-500 text-sm sm:text-base flex-shrink-0" />
+                {whatsappDeliveryOk ? (
+                  <p className="text-xs sm:text-sm text-gray-500">Code sent to WhatsApp</p>
+                ) : (
+                  <p className="text-xs sm:text-sm text-amber-800 text-center max-w-[280px]">
+                    We could not confirm WhatsApp delivery. If you do not see the code, use{" "}
+                    <span className="font-medium">Resend</span> below or edit your number.
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Edit Number Link */}

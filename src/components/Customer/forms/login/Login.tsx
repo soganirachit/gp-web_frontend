@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { authService } from "../../../../services/auth.service";
+import toast from "react-hot-toast";
+import {
+    authService,
+    shouldBlockOtpEntryAfterSendOtp,
+    whatsappOtpLikelyDelivered,
+} from "../../../../services/auth.service";
 import { useFeatureTheme } from "../../../../context/FeatureThemeContext";
 import Spinner from "../../../common/Spinner";
 
@@ -11,6 +16,7 @@ const Login = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const navigate = useNavigate();
+    const location = useLocation();
     const { theme, feature } = useFeatureTheme();
     const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
 
@@ -36,9 +42,49 @@ const Login = () => {
         try {
             setIsLoading(true);
             setError("");
-            await authService.sendOTP(phoneNumber);
+            const result = await authService.sendOTP(phoneNumber);
+            if (!result.success) {
+                setError(result.message || "Failed to send OTP");
+                return;
+            }
+            if (shouldBlockOtpEntryAfterSendOtp(result)) {
+                toast.error(
+                    result.message ||
+                        "This number is not registered on WhatsApp. Please use a WhatsApp-enabled number to log in."
+                );
+                return;
+            }
+
+            const warnStyle = { background: "#fffbeb", color: "#92400e" } as const;
+            if (result.whatsapp_status === "failed") {
+                toast(result.message || "OTP delivery failed. Please tap “Resend” in a moment.", {
+                    icon: "⚠️",
+                    duration: 5000,
+                    style: warnStyle,
+                });
+            } else if (result.whatsapp_status === "not_configured") {
+                toast(
+                    result.message ||
+                        "WhatsApp is not configured. If you do not receive a code, tap “Resend” or try another number.",
+                    { icon: "⚠️", duration: 5000, style: warnStyle }
+                );
+            } else {
+                toast.success(result.message || "OTP sent to your WhatsApp");
+            }
+
             const otpPath = `${basePath}/otp-verification`;
-            navigate(otpPath, { state: { phoneNumber } });
+            const incoming = location.state as { returnUrl?: string; fromCart?: boolean } | null;
+            navigate(otpPath, {
+                state: {
+                    phoneNumber,
+                    whatsappOtpLikelyDelivered: whatsappOtpLikelyDelivered(result),
+                    /** E.164 or backend-normalized phone for GET otp-delivery-status */
+                    deliveryPollPhone: result.phone ?? phoneNumber,
+                    startDeliveryPoll: true,
+                    returnUrl: incoming?.returnUrl,
+                    fromCart: incoming?.fromCart,
+                },
+            });
         } catch (err: any) {
             let errorMessage = err?.error || err?.response?.data?.message || err?.message || "Failed to send OTP";
             
