@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { IoArrowBack } from "react-icons/io5";
-import { productService, getEffectivePrice, getBasePrice, showStrikeBase } from "../../services/product.service";
+import { productService, getEffectivePrice, getBasePrice, showStrikeBaseOnCard } from "../../services/product.service";
 import type { Product, BestSeller } from "../../services/product.service";
 import { basePackService, BasePack } from "../../services/basepack.service";
 import { storeService } from "../../services/store.service";
@@ -230,7 +230,7 @@ const ExploreMore: React.FC = () => {
   const renderCard = (item: any, index: number) => {
     const effective = getEffectivePrice(item);
     const base = getBasePrice(item);
-    const showStrike = showStrikeBase(item);
+    const showStrike = showStrikeBaseOnCard(item);
     const price = effective > 0 ? `₹${effective}` : "";
 
     const imageUrl = item.primary_image || getImageUrl(item.imagesUrl);

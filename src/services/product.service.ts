@@ -442,3 +442,15 @@ export function showStrikeBase(item: any): boolean {
   const effective = getEffectivePrice(item);
   return base > 0 && effective < base;
 }
+
+/**
+ * Keep price rows stable on cards: if payable price is already wide,
+ * hide struck-through MRP on cards and show it only on detail pages.
+ */
+export function showStrikeBaseOnCard(item: any): boolean {
+  if (!showStrikeBase(item)) return false;
+  const effective = getEffectivePrice(item);
+  if (effective >= 1000) return false;
+  const priceText = `₹${effective}`;
+  return priceText.length <= 7;
+}

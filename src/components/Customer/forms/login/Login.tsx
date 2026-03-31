@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import {
     authService,
+    checkNotOnWhatsappBeforeOtpRoute,
+    OTP_NOT_ON_WHATSAPP_MESSAGE,
     shouldBlockOtpEntryAfterSendOtp,
     whatsappOtpLikelyDelivered,
 } from "../../../../services/auth.service";
@@ -47,11 +49,26 @@ const Login = () => {
                 setError(result.message || "Failed to send OTP");
                 return;
             }
-            if (shouldBlockOtpEntryAfterSendOtp(result)) {
+            const pollPhone = result.phone ?? phoneNumber;
+            let shouldBlockEntry = shouldBlockOtpEntryAfterSendOtp(result);
+            let blockMessage =
+                result.message && result.message.toLowerCase() !== "success"
+                    ? result.message
+                    : OTP_NOT_ON_WHATSAPP_MESSAGE;
+
+            if (!shouldBlockEntry) {
+                const guard = await checkNotOnWhatsappBeforeOtpRoute(pollPhone);
+                if (guard.notOnWhatsapp) {
+                    shouldBlockEntry = true;
+                    blockMessage = guard.message || OTP_NOT_ON_WHATSAPP_MESSAGE;
+                }
+            }
+
+            if (shouldBlockEntry) {
                 toast.error(
-                    result.message ||
-                        "This number is not registered on WhatsApp. Please use a WhatsApp-enabled number to log in."
+                    blockMessage
                 );
+                setError(blockMessage);
                 return;
             }
 
@@ -79,8 +96,7 @@ const Login = () => {
                     phoneNumber,
                     whatsappOtpLikelyDelivered: whatsappOtpLikelyDelivered(result),
                     /** E.164 or backend-normalized phone for GET otp-delivery-status */
-                    deliveryPollPhone: result.phone ?? phoneNumber,
-                    startDeliveryPoll: true,
+                    deliveryPollPhone: pollPhone,
                     returnUrl: incoming?.returnUrl,
                     fromCart: incoming?.fromCart,
                 },

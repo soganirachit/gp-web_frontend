@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { GoogleMap } from '@react-google-maps/api';
-import { FaBox, FaClock, FaMapMarkerAlt, FaRupeeSign } from 'react-icons/fa';
+import { FaBox, FaCheck, FaClock, FaMapMarkerAlt, FaRupeeSign } from 'react-icons/fa';
 import { MdLocationOn } from 'react-icons/md';
 import { useGoogleMaps } from '../../hooks/useGoogleMaps';
 import Spinner from '../common/Spinner';
@@ -10,7 +10,6 @@ import { OrderConfirmationSkeleton } from '../common/PageSkeletons';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { orderService } from '../../services/order.service';
 import { format } from 'date-fns';
-import allsetLogo from '../../assets/All/allset_logo.png';
 import flowerCnfSvg from '../../assets/svg/gp_daily svg/flower_cnf.svg';
 import savingsCnfSvg from '../../assets/svg/gp_daily svg/savings_cnf.svg';
 
@@ -59,18 +58,9 @@ const SuccessCheckmark: React.FC = () => {
         delay: 0.2,
       }}
     >
-      {/* Using the existing confirmation logo asset keeps visual consistency */}
-      <img
-        src={allsetLogo}
-        alt="Success"
-        className="w-20 h-20 object-contain select-none"
-        style={{
-          imageRendering: 'auto',
-          WebkitBackfaceVisibility: 'hidden',
-          backfaceVisibility: 'hidden',
-          transform: 'translateZ(0) scale(1)',
-        }}
-      />
+      <div className="w-20 h-20 rounded-full bg-[#19411f] flex items-center justify-center">
+        <FaCheck className="text-white text-3xl" />
+      </div>
     </motion.div>
   );
 };

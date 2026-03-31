@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { useFeatureTheme } from "../context/FeatureThemeContext";
 import { addressService } from "../services/address.service";
 import { customerService } from "../services/getcustomer.service";
-import { productService, Category, BestSeller, getEffectivePrice, getBasePrice, showStrikeBase } from "../services/product.service";
+import { productService, Category, BestSeller, getEffectivePrice, getBasePrice, showStrikeBaseOnCard } from "../services/product.service";
 import { storeService } from "../services/store.service";
 import { toast } from "react-hot-toast";
 import { StoreHomeSkeleton } from "../components/common/PageSkeletons";
@@ -509,7 +509,7 @@ const GpStore_Homepage: React.FC = () => {
                                             <div className="mt-auto flex items-center justify-between gap-2">
                                                 <p className="text-gray-900 text-base font-bold">
                                                     <span>₹{getEffectivePrice(product)}</span>
-                                                    {showStrikeBase(product) && (
+                                                    {showStrikeBaseOnCard(product) && (
                                                         <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(product)}</span>
                                                     )}
                                                 </p>
@@ -573,7 +573,7 @@ const GpStore_Homepage: React.FC = () => {
                                             <div className="mt-auto flex items-center justify-between gap-2">
                                                 <p className="text-gray-900 text-base font-bold">
                                                     <span>₹{getEffectivePrice(bestSeller)}</span>
-                                                    {showStrikeBase(bestSeller) && (
+                                                    {showStrikeBaseOnCard(bestSeller) && (
                                                         <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(bestSeller)}</span>
                                                     )}
                                                 </p>
@@ -635,7 +635,7 @@ const GpStore_Homepage: React.FC = () => {
                                         <div className="mt-auto flex items-center justify-between gap-2">
                                             <p className="text-gray-900 text-base font-bold">
                                                 <span>₹{getEffectivePrice(product)}</span>
-                                                {showStrikeBase(product) && (
+                                                {showStrikeBaseOnCard(product) && (
                                                     <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(product)}</span>
                                                 )}
                                             </p>

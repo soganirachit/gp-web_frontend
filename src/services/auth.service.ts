@@ -62,6 +62,17 @@ export interface OtpDeliveryStatusData {
   message?: string;
 }
 
+export const OTP_NOT_ON_WHATSAPP_MESSAGE =
+  "This number is not registered on WhatsApp. Please use a WhatsApp-enabled number to log in.";
+
+function getNotOnWhatsappMessage(message?: string): string {
+  const msg = (message || "").trim();
+  if (!msg || msg.toLowerCase() === "success") {
+    return OTP_NOT_ON_WHATSAPP_MESSAGE;
+  }
+  return msg;
+}
+
 function normalizeOtpDeliveryStatusBody(body: unknown): OtpDeliveryStatusData {
   const b = body as Record<string, unknown> | null | undefined;
   let d = (b?.data as Record<string, unknown>) ?? {};
@@ -324,7 +335,7 @@ export const authService = {
 
 /**
  * Poll GET /auth/otp-delivery-status/?phone= every 3s, up to 5 times (~15s).
- * First request runs after 3s. Returns `stop` — call on unmount or after OTP verify.
+ * First request runs immediately. Returns `stop` — call on unmount or after OTP verify.
  */
 export function startOtpDeliveryPolling(phone: string, callbacks: OtpDeliveryPollCallbacks = {}): () => void {
   if (!API_URL || !phone) {
@@ -352,7 +363,7 @@ export function startOtpDeliveryPolling(phone: string, callbacks: OtpDeliveryPol
 
       if (status.not_on_whatsapp) {
         stop();
-        callbacks.onNotOnWhatsapp?.(status.message);
+        callbacks.onNotOnWhatsapp?.(getNotOnWhatsappMessage(status.message));
         return;
       }
       if (status.wa_delivery_status === "delivered") {
@@ -370,9 +381,43 @@ export function startOtpDeliveryPolling(phone: string, callbacks: OtpDeliveryPol
     }
   };
 
+  void run();
   intervalId = setInterval(() => {
     void run();
   }, OTP_DELIVERY_POLL_INTERVAL_MS);
 
   return stop;
+}
+
+/**
+ * Login-page guard: check delivery status before routing to OTP page.
+ * Immediate attempt + short retries to avoid async status propagation race.
+ */
+export async function checkNotOnWhatsappBeforeOtpRoute(
+  phone: string,
+  maxAttempts = 4,
+  retryDelayMs = 350
+): Promise<{ notOnWhatsapp: boolean; message?: string }> {
+  const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  for (let i = 0; i < maxAttempts; i += 1) {
+    try {
+      const status = await authService.getOtpDeliveryStatus(phone);
+      if (status.not_on_whatsapp) {
+        return {
+          notOnWhatsapp: true,
+          message: getNotOnWhatsappMessage(status.message),
+        };
+      }
+      if (status.wa_delivery_status === "delivered") {
+        return { notOnWhatsapp: false };
+      }
+    } catch {
+      // ignore transient status errors for guard checks
+    }
+    if (i < maxAttempts - 1) {
+      await wait(retryDelayMs);
+    }
+  }
+  return { notOnWhatsapp: false };
 }

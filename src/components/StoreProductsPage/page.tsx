@@ -5,7 +5,7 @@ import { MdKeyboardArrowDown } from "react-icons/md";
 import { FaChevronRight, FaSearch } from "react-icons/fa";
 import { IoFilterOutline, IoSwapVerticalOutline } from "react-icons/io5";
 import locationhomeIcon from "../../assets/svg/gp_daily svg/locationhome.svg";
-import { productService, Category, getEffectivePrice, getBasePrice, showStrikeBase } from "../../services/product.service";
+import { productService, Category, getEffectivePrice, getBasePrice, showStrikeBaseOnCard } from "../../services/product.service";
 import { storeService } from "../../services/store.service";
 import { addressService } from "../../services/address.service";
 import { ProductBrowseSkeleton } from "../common/PageSkeletons";
@@ -515,7 +515,7 @@ const StoreProductsPages: React.FC = () => {
                       <div className="mt-auto flex items-center justify-between gap-2">
                         <p className="text-gray-900 text-base font-bold">
                           <span>₹{getItemPrice(item)}</span>
-                          {showStrikeBase(item) && (
+                          {showStrikeBaseOnCard(item) && (
                             <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(item)}</span>
                           )}
                         </p>

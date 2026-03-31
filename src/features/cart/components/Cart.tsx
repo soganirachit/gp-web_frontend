@@ -195,17 +195,16 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
   const [fetchError, setFetchError] = useState<string | null>(null);
   /** Inline feedback below manual entry (replaces toast for apply success/error) */
   const [applyHint, setApplyHint] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
-  /** Lifts sheet above mobile keyboard (visualViewport shrinks when IME is open) */
-  const [sheetInset, setSheetInset] = useState({ bottom: 0, maxHeight: '88dvh' as string });
+  /** Keep sheet anchored to bottom like app; only adapt maxHeight for keyboard/view changes. */
+  const [sheetMaxHeight, setSheetMaxHeight] = useState('88dvh');
   const manualInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
     const sync = () => {
-      const insetBottom = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
       const maxH = Math.max(220, Math.min(vv.height * 0.92, window.innerHeight * 0.88));
-      setSheetInset({ bottom: insetBottom, maxHeight: `${maxH}px` });
+      setSheetMaxHeight(`${maxH}px`);
     };
     vv.addEventListener('resize', sync);
     vv.addEventListener('scroll', sync);
@@ -253,13 +252,13 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
 
   return (
     <>
-      {/* Backdrop above app chrome (bottom nav z-50) */}
-      <div className="fixed inset-0 z-[90] bg-black/40" onClick={onClose} aria-hidden />
+      {/* Backdrop above all app chrome, including bottom nav */}
+      <div className="fixed inset-0 z-[99998] bg-black/40" onClick={onClose} aria-hidden />
 
       {/* Bottom sheet — bottom/maxHeight follow visualViewport so content stays above the keyboard */}
       <div
-        className="fixed inset-x-0 z-[100] flex min-h-0 flex-col rounded-t-[24px] bg-white pb-safe-bottom shadow-2xl sm:rounded-t-[28px]"
-        style={{ bottom: sheetInset.bottom, maxHeight: sheetInset.maxHeight }}
+        className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-[99999] flex min-h-0 flex-col rounded-t-[24px] bg-white pb-safe-bottom shadow-2xl sm:bottom-0 sm:rounded-t-[28px]"
+        style={{ maxHeight: sheetMaxHeight }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="promo-modal-title"
@@ -1346,90 +1345,79 @@ const Cart: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => navigateToProductDetail(item)}
-                      className="h-[5.25rem] w-[5.25rem] flex-shrink-0 overflow-hidden rounded-2xl p-0"
-                      aria-label={`View ${item.name}`}
+                      className="flex min-w-0 flex-1 items-start gap-3 text-left"
                     >
                       <img
                         src={item.image}
                         alt=""
                         loading="lazy"
-                        className="h-full w-full object-cover"
+                        className="pointer-events-none h-[5.25rem] w-[5.25rem] flex-shrink-0 rounded-2xl object-cover"
                         onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
                       />
-                    </button>
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <div className="flex items-start justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={() => navigateToProductDetail(item)}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <h3 className="text-sm font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere]">
-                            {item.name} x {item.quantity}
-                            {item.variant?.name && (
-                              <span className="font-normal text-gray-600"> ({item.variant.name})</span>
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-sm font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere]">
+                              {item.name} x {item.quantity}
+                              {item.variant?.name && (
+                                <span className="font-normal text-gray-600"> ({item.variant.name})</span>
+                              )}
+                            </h3>
+                            {deliveryInfo && (
+                              <div className="mt-0.5 text-xs leading-snug text-gray-600">
+                                <div>Delivery: {deliveryInfo.deliveryDate}</div>
+                                <div>Time Slot: {deliveryInfo.timeSlot}</div>
+                              </div>
                             )}
-                          </h3>
-                          {deliveryInfo && (
-                            <div className="mt-0.5 text-xs leading-snug text-gray-600">
-                              <div>Delivery: {deliveryInfo.deliveryDate}</div>
-                              <div>Time Slot: {deliveryInfo.timeSlot}</div>
-                            </div>
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="touch-target-compact flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-red-500 transition-colors hover:bg-gray-200"
-                          aria-label="Remove item"
-                        >
-                          <IoTrashOutline className="h-[15px] w-[15px]" aria-hidden />
-                        </button>
-                      </div>
-                      <div className="mt-1 flex min-h-[1.75rem] items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={() => navigateToProductDetail(item)}
-                          className="text-base font-semibold leading-tight text-gray-900"
-                        >
-                          ₹{Number(item.price).toFixed(2)} each
-                        </button>
-                        <div className="flex shrink-0 items-center gap-1">
+                          </div>
                           <button
                             type="button"
-                            onClick={() => handleQuantityDelta(item.id, -1)}
-                            disabled={item.quantity <= 1}
-                            className="touch-target-compact flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition-colors hover:bg-gray-200 disabled:opacity-50"
-                            aria-label="Decrease quantity"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDeleteItem(item.id);
+                            }}
+                            className="touch-target-compact flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-red-500 transition-colors hover:bg-gray-200"
+                            aria-label="Remove item"
                           >
-                            <FaMinus className="text-[7px]" />
-                          </button>
-                          <span className="min-w-[0.875rem] text-center text-[11px] font-medium tabular-nums text-gray-900">
-                            {item.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleQuantityDelta(item.id, 1)}
-                            className="touch-target-compact flex h-6 w-6 items-center justify-center rounded-full bg-[#19411F] text-white transition-colors hover:bg-[#1e5a1c]"
-                            aria-label="Increase quantity"
-                          >
-                            <FaPlus className="text-[7px]" />
+                            <IoTrashOutline className="h-[15px] w-[15px]" aria-hidden />
                           </button>
                         </div>
+                        <div className="mt-1 flex min-h-[1.75rem] items-center justify-between gap-2">
+                          <span className="text-base font-semibold leading-tight text-gray-900">
+                            ₹{Number(item.price).toFixed(2)} each
+                          </span>
+                          <div
+                            className="flex shrink-0 items-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            role="presentation"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleQuantityDelta(item.id, -1)}
+                              disabled={item.quantity <= 1}
+                              className="touch-target-compact flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition-colors hover:bg-gray-200 disabled:opacity-50"
+                              aria-label="Decrease quantity"
+                            >
+                              <FaMinus className="text-[7px]" />
+                            </button>
+                            <span className="min-w-[0.875rem] text-center text-[11px] font-medium tabular-nums text-gray-900">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleQuantityDelta(item.id, 1)}
+                              className="touch-target-compact flex h-6 w-6 items-center justify-center rounded-full bg-[#19411F] text-white transition-colors hover:bg-[#1e5a1c]"
+                              aria-label="Increase quantity"
+                            >
+                              <FaPlus className="text-[7px]" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    </button>
                   </div>
-                  {lineStockErrorByItemId[item.id] ? (
-                    <p
-                      key={stockShakeVersionByItemId[item.id] ?? 0}
-                      className={`mt-2 pl-1 text-xs font-medium text-red-600 ${
-                        (stockShakeVersionByItemId[item.id] ?? 0) > 0 ? 'gp-cart-stock-shake' : ''
-                      }`}
-                    >
-                      {lineStockErrorByItemId[item.id]}
-                    </p>
-                  ) : null}
-
                   {/* Bouquet: custom message */}
                   {isBouquetItem(item) && editingItemId !== item.id && (
                     item.customizedMessage ? (
@@ -1494,6 +1482,16 @@ const Cart: React.FC = () => {
                       </div>
                     </div>
                   )}
+                  {lineStockErrorByItemId[item.id] ? (
+                    <p
+                      key={stockShakeVersionByItemId[item.id] ?? 0}
+                      className={`mt-2  pr-1 text-xs font-medium text-red-600  ${
+                        (stockShakeVersionByItemId[item.id] ?? 0) > 0 ? 'gp-cart-stock-shake' : ''
+                      }`}
+                    >
+                      {lineStockErrorByItemId[item.id]}
+                    </p>
+                  ) : null}
                 </div>
               ))}
 

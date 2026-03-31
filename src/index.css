@@ -164,3 +164,26 @@
   min-width: 0;
   min-height: 0;
 }
+
+/* Force app-like wide toasts: prevent narrow tall bubble rendering */
+.gp-app-toaster {
+  /* left: 0 !important; */
+  /* right: 0 !important; */
+  transform: none !important;
+  width: 100vw !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  text-align: justify !important;
+}
+
+.gp-app-toaster > div {
+  width: min(92vw, 44rem) !important;
+  max-width: min(92vw, 44rem) !important;
+}
+
+.gp-app-toaster [role="status"],
+.gp-app-toaster [role="alert"] {
+  width: 100% !important;
+  max-width: 100% !important;
+}

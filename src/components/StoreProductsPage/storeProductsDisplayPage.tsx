@@ -12,7 +12,7 @@ import logo from "../../assets/All/logo.png";
 import { ProductDetailSkeleton } from "../common/PageSkeletons";
 import { IoArrowBack } from "react-icons/io5";
 import { FaChevronRight, FaMinus, FaPlus } from "react-icons/fa";
-import { productService, getEffectivePrice, getBasePrice, showStrikeBase } from "../../services/product.service";
+import { productService, getEffectivePrice, getBasePrice, showStrikeBaseOnCard } from "../../services/product.service";
 import DatePicker from "react-datepicker";
 import clockIcon from "../../assets/svg/gp_store_svg/clock.svg";
 import deliveryIcon from "../../assets/svg/gp_store_svg/delivery.svg";
@@ -1016,7 +1016,7 @@ const StorePage: React.FC = () => {
                       <div className="mt-auto flex items-center justify-between gap-2">
                         <p className="text-base font-bold text-gray-900">
                           <span>₹{getEffectivePrice(item)}</span>
-                          {showStrikeBase(item) && (
+                          {showStrikeBaseOnCard(item) && (
                             <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(item)}</span>
                           )}
                         </p>

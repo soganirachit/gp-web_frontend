@@ -29,9 +29,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onClick,
   className = ''
 }) => {
+  const shouldShowOriginalOnCard =
+    originalPrice != null && originalPrice > 0 && String(price || "").length <= 8;
   return (
     <div
-      className={`bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer transition-transform hover:scale-[1.02] ${className}`}
+      className={`bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer transition-transform hover:scale-[1.02] h-full flex flex-col ${className}`}
       onClick={onClick}
     >
       {/* Image Section */}
@@ -51,7 +53,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
       </div>
 
       {/* Information Section */}
-      <div className="p-2.5 sm:p-4 md:p-5">
+      <div className="p-2.5 sm:p-4 md:p-5 flex flex-1 flex-col">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex-1 min-w-0">
             <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 truncate mb-1">
@@ -77,10 +79,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         {/* Offer price first, then struck MRP when applicable */}
-        <div className="flex items-center justify-between mt-1.5 sm:mt-3">
-          <span className="text-sm sm:text-base md:text-lg font-semibold text-gray-900">
+        <div className="flex items-center justify-between mt-auto pt-1.5 sm:pt-3">
+          <span className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 whitespace-nowrap">
             {price}
-            {originalPrice != null && originalPrice > 0 && (
+            {shouldShowOriginalOnCard && (
               <span className="text-gray-500 font-medium line-through ml-1">₹{originalPrice}</span>
             )}
           </span>

@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   authService,
+  checkNotOnWhatsappBeforeOtpRoute,
+  OTP_NOT_ON_WHATSAPP_MESSAGE,
   shouldBlockOtpEntryAfterSendOtp,
   whatsappOtpLikelyDelivered,
-  startOtpDeliveryPolling,
 } from '../../../../services/auth.service';
 import { addressService } from '../../../../services/address.service';
 import { useAuth } from '../../../../context/AuthContext';
@@ -24,8 +25,6 @@ interface LocationState {
   whatsappOtpLikelyDelivered?: boolean;
   /** Same phone key as send-otp / status API (often E.164 from backend). */
   deliveryPollPhone?: string;
-  /** When true, poll GET otp-delivery-status after send (Login sets this). */
-  startDeliveryPoll?: boolean;
 }
 
 const OTPVerification: React.FC = () => {
@@ -48,44 +47,7 @@ const OTPVerification: React.FC = () => {
     locState.whatsappOtpLikelyDelivered !== false
   );
 
-  const stopDeliveryPollRef = useRef<(() => void) | null>(null);
   const deliveryPollPhone = locState.deliveryPollPhone ?? phoneNumber;
-  const startDeliveryPollFlag = locState.startDeliveryPoll === true;
-
-  const beginOtpDeliveryPoll = useCallback(
-    (pollPhone: string) => {
-      if (!pollPhone) return;
-      stopDeliveryPollRef.current?.();
-      stopDeliveryPollRef.current = startOtpDeliveryPolling(pollPhone, {
-        onNotOnWhatsapp: (msg) => {
-          stopDeliveryPollRef.current = null;
-          setWhatsappDeliveryOk(false);
-          toast.error(
-            msg ||
-              'This number is not registered on WhatsApp. Please use a WhatsApp-enabled number to log in.'
-          );
-          navigate(`${basePath}/login`, { state: { returnUrl, fromCart } });
-        },
-        onDelivered: () => {
-          stopDeliveryPollRef.current = null;
-          setWhatsappDeliveryOk(true);
-        },
-        onGiveUp: () => {
-          stopDeliveryPollRef.current = null;
-        },
-      });
-    },
-    [basePath, navigate, returnUrl, fromCart]
-  );
-
-  useEffect(() => {
-    if (!phoneNumber || !startDeliveryPollFlag) return;
-    beginOtpDeliveryPoll(deliveryPollPhone || phoneNumber);
-    return () => {
-      stopDeliveryPollRef.current?.();
-      stopDeliveryPollRef.current = null;
-    };
-  }, [phoneNumber, startDeliveryPollFlag, deliveryPollPhone, beginOtpDeliveryPoll]);
 
   // Array of images to cycle through
   const images = [theme.assets.otpHero, theme.assets.loginHero];
@@ -184,9 +146,6 @@ const OTPVerification: React.FC = () => {
 
       // Handle new Django API response structure
       if (response.success && response.message) {
-        stopDeliveryPollRef.current?.();
-        stopDeliveryPollRef.current = null;
-
         toast.success(response.message || 'OTP verified successfully!');
 
         // Login — tokens are in HttpOnly cookies set by server
@@ -267,11 +226,24 @@ const OTPVerification: React.FC = () => {
         toast.error(result.message || 'Failed to resend OTP');
         return;
       }
-      if (shouldBlockOtpEntryAfterSendOtp(result)) {
+      const pollPhone = result.phone ?? phoneNumber;
+      let shouldBlockEntry = shouldBlockOtpEntryAfterSendOtp(result);
+      let blockMessage =
+        result.message && result.message.toLowerCase() !== "success"
+          ? result.message
+          : OTP_NOT_ON_WHATSAPP_MESSAGE;
+      if (!shouldBlockEntry) {
+        const guard = await checkNotOnWhatsappBeforeOtpRoute(pollPhone);
+        if (guard.notOnWhatsapp) {
+          shouldBlockEntry = true;
+          blockMessage = guard.message || OTP_NOT_ON_WHATSAPP_MESSAGE;
+        }
+      }
+      if (shouldBlockEntry) {
         toast.error(
-          result.message ||
-            'This number is not registered on WhatsApp. Please go back and use a WhatsApp-enabled number.'
+          blockMessage
         );
+        navigate(`${basePath}/login`, { state: { returnUrl, fromCart } });
         return;
       }
 
@@ -294,7 +266,6 @@ const OTPVerification: React.FC = () => {
 
       setWhatsappDeliveryOk(whatsappOtpLikelyDelivered(result));
       setCountdown(30);
-      beginOtpDeliveryPoll(result.phone ?? phoneNumber);
     } catch (err: any) {
       let errorMessage = err?.response?.data?.message || err?.message || 'Failed to resend OTP';
       
