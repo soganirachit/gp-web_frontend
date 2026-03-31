@@ -165,25 +165,9 @@
   min-height: 0;
 }
 
-/* Force app-like wide toasts: prevent narrow tall bubble rendering */
-.gp-app-toaster {
-  /* left: 0 !important; */
-  /* right: 0 !important; */
-  transform: none !important;
-  width: 100vw !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  text-align: justify !important;
-}
-
-.gp-app-toaster > div {
-  width: min(92vw, 44rem) !important;
-  max-width: min(92vw, 44rem) !important;
-}
-
-.gp-app-toaster [role="status"],
-.gp-app-toaster [role="alert"] {
-  width: 100% !important;
-  max-width: 100% !important;
-}
+/*
+ * react-hot-toast bottom-center: each toast row is position:absolute; left:0; right:0;
+ * display:flex; justify-content:center — the row must stay full width.
+ * Do NOT set width:fit-content on .gp-app-toaster > div or the bar sticks to the left corner.
+ * Compact pill width comes from AppToaster toastOptions (w-fit / max-w-*), not from these wrappers.
+ */

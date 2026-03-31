@@ -9,6 +9,7 @@ import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import supportIcon from '../../assets/svg/gp_store_svg/support.svg';
 import orderTickIcon from '../../assets/svg/gp_store_svg/ordertick.svg';
 import orderDeliveredIcon from '../../assets/svg/gp_store_svg/orderdelivered.svg';
+import truckStoreIcon from '../../assets/svg/gp_store_svg/truckhome.svg';
 import detailshomeIcon from '../../assets/svg/gp_store_svg/detailshome.svg';
 import detailsuserIcon from '../../assets/svg/gp_store_svg/detailsuser.svg';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
@@ -248,6 +249,7 @@ const OrderDetails: React.FC = () => {
 
   // Get timeline events
   const confirmedEvent = order.timeline.find(e => e.status === 'confirmed' || e.status === 'order_confirmed');
+  const outForDeliveryEvent = order.timeline.find(e => e.status === 'out_for_delivery');
   const deliveredEvent = order.timeline.find(e => e.status === 'delivered');
   const cancelledEvent = order.timeline.find(e => e.status === 'cancelled' || e.status === 'canceled');
 
@@ -276,6 +278,16 @@ const OrderDetails: React.FC = () => {
       date: formatDateTime(order.created_at).date,
       time: formatDateTime(order.created_at).time,
       status: 'confirmed'
+    });
+  }
+
+  if (outForDeliveryEvent) {
+    timelinePoints.push({
+      label: 'Out for Delivery',
+      icon: truckStoreIcon,
+      date: formatDateTime(outForDeliveryEvent.created_at).date,
+      time: formatDateTime(outForDeliveryEvent.created_at).time,
+      status: 'out_for_delivery'
     });
   }
 
@@ -386,7 +398,11 @@ const OrderDetails: React.FC = () => {
                             <path d="M12 4L4 12M4 4L12 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         ) : (
-                          <img src={point.icon} alt={point.label} className="w-4 h-4" />
+                          <img
+                            src={point.icon}
+                            alt={point.label}
+                            className={`w-8 h-6 ${point.status === 'out_for_delivery' ? 'brightness-0 invert' : ''}`}
+                          />
                         )}
                       </div>
                       <div className="text-center">

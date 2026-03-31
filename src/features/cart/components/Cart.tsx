@@ -27,6 +27,7 @@ import { SEO } from '../../../components/SEO';
 import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
+import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
 
 /**
  * Survives component remounts (e.g. React Strict Mode) so we only show one toast per
@@ -257,7 +258,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
 
       {/* Bottom sheet — bottom/maxHeight follow visualViewport so content stays above the keyboard */}
       <div
-        className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-[99999] flex min-h-0 flex-col rounded-t-[24px] bg-white pb-safe-bottom shadow-2xl sm:bottom-0 sm:rounded-t-[28px]"
+        className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+2.5rem)] z-[99999] flex min-h-0 flex-col rounded-t-[24px] bg-white pb-[max(5.75rem,env(safe-area-inset-bottom,0px))] shadow-2xl sm:bottom-0 sm:rounded-t-[28px]"
         style={{ maxHeight: sheetMaxHeight }}
         role="dialog"
         aria-modal="true"
@@ -420,6 +421,7 @@ const Cart: React.FC = () => {
   const location = useLocation();
   const { isLoggedIn, phoneNumber: authPhoneNumber } = useAuth();
   const { feature } = useFeatureTheme();
+  const browseProductsPath = feature === 'gpStore' ? '/gp-store/products' : '/gp-daily/Products';
   const { storePendingPayment, getPendingPayments, removePendingPayment, retryWithBackoff } = useNetworkRecovery();
   const {
     items,
@@ -1294,7 +1296,7 @@ const Cart: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f6f1]">
+    <div className="flex min-h-screen flex-col bg-[#f8f6f1]">
       <style>{`
         @keyframes gp-cart-stock-shake {
           0%, 100% { transform: translateX(0); }
@@ -1314,29 +1316,37 @@ const Cart: React.FC = () => {
         canonical="https://customerapp.mygendaphool.com/gp-store/basket"
         noIndex={true}
       />
-      <div className="mx-auto w-full max-w-[min(800px,100vw)] pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]">
-        {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate(-1)} className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors">
-              <IoArrowBack size={24} />
+      <div className="mx-auto flex min-h-screen w-full max-w-[min(800px,100vw)] flex-1 flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]">
+        {/* Header — matches mobile CartScreen (padding, border, title) */}
+        <div className="sticky top-0 z-10 border-b border-gray-200 bg-[#f8f6f1] px-4 pb-3 pt-6">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="-ml-2 rounded-full p-2 transition-colors hover:bg-black/5"
+              aria-label="Back"
+            >
+              <IoArrowBack size={24} className="text-gray-900" />
             </button>
-            <h1 className="text-2xl font-bold font-serif text-gray-900">My Basket</h1>
+            <h1 className="text-2xl font-bold text-gray-900">My Basket</h1>
           </div>
         </div>
 
-        <div className="px-4 py-4 space-y-4">
-          {items.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">Your cart is empty</p>
-              <button
-                onClick={() => navigate('/gp-store/products')}
-                className="mt-4 mx-auto bg-[#19411F] text-white px-6 py-2 rounded-lg hover:bg-[#1e5a1c] transition-colors flex items-center justify-center"
-              >
-                Browse Products
-              </button>
-            </div>
-          ) : (
+        {items.length === 0 ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-4">
+            <img src={emptyCartSvg} alt="" width={72} height={72} className="mb-3 shrink-0" />
+            <p className="mb-2 text-center text-[18px] font-semibold leading-snug text-gray-900">Your basket is empty</p>
+            <p className="mb-4 max-w-sm text-center text-sm text-gray-500">Add some blooms from the store to see them here.</p>
+            <button
+              type="button"
+              onClick={() => navigate(browseProductsPath)}
+              className="mt-2 rounded-full bg-[#19411F] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1e5a1c]"
+            >
+              Browse Products
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4 px-4 py-4">
             <>
               {/* Product Items */}
               {items.map((item) => (
@@ -1752,8 +1762,9 @@ const Cart: React.FC = () => {
                 {isProcessingPayment ? 'Preparing payment…' : 'Checkout'}
               </button>
             </>
-          )}
-        </div>
+          </div>
+        )}
+
       </div>
 
       {/* Promo Code Modal */}

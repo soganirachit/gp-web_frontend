@@ -16,23 +16,23 @@ export function AppToaster() {
       toastOptions={{
         duration: 2800,
         className:
-          '!flex !items-center !justify-center !box-border !text-center !whitespace-normal !rounded-2xl ' +
-          '!px-[16px] !py-[9px] !min-w-0 !w-full !max-w-full ' +
-          '!text-sm !leading-snug !font-medium [&>div]:!w-full [&>div]:!text-center [&>div]:!whitespace-normal [&>div]:!break-words',
+          '!inline-flex !items-center !justify-center !box-border !text-center !whitespace-normal !rounded-2xl ' +
+          '!px-[16px] !py-[9px] !min-w-0 !w-fit !max-w-[92vw] sm:!max-w-[44rem] ' +
+          '!text-sm !leading-snug !font-medium [&>div]:!text-center [&>div]:!whitespace-normal [&>div]:!break-words',
         style: {
           borderRadius: '16px',
-          background: 'rgba(17, 24, 39, 0.94)',
+          background: '#19411f',
           color: '#f9fafb',
           boxShadow: '0 6px 10px rgba(0, 0, 0, 0.18)',
-          border: '1px solid rgba(255,255,255,0.06)',
+          border: '1px solid #19411f',
         },
         success: {
           duration: 2600,
           icon: null,
           style: {
-            background: 'rgba(17, 24, 39, 0.94)',
+            background: '#19411f',
             color: '#f9fafb',
-            border: '1px solid rgba(74, 222, 128, 0.35)',
+            border: '1px solid #19411f',
           },
         },
         error: {
@@ -47,8 +47,9 @@ export function AppToaster() {
         loading: {
           icon: null,
           style: {
-            background: 'rgba(17, 24, 39, 0.94)',
+            background: '#19411f',
             color: '#f9fafb',
+            border: '1px solid #19411f',
           },
         },
       }}
