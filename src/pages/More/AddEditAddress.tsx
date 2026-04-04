@@ -391,17 +391,75 @@ const AddEditAddress: React.FC = () => {
     }
   };
 
+  /** Apply a Geocoder / Places result to search box, pin line, and pincode (same shape as Autocomplete). */
+  const applyGeocodedPlaceToForm = (place: google.maps.GeocoderResult) => {
+    const formattedAddress = place.formatted_address || '';
+    setDeliveryAddress(formattedAddress);
+    setSearchQuery(formattedAddress);
+
+    const addressComponents: Record<string, string> = {};
+    place.address_components?.forEach((component) => {
+      component.types.forEach((type: string) => {
+        if (type === 'street_number' && !addressComponents.houseNo) {
+          addressComponents.houseNo = component.long_name;
+        }
+        if (type === 'route' && !addressComponents.streetName) {
+          addressComponents.streetName = component.long_name;
+        }
+        if (
+          (type === 'sublocality_level_1' || type === 'sublocality') &&
+          !addressComponents.area
+        ) {
+          addressComponents.area = component.long_name;
+        }
+      });
+    });
+
+    const completeAddr = [
+      addressComponents.houseNo,
+      addressComponents.streetName,
+      addressComponents.area,
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    if (completeAddr) {
+      setFormData((prev) => ({
+        ...prev,
+        completeAddress: completeAddr,
+      }));
+    }
+
+    const pin = place.address_components?.find((c) =>
+      c.types.includes('postal_code')
+    )?.long_name;
+    if (pin) setPincode(pin);
+  };
+
+  const reverseGeocodeMapCenter = async (lat: number, lng: number) => {
+    if (!window.google?.maps) return;
+    try {
+      const geocoder = new google.maps.Geocoder();
+      const { results } = await geocoder.geocode({ location: { lat, lng } });
+      if (results?.[0]) {
+        applyGeocodedPlaceToForm(results[0]);
+      }
+    } catch (error) {
+      console.error('Reverse geocode failed:', error);
+    }
+  };
+
   const handleMapDrag = () => {
     if (mapRef.current) {
       const center = mapRef.current.getCenter();
       if (center) {
         const newPosition = {
           lat: center.lat(),
-          lng: center.lng()
+          lng: center.lng(),
         };
         setSelectedPosition(newPosition);
-        // Clear previous validation when user moves the map
         setLocationValidation(null);
+        void reverseGeocodeMapCenter(newPosition.lat, newPosition.lng);
       }
     }
   };
@@ -605,8 +663,8 @@ const AddEditAddress: React.FC = () => {
               scrollwheel: true
             }}
           />
-          {/* Fixed Marker — classic teardrop pin (modern + subtle pulse) */}
-          <div className="absolute left-1/2 top-[40%] -translate-x-1/2 -translate-y-full pointer-events-none z-20">
+          {/* Fixed Marker — tip at map center (matches getCenter() after drag) */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full pointer-events-none z-20">
             <div className="relative">
               {/* shadow */}
               <div className="absolute left-1/2 top-[44px] h-3 w-7 -translate-x-1/2 rounded-full bg-black/15 blur-[6px]" />

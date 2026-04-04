@@ -6,11 +6,13 @@ import { FaChevronRight, FaSearch } from "react-icons/fa";
 import { IoFilterOutline, IoSwapVerticalOutline } from "react-icons/io5";
 import locationhomeIcon from "../../assets/svg/gp_daily svg/locationhome.svg";
 import { productService, Category, getEffectivePrice, getBasePrice, showStrikeBaseOnCard } from "../../services/product.service";
-import { storeService } from "../../services/store.service";
 import { addressService } from "../../services/address.service";
 import { ProductBrowseSkeleton } from "../common/PageSkeletons";
 import { SearchBar } from "../common/SearchBar";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import { useAuth } from "../../context/AuthContext";
+import { GuestServiceAreaModal } from "../store/GuestServiceAreaModal";
+import { GUEST_STORE_UPDATED_EVENT, storeService } from "../../services/store.service";
 import { getApiUrl } from "../../config/api.config";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
@@ -19,8 +21,11 @@ const StoreProductsPages: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { feature } = useFeatureTheme();
+  const { feature, theme } = useFeatureTheme();
+  const { isLoggedIn } = useAuth();
   const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
+  const [guestAreaModalOpen, setGuestAreaModalOpen] = useState(false);
+  const [guestStoreEpoch, setGuestStoreEpoch] = useState(0);
 
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -98,7 +103,14 @@ const StoreProductsPages: React.FC = () => {
     };
 
     fetchCategories();
-  }, []);
+  }, [guestStoreEpoch]);
+
+  useEffect(() => {
+    if (isLoggedIn) return;
+    const onPick = () => setGuestStoreEpoch((e) => e + 1);
+    window.addEventListener(GUEST_STORE_UPDATED_EVENT, onPick);
+    return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, onPick);
+  }, [isLoggedIn]);
 
   // Fetch products
   useEffect(() => {
@@ -107,16 +119,17 @@ const StoreProductsPages: React.FC = () => {
         setIsLoading(true);
         setError(null);
         
-        // Initialize temporary store ID if user is not logged in
-        if (!localStorage.getItem("phoneNumber")) {
+        if (!isLoggedIn) {
           const existingTempStoreId = storeService.getTemporaryStoreId();
           if (!existingTempStoreId) {
             try {
               await storeService.getStoreFromLocation();
             } catch (error: any) {
               console.error("Error getting store from location:", error);
-              // Continue without store ID - products might still load
             }
+          }
+          if (!storeService.getStoreIdForProducts()) {
+            setGuestAreaModalOpen(true);
           }
         }
         
@@ -165,7 +178,7 @@ const StoreProductsPages: React.FC = () => {
 
     fetchData();
     fetchLatestAddress();
-  }, [categorySlug, stateCategoryName, fetchLatestAddress]);
+  }, [categorySlug, stateCategoryName, fetchLatestAddress, isLoggedIn, guestStoreEpoch]);
 
   const getItemPrice = (item: any): number => getEffectivePrice(item);
 
@@ -205,6 +218,10 @@ const StoreProductsPages: React.FC = () => {
   };
 
   const handleLocationClick = () => {
+    if (!isLoggedIn) {
+      setGuestAreaModalOpen(true);
+      return;
+    }
     navigate(`${basePath}/addresses`);
   };
 
@@ -293,6 +310,13 @@ const StoreProductsPages: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
+      {!isLoggedIn ? (
+        <GuestServiceAreaModal
+          open={guestAreaModalOpen}
+          onClose={() => setGuestAreaModalOpen(false)}
+          primaryColor={theme.colors.primary}
+        />
+      ) : null}
       <SEO
         title={seoTitle}
         description={seoDescription}

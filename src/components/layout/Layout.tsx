@@ -67,7 +67,7 @@ const Layout: React.FC = () => {
       {/* Fixed Header - Hide on auth routes */}
       {/* {!isAuthRoute && <FixedHeader />} */}
 
-      <main className={!isAuthRoute && !shouldHideTopPadding ? "pt-4" : ""}>
+      <main className={!isAuthRoute && !shouldHideTopPadding ? "pt-0" : ""}>
           <div
             className={
               isAuthRoute

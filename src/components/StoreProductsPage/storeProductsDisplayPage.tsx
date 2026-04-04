@@ -21,6 +21,12 @@ import { useAuth } from "../../context/AuthContext";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
 import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
+import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import { GuestServiceAreaModal } from "../store/GuestServiceAreaModal";
+import {
+  GUEST_STORE_UPDATED_EVENT,
+  storeService,
+} from "../../services/store.service";
 
 interface ProductImage {
   id: number;
@@ -97,6 +103,9 @@ const StorePage: React.FC = () => {
   const location = useLocation();
   const { items, addToCart, updateQuantity, removeFromCart } = useCart();
   const { isLoggedIn } = useAuth();
+  const { theme } = useFeatureTheme();
+  const [guestAreaModalOpen, setGuestAreaModalOpen] = useState(false);
+  const [guestStoreEpoch, setGuestStoreEpoch] = useState(0);
   const [selectedType] = useState<SubscriptionType>("Daily");
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
@@ -152,18 +161,17 @@ const StorePage: React.FC = () => {
         return;
       }
       
-      // Initialize temporary store ID if user is not logged in
-      const isLoggedIn = !!localStorage.getItem("phoneNumber");
       if (!isLoggedIn) {
-        const { storeService } = await import("../../services/store.service");
         const existingTempStoreId = storeService.getTemporaryStoreId();
         if (!existingTempStoreId) {
           try {
             await storeService.getStoreFromLocation();
           } catch (error: any) {
             console.error("Error getting store from location:", error);
-            // Continue without store ID - product might still load
           }
+        }
+        if (!storeService.getStoreIdForProducts()) {
+          setGuestAreaModalOpen(true);
         }
       }
       
@@ -213,7 +221,14 @@ const StorePage: React.FC = () => {
   useEffect(() => {
     fetchProductBySlug();
     setSelectedImageIndex(0); // reset gallery when slug changes
-  }, [slug, navigate]);
+  }, [slug, navigate, guestStoreEpoch]);
+
+  useEffect(() => {
+    if (isLoggedIn) return;
+    const h = () => setGuestStoreEpoch((e) => e + 1);
+    window.addEventListener(GUEST_STORE_UPDATED_EVENT, h);
+    return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, h);
+  }, [isLoggedIn]);
 
   // Fire ViewContent pixel when product data loads (any product, any category)
   useEffect(() => {
@@ -611,6 +626,13 @@ const StorePage: React.FC = () => {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f8f6f1]">
+      {!isLoggedIn ? (
+        <GuestServiceAreaModal
+          open={guestAreaModalOpen}
+          onClose={() => setGuestAreaModalOpen(false)}
+          primaryColor={theme.colors.primary}
+        />
+      ) : null}
       {/* SEO — dynamic per product, works for all current and future products */}
       {product && (
         <SEO

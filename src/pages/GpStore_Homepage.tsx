@@ -8,7 +8,8 @@ import { useFeatureTheme } from "../context/FeatureThemeContext";
 import { addressService } from "../services/address.service";
 import { customerService } from "../services/getcustomer.service";
 import { productService, Category, BestSeller, getEffectivePrice, getBasePrice, showStrikeBaseOnCard } from "../services/product.service";
-import { storeService } from "../services/store.service";
+import { storeService, GUEST_STORE_UPDATED_EVENT } from "../services/store.service";
+import { GuestServiceAreaModal } from "../components/store/GuestServiceAreaModal";
 import { toast } from "react-hot-toast";
 import { StoreHomeSkeleton } from "../components/common/PageSkeletons";
 import { SearchBar } from "../components/common/SearchBar";
@@ -52,6 +53,7 @@ const GpStore_Homepage: React.FC = () => {
     const [bestSellers, setBestSellers] = useState<BestSeller[]>([]);
     const [isLoadingBestSellers, setIsLoadingBestSellers] = useState(true);
     const [storeId, setStoreId] = useState<number | null>(null);
+    const [guestAreaModalOpen, setGuestAreaModalOpen] = useState(false);
 
     const fetchCustomerName = async () => {
         try {
@@ -241,6 +243,9 @@ const GpStore_Homepage: React.FC = () => {
                         console.error("Error getting store from location:", error);
                     }
                 }
+                if (isMounted && !storeService.getStoreIdForProducts()) {
+                    setGuestAreaModalOpen(true);
+                }
             }
 
             if (!isMounted) return;
@@ -267,7 +272,25 @@ const GpStore_Homepage: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    useEffect(() => {
+        if (isLoggedIn) return;
+        const onGuestStore = () => {
+            const sid = storeService.getStoreIdForProducts();
+            setStoreId(sid ?? null);
+            const ac = new AbortController();
+            fetchProducts(ac.signal);
+            fetchCategories(ac.signal);
+            fetchBestSellers(ac.signal);
+        };
+        window.addEventListener(GUEST_STORE_UPDATED_EVENT, onGuestStore);
+        return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, onGuestStore);
+    }, [isLoggedIn]);
+
     const handleLocationClick = () => {
+        if (!isLoggedIn) {
+            setGuestAreaModalOpen(true);
+            return;
+        }
         navigate(`${basePath}/addresses`);
     };
 
@@ -298,6 +321,13 @@ const GpStore_Homepage: React.FC = () => {
 
     return (
         <ErrorBoundary>
+            {!isLoggedIn ? (
+                <GuestServiceAreaModal
+                    open={guestAreaModalOpen}
+                    onClose={() => setGuestAreaModalOpen(false)}
+                    primaryColor={theme.colors.primary}
+                />
+            ) : null}
             <SEO
               title="Genda Phool Store — Flowers, Bouquets & Pooja Items in Jaipur"
               description="Shop fresh loose flowers, bouquets, garlands, pooja kits, diyas and incense online. Same-day delivery in Jaipur."

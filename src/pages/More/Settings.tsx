@@ -93,11 +93,10 @@ const Settings: React.FC = () => {
       setLoading(false);
       return;
     }
-  
-    const fetchData = async () => {
+
+    const fetchUser = async () => {
       setLoading(true);
       try {
-        // Fetch customer details
         const customers = await customerService.getAllCustomers();
         const user = customers[0];
         if (user) {
@@ -106,9 +105,6 @@ const Settings: React.FC = () => {
           setUserEmail(user.emailAddress);
           setHasEmail(!!user.emailAddress);
         }
-
-        // Fetch default address and stores
-        await fetchStores();
       } catch (err) {
         setError("Failed to fetch customer details.");
       } finally {
@@ -116,8 +112,16 @@ const Settings: React.FC = () => {
       }
     };
 
-    fetchData();
-  }, []);
+    void fetchUser();
+  }, [isLoggedIn]);
+
+  /** Re-sync store dropdown when opening Account after cart store change (app parity). */
+  useEffect(() => {
+    if (!isLoggedIn || showAsLoggedOut) return;
+    if (location.pathname !== `${basePath}/account`) return;
+    void fetchStores();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: refetch on route focus only
+  }, [location.pathname, basePath, isLoggedIn, showAsLoggedOut]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
