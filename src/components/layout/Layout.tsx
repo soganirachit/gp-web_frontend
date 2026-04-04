@@ -62,7 +62,8 @@ const Layout: React.FC = () => {
 
   return (
     <FeatureThemeProvider>
-    <div className="min-h-screen bg-[#f8f6f1]">
+    {/* Fix_V0.9: data-testid for Playwright / QA without changing layout behaviour */}
+    <div className="min-h-screen bg-[#f8f6f1]" data-testid="gp-root-layout">
       {/* Fixed Header - Hide on auth routes */}
       {/* {!isAuthRoute && <FixedHeader />} */}
 

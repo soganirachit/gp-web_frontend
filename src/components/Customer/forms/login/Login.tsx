@@ -11,6 +11,7 @@ import {
 } from "../../../../services/auth.service";
 import { useFeatureTheme } from "../../../../context/FeatureThemeContext";
 import Spinner from "../../../common/Spinner";
+import { errorMessageFromCatch } from "../../../../utils/apiErrorMessage";
 
 const Login = () => {
     const [phoneNumber, setPhoneNumber] = useState("");
@@ -101,8 +102,8 @@ const Login = () => {
                     fromCart: incoming?.fromCart,
                 },
             });
-        } catch (err: any) {
-            let errorMessage = err?.error || err?.response?.data?.message || err?.message || "Failed to send OTP";
+        } catch (err: unknown) {
+            let errorMessage = errorMessageFromCatch(err, "Failed to send OTP");
             
             // Handle throttling error with user-friendly message
             if (errorMessage.includes("throttled") || errorMessage.includes("Expected available")) {

@@ -27,6 +27,7 @@ import { SEO } from '../../../components/SEO';
 import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
+import { errorMessageFromCatch } from '../../../utils/apiErrorMessage';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
 
 /**
@@ -165,18 +166,16 @@ const applyCouponAPI = async (couponCode: string): Promise<ApplyCouponResponse> 
     const res = await api.post(`${getApiUrl()}/cart/apply-coupon/`, { coupon_code: couponCode });
     const body = res.data as { data?: ApplyCouponResponse } | ApplyCouponResponse;
     return (body as { data?: ApplyCouponResponse }).data ?? (body as ApplyCouponResponse);
-  } catch (error: any) {
-    const err = error?.response?.data || {};
-    throw new Error(err?.message || err?.detail || 'Invalid or expired promo code');
+  } catch (error: unknown) {
+    throw new Error(errorMessageFromCatch(error, "Invalid or expired promo code"));
   }
 };
 
 const removeCouponAPI = async (): Promise<void> => {
   try {
     await api.post(`${getApiUrl()}/cart/remove-coupon/`, {});
-  } catch (error: any) {
-    const err = error?.response?.data || {};
-    throw new Error(err?.message || err?.detail || 'Failed to remove promo code');
+  } catch (error: unknown) {
+    throw new Error(errorMessageFromCatch(error, "Failed to remove promo code"));
   }
 };
 
@@ -991,12 +990,8 @@ const Cart: React.FC = () => {
       await updateQuantity(itemId, item.quantity, editMessage.trim());
       setEditingItemId(null);
       toast.success('Message updated');
-    } catch (error: any) {
-      const apiMessage =
-        error?.response?.data?.message ||
-        error?.response?.data?.detail ||
-        error?.message;
-      toast.error(apiMessage || 'Failed to update message. Please try again.');
+    } catch (error: unknown) {
+      toast.error(errorMessageFromCatch(error, "Failed to update message. Please try again."));
     }
   };
 
@@ -1026,18 +1021,15 @@ const Cart: React.FC = () => {
         delete n[itemId];
         return n;
       });
-    } catch (error: any) {
-      const apiMessage =
-        error?.response?.data?.message ||
-        error?.response?.data?.detail ||
-        error?.message;
+    } catch (error: unknown) {
+      const apiMessage = errorMessageFromCatch(error, "Could not update quantity.");
       if (isStockLimitError(apiMessage)) {
         setLineStockErrorByItemId((prev) => ({
           ...prev,
           [itemId]: 'Exceeded item limit',
         }));
       } else {
-        toast.error(apiMessage || 'Could not update quantity.');
+        toast.error(apiMessage);
       }
     }
   };

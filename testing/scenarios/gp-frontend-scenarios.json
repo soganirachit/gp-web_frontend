@@ -1,0 +1,1199 @@
+{
+  "meta": {
+    "app": "gp-frontend",
+    "catalogVersion": "1.1.0",
+    "sourceDoc": "testing/docs/TESTING_SCENARIOS.md",
+    "generator": "testing/scripts/generate-artifacts.mjs",
+    "fixTag": "Fix_V0.9"
+  },
+  "suites": [
+    {
+      "id": "ENV",
+      "name": "Environment & build",
+      "cases": [
+        {
+          "id": "GFP-ENV-01",
+          "title": "npm run build (tsc + vite) succeeds",
+          "critical": true,
+          "automation": "build"
+        },
+        {
+          "id": "GFP-ENV-02",
+          "title": "npm run dev serves application",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ENV-03",
+          "title": "VITE_API_BASE_URL not accidentally localhost in prod build",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ENV-04",
+          "title": "VITE_GP_DAILY_ENABLED=true exposes /gp-daily routes",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ENV-05",
+          "title": "VITE_GP_DAILY_ENABLED=false redirects /gp-daily to /gp-store",
+          "critical": true,
+          "automation": "e2e"
+        },
+        {
+          "id": "GFP-ENV-06",
+          "title": "Feature query ?feature=gpStore|gpDaily applies theme",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ENV-07",
+          "title": "Empty VITE_SENTRY_DSN does not throw",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ENV-08",
+          "title": "Sentry DSN set receives events (staging)",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "LAY",
+      "name": "Layout & navigation",
+      "cases": [
+        {
+          "id": "GFP-LAY-01",
+          "title": "Scroll to top on route change",
+          "critical": false,
+          "automation": "e2e"
+        },
+        {
+          "id": "GFP-LAY-02",
+          "title": "Meta Pixel trackPageView on SPA navigations",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-LAY-03",
+          "title": "Auth routes hide bottom padding pattern",
+          "critical": false,
+          "automation": "e2e"
+        },
+        {
+          "id": "GFP-LAY-04",
+          "title": "/location hides BottomNav",
+          "critical": false,
+          "automation": "e2e"
+        },
+        {
+          "id": "GFP-LAY-05",
+          "title": "customer-support/questions hides BottomNav",
+          "critical": false,
+          "automation": "e2e"
+        },
+        {
+          "id": "GFP-LAY-06",
+          "title": "GP Store/Daily routes avoid double bottom padding",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-NAV-01",
+          "title": "GP Store bottom nav: Home, Store, Basket, Order, Account",
+          "critical": true,
+          "automation": "e2e"
+        },
+        {
+          "id": "GFP-NAV-02",
+          "title": "Basket when logged out redirects to login with returnUrl",
+          "critical": true,
+          "automation": "e2e"
+        },
+        {
+          "id": "GFP-NAV-03",
+          "title": "GP Daily nav uses /gp-daily base when enabled",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-NAV-04",
+          "title": "Active nav state / visuals",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-NAV-05",
+          "title": "Cart badge matches CartContext",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ERR-01",
+          "title": "RouteErrorPage on thrown route errors",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ERR-02",
+          "title": "lazyWithRetry on chunk failure",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ERR-03",
+          "title": "Suspense PageFadeFallback",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "AUTH",
+      "name": "Authentication & onboarding",
+      "cases": [
+        {
+          "id": "GFP-AUTH-01",
+          "title": "Startup shown at / and /startup",
+          "critical": true,
+          "automation": "e2e"
+        },
+        {
+          "id": "GFP-AUTH-02",
+          "title": "Already logged in redirect from startup",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-03",
+          "title": "GP Store vs Daily entry paths",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-10",
+          "title": "Login valid phone requests OTP",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-11",
+          "title": "Login invalid phone validation",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-12",
+          "title": "OTP rate limit messaging",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-13",
+          "title": "Login network error UX",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-20",
+          "title": "Correct OTP stores tokens",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-21",
+          "title": "Wrong OTP error",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-22",
+          "title": "Resend OTP cooldown",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-23",
+          "title": "Expired OTP message",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-30",
+          "title": "NameInput new user profile",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-31",
+          "title": "NameInput skip existing user",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-40",
+          "title": "Allset completion navigates home",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-50",
+          "title": "ProtectedRoute redirects to feature login when logged out",
+          "critical": true,
+          "automation": "e2e"
+        },
+        {
+          "id": "GFP-AUTH-51",
+          "title": "isLoggedIn without access_token treated logged out",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-52",
+          "title": "returnUrl / state.from after login",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-60",
+          "title": "401 handling → login",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-61",
+          "title": "Logout clears storage",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-AUTH-62",
+          "title": "Token refresh if implemented",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "LOC",
+      "name": "Store & location",
+      "cases": [
+        {
+          "id": "GFP-LOC-01",
+          "title": "Update location assigns store",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-LOC-02",
+          "title": "Nearby stores list + distance",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-LOC-03",
+          "title": "Switch store clears cart per API",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-LOC-04",
+          "title": "Out of zone messaging",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-LOC-05",
+          "title": "Maps autocomplete / pin",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-LOC-06",
+          "title": "Geolocation denied fallback",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-LOC-07",
+          "title": "Unsubscribed_User_Home CTAs",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "CAT",
+      "name": "Home & catalog",
+      "cases": [
+        {
+          "id": "GFP-HOM-01",
+          "title": "GpStore_Homepage banners & categories",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-HOM-02",
+          "title": "GpDaily_Homepage when flag on",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-HOM-03",
+          "title": "Legacy /home",
+          "critical": false,
+          "automation": "e2e"
+        },
+        {
+          "id": "GFP-HOM-04",
+          "title": "OffersBannerCarousel",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CAT-01",
+          "title": "/gp-store/products grid loads",
+          "critical": true,
+          "automation": "e2e"
+        },
+        {
+          "id": "GFP-CAT-02",
+          "title": "/gp-daily/Products when flag on",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CAT-03",
+          "title": "Category filters",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CAT-04",
+          "title": "Pagination / infinite scroll no duplicates",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CAT-05",
+          "title": "Out of stock display",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CAT-06",
+          "title": "Search debounce & empty state",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CAT-07",
+          "title": "ExploreMore cross-sell",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-PDP-01",
+          "title": "/gp-store/product/:slug PDP",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-PDP-02",
+          "title": "/gp-daily/product/:id",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-PDP-03",
+          "title": "Invalid slug/id 404 UX",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-PDP-04",
+          "title": "Variant selector updates price",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-PDP-05",
+          "title": "Add to cart from PDP",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-IMG-01",
+          "title": "Broken image fallback",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-IMG-02",
+          "title": "Lazy load performance",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "CART",
+      "name": "Cart & checkout",
+      "cases": [
+        {
+          "id": "GFP-CART-01",
+          "title": "Add item to cart",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CART-02",
+          "title": "Update quantity / subtotal",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CART-03",
+          "title": "Remove line item",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CART-04",
+          "title": "Apply coupon",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CART-05",
+          "title": "Delivery slot if required",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CART-06",
+          "title": "Address selection / default",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CART-07",
+          "title": "Delivery fee / free threshold math",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CART-08",
+          "title": "Wallet application",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CART-09",
+          "title": "Razorpay checkout success & failure URLs",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CART-10",
+          "title": "Payment failure order not paid",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CART-11",
+          "title": "Network drop during payment recovery",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CART-12",
+          "title": "Empty cart checkout blocked",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-CART-13",
+          "title": "Store switch clears cart per rule",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "PAY",
+      "name": "Payment confirmation",
+      "cases": [
+        {
+          "id": "GFP-PAY-01",
+          "title": "/gp-store/payment-success order summary",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-PAY-02",
+          "title": "/payment-success generic",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-PAY-03",
+          "title": "Deep link without order context graceful",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-PAY-04",
+          "title": "Invoice link",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "WAL",
+      "name": "Wallet",
+      "cases": [
+        {
+          "id": "GFP-WAL-01",
+          "title": "View balance",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-WAL-02",
+          "title": "Top-up Razorpay",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-WAL-03",
+          "title": "Transaction history pagination",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-WAL-04",
+          "title": "Insufficient balance at checkout",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "ORD",
+      "name": "Orders",
+      "cases": [
+        {
+          "id": "GFP-ORD-01",
+          "title": "Orders list statuses",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ORD-02",
+          "title": "Filter orders",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ORD-03",
+          "title": "Order detail timeline",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ORD-04",
+          "title": "Track delivery",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ORD-05",
+          "title": "Cancel order if allowed",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ORD-06",
+          "title": "Reorder prefill",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ORD-07",
+          "title": "GP Daily order routes mirror",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "SUB",
+      "name": "Subscriptions",
+      "cases": [
+        {
+          "id": "GFP-SUB-01",
+          "title": "View active subscription",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUB-02",
+          "title": "New subscription address validation",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUB-03",
+          "title": "Confirm subscription payment",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUB-04",
+          "title": "Modify pack/frequency",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUB-05",
+          "title": "Pause subscription",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUB-06",
+          "title": "Paused landing resume",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUB-07",
+          "title": "Cancel landing",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUB-08",
+          "title": "Cancel reason required",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUB-09",
+          "title": "Cancel success",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUB-10",
+          "title": "manageMyStoreProducts",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUB-11",
+          "title": "GP Daily vs Store subscription paths",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "ACC",
+      "name": "Account & profile",
+      "cases": [
+        {
+          "id": "GFP-ACC-01",
+          "title": "Settings sections navigate",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ACC-02",
+          "title": "Edit profile photo/name",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ACC-03",
+          "title": "Logout from settings",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ACC-04",
+          "title": "Addresses list",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ACC-05",
+          "title": "Add/edit/default/delete address",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ACC-06",
+          "title": "Address map geocode",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-ACC-07",
+          "title": "Pincode/phone validation",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "SUP",
+      "name": "Support",
+      "cases": [
+        {
+          "id": "GFP-SUP-01",
+          "title": "CustomerSupport list/categories",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUP-02",
+          "title": "SupportTicketChat send/receive",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUP-03",
+          "title": "TicketQuestionForm create",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUP-04",
+          "title": "FAQ search",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUP-05",
+          "title": "Attachment limits if any",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SUP-06",
+          "title": "Support offline error",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "REF",
+      "name": "Referral",
+      "cases": [
+        {
+          "id": "GFP-REF-01",
+          "title": "Refer code copy",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-REF-02",
+          "title": "Share deep link",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-REF-03",
+          "title": "Referral API failure",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "LEG",
+      "name": "Legal",
+      "cases": [
+        {
+          "id": "GFP-LEG-01",
+          "title": "Terms renders",
+          "critical": true,
+          "automation": "e2e"
+        },
+        {
+          "id": "GFP-LEG-02",
+          "title": "Privacy renders",
+          "critical": true,
+          "automation": "e2e"
+        },
+        {
+          "id": "GFP-LEG-03",
+          "title": "Footer/settings legal links",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "SVC",
+      "name": "Services (API mapping)",
+      "cases": [
+        {
+          "id": "GFP-SVC-api",
+          "title": "api.ts client + interceptors",
+          "critical": false,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-auth",
+          "title": "auth.service OTP/tokens",
+          "critical": true,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-product",
+          "title": "product.service catalog",
+          "critical": true,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-cart",
+          "title": "cart.service",
+          "critical": true,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-store",
+          "title": "store.service assignment",
+          "critical": true,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-order",
+          "title": "order.service",
+          "critical": true,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-payment",
+          "title": "payment.service",
+          "critical": true,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-wallet",
+          "title": "wallet.service",
+          "critical": false,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-subscription",
+          "title": "subscription.service",
+          "critical": false,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-basepack",
+          "title": "basepack.service",
+          "critical": false,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-address",
+          "title": "address.service",
+          "critical": false,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-support",
+          "title": "support.service",
+          "critical": false,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-faq",
+          "title": "faq.service",
+          "critical": false,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-invoice",
+          "title": "invoice.service",
+          "critical": false,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-editcustomer",
+          "title": "editcustomer.service",
+          "critical": false,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-getcustomer",
+          "title": "getcustomer.service",
+          "critical": false,
+          "automation": "api"
+        },
+        {
+          "id": "GFP-SVC-headers",
+          "title": "headers.service",
+          "critical": false,
+          "automation": "api"
+        }
+      ]
+    },
+    {
+      "id": "NFR",
+      "name": "Non-functional",
+      "cases": [
+        {
+          "id": "GFP-NFR-01",
+          "title": "LCP home/PDP",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-NFR-02",
+          "title": "A11y keyboard modals",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-NFR-03",
+          "title": "SEO helmet titles",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-NFR-04",
+          "title": "Safe area inset nav",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-NFR-05",
+          "title": "Chart widgets if any",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-NFR-06",
+          "title": "date-fns delivery timezone",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-NFR-07",
+          "title": "Redux persistence",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "SEC",
+      "name": "Security",
+      "cases": [
+        {
+          "id": "GFP-SEC-01",
+          "title": "XSS search escaped",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SEC-02",
+          "title": "IDOR other user order URL",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SEC-03",
+          "title": "CSRF / cookie SameSite",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-SEC-04",
+          "title": "Token not in URL/logs",
+          "critical": true,
+          "automation": "manual"
+        }
+      ]
+    },
+    {
+      "id": "REG",
+      "name": "Release gate checklist",
+      "cases": [
+        {
+          "id": "GFP-REG-01",
+          "title": "Auth login→OTP→protected",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-REG-02",
+          "title": "ProtectedRoute + access_token",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-REG-03",
+          "title": "Store + cart",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-REG-04",
+          "title": "Checkout Razorpay test",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-REG-05",
+          "title": "Order detail + invoice",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-REG-06",
+          "title": "Subscription modify/pause/cancel",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-REG-07",
+          "title": "Address CRUD + map",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-REG-08",
+          "title": "Support create + chat",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-REG-09",
+          "title": "GP Daily flag off: no broken gp-daily links",
+          "critical": true,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-REG-10",
+          "title": "Meta Pixel no console errors",
+          "critical": false,
+          "automation": "manual"
+        },
+        {
+          "id": "GFP-REG-11",
+          "title": "Sentry sample rate staging",
+          "critical": false,
+          "automation": "manual"
+        }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "FLOW-J1",
+      "name": "J1 — First purchase (GP Store)",
+      "critical": true,
+      "description": "Startup → Login → OTP → Location/store → Browse → PDP → Cart → Address → Pay → Success → Order visible",
+      "caseIds": [
+        "GFP-AUTH-01",
+        "GFP-AUTH-10",
+        "GFP-AUTH-20",
+        "GFP-LOC-01",
+        "GFP-HOM-01",
+        "GFP-PDP-05",
+        "GFP-CART-01",
+        "GFP-CART-06",
+        "GFP-CART-09",
+        "GFP-PAY-01",
+        "GFP-ORD-01"
+      ]
+    },
+    {
+      "id": "FLOW-J2",
+      "name": "J2 — Returning user checkout",
+      "critical": true,
+      "description": "Login → cart state → wallet partial pay → confirmation",
+      "caseIds": [
+        "GFP-AUTH-20",
+        "GFP-CART-02",
+        "GFP-CART-08",
+        "GFP-CART-09",
+        "GFP-PAY-01"
+      ]
+    },
+    {
+      "id": "FLOW-J3",
+      "name": "J3 — Subscription lifecycle",
+      "critical": false,
+      "description": "Subscribe → pause → resume → cancel with reason",
+      "caseIds": [
+        "GFP-SUB-02",
+        "GFP-SUB-03",
+        "GFP-SUB-05",
+        "GFP-SUB-06",
+        "GFP-SUB-08",
+        "GFP-SUB-09"
+      ]
+    },
+    {
+      "id": "FLOW-J4",
+      "name": "J4 — Support",
+      "critical": false,
+      "description": "Open ticket → chat → resolve",
+      "caseIds": [
+        "GFP-SUP-03",
+        "GFP-SUP-02"
+      ]
+    },
+    {
+      "id": "FLOW-J5",
+      "name": "J5 — GP Daily mirror",
+      "critical": false,
+      "description": "Repeat store flows under /gp-daily when flag enabled",
+      "caseIds": [
+        "GFP-ENV-04",
+        "GFP-CAT-02",
+        "GFP-SUB-11"
+      ]
+    },
+    {
+      "id": "FLOW-J6",
+      "name": "J6 — Payment failure recovery",
+      "critical": true,
+      "description": "Declined payment → cart consistent → retry success",
+      "caseIds": [
+        "GFP-CART-10",
+        "GFP-CART-11",
+        "GFP-CART-09"
+      ]
+    },
+    {
+      "id": "FLOW-E2E-SMOKE",
+      "name": "Automated smoke (Playwright)",
+      "critical": true,
+      "description": "Public routes, startup redirect, protected redirect, legal pages",
+      "caseIds": [
+        "GFP-AUTH-01",
+        "GFP-HOM-03",
+        "GFP-LAY-03",
+        "GFP-NAV-01",
+        "GFP-AUTH-50",
+        "GFP-LEG-01",
+        "GFP-LEG-02",
+        "GFP-CAT-01"
+      ]
+    }
+  ]
+}

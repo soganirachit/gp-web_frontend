@@ -15,7 +15,11 @@ const Startup: React.FC = () => {
   }, [navigate]);
 
   return (
-    <div className="fixed inset-0 flex min-h-screen w-screen items-center justify-center bg-white">
+    /* Fix_V0.9: E2E anchor for splash */
+    <div
+      className="fixed inset-0 flex min-h-screen w-screen items-center justify-center bg-white"
+      data-testid="gp-startup-screen"
+    >
       <motion.div
         initial={{ opacity: 0, y: 110 }}
         animate={{ opacity: 1, y: 0 }}

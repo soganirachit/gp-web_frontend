@@ -16,6 +16,7 @@ import { FaWhatsapp } from 'react-icons/fa';
 import { MdEdit } from 'react-icons/md';
 import { useFeatureTheme } from '../../../../context/FeatureThemeContext';
 import Spinner from '../../../common/Spinner';
+import { errorMessageFromCatch } from '../../../../utils/apiErrorMessage';
 
 interface LocationState {
   phoneNumber: string;
@@ -208,8 +209,8 @@ const OTPVerification: React.FC = () => {
       } else {
         throw new Error(response.message || 'OTP verification failed');
       }
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.message || err.error || 'Invalid OTP';
+    } catch (err: unknown) {
+      const errorMessage = errorMessageFromCatch(err, 'Invalid OTP');
       setOtp(new Array(6).fill(""));
       toast.error(errorMessage);
     } finally {

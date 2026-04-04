@@ -1,4 +1,5 @@
 import axios from "axios";
+import { errorMessageFromParsedBody, errorMessageFromCatch } from "../utils/apiErrorMessage";
 
 const API_URL = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL}/auth`
@@ -216,16 +217,13 @@ export const authService = {
 
       return {
         success: false,
-        error: response.data.message || "Failed to update profile",
+        error: errorMessageFromParsedBody(response.data, "Failed to update profile"),
       };
     } catch (error) {
       if (axios.isAxiosError(error)) {
         return {
           success: false,
-          error:
-            error.response?.data?.message ||
-            error.response?.data?.error ||
-            "Failed to complete onboarding",
+          error: errorMessageFromCatch(error, "Failed to complete onboarding"),
         };
       }
       return {
@@ -309,9 +307,10 @@ export const authService = {
       console.error("Logout API call failed:", error);
       apiResponse = {
         success: false,
-        message:
-          error.response?.data?.message ||
-          "Logout API call failed, but local logout completed",
+        message: errorMessageFromCatch(
+          error,
+          "Logout API call failed, but local logout completed"
+        ),
         error: error.response?.data || error,
       };
     }

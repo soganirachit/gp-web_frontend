@@ -20,6 +20,7 @@ import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
+import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
 
 interface ProductImage {
   id: number;
@@ -333,13 +334,9 @@ const StorePage: React.FC = () => {
       } else {
         await updateQuantity(activeCartLine.id, nextQty, activeCartLine.customizedMessage);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating basket quantity:", error);
-      const rawMessage =
-        error?.response?.data?.message ||
-        error?.response?.data?.detail ||
-        error?.message ||
-        "";
+      const rawMessage = errorMessageFromCatch(error, "");
       const msg = String(rawMessage).toLowerCase();
       const isStockError =
         msg.includes("stock") ||
@@ -352,7 +349,7 @@ const StorePage: React.FC = () => {
           "Exceeded item limit",
         );
       } else {
-        toast.error("Failed to update basket quantity. Please try again.");
+        toast.error(rawMessage || "Failed to update basket quantity. Please try again.");
       }
     } finally {
       setIsUpdatingBasket(false);

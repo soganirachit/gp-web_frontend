@@ -61,7 +61,11 @@ const BottomNav: React.FC = () => {
   // GP Store Navigation: Home, Store (logo only), Basket, Order, Account
   if (feature === "gpStore") {
     return (
-      <nav className="fixed bottom-0 left-0 right-0 z-50 w-full pointer-events-none">
+      /* Fix_V0.9: E2E anchor for bottom navigation */
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 w-full pointer-events-none"
+        data-testid="gp-bottom-nav"
+      >
         <div className="w-full max-w-none bg-white shadow-lg rounded-none pointer-events-auto overflow-visible pb-[env(safe-area-inset-bottom,0px)]">
           <div className="flex justify-between items-center px-3 py-2 pt-2">
             <Link
@@ -195,7 +199,11 @@ const BottomNav: React.FC = () => {
 
   // GP Daily Navigation: Home, Daily (logo only), Wallet, Basket, Account
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 w-full pointer-events-none">
+    /* Fix_V0.9: E2E anchor for bottom navigation */
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-50 w-full pointer-events-none"
+      data-testid="gp-bottom-nav"
+    >
       <div className="w-full max-w-none bg-white shadow-lg rounded-none pointer-events-auto overflow-visible pb-[env(safe-area-inset-bottom,0px)]">
         <div className="flex justify-between items-center px-3 py-2 pt-2">
           <Link
