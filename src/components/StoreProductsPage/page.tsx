@@ -11,9 +11,9 @@ import { ProductBrowseSkeleton } from "../common/PageSkeletons";
 import { SearchBar } from "../common/SearchBar";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useAuth } from "../../context/AuthContext";
-import { GuestServiceAreaModal } from "../store/GuestServiceAreaModal";
 import { GUEST_STORE_UPDATED_EVENT, storeService } from "../../services/store.service";
 import { getApiUrl } from "../../config/api.config";
+import { GP_OPEN_GUEST_AREA_MODAL_EVENT } from "../../config/guestAreaModalCopy";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
 
@@ -24,7 +24,6 @@ const StoreProductsPages: React.FC = () => {
   const { feature, theme } = useFeatureTheme();
   const { isLoggedIn } = useAuth();
   const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
-  const [guestAreaModalOpen, setGuestAreaModalOpen] = useState(false);
   const [guestStoreEpoch, setGuestStoreEpoch] = useState(0);
 
   const [products, setProducts] = useState<any[]>([]);
@@ -46,10 +45,15 @@ const StoreProductsPages: React.FC = () => {
   const categorySlug = useMemo(() => searchParams.get('category'), [searchParams]);
   const stateCategoryName = useMemo(() => location.state?.categoryName, [location.state?.categoryName]);
 
-  // Fetch address
+  // Fetch address — logged-in only. Guests calling /addresses/ get 401; web api.ts then redirects to /login.
   const fetchLatestAddress = useCallback(async () => {
     try {
       setIsLoadingAddress(true);
+      if (!isLoggedIn) {
+        setDeliveryLocation("");
+        setAddressType("Home");
+        return;
+      }
       const addresses = await addressService.getAllAddresses();
       const defaultAddress = addresses.find(addr => addr.isDefault);
       const selectedAddress = defaultAddress || addresses
@@ -78,7 +82,7 @@ const StoreProductsPages: React.FC = () => {
     } finally {
       setIsLoadingAddress(false);
     }
-  }, []);
+  }, [isLoggedIn]);
 
   // Fetch categories
   useEffect(() => {
@@ -118,20 +122,6 @@ const StoreProductsPages: React.FC = () => {
       try {
         setIsLoading(true);
         setError(null);
-        
-        if (!isLoggedIn) {
-          const existingTempStoreId = storeService.getTemporaryStoreId();
-          if (!existingTempStoreId) {
-            try {
-              await storeService.getStoreFromLocation();
-            } catch (error: any) {
-              console.error("Error getting store from location:", error);
-            }
-          }
-          if (!storeService.getStoreIdForProducts()) {
-            setGuestAreaModalOpen(true);
-          }
-        }
         
         // Get category name from location state or use default
         if (stateCategoryName) {
@@ -219,7 +209,11 @@ const StoreProductsPages: React.FC = () => {
 
   const handleLocationClick = () => {
     if (!isLoggedIn) {
-      setGuestAreaModalOpen(true);
+      window.dispatchEvent(
+        new CustomEvent(GP_OPEN_GUEST_AREA_MODAL_EVENT, {
+          detail: { dismissible: true, variant: "need_location" },
+        }),
+      );
       return;
     }
     navigate(`${basePath}/addresses`);
@@ -310,13 +304,6 @@ const StoreProductsPages: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
-      {!isLoggedIn ? (
-        <GuestServiceAreaModal
-          open={guestAreaModalOpen}
-          onClose={() => setGuestAreaModalOpen(false)}
-          primaryColor={theme.colors.primary}
-        />
-      ) : null}
       <SEO
         title={seoTitle}
         description={seoDescription}

@@ -7,13 +7,13 @@ interface SpinnerProps {
   size?: number;
   className?: string;
   isLoading?: boolean;
-  /** Kept for API compatibility; inline loading uses a soft opacity pulse (no rotating spinner). */
+  /** `light`: white ring for dark primary buttons. `default`: brand / neutral ring on light UI. */
   variant?: 'default' | 'light';
 }
 
 /**
  * Page-level loading (size ≥ 100): empty fade surface — no spinner asset.
- * Inline loading (size &lt; 100): subtle opacity pulse — no rotating spinner.
+ * Inline loading (size &lt; 100): rotating circular border (standard loader).
  */
 const Spinner: React.FC<SpinnerProps> = ({
   size = 64,
@@ -26,12 +26,6 @@ const Spinner: React.FC<SpinnerProps> = ({
   if (!isLoading) return null;
 
   const feature = themeContext?.feature;
-  const pulseColor =
-    variant === 'light'
-      ? 'rgba(255,255,255,0.35)'
-      : feature === 'gpStore'
-        ? 'rgba(25, 65, 31, 0.2)'
-        : 'rgba(17, 24, 39, 0.15)';
 
   if (size >= 100) {
     return (
@@ -46,23 +40,20 @@ const Spinner: React.FC<SpinnerProps> = ({
   }
 
   const s = Math.max(12, Math.min(size, 96));
+  const ringClass =
+    variant === 'light'
+      ? 'border-white/35 border-t-white'
+      : feature === 'gpStore'
+        ? 'border-[rgba(25,65,31,0.22)] border-t-[#19411f]'
+        : 'border-gray-200 border-t-gray-800';
+
   return (
     <div className={`flex items-center justify-center ${className}`}>
-      <motion.div
-        aria-label="Loading"
+      <div
         role="status"
-        style={{
-          width: s,
-          height: s,
-          borderRadius: 9999,
-          backgroundColor: pulseColor,
-        }}
-        animate={{ opacity: [0.35, 0.85, 0.35] }}
-        transition={{
-          duration: 1.15,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
+        aria-label="Loading"
+        className={`box-border animate-spin rounded-full border-2 border-solid ${ringClass}`}
+        style={{ width: s, height: s }}
       />
     </div>
   );

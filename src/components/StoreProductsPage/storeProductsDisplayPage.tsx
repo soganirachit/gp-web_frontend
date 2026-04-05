@@ -22,7 +22,6 @@ import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
 import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
-import { GuestServiceAreaModal } from "../store/GuestServiceAreaModal";
 import {
   GUEST_STORE_UPDATED_EVENT,
   storeService,
@@ -103,8 +102,7 @@ const StorePage: React.FC = () => {
   const location = useLocation();
   const { items, addToCart, updateQuantity, removeFromCart } = useCart();
   const { isLoggedIn } = useAuth();
-  const { theme } = useFeatureTheme();
-  const [guestAreaModalOpen, setGuestAreaModalOpen] = useState(false);
+  const { theme, basePath } = useFeatureTheme();
   const [guestStoreEpoch, setGuestStoreEpoch] = useState(0);
   const [selectedType] = useState<SubscriptionType>("Daily");
   const [product, setProduct] = useState<ProductDetail | null>(null);
@@ -159,20 +157,6 @@ const StorePage: React.FC = () => {
       if (!slug) {
         setError("No product slug provided");
         return;
-      }
-      
-      if (!isLoggedIn) {
-        const existingTempStoreId = storeService.getTemporaryStoreId();
-        if (!existingTempStoreId) {
-          try {
-            await storeService.getStoreFromLocation();
-          } catch (error: any) {
-            console.error("Error getting store from location:", error);
-          }
-        }
-        if (!storeService.getStoreIdForProducts()) {
-          setGuestAreaModalOpen(true);
-        }
       }
       
       // Product fetching works without authentication - token is optional
@@ -297,11 +281,7 @@ const StorePage: React.FC = () => {
         return;
       }
       
-      if (!isLoggedIn) {
-        toast.error("Please login to continue");
-        navigate("/login", { state: { returnUrl: `/gp-store/product/${slug}` } });
-        return;
-      }
+      if (!isLoggedIn) return;
 
       const { price } = getPriceDisplay();
       
@@ -375,7 +355,9 @@ const StorePage: React.FC = () => {
     try {
       if (!localStorage.getItem("phoneNumber")) {
         toast.error("Please login to continue");
-        navigate("/login", { state: { returnUrl: `/gp-store/product/${slug}` } });
+        navigate(`${basePath}/login`, {
+          state: { returnUrl: `${basePath}/product/${slug}` },
+        });
         return;
       }
       if (!product || !slug) {
@@ -626,13 +608,6 @@ const StorePage: React.FC = () => {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f8f6f1]">
-      {!isLoggedIn ? (
-        <GuestServiceAreaModal
-          open={guestAreaModalOpen}
-          onClose={() => setGuestAreaModalOpen(false)}
-          primaryColor={theme.colors.primary}
-        />
-      ) : null}
       {/* SEO — dynamic per product, works for all current and future products */}
       {product && (
         <SEO
@@ -902,6 +877,25 @@ const StorePage: React.FC = () => {
                 </p>
               )}
             </div>
+          ) : !isLoggedIn ? (
+            <button
+              type="button"
+              onClick={() =>
+                navigate(`${basePath}/login`, {
+                  state: { returnUrl: `${basePath}/product/${slug}` },
+                })
+              }
+              className={`w-full mt-6 py-3.5 rounded-[25px] text-base font-semibold mb-6 flex items-center justify-center ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
+              disabled={
+                !product ||
+                product.in_stock === false ||
+                product.is_available === false
+              }
+            >
+              {product?.in_stock !== false && product?.is_available !== false
+                ? "Log in to add to basket"
+                : "Out of Stock"}
+            </button>
           ) : (
             <button
               onClick={createStoreOrder}

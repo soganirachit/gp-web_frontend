@@ -1,48 +1,151 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { IoClose } from "react-icons/io5";
+import { motion, AnimatePresence } from "framer-motion";
+import { IoClose, IoLocationOutline } from "react-icons/io5";
 import {
-  GUEST_SERVICE_CITIES,
   CityOption,
   notifyGuestTemporaryStoreUpdated,
   storeService,
   Store,
 } from "../../services/store.service";
+import {
+  GUEST_AREA_MODAL_TITLE,
+  guestAreaSubtitleForVariant,
+  type GuestAreaModalVariant,
+} from "../../config/guestAreaModalCopy";
+import { useFeatureTheme } from "../../context/FeatureThemeContext";
 
-type Step = "cities" | "stores";
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace("#", "").trim();
+  const full =
+    h.length === 3
+      ? h
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : h;
+  if (full.length !== 6) return `rgba(0,0,0,${alpha})`;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/** Random pick from `stores` — caller must pass only stores in the selected city. */
+function pickRandomStore(stores: Store[]): Store | null {
+  if (!stores.length) return null;
+  return stores[Math.floor(Math.random() * stores.length)]!;
+}
 
 export interface GuestServiceAreaModalProps {
   open: boolean;
   onClose: () => void;
-  /** Primary green from theme */
+  /** Optional override; defaults to current feature theme primary. */
   primaryColor?: string;
+  variant?: GuestAreaModalVariant;
+  /** If false, overlay and close button do not dismiss (city pick still calls onClose). */
+  dismissible?: boolean;
 }
 
+const overlayVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1 },
+  exit: { opacity: 0 },
+};
+
+const panelVariants = {
+  hidden: { opacity: 0, y: 36, scale: 0.92 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: "spring" as const,
+      damping: 22,
+      stiffness: 320,
+      mass: 0.85,
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: 20,
+    scale: 0.96,
+    transition: { duration: 0.18 },
+  },
+};
+
 /**
- * Logged-out users outside delivery coverage (or without location): pick a city, then a store.
+ * Logged-out users outside delivery coverage (or without location): pick a city;
+ * a random online store in that city is assigned automatically.
  */
 export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
   open,
   onClose,
-  primaryColor = "#19411F",
+  primaryColor: primaryColorProp,
+  variant = "outside_service",
+  dismissible = true,
 }) => {
+  const { theme, feature } = useFeatureTheme();
+  const primary = primaryColorProp ?? theme.colors.primary;
+
+  const chrome = useMemo(() => {
+    const borderSoft = hexToRgba(primary, 0.22);
+    const borderStrong = hexToRgba(primary, 0.45);
+    const rowBg = hexToRgba(primary, 0.06);
+    const rowHover = hexToRgba(primary, 0.1);
+    return { borderSoft, borderStrong, rowBg, rowHover };
+  }, [primary]);
+
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const [step, setStep] = useState<Step>("cities");
-  const [pickedCity, setPickedCity] = useState<CityOption | null>(null);
-  const [cityStores, setCityStores] = useState<Store[]>([]);
+  const [apiCities, setApiCities] = useState<CityOption[]>([]);
+  const [citiesLoading, setCitiesLoading] = useState(false);
+  const [citiesError, setCitiesError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const reset = useCallback(() => {
-    setStep("cities");
-    setPickedCity(null);
-    setCityStores([]);
+    setApiCities([]);
+    setCitiesLoading(false);
+    setCitiesError(null);
     setLoading(false);
     setError(null);
   }, []);
 
-  const handleClose = () => {
+  const loadCities = useCallback(async () => {
+    setCitiesLoading(true);
+    setCitiesError(null);
+    try {
+      const list = await storeService.getUniqueCitiesFromOnlineStores();
+      setApiCities(list);
+      if (list.length === 0) {
+        setCitiesError("No cities available from stores right now.");
+      }
+    } catch (e: unknown) {
+      setCitiesError(
+        e instanceof Error ? e.message : "Failed to load cities. Try again.",
+      );
+      setApiCities([]);
+    } finally {
+      setCitiesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      reset();
+      return;
+    }
+    void loadCities();
+  }, [open, loadCities, reset]);
+
+  const dismissFromChrome = () => {
+    if (!dismissible) return;
+    reset();
+    onClose();
+  };
+
+  const completeWithStore = () => {
     reset();
     onClose();
   };
@@ -50,29 +153,25 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
   const finalizeStore = (storeId: number) => {
     storeService.setTemporaryStoreId(storeId);
     notifyGuestTemporaryStoreUpdated();
-    handleClose();
+    completeWithStore();
     if (!pathname.startsWith("/gp-store")) {
       navigate("/gp-store", { replace: true });
     }
   };
 
   const onCityPick = async (city: CityOption) => {
-    setPickedCity(city);
     setLoading(true);
     setError(null);
     try {
-      const stores = await storeService.getStoresInCity(city.name);
-      if (stores.length === 0) {
+      const storesInCity = await storeService.getStoresInCity(city.name);
+      if (storesInCity.length === 0) {
         setError(`No active store found in ${city.name} right now. Try another city.`);
-        setLoading(false);
         return;
       }
-      if (stores.length === 1) {
-        finalizeStore(stores[0].id);
-        return;
+      const store = pickRandomStore(storesInCity);
+      if (store) {
+        finalizeStore(store.id);
       }
-      setCityStores(stores);
-      setStep("stores");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not load stores.");
     } finally {
@@ -80,120 +179,198 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
     }
   };
 
-  if (!open) return null;
+  const primaryButtonHover =
+    feature === "gpDaily"
+      ? "hover:bg-[#DD7600]"
+      : "hover:bg-[#1e4d1c]";
+
+  const subtitle = guestAreaSubtitleForVariant(variant);
 
   return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="guest-service-area-title"
-    >
-      <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl max-h-[min(90vh,560px)] flex flex-col">
-        <button
-          type="button"
-          onClick={handleClose}
-          className="absolute right-3 top-3 rounded-full p-2 text-gray-500 hover:bg-gray-100 z-10"
-          aria-label="Close"
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          key="guest-area-overlay"
+          role="presentation"
+          className="fixed inset-0 z-[200] flex items-end justify-center bg-black/55 p-0 sm:items-center sm:bg-black/50 sm:p-4"
+          variants={overlayVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          transition={{ duration: 0.22 }}
+          onClick={dismissFromChrome}
         >
-          <IoClose className="text-2xl" />
-        </button>
-
-        <div className="px-5 pt-6 pb-2 shrink-0">
-          <h2
-            id="guest-service-area-title"
-            className="text-lg font-semibold text-gray-900 pr-10"
+          <motion.div
+            key="guest-area-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="guest-service-area-title"
+            variants={panelVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className={`relative flex max-h-[min(88dvh,720px)] w-full max-w-md flex-col overflow-hidden rounded-t-[22px] shadow-2xl ring-1 ring-black/5 sm:max-h-[min(85vh,640px)] sm:rounded-2xl ${theme.classes.authPageBackground}`}
+            style={{
+              borderTop: `4px solid ${primary}`,
+              boxShadow: `0 24px 48px -12px ${hexToRgba(primary, 0.22)}`,
+            }}
+            onClick={(e) => e.stopPropagation()}
           >
-            {step === "cities"
-              ? "We’re not in your area yet"
-              : `Stores in ${pickedCity?.name ?? ""}`}
-          </h2>
-          {step === "cities" ? (
-            <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-              Coming soon to more cities. Until then, choose a city we serve to browse products
-              and checkout.
-            </p>
-          ) : (
-            <p className="mt-2 text-sm text-gray-600">
-              Pick a store to see its catalogue.
-            </p>
-          )}
-        </div>
+            {dismissible ? (
+              <button
+                type="button"
+                onClick={dismissFromChrome}
+                className="absolute right-3 top-3 z-10 rounded-full p-2 text-gray-500 transition-colors hover:bg-black/5"
+                style={{ color: primary }}
+                aria-label="Close"
+              >
+                <IoClose className="text-2xl" />
+              </button>
+            ) : null}
 
-        {error ? (
-          <div className="mx-5 mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </div>
-        ) : null}
-
-        <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-5">
-          {step === "cities" ? (
-            <ul className="space-y-2 pt-1">
-              {GUEST_SERVICE_CITIES.map((city) => (
-                <li key={`${city.id}-${city.name}`}>
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => onCityPick(city)}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-sm font-medium text-gray-800 hover:border-gray-300 hover:bg-white disabled:opacity-60"
+            <div className="shrink-0 px-5 pb-1 pt-5 sm:pt-6">
+              <div
+                className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full sm:hidden"
+                style={{ backgroundColor: hexToRgba(primary, 0.35) }}
+                aria-hidden
+              />
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.06, duration: 0.28 }}
+                className="flex items-start gap-3"
+              >
+                <div
+                  className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                  style={{ backgroundColor: hexToRgba(primary, 0.12) }}
+                  aria-hidden
+                >
+                  <IoLocationOutline className="h-5 w-5" style={{ color: primary }} />
+                </div>
+                <div className="min-w-0 flex-1 pr-2">
+                  <h2
+                    id="guest-service-area-title"
+                    className="text-lg font-bold leading-snug text-gray-900 sm:text-xl"
                   >
-                    <span className="block">{city.name}</span>
-                    <span className="text-xs font-normal text-gray-500">{city.state}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <ul className="space-y-2 pt-1">
-              {cityStores.map((s) => (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => finalizeStore(s.id)}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-left text-sm hover:bg-gray-50 disabled:opacity-60"
-                    style={{ borderColor: `${primaryColor}33` }}
+                    {GUEST_AREA_MODAL_TITLE}
+                  </h2>
+                  <motion.p
+                    className="mt-1.5 text-sm leading-relaxed text-gray-600"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1, duration: 0.28 }}
                   >
-                    <span className="font-medium text-gray-900">{s.name}</span>
-                    {s.address ? (
-                      <span className="mt-0.5 block text-xs text-gray-500 line-clamp-2">
-                        {s.address}
-                      </span>
-                    ) : null}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                    {subtitle}
+                  </motion.p>
+                </div>
+              </motion.div>
+            </div>
 
-        {step === "stores" ? (
-          <div className="border-t border-gray-100 px-5 py-3 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                setStep("cities");
-                setCityStores([]);
-                setPickedCity(null);
-                setError(null);
-              }}
-              className="text-sm font-medium text-gray-600 hover:text-gray-900"
-            >
-              ← Back to cities
-            </button>
-          </div>
-        ) : null}
+            {citiesError ? (
+              <motion.div
+                className="mx-5 mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.14, duration: 0.25 }}
+              >
+                <p>{citiesError}</p>
+                <button
+                  type="button"
+                  onClick={() => void loadCities()}
+                  disabled={citiesLoading}
+                  className={`mt-2 rounded-lg px-3 py-1.5 text-sm font-semibold text-white transition-colors disabled:opacity-50 ${theme.classes.primaryButton} ${primaryButtonHover}`}
+                >
+                  Retry
+                </button>
+              </motion.div>
+            ) : null}
 
-        {loading ? (
-          <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/70">
-            <div
-              className="h-9 w-9 animate-spin rounded-full border-2 border-gray-200 border-t-transparent"
-              style={{ borderTopColor: primaryColor }}
-              aria-hidden
-            />
-          </div>
-        ) : null}
-      </div>
-    </div>
+            {error ? (
+              <motion.div
+                className="mx-5 mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                {error}
+              </motion.div>
+            ) : null}
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-6 pt-2">
+              {citiesLoading ? (
+                <motion.div
+                  className="flex flex-col items-center justify-center gap-3 py-12"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.12, duration: 0.3 }}
+                >
+                  <div
+                    className="h-9 w-9 animate-spin rounded-full border-2 border-gray-200 border-t-transparent"
+                    style={{ borderTopColor: primary }}
+                    aria-hidden
+                  />
+                  <p className="text-sm text-gray-600">Loading cities…</p>
+                </motion.div>
+              ) : (
+                <ul className="space-y-2 pt-1">
+                  {apiCities.map((city, index) => (
+                    <motion.li
+                      key={`${city.id}-${city.name}`}
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        delay: 0.12 + Math.min(index * 0.042, 0.42),
+                        duration: 0.32,
+                        ease: [0.22, 1, 0.36, 1],
+                      }}
+                    >
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => void onCityPick(city)}
+                        className="w-full rounded-xl border-2 px-4 py-3 text-left text-sm font-medium text-gray-900 transition-colors disabled:opacity-60"
+                        style={{
+                          backgroundColor: chrome.rowBg,
+                          borderColor: chrome.borderSoft,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = chrome.rowHover;
+                          e.currentTarget.style.borderColor = chrome.borderStrong;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = chrome.rowBg;
+                          e.currentTarget.style.borderColor = chrome.borderSoft;
+                        }}
+                      >
+                        <span className="block">{city.name}</span>
+                        {city.state ? (
+                          <span className="text-xs font-normal text-gray-500">
+                            {city.state}
+                          </span>
+                        ) : null}
+                      </button>
+                    </motion.li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {loading ? (
+              <motion.div
+                className="absolute inset-0 flex items-center justify-center rounded-2xl backdrop-blur-[1px]"
+                style={{ backgroundColor: hexToRgba("#fff", 0.75) }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <div
+                  className="h-9 w-9 animate-spin rounded-full border-2 border-gray-200 border-t-transparent"
+                  style={{ borderTopColor: primary }}
+                  aria-hidden
+                />
+              </motion.div>
+            ) : null}
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 };

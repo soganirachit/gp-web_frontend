@@ -144,61 +144,65 @@ const Startup: React.FC = () => {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.45, duration: 0.45, ease: [0.25, 0.1, 0.25, 1] }}
-            className="mt-5 w-full rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-2 shadow-sm"
+            className="mt-5 w-full overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_12px_40px_-12px_rgba(15,23,42,0.14)]"
           >
             {account.displayName && account.initial ? (
-              <div className="mb-2 flex items-center gap-2 border-b border-gray-200/80 pb-2">
+              <div
+                className="flex items-center gap-3.5 border-b border-slate-100 px-4 py-4"
+                style={{
+                  background: `linear-gradient(145deg, ${primary}12 0%, transparent 58%)`,
+                }}
+              >
                 <div
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                  style={{ backgroundColor: primary }}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-bold text-white shadow-sm"
+                  style={{
+                    backgroundColor: primary,
+                    boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${primary}40`,
+                  }}
                   aria-hidden
                 >
                   {account.initial}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                    Signed in as
-                  </p>
-                  <p className="truncate text-sm font-semibold text-gray-900">
+                  <p className="text-xs font-medium text-slate-500">Signed in as</p>
+                  <p className="mt-0.5 truncate text-base font-semibold tracking-tight text-slate-900">
                     {account.displayName}
                   </p>
                 </div>
               </div>
             ) : null}
 
-            {account.addressLine ? (
-              <div className="flex gap-1.5 rounded-lg bg-white/90 px-2 py-1.5">
-                <IoLocationOutline
-                  className="mt-px h-3.5 w-3.5 shrink-0 text-gray-500"
+            <div className="px-4">
+              {account.addressLine ? (
+                <div className="flex gap-3 border-b border-slate-100 py-3.5">
+                  <IoLocationOutline
+                    className="mt-0.5 h-5 w-5 shrink-0 text-slate-400"
+                    aria-hidden
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-slate-500">Delivery address</p>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-800 line-clamp-2">
+                      {account.addressLine}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="border-b border-slate-100 py-3.5 text-center text-sm text-slate-500">
+                  No saved address yet
+                </p>
+              )}
+
+              <div className="flex gap-3 py-3.5">
+                <IoStorefrontOutline
+                  className="mt-0.5 h-5 w-5 shrink-0 text-slate-400"
                   aria-hidden
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-500">
-                    Address
-                  </p>
-                  <p className="text-xs leading-snug text-gray-800 line-clamp-2">
-                    {account.addressLine}
+                  <p className="text-xs font-medium text-slate-500">Your store</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-slate-900">
+                    {account.storeName}
                   </p>
                 </div>
-              </div>
-            ) : (
-              <p className="py-0.5 text-center text-[11px] text-gray-500">
-                No saved address
-              </p>
-            )}
-
-            <div className="mt-1.5 flex gap-1.5 rounded-lg bg-white/90 px-2 py-1.5">
-              <IoStorefrontOutline
-                className="mt-px h-3.5 w-3.5 shrink-0 text-gray-500"
-                aria-hidden
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-500">
-                  Store
-                </p>
-                <p className="truncate text-xs font-medium text-gray-800">
-                  {account.storeName}
-                </p>
               </div>
             </div>
           </motion.div>

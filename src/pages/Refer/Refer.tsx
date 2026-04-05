@@ -1,116 +1,313 @@
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { IoArrowBack } from 'react-icons/io5';
 import { FaGift, FaWhatsapp, FaTelegramPlane, FaCopy } from 'react-icons/fa';
 import { MdEmail } from 'react-icons/md';
+import { toast } from 'react-hot-toast';
+import { useFeatureTheme } from '../../context/FeatureThemeContext';
+import {
+  getMailtoShareUrl,
+  getReferralShareText,
+  getTelegramShareUrl,
+  getWhatsAppShareUrl,
+  REFERRAL_COPY_BUTTON,
+  REFERRAL_COPIED_TOAST,
+  REFER_CARD_HINT,
+  REFER_CARD_TITLE,
+  REFER_HERO_TAGLINE,
+  REFER_SHARE_SECTION_LABEL,
+} from '../../config/referralShare';
+
+const PAGE_BG = '#f8f6f1';
+const ACCENT_ORANGE = '#F15A22';
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const h = hex.replace('#', '').trim();
+  const full =
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h;
+  if (full.length !== 6) return null;
+  return {
+    r: parseInt(full.slice(0, 2), 16),
+    g: parseInt(full.slice(2, 4), 16),
+    b: parseInt(full.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const c = (n: number) =>
+    Math.min(255, Math.max(0, Math.round(n)))
+      .toString(16)
+      .padStart(2, '0');
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+
+function mixHex(hex: string, target: string, t: number): string {
+  const A = hexToRgb(hex);
+  const B = hexToRgb(target);
+  if (!A || !B) return hex;
+  return rgbToHex(
+    A.r + (B.r - A.r) * t,
+    A.g + (B.g - A.g) * t,
+    A.b + (B.b - A.b) * t,
+  );
+}
+
+function heroGradientStops(primary: string): [string, string, string] {
+  return [
+    mixHex(primary, '#ffffff', 0.34),
+    mixHex(primary, '#ffffff', 0.12),
+    mixHex(primary, '#000000', 0.1),
+  ];
+}
+
+const shareChannels = [
+  {
+    key: 'whatsapp',
+    label: 'WhatsApp',
+    icon: FaWhatsapp,
+    iconClass: 'text-[#25D366]',
+    circleClass: 'bg-[#25D366]/12',
+  },
+  {
+    key: 'email',
+    label: 'Email',
+    icon: MdEmail,
+    iconClass: 'text-red-600',
+    circleClass: 'bg-red-600/10',
+  },
+  {
+    key: 'telegram',
+    label: 'Telegram',
+    icon: FaTelegramPlane,
+    iconClass: 'text-sky-600',
+    circleClass: 'bg-sky-600/10',
+  },
+] as const;
+
+const cardSpring = {
+  type: 'spring' as const,
+  damping: 22,
+  stiffness: 320,
+  mass: 0.85,
+};
 
 const Refer: React.FC = () => {
-  const [copied, setCopied] = useState(false);
-  const referralCode = "GP2023REF";
+  const navigate = useNavigate();
+  const { theme } = useFeatureTheme();
+  const primary = theme.colors.primary;
+  const [copying, setCopying] = useState(false);
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(referralCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const [g0, g1, g2] = useMemo(
+    () => heroGradientStops(primary),
+    [primary],
+  );
 
-  const shareOptions = [
-    {
-      icon: <FaWhatsapp className="text-green-500" />,
-      label: 'WhatsApp',
-      bgColor: 'bg-green-50'
-    },
-    {
-      icon: <MdEmail className="text-red-500" />,
-      label: 'Email',
-      bgColor: 'bg-red-50'
-    },
-    {
-      icon: <FaTelegramPlane className="text-blue-500" />,
-      label: 'Telegram',
-      bgColor: 'bg-blue-50'
+  const heroBg = useMemo(
+    () => ({ background: `linear-gradient(135deg, ${g0} 0%, ${g1} 48%, ${g2} 100%)` }),
+    [g0, g1, g2],
+  );
+
+  const borderSoft =
+    primary.length === 7 ? `${primary}22` : primary;
+
+  const copyInvite = useCallback(async () => {
+    const text = getReferralShareText();
+    try {
+      setCopying(true);
+      await navigator.clipboard.writeText(text);
+      toast.success(REFERRAL_COPIED_TOAST, { duration: 2200 });
+    } catch {
+      toast.error('Could not copy.');
+    } finally {
+      setCopying(false);
     }
-  ];
+  }, []);
+
+  const openShare = useCallback((key: (typeof shareChannels)[number]['key']) => {
+    const url =
+      key === 'whatsapp'
+        ? getWhatsAppShareUrl()
+        : key === 'email'
+          ? getMailtoShareUrl()
+          : getTelegramShareUrl();
+    if (key === 'email') {
+      window.location.href = url;
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-nav-bottom">
-      {/* Hero Section */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-br from-green-400 to-green-600 p-6 text-white rounded-b-3xl"
+    <div className="min-h-screen pb-nav-bottom" style={{ backgroundColor: PAGE_BG }}>
+      <div
+        className="relative overflow-hidden text-white"
+        style={heroBg}
       >
-        <motion.div
-          animate={{ rotate: [0, 10, -10, 0] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-          className="w-24 h-24 mx-auto mb-6"
-        >
-          <FaGift className="w-full h-full" />
-        </motion.div>
-        {/* <h1 className="text-2xl font-bold text-center mb-2">Invite Friends & Earn</h1> */}
-        <h1 className="text-2xl font-bold text-center mb-2">Invite Friends</h1>
-        {/* <p className="text-center text-green-100">Get ₹100 for every friend who joins</p> */}
-      </motion.div>
+        <div
+          className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/12 blur-2xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -bottom-12 left-1/2 h-36 w-72 -translate-x-1/2 rounded-full bg-white/10 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute bottom-8 left-6 h-24 w-24 rounded-full border border-white/15 bg-white/5"
+          aria-hidden
+        />
 
-      {/* Referral Code Section */}
-      <div className="p-6">
-        {/* <div className="bg-white rounded-xl p-6 shadow-sm mb-8">
-          <p className="text-gray-600 text-sm mb-3">Your Referral Code</p>
-          <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
-            <span className="font-mono text-xl font-semibold">{referralCode}</span>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={copyToClipboard}
-              className="flex items-center text-green-600"
-            >
-              <FaCopy className="mr-2" />
-              {copied ? 'Copied!' : 'Copy'}
-            </motion.button>
-          </div>
-        </div> */}
-
-        {/* Share Options */}
-        <div className="bg-white rounded-xl p-6 shadow-sm">
-          <h2 className="text-lg font-semibold mb-4">Share via</h2>
-          <div className="grid grid-cols-3 gap-2 xs:gap-3 sm:gap-4">
-            {shareOptions.map((option, index) => (
-              <motion.button
-                key={index}
-                type="button"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className={`${option.bgColor} flex min-w-0 flex-col items-center rounded-xl p-2 xs:p-4`}
-              >
-                <span className="mb-1 text-xl xs:mb-2 xs:text-2xl">{option.icon}</span>
-                <span className="text-center text-[10px] font-medium leading-tight xs:text-sm">{option.label}</span>
-              </motion.button>
-            ))}
-          </div>
+        <div className="relative mx-auto flex max-w-lg items-center gap-2 px-4 py-3 sm:px-5">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="rounded-full p-2 text-white transition-colors hover:bg-white/15"
+            aria-label="Go back"
+          >
+            <IoArrowBack className="text-2xl" />
+          </button>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Refer Us</h1>
         </div>
 
-        {/* How it Works */}
-        {/* <div className="mt-8">
-          <h2 className="text-lg font-semibold mb-4">How it Works</h2>
-          <div className="space-y-4">
-            {[
-              { step: 1, text: "Share your referral code with friends" },
-              { step: 2, text: "They sign up using your code" },
-              { step: 3, text: "Both get ₹100 when they make first purchase" }
-            ].map((item) => (
-              <motion.div
-                key={item.step}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: item.step * 0.2 }}
-                className="flex items-center bg-white p-4 rounded-lg shadow-sm"
-              >
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-4">
-                  <span className="text-green-600 font-semibold">{item.step}</span>
-                </div>
-                <p className="text-gray-700">{item.text}</p>
-              </motion.div>
-            ))}
+        <div className="relative mx-auto flex max-w-lg flex-col items-center px-5 pb-14 pt-2 sm:px-6">
+          <motion.div
+            animate={{ rotate: [0, 8, -8, 0] }}
+            transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
+            className="flex h-[5.75rem] w-[5.75rem] items-center justify-center rounded-[1.75rem] bg-white/20 shadow-lg ring-1 ring-white/35"
+          >
+            <FaGift className="h-14 w-14 text-white drop-shadow-md" />
+          </motion.div>
+
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+            className="mt-5 max-w-[20rem] text-center text-[0.9375rem] font-medium leading-relaxed text-white/95 sm:max-w-none sm:text-base"
+          >
+            {REFER_HERO_TAGLINE}
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.35 }}
+            className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-[0.14em] text-white/75"
+          >
+            <span>Puja</span>
+            <span style={{ color: ACCENT_ORANGE }} aria-hidden>
+              ·
+            </span>
+            <span>Home</span>
+            <span style={{ color: ACCENT_ORANGE }} aria-hidden>
+              ·
+            </span>
+            <span>Gifting</span>
+          </motion.div>
+        </div>
+      </div>
+
+      <div className="relative z-10 -mt-11 px-5 sm:px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 36, scale: 0.92 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ ...cardSpring, delay: 0.04 }}
+          className="mx-auto max-w-lg overflow-hidden rounded-[1.75rem] border bg-white shadow-[0_20px_50px_-18px_rgba(17,24,39,0.18)]"
+          style={{ borderColor: borderSoft }}
+        >
+          <div
+            className="h-1 w-full"
+            style={{
+              background: `linear-gradient(90deg, transparent 0%, ${primary} 42%, ${ACCENT_ORANGE} 100%)`,
+            }}
+            aria-hidden
+          />
+
+          <div className="px-6 pb-6 pt-5 sm:px-7 sm:pb-7 sm:pt-6">
+            <motion.h2
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
+              className="text-lg font-bold tracking-tight text-gray-900 sm:text-xl"
+            >
+              {REFER_CARD_TITLE}
+            </motion.h2>
+            <motion.p
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.14, duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
+              className="mt-2 text-sm leading-relaxed text-gray-600 sm:text-[0.9375rem]"
+            >
+              {REFER_CARD_HINT}
+            </motion.p>
+
+            <motion.button
+              type="button"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.18, duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
+              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: 1.01 }}
+              onClick={() => void copyInvite()}
+              disabled={copying}
+              className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-[1.125rem] px-4 py-4 text-base font-bold text-white shadow-md transition-[filter] hover:brightness-110 disabled:opacity-70"
+              style={{ backgroundColor: primary }}
+            >
+              <FaCopy className="text-lg" aria-hidden />
+              {copying ? 'Copying…' : REFERRAL_COPY_BUTTON}
+            </motion.button>
+
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.22, duration: 0.3 }}
+              className="mb-3 mt-8 text-xs font-bold uppercase tracking-[0.12em] text-gray-500"
+            >
+              {REFER_SHARE_SECTION_LABEL}
+            </motion.p>
+
+            <div className="grid grid-cols-3 gap-3">
+              {shareChannels.map((ch, i) => {
+                const Icon = ch.icon;
+                return (
+                  <motion.button
+                    key={ch.key}
+                    type="button"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      delay: 0.12 + i * 0.06,
+                      duration: 0.35,
+                      ease: [0.25, 0.1, 0.25, 1],
+                    }}
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => openShare(ch.key)}
+                    className="flex min-h-[6.75rem] flex-col items-center justify-center rounded-[1.25rem] border px-2 py-3 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gp-ref-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                    style={
+                      {
+                        borderColor: borderSoft,
+                        backgroundColor: PAGE_BG,
+                        ['--gp-ref-primary' as string]: primary,
+                      } as React.CSSProperties
+                    }
+                  >
+                    <span
+                      className={`mb-2 flex h-[3.25rem] w-[3.25rem] items-center justify-center rounded-full ${ch.circleClass}`}
+                    >
+                      <Icon className={`text-[1.65rem] ${ch.iconClass}`} aria-hidden />
+                    </span>
+                    <span className="text-xs font-bold text-gray-800">{ch.label}</span>
+                  </motion.button>
+                );
+              })}
+            </div>
           </div>
-        </div> */}
+        </motion.div>
       </div>
     </div>
   );

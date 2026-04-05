@@ -21,28 +21,6 @@ export interface CityOption {
   state: string;
 }
 
-/** Cities we operate in (guest city picker; keep in sync with mobile `AVAILABLE_CITIES`). */
-export const GUEST_SERVICE_CITIES: CityOption[] = [
-  { id: 1, name: "Delhi", state: "Delhi" },
-  { id: 2, name: "New Delhi", state: "Delhi" },
-  { id: 3, name: "Bengaluru", state: "Karnataka" },
-  { id: 4, name: "Mumbai", state: "Maharashtra" },
-  { id: 5, name: "Pune", state: "Maharashtra" },
-  { id: 6, name: "Jaipur", state: "Rajasthan" },
-  { id: 7, name: "Chennai", state: "Tamil Nadu" },
-  { id: 8, name: "Hyderabad", state: "Telangana" },
-  { id: 9, name: "Chandigarh", state: "Punjab" },
-  { id: 10, name: "Kolkata", state: "West Bengal" },
-  { id: 11, name: "Lucknow", state: "Uttar Pradesh" },
-  { id: 12, name: "Surat", state: "Gujarat" },
-  { id: 13, name: "Nashik", state: "Maharashtra" },
-  { id: 14, name: "Mysore", state: "Karnataka" },
-  { id: 15, name: "Coimbatore", state: "Tamil Nadu" },
-  { id: 16, name: "Warangal", state: "Telangana" },
-  { id: 17, name: "Vijayawada", state: "Andhra Pradesh" },
-  { id: 18, name: "Guntur", state: "Andhra Pradesh" },
-];
-
 function storeIsOperationalWeb(s: Store): boolean {
   if (typeof s.is_online === "boolean") return s.is_online;
   return true;
@@ -65,6 +43,20 @@ export function storeIsWithinDeliveryRadius(s: Store): boolean {
 
 function storeIsSelectableWeb(s: Store): boolean {
   return storeIsOperationalWeb(s) && storeIsWithinDeliveryRadius(s);
+}
+
+/** Normalize for comparing API `city` with the city the user selected. */
+export function normalizeCityLabel(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Keep only stores whose `city` matches the chosen city (API `?city=` may be broad). */
+export function filterStoresBelongingToCity(
+  stores: Store[],
+  cityName: string,
+): Store[] {
+  const target = normalizeCityLabel(cityName);
+  return stores.filter((s) => normalizeCityLabel(s.city ?? "") === target);
 }
 
 export interface Store {
@@ -121,6 +113,34 @@ class StoreService {
     }
   }
 
+  /**
+   * Unique city names from online stores (GET /stores/). Guest picker — no hardcoded list.
+   */
+  async getUniqueCitiesFromOnlineStores(): Promise<CityOption[]> {
+    const stores = await this.getAllStores();
+    const operational = stores.filter(storeIsOperationalWeb);
+    const byKey = new Map<string, { name: string; state: string }>();
+    for (const s of operational) {
+      const raw = (s.city ?? "").trim();
+      if (!raw) continue;
+      const key = raw.toLowerCase();
+      if (!byKey.has(key)) {
+        byKey.set(key, {
+          name: raw,
+          state: (s.state ?? "").trim(),
+        });
+      }
+    }
+    const sorted = [...byKey.entries()].sort((a, b) =>
+      a[1].name.localeCompare(b[1].name, undefined, { sensitivity: "base" }),
+    );
+    return sorted.map(([, v], i) => ({
+      id: i + 1,
+      name: v.name,
+      state: v.state,
+    }));
+  }
+
   async getNearestStore(latitude: number, longitude: number): Promise<Store | null> {
     try {
       const response = await axios.get(`${getApiUrl()}/stores/nearest/`, {
@@ -153,10 +173,9 @@ class StoreService {
         params: { city: cityName },
       });
       if (response.data.success && Array.isArray(response.data.data)) {
-        const list = response.data.data as Store[];
-        return list
-          .filter(storeIsOperationalWeb)
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const list = (response.data.data as Store[]).filter(storeIsOperationalWeb);
+        const inCity = filterStoresBelongingToCity(list, cityName);
+        return inCity.sort((a, b) => a.name.localeCompare(b.name));
       }
       return [];
     } catch (error) {
