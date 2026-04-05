@@ -33,6 +33,7 @@ import faqIcon from '../../assets/icon/Faq.svg';
 import facebookIcon from '../../assets/icon/social/facebook.svg';
 import instagramIcon from '../../assets/icon/social/insta.svg';
 import whatsappIcon from '../../assets/icon/social/whatsapp.svg';
+import { SOCIAL_URLS } from '../../config/socialUrls';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 
 const Settings: React.FC = () => {
@@ -355,7 +356,11 @@ const Settings: React.FC = () => {
   // Select menu items based on feature
   const menuItems = feature === 'gpStore' ? gpStoreMenuItems : gpDailyMenuItems;
 
-  const socialIcons = [facebookIcon, instagramIcon, whatsappIcon];
+  const socialLinks = [
+    { icon: facebookIcon, url: SOCIAL_URLS.facebook, label: 'Facebook' },
+    { icon: instagramIcon, url: SOCIAL_URLS.instagramMyGendaPhool, label: 'Instagram' },
+    { icon: whatsappIcon, url: SOCIAL_URLS.whatsapp, label: 'WhatsApp' },
+  ] as const;
 
   const handleLogoutClick = () => {
     setShowLogoutDialog(true);
@@ -781,11 +786,17 @@ const Settings: React.FC = () => {
             <p className="text-[15px] text-gray-500 mb-4">
               Follow us on social media for daily flowers inspiration, puja tips, & exclusive offers.
             </p>
-            <div className="flex items-center justify-center gap-6" aria-hidden="true">
-              {socialIcons.map((icon, index) => (
-                <span key={index} className="inline-flex opacity-90">
+            <div className="flex items-center justify-center gap-6">
+              {socialLinks.map(({ icon, url, label }) => (
+                <button
+                  key={label}
+                  type="button"
+                  className="inline-flex rounded-lg p-1 opacity-90 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-600"
+                  aria-label={`Open ${label}`}
+                  onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
+                >
                   <img src={icon} alt="" className="w-6 h-6 pointer-events-none select-none" draggable={false} />
-                </span>
+                </button>
               ))}
             </div>
           </div>
