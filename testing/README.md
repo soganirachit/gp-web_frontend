@@ -11,7 +11,10 @@ All GP customer-app testing assets live **only** under this folder (plus minimal
 | `scripts/generate-artifacts.mjs` | Builds `generated/EXECUTION_CHECKLIST.md`, `FLOW_COVERAGE_MATRIX.md`, `stats.json`. |
 | `scripts/api-smoke.mjs` | `GET /health/` + `/api/schema/` from API origin (reads `.env` `VITE_API_BASE_URL`). |
 | `scripts/run-full-plan.mjs` | Build + Playwright + API smoke + **report** to `reports/`. |
-| `e2e/` | Playwright config + smoke specs. |
+| `e2e/` | Playwright config + smoke + **authenticated** specs. |
+| `e2e/.env.local` | **(gitignored)** `E2E_ACCESS_TOKEN` or `E2E_PHONE` (+ optional `E2E_OTP` for UI smoke) — see `e2e/CREDENTIALS.md`. |
+| `scripts/e2e-auth-via-db.mjs` | `send-otp` → DB `otp_verifications` → `verify-otp` → writes JWT to `.env.local` (no OTP UI). |
+| `scripts/api-authenticated-smoke.mjs` | `GET /users/me/`, `/cart/`, `/orders/`, `/users/addresses/` with JWT. |
 | `generated/` | **Gitignored** — produced by scripts (checklists). |
 | `reports/` | Full plan reports + Playwright HTML (subfolder). |
 
@@ -20,9 +23,13 @@ All GP customer-app testing assets live **only** under this folder (plus minimal
 ```bash
 npm run test:generate          # Checklist + stats + matrix only
 npm run test:api-smoke         # Backend reachability (needs .env API URL)
+npm run test:api-auth-smoke    # JWT calls (needs testing/e2e/.env.local)
 npm run test:static-smoke      # After `npm run build` — verify dist + Fix_V0.9 testids in bundle
 npm run test:e2e               # Playwright (starts dev server if needed)
+npm run test:e2e:auth-db       # JWT via API+DB (needs E2E_PHONE + DB; see e2e/.env.example)
+npm run test:e2e:auth-db:run   # same, then full Playwright
 npm run test:gp-plan           # Full orchestration + LATEST_FULL_PLAN_REPORT.md
+npm run test:gp-plan:full      # Refresh JWT (test:e2e:auth-db) then full plan — one-shot authenticated run
 npm run test:gp-plan:no-e2e    # Same but skips Playwright (minimal Linux CI / headless deps)
 ```
 

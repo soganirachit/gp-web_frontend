@@ -1,13 +1,16 @@
-import { Toaster } from 'react-hot-toast';
+import { Toaster, ToastBar, toast, type Toast } from 'react-hot-toast';
+import { IoClose } from 'react-icons/io5';
 
 /**
  * Global toast: compact snackbar above the tab bar — small type, modest radius, capped width.
- * All copy uses the same visual system; shorten long strings at the call site when needed.
+ * Each toast includes a dismiss control (react-hot-toast has no built-in close on default bar).
  */
 export function AppToaster() {
+  const position = 'bottom-center' as const;
+
   return (
     <Toaster
-      position="bottom-center"
+      position={position}
       containerClassName="gp-app-toaster"
       containerStyle={{
         bottom: 'max(5.25rem, calc(env(safe-area-inset-bottom, 0px) + 4.25rem))',
@@ -53,6 +56,27 @@ export function AppToaster() {
           },
         },
       }}
-    />
+    >
+      {(t: Toast) => (
+        <ToastBar toast={t} position={position}>
+          {({ icon, message }) => (
+            <div className="flex w-full min-w-0 items-center gap-1">
+              {icon}
+              <div className="gp-toast-message-wrap flex min-w-0 flex-1 flex-col justify-center text-center">
+                {message}
+              </div>
+              <button
+                type="button"
+                className="gp-toast-dismiss"
+                aria-label="Dismiss notification"
+                onClick={() => toast.dismiss(t.id)}
+              >
+                <IoClose className="h-5 w-5 opacity-90" aria-hidden />
+              </button>
+            </div>
+          )}
+        </ToastBar>
+      )}
+    </Toaster>
   );
 }

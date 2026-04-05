@@ -2,8 +2,8 @@
 
 **Program:** Genda Phool customer web (`gp-frontend`)  
 **Engineering tag:** `Fix_V0.9` (non-disruptive `data-testid` hooks + managed testing folder)  
-**Report date:** 2026-04-02 (UTC)  
-**Machine run:** automated plan + live API smoke against configured `VITE_API_BASE_URL`
+**Report date:** 2026-04-04 (UTC)  
+**Machine run:** `npm run test:gp-plan:full` (JWT via `test:e2e:auth-db`) + `LATEST_FULL_PLAN_REPORT.md` against configured `VITE_API_BASE_URL`
 
 ---
 
@@ -14,11 +14,12 @@
 | TypeScript + Vite production build | **PASS** | `npm run build` completed |
 | Static bundle integrity | **PASS** | `dist/` present; **Fix_V0.9** strings `gp-root-layout`, `gp-startup-screen`, `gp-bottom-nav` found in compiled JS |
 | Backend reachability (same origin as API) | **PASS** | `GET /health/` → 200 healthy; `GET /api/schema/` → 200 |
-| Playwright E2E (10 smoke tests) | **PASS** | After `npx playwright install-deps chromium` + `playwright install chromium`, full `test:gp-plan` run: **10/10 passed** (~19s). Re-run locally if deps missing. |
+| Playwright E2E | **PASS** | **25 passed**, **1 skipped** (optional UI OTP spec — needs `E2E_OTP`). Includes JWT-injected routes + public smoke. `npx playwright install chromium` if binaries missing. |
+| API smoke (JWT) | **PASS** | `npm run test:api-auth-smoke` — `/users/me/`, `/cart/`, `/orders/`, `/users/addresses/` with token from `.env.local` |
 | Full manual catalog (164 cases) | **PENDING** | Execute `testing/generated/EXECUTION_CHECKLIST.md` — especially **53 critical (★)** rows |
 | Connected journeys J1–J6 | **PENDING** | Require OTP, payment, and staging credentials — cannot be fully automated without secrets |
 
-**Readiness statement:** The application **builds cleanly**, **Playwright smoke is green** (routing, shell, nav, legal, protected basket redirect), the **production bundle contains QA hooks**, and the **configured API origin is healthy with OpenAPI available**. Full **manual** catalog and **J1–J6** on staging remain **mandatory** for complete sign-off.
+**Readiness statement:** The application **builds cleanly**, **automated E2E is green** (public shell + **authenticated** basket, orders, account, wallet, support, FAQ, refer, products, payment/subscription shells, connected browse), **authenticated API smoke is green**, the **bundle contains Fix_V0.9 testids**, and the **API origin is healthy**. Full **manual** catalog (164) and **J1–J6** on staging remain **mandatory** for complete sign-off.
 
 ---
 
@@ -40,13 +41,13 @@ Machine-readable cases + **7 connected flows** (including J1–J6 + automated sm
 
 | Flow ID | Name | Automated this run | Manual / staging |
 |---------|------|--------------------|------------------|
-| FLOW-J1 | First purchase (GP Store) | Partial (shell only if E2E run) | **Required** — OTP, Razorpay, order |
-| FLOW-J2 | Returning user + wallet | — | **Required** |
+| FLOW-J1 | First purchase (GP Store) | Partial (browse + auth shell; no paid checkout) | **Required** — OTP, Razorpay, order |
+| FLOW-J2 | Returning user + wallet | Partial (wallet route + API cart) | **Required** — full wallet top-up / spend |
 | FLOW-J3 | Subscription lifecycle | — | **Required** |
 | FLOW-J4 | Support ticket + chat | — | **Required** |
 | FLOW-J5 | GP Daily mirror | ENV-05 in E2E | **Required** if `VITE_GP_DAILY_ENABLED=true` |
 | FLOW-J6 | Payment failure recovery | — | **Required** |
-| FLOW-E2E-SMOKE | Playwright smoke suite | **PASS** (10 tests) | Re-run: `npm run test:e2e` or `npm run test:gp-plan` |
+| FLOW-E2E-SMOKE | Playwright suite | **PASS** (25 run, 1 skipped OTP UI) | One-shot: `npm run test:gp-plan:full` · Report: `npm run test:gp-plan` |
 
 ---
 
@@ -67,12 +68,17 @@ Machine-readable cases + **7 connected flows** (including J1–J6 + automated sm
 ```bash
 cd gp-frontend
 npm install
-node testing/scripts/generate-artifacts.mjs --init-scenarios   # first-time JSON seed
-npm run test:generate
-SKIP_PLAYWRIGHT=1 node testing/scripts/run-full-plan.mjs      # build + static + API + report
-# Optional full run with browser:
-# npx playwright install-deps chromium   # Linux
-# npm run test:gp-plan
+# testing/e2e/.env.local: E2E_PHONE (+ DB or E2E_DATABASE_URL) for JWT refresh; see testing/e2e/CREDENTIALS.md
+npm run test:gp-plan:full    # test:e2e:auth-db → JWT in .env.local, then full plan (build, E2E, API smokes, report)
+
+# Headless CI without browser / port issues:
+# SKIP_PLAYWRIGHT=1 npm run test:gp-plan
+
+# Linux browser deps if needed:
+# npx playwright install-deps chromium && npx playwright install chromium
+
+# Force Playwright to start a fresh dev server (default reuses 5173 if already listening):
+# PLAYWRIGHT_FORCE_NEW_SERVER=1 npm run test:e2e
 ```
 
 ---
@@ -82,7 +88,7 @@ SKIP_PLAYWRIGHT=1 node testing/scripts/run-full-plan.mjs      # build + static +
 - [ ] **Build:** `npm run build` green on release branch  
 - [ ] **Static smoke:** `npm run build && npm run test:static-smoke` green  
 - [ ] **API:** `npm run test:api-smoke` green against **production** API URL (or dedicated prod smoke)  
-- [ ] **E2E:** `npm run test:e2e` green on staging URL with `PLAYWRIGHT_BASE_URL` if not using bundled `webServer`  
+- [ ] **E2E:** `npm run test:gp-plan:full` or `npm run test:e2e` green (`PLAYWRIGHT_BASE_URL` if not using bundled `webServer`)  
 - [ ] **Checklist:** All ★ rows in `testing/generated/EXECUTION_CHECKLIST.md`  
 - [ ] **Flows J1–J6:** Documented pass on staging with real OTP / test payments  
 - [ ] **Config:** `VITE_GP_DAILY_ENABLED`, `VITE_RAZORPAY_KEY`, `VITE_API_BASE_URL` verified for target environment  

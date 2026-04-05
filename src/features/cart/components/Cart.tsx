@@ -1475,8 +1475,12 @@ const Cart: React.FC = () => {
         items.map(item => ({ id: item.productId, price: item.price, quantity: item.quantity })),
         total
       );
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to initiate payment. Please try again.');
+    } catch (error: unknown) {
+      const msg =
+        error instanceof Error
+          ? error.message
+          : 'Failed to initiate payment. Please try again.';
+      toast.error(msg);
       setIsProcessingPayment(false);
     }
   };

@@ -1,6 +1,6 @@
+import axios from "axios";
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
-import { headerService } from "./headers.service";
 
 // Ensure API URL includes /api/v1 if not already in base URL
 const getPaymentApiUrl = () => {
@@ -14,6 +14,87 @@ const getPaymentApiUrl = () => {
 };
 
 const API_URL = getPaymentApiUrl();
+
+/** Best-effort parse of Django / DRF error bodies */
+function extractServerErrorMessage(data: unknown): string | undefined {
+  if (data == null || typeof data !== "object") return undefined;
+  const d = data as Record<string, unknown>;
+  if (typeof d.message === "string" && d.message.trim()) return d.message.trim();
+  if (typeof d.detail === "string" && d.detail.trim()) return d.detail.trim();
+  if (Array.isArray(d.detail) && d.detail.length > 0) {
+    const first = d.detail[0];
+    if (typeof first === "string") return first;
+    if (first && typeof first === "object" && "message" in first) {
+      const m = (first as { message?: string }).message;
+      if (typeof m === "string") return m;
+    }
+  }
+  if (typeof d.error === "string" && d.error.trim()) return d.error.trim();
+  return undefined;
+}
+
+/**
+ * Maps Axios/network failures to copy suitable for customers (avoids raw "Request failed with status code 404").
+ * Export for basket/checkout UI if needed.
+ */
+export function getUserFacingPaymentError(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status;
+    const data = error.response?.data;
+    const serverMsg = extractServerErrorMessage(data);
+
+    if (!error.response) {
+      return "We could not reach the payment service. Check your connection and try again.";
+    }
+
+    if (status === 404) {
+      return (
+        serverMsg ||
+        "Checkout could not start because the payment endpoint was not found on the server (404). " +
+          "This is usually a configuration or deployment issue — please try again later or contact support."
+      );
+    }
+
+    if (status === 401) {
+      return serverMsg || "Your session may have expired. Please log in again and try checkout.";
+    }
+
+    if (status === 403) {
+      return serverMsg || "You do not have permission to complete this payment. Try logging in again.";
+    }
+
+    if (status === 400 && serverMsg) {
+      return serverMsg;
+    }
+
+    if (status === 408 || status === 504) {
+      return "The request timed out. Please try checkout again.";
+    }
+
+    if (status === 502 || status === 503) {
+      return "Payment service is temporarily unavailable. Please try again in a few minutes.";
+    }
+
+    if (serverMsg) {
+      return serverMsg;
+    }
+
+    return `Could not start payment (${status}). Please try again.`;
+  }
+
+  if (error instanceof Error) {
+    const m = error.message;
+    if (/Request failed with status code\s*404/i.test(m) || /\b404\b/.test(m)) {
+      return (
+        "Checkout could not start because the payment service was not found (404). " +
+        "Please try again later or contact support if this continues."
+      );
+    }
+    return m;
+  }
+
+  return "Something went wrong while starting payment. Please try again.";
+}
 
 /** Same wrapper pattern as create-order: `{ success, data: { ... } }` */
 function unwrapResponseBody(raw: unknown): Record<string, unknown> {
@@ -146,25 +227,18 @@ class PaymentService {
       console.log('Payment Service - Normalized create-order payload:', maybeWrapped);
 
       return maybeWrapped;
-    } catch (error: any) {
-      console.error('Error creating checkout order:', error);
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers
-      });
-
-      if (error instanceof Error) {
-        throw error;
+    } catch (error: unknown) {
+      console.error("Error creating checkout order:", error);
+      if (axios.isAxiosError(error)) {
+        console.error("Checkout request details:", {
+          url: error.config?.url,
+          method: error.config?.method,
+          status: error.response?.status,
+          data: error.response?.data,
+        });
       }
 
-      if (error.response?.data?.success === false) {
-        throw new Error(error.response.data.message || 'Authentication failed');
-      }
-
-      headerService.handleError(error);
-      throw error;
+      throw new Error(getUserFacingPaymentError(error));
     }
   }
 
@@ -246,15 +320,15 @@ class PaymentService {
       }
 
       return normalizeVerifyResponse(response.data);
-    } catch (error: any) {
-      console.error('Error verifying payment:', error);
-
+    } catch (error: unknown) {
+      console.error("Error verifying payment:", error);
+      if (axios.isAxiosError(error)) {
+        throw new Error(getUserFacingPaymentError(error));
+      }
       if (error instanceof Error) {
         throw error;
       }
-
-      headerService.handleError(error);
-      throw error;
+      throw new Error(getUserFacingPaymentError(error));
     }
   }
 
@@ -285,10 +359,15 @@ class PaymentService {
             ? String(body.razorpay_payment_id)
             : undefined,
       };
-    } catch (error: any) {
-      console.error('Error getting payment status:', error);
-      headerService.handleError(error);
-      throw error;
+    } catch (error: unknown) {
+      console.error("Error getting payment status:", error);
+      if (axios.isAxiosError(error)) {
+        throw new Error(getUserFacingPaymentError(error));
+      }
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(getUserFacingPaymentError(error));
     }
   }
 }
