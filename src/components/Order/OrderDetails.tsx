@@ -474,7 +474,7 @@ const OrderDetails: React.FC = () => {
             <div className="bg-white rounded-2xl p-4 shadow-sm">
               <div className="space-y-2.5 text-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="shrink-0 text-gray-600">Selling Price</span>
+                  <span className="shrink-0 text-gray-600">Item Total</span>
                   <span className="text-right font-medium text-gray-900 tabular-nums">
                     ₹{formatRupee(order.subtotal)}
                   </span>

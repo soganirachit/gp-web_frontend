@@ -318,13 +318,17 @@ const StorePage: React.FC = () => {
     return '';
   };
 
+  /** Same ordering as `orderedImages` (primary, then gallery) — keep in sync for cart line image. */
   const getProductImage = () => {
     if (!product) return "/placeholder.svg";
-    if (product.primary_image) return product.primary_image;
-    if (product.images && product.images.length > 0) {
-      // Sort by display_order and get the first one
-      const sortedImages = [...product.images].sort((a, b) => a.display_order - b.display_order);
-      return sortedImages[0].image;
+    const p = String(product.primary_image || "").trim();
+    if (p) return p;
+    if (product.images?.length) {
+      const sorted = [...product.images].sort(
+        (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0),
+      );
+      const u = String(sorted.find((i) => i.image?.trim())?.image || "").trim();
+      if (u) return u;
     }
     return "/placeholder.svg";
   };
@@ -479,19 +483,26 @@ const StorePage: React.FC = () => {
 
   const categoryName = product?.category_name || "Products";
 
-  // Build the ordered image list for the gallery.
-  // Uses the images[] array (sorted by display_order) and falls back to primary_image.
-  // Works for any product regardless of how many images it has.
-  // Must be declared before any early return (Rules of Hooks).
+  // Build the ordered image list: primary first, then gallery rows (by display_order), deduped by URL.
+  // API often sets primary_image and also lists extra files only under images[] — using only one source hides photos.
   const orderedImages = useMemo(() => {
     if (!product) return [];
     const list: { src: string; alt: string }[] = [];
-    if (product.images && product.images.length > 0) {
-      const sorted = [...product.images].sort((a, b) => a.display_order - b.display_order);
-      sorted.forEach(img => list.push({ src: img.image, alt: img.alt_text || product.name }));
-    } else if (product.primary_image) {
-      list.push({ src: product.primary_image, alt: product.name });
-    } else {
+    const seen = new Set<string>();
+    const push = (src: string | null | undefined, alt: string) => {
+      const u = src != null ? String(src).trim() : '';
+      if (!u || seen.has(u)) return;
+      seen.add(u);
+      list.push({ src: u, alt });
+    };
+    push(product.primary_image, product.name);
+    if (product.images?.length) {
+      const sorted = [...product.images].sort(
+        (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0),
+      );
+      sorted.forEach((img) => push(img.image, img.alt_text || product.name));
+    }
+    if (list.length === 0) {
       list.push({ src: '/placeholder.svg', alt: product.name });
     }
     return list;

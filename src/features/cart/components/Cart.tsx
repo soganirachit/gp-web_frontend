@@ -11,7 +11,7 @@ import { addressService, Address } from '../../../services/address.service';
 import { storeService, storeIsWithinDeliveryRadius } from '../../../services/store.service';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import { format, addDays, isToday, isTomorrow, startOfDay } from 'date-fns';
+import { format, addDays, isAfter, isBefore, isToday, isTomorrow, startOfDay } from 'date-fns';
 import toast from 'react-hot-toast';
 import CartRazorpayPayment from '../../../components/Payment/Rezorpay/CartRazorpayPayment';
 import { paymentService } from '../../../services/payment.service';
@@ -28,6 +28,7 @@ import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
 import { errorMessageFromCatch } from '../../../utils/apiErrorMessage';
+import { DELIVERY_DATE_MAX_DAYS_FROM_TODAY } from '../../../constants/deliveryBooking';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
 
 /**
@@ -502,6 +503,7 @@ const Cart: React.FC = () => {
   const [defaultAddress, setDefaultAddress] = useState<Address | null>(null);
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerRangeMessage, setDatePickerRangeMessage] = useState<string | null>(null);
   const [selectedDateOption, setSelectedDateOption] = useState<'today' | 'tomorrow' | 'dayAfter' | 'pickDate'>('tomorrow');
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
@@ -669,6 +671,30 @@ const Cart: React.FC = () => {
     const today = startOfDay(new Date());
     return availableSlots.some((slot) => isSlotSelectable(slot, today));
   }, [availableSlots, slotsNowTick]);
+
+  const deliveryDateMaxStart = useMemo(
+    () => startOfDay(addDays(new Date(), DELIVERY_DATE_MAX_DAYS_FROM_TODAY)),
+    [slotsNowTick],
+  );
+
+  /** Matches `DatePicker` minDate (today vs tomorrow when today has no bookable slots). */
+  const datePickerMinStart = useMemo(
+    () =>
+      isLoadingSlots || hasSelectableTodaySlots
+        ? startOfDay(new Date())
+        : addDays(startOfDay(new Date()), 1),
+    [isLoadingSlots, hasSelectableTodaySlots, slotsNowTick],
+  );
+
+  const datePickerSelected = useMemo(() => {
+    if (!deliveryInfo?.selectedDate) return null;
+    const d = startOfDay(
+      deliveryInfo.selectedDate instanceof Date
+        ? deliveryInfo.selectedDate
+        : new Date(deliveryInfo.selectedDate),
+    );
+    return isAfter(d, deliveryDateMaxStart) ? deliveryDateMaxStart : d;
+  }, [deliveryInfo?.selectedDate, deliveryDateMaxStart]);
 
   useEffect(() => {
     const state = location.state as { addressUpdated?: boolean } | null;
@@ -1151,11 +1177,22 @@ const Cart: React.FC = () => {
       setSelectedDateOption('tomorrow');
       fetchSlotsForDate(tomorrow);
     } else {
-      const dateObj = deliveryInfo.selectedDate instanceof Date
+      let dateObj = deliveryInfo.selectedDate instanceof Date
         ? deliveryInfo.selectedDate
         : deliveryInfo.selectedDate
           ? new Date(deliveryInfo.selectedDate)
           : tomorrow;
+      const maxStart = startOfDay(addDays(new Date(), DELIVERY_DATE_MAX_DAYS_FROM_TODAY));
+      if (isAfter(startOfDay(dateObj), maxStart)) {
+        dateObj = maxStart;
+        updateDeliveryInfo({
+          ...(deliveryInfo ?? {}),
+          deliveryDate: format(dateObj, 'dd MMM yyyy'),
+          timeSlot: '',
+          slotId: undefined,
+          selectedDate: dateObj,
+        });
+      }
       if (isToday(dateObj)) setSelectedDateOption('today');
       else if (isTomorrow(dateObj)) setSelectedDateOption('tomorrow');
       else {
@@ -1170,9 +1207,45 @@ const Cart: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Lets users tap greyed days and see why (react-datepicker does not call onChange for disabled days). */
+  const renderDeliveryDayContents = useCallback(
+    (dayOfMonth: number, date?: Date) => {
+      if (!date) return dayOfMonth;
+      const d = startOfDay(date);
+      const tooEarly = isBefore(d, datePickerMinStart);
+      const tooLate = isAfter(d, deliveryDateMaxStart);
+      if (!tooEarly && !tooLate) {
+        return dayOfMonth;
+      }
+      return (
+        <span
+          className="inline-flex size-full min-h-[2.5rem] min-w-[2.5rem] items-center justify-center"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (tooLate) {
+              setDatePickerRangeMessage(
+                `You can only pre-order up to ${DELIVERY_DATE_MAX_DAYS_FROM_TODAY} days in advance.`,
+              );
+            } else {
+              setDatePickerRangeMessage("That date isn’t available for delivery.");
+            }
+          }}
+        >
+          {dayOfMonth}
+        </span>
+      );
+    },
+    [datePickerMinStart, deliveryDateMaxStart],
+  );
+
   const handleDateOptionSelect = (option: 'today' | 'tomorrow' | 'dayAfter' | 'pickDate') => {
     setSelectedDateOption(option);
-    if (option === 'pickDate') { setShowDatePicker(true); return; }
+    if (option === 'pickDate') {
+      setDatePickerRangeMessage(null);
+      setShowDatePicker(true);
+      return;
+    }
     const dateMap = { today: new Date(), tomorrow: addDays(new Date(), 1), dayAfter: addDays(new Date(), 2) };
     const selectedDate = startOfDay(dateMap[option]);
     updateDeliveryInfo({ deliveryDate: format(selectedDate, 'dd MMM yyyy'), timeSlot: '', slotId: undefined, selectedDate });
@@ -1181,10 +1254,20 @@ const Cart: React.FC = () => {
 
   const handleDatePickerChange = (date: Date | null) => {
     if (date) {
-      const today = startOfDay(new Date());
       const pickedDate = startOfDay(date);
-      if (pickedDate < today) return;
+      if (isBefore(pickedDate, datePickerMinStart)) {
+        setDatePickerRangeMessage("That date isn’t available for delivery.");
+        return;
+      }
+      if (isAfter(pickedDate, deliveryDateMaxStart)) {
+        setDatePickerRangeMessage(
+          `You can only pre-order up to ${DELIVERY_DATE_MAX_DAYS_FROM_TODAY} days in advance.`,
+        );
+        return;
+      }
+      setDatePickerRangeMessage(null);
       setShowDatePicker(false);
+      const today = startOfDay(new Date());
       const dayAfter = addDays(today, 2);
       if (isToday(pickedDate)) setSelectedDateOption('today');
       else if (isTomorrow(pickedDate)) setSelectedDateOption('tomorrow');
@@ -1198,6 +1281,7 @@ const Cart: React.FC = () => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setDatePickerRangeMessage(null);
         setShowDatePicker(false);
       }
     };
@@ -1399,6 +1483,23 @@ const Cart: React.FC = () => {
 
     if (!selectedSlotId) {
       toast.error('Please select a delivery time slot');
+      return;
+    }
+
+    const selectedDeliveryDay = deliveryInfo.selectedDate
+      ? startOfDay(
+          deliveryInfo.selectedDate instanceof Date
+            ? deliveryInfo.selectedDate
+            : new Date(deliveryInfo.selectedDate),
+        )
+      : null;
+    if (
+      selectedDeliveryDay &&
+      isAfter(selectedDeliveryDay, deliveryDateMaxStart)
+    ) {
+      toast.error(
+        `Please choose a delivery date within the next ${DELIVERY_DATE_MAX_DAYS_FROM_TODAY} days.`,
+      );
       return;
     }
 
@@ -1960,7 +2061,10 @@ const Cart: React.FC = () => {
                   <>
                     <div
                       className="fixed inset-0 bg-black bg-opacity-20 z-40"
-                      onClick={() => setShowDatePicker(false)}
+                      onClick={() => {
+                        setDatePickerRangeMessage(null);
+                        setShowDatePicker(false);
+                      }}
                     />
                     {/* Centered date picker modal; stays within viewport on all screen sizes */}
                     <div
@@ -1978,19 +2082,28 @@ const Cart: React.FC = () => {
                         .react-datepicker__day--today { font-weight: 600; }
                         .react-datepicker__navigation { top: 1rem; }
                         .react-datepicker__navigation-icon::before { border-color: #6b7280; }
+                        .react-datepicker__day--disabled { pointer-events: auto; }
                       `}</style>
                       <DatePicker
-                        selected={deliveryInfo?.selectedDate || null}
+                        selected={datePickerSelected}
                         onChange={handleDatePickerChange}
-                        minDate={
-                          isLoadingSlots || hasSelectableTodaySlots
-                            ? startOfDay(new Date())
-                            : addDays(startOfDay(new Date()), 1)
-                        }
+                        minDate={datePickerMinStart}
+                        maxDate={deliveryDateMaxStart}
+                        onMonthChange={() => setDatePickerRangeMessage(null)}
+                        renderDayContents={renderDeliveryDayContents}
                         inline
                         calendarClassName="!border-0 !shadow-none"
                         className="w-full"
                       />
+                      {datePickerRangeMessage ? (
+                        <p
+                          className="mt-3 text-center text-sm font-semibold text-amber-800"
+                          role="status"
+                          aria-live="polite"
+                        >
+                          {datePickerRangeMessage}
+                        </p>
+                      ) : null}
                     </div>
                   </>
                 )}
@@ -2174,18 +2287,14 @@ const Cart: React.FC = () => {
                     </span>
                     <span>₹{deliveryFee.toLocaleString('en-IN')}</span>
                   </div>
-                  {tax > 0 && (
-                    <div className="flex justify-between text-sm text-gray-700">
-                      <span>GST</span>
-                      <span>₹{tax.toLocaleString('en-IN')}</span>
-                    </div>
-                  )}
-                  {discount > 0 && (
-                    <div className="flex justify-between text-sm text-gray-700">
-                      <span>Discount</span>
-                      <span>-₹{discount.toLocaleString('en-IN')}</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>GST</span>
+                    <span>₹{tax.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>Discount</span>
+                    <span>-₹{discount.toLocaleString('en-IN')}</span>
+                  </div>
                   {/* Show promo line only if backend hasn't merged it into discount already */}
                   {appliedPromoCode && promoDiscount > 0 && discount === 0 && (
                     <div className="flex justify-between text-sm text-[#19411F] font-medium">
