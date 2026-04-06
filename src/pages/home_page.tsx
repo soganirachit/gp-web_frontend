@@ -9,7 +9,7 @@ import { MdLocationOn, MdKeyboardArrowDown, MdAccessTime } from 'react-icons/md'
 import { FaLeaf, FaUsers, FaBox } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { addressService, Address } from '../services/address.service';
-import { storeService } from '../services/store.service';
+import { storeService, GUEST_STORE_UPDATED_EVENT } from '../services/store.service';
 import { OffersBannerCarousel } from '../components/OffersBannerCarousel';
 import ProfileIcon from '../assets/icon/Profile.png';
 import { SearchBar } from '../components/common/SearchBar';
@@ -40,7 +40,23 @@ const HomePage: React.FC = () => {
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
   const [isStoryExpanded, setIsStoryExpanded] = useState(false);
-  const [offersStoreId] = useState(() => storeService.getStoreIdForProducts() ?? 4);
+  const [offersStoreId, setOffersStoreId] = useState<number | null>(() =>
+    storeService.getStoreIdForProducts(),
+  );
+
+  const refreshOffersStoreId = useCallback(() => {
+    setOffersStoreId((prev) => {
+      const next = storeService.getStoreIdForProducts();
+      return prev === next ? prev : next;
+    });
+  }, []);
+
+  // Single effect: avoids duplicate refresh on mount (was two useEffects × Strict Mode = 4 store updates).
+  useEffect(() => {
+    refreshOffersStoreId();
+    window.addEventListener(GUEST_STORE_UPDATED_EVENT, refreshOffersStoreId);
+    return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, refreshOffersStoreId);
+  }, [isLoggedIn, refreshOffersStoreId]);
 
   // Function to fetch the latest address from API (only when logged in — avoids wrong JWT for guests)
   const fetchLatestAddress = useCallback(async () => {

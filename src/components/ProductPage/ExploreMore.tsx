@@ -48,10 +48,10 @@ const ExploreMore: React.FC = () => {
     }
   };
 
-  // Fetch data based on category/section query params
+  // Fetch data based on category/section query params (no AbortController — avoids
+  // "(canceled)" noise from Strict Mode / route transitions; fetchId drops stale results.)
   useEffect(() => {
     const id = ++fetchIdRef.current;
-    const abortController = new AbortController();
 
     const fetchData = async () => {
       try {
@@ -68,7 +68,7 @@ const ExploreMore: React.FC = () => {
             const fetched = await productService.getProductsByLabel(
               "best-seller",
               storeId || undefined,
-              abortController.signal,
+              undefined,
               "-order_count"
             );
             if (id !== fetchIdRef.current) return;
@@ -79,7 +79,7 @@ const ExploreMore: React.FC = () => {
             const fetched = await productService.getProductsByLabel(
               "premium",
               storeId || undefined,
-              abortController.signal,
+              undefined,
               "-order_count"
             );
             if (id !== fetchIdRef.current) return;
@@ -89,8 +89,7 @@ const ExploreMore: React.FC = () => {
             // → GET api/v1/products/  (no ordering param)
             const fetched = await productService.getProductsByOrdering(
               undefined,
-              storeId || undefined,
-              abortController.signal
+              storeId || undefined
             );
             if (id !== fetchIdRef.current) return;
             setAllStoreProducts(fetched || []);
@@ -99,8 +98,7 @@ const ExploreMore: React.FC = () => {
                 // Fallback: All store products (no special ordering)
                 const fetched = await productService.getProductsByOrdering(
                   undefined,
-                  storeId || undefined,
-                  abortController.signal
+                  storeId || undefined
                 );
                 if (id !== fetchIdRef.current) return;
                 setAllStoreProducts(fetched || []);
@@ -128,10 +126,6 @@ const ExploreMore: React.FC = () => {
     };
 
     fetchData();
-
-    return () => {
-      abortController.abort();
-    };
   }, [activeFeature, category, section]);
 
   // Return the correct product list based on active section

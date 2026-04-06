@@ -141,65 +141,65 @@ const Startup: React.FC = () => {
 
         {account ? (
           <motion.div
-            initial={{ opacity: 0, y: 12 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.45, duration: 0.45, ease: [0.25, 0.1, 0.25, 1] }}
-            className="mt-5 w-full overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_12px_40px_-12px_rgba(15,23,42,0.14)]"
+            className="mt-5 flex w-full max-w-[min(260px,88vw)] flex-col items-center gap-5 px-2"
           >
             {account.displayName && account.initial ? (
-              <div
-                className="flex items-center gap-3.5 border-b border-slate-100 px-4 py-4"
-                style={{
-                  background: `linear-gradient(145deg, ${primary}12 0%, transparent 58%)`,
-                }}
-              >
+              <div className="flex  items-center gap-1.5 text-center">
                 <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-bold text-white shadow-sm"
-                  style={{
-                    backgroundColor: primary,
-                    boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${primary}40`,
-                  }}
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white"
+                  style={{ backgroundColor: primary }}
                   aria-hidden
                 >
                   {account.initial}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-slate-500">Signed in as</p>
-                  <p className="mt-0.5 truncate text-base font-semibold tracking-tight text-slate-900">
-                    {account.displayName}
-                  </p>
-                </div>
+                
+                <p className="max-w-full truncate px-1 text-[15px] font-semibold tracking-tight text-slate-900">
+                  {account.displayName}
+                </p>
               </div>
-            ) : null}
+            ) : (
+              <p className="text-center text-[13px] font-medium text-slate-400">
+                You&apos;re signed in
+              </p>
+            )}
 
-            <div className="px-4">
+            <div className="flex w-full flex-col gap-4">
               {account.addressLine ? (
-                <div className="flex gap-3 border-b border-slate-100 py-3.5">
+                <div className="flex gap-2.5">
                   <IoLocationOutline
-                    className="mt-0.5 h-5 w-5 shrink-0 text-slate-400"
+                    className="mt-0.5 h-[18px] w-[18px] shrink-0"
+                    style={{ color: primary }}
                     aria-hidden
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-slate-500">Delivery address</p>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-800 line-clamp-2">
+                    <p className="text-[11px] font-medium text-slate-400">
+                      Delivering to
+                    </p>
+                    <p className="mt-0.5 text-left text-[12px] font-normal leading-relaxed text-slate-600 line-clamp-3">
                       {account.addressLine}
                     </p>
                   </div>
                 </div>
               ) : (
-                <p className="border-b border-slate-100 py-3.5 text-center text-sm text-slate-500">
+                <p className="text-center text-[11px] text-slate-400">
                   No saved address yet
                 </p>
               )}
 
-              <div className="flex gap-3 py-3.5">
+              <div className="flex gap-2.5">
                 <IoStorefrontOutline
-                  className="mt-0.5 h-5 w-5 shrink-0 text-slate-400"
+                  className="mt-0.5 h-[18px] w-[18px] shrink-0"
+                  style={{ color: primary }}
                   aria-hidden
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-slate-500">Your store</p>
-                  <p className="mt-1 truncate text-sm font-semibold text-slate-900">
+                  <p className="text-[11px] font-medium text-slate-400">
+                    Your store
+                  </p>
+                  <p className="mt-0.5 truncate text-left text-[12px] font-semibold text-slate-800">
                     {account.storeName}
                   </p>
                 </div>

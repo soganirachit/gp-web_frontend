@@ -116,6 +116,19 @@ function formatPaymentMethodLabel(raw: string | undefined): string {
   return raw;
 }
 
+const SUPPORT_TICKET_WINDOW_MS = 4 * 60 * 60 * 1000;
+
+function isWithinSupportWindowAfterDelivery(
+  status: string,
+  deliveredAtIso: string | null | undefined,
+): boolean {
+  if (status?.toLowerCase() !== 'delivered') return false;
+  if (!deliveredAtIso) return false;
+  const deliveredMs = new Date(deliveredAtIso).getTime();
+  if (!Number.isFinite(deliveredMs) || deliveredMs <= 0) return false;
+  return Date.now() - deliveredMs < SUPPORT_TICKET_WINDOW_MS;
+}
+
 const OrderDetails: React.FC = () => {
   const { orderNumber } = useParams<{ orderNumber: string }>();
   const navigate = useNavigate();
@@ -315,6 +328,12 @@ const OrderDetails: React.FC = () => {
       });
     }
   }
+
+  const supportDeliveredAtIso = order.delivered_at || deliveredEvent?.created_at || null;
+  const showSupportTicketSection = isWithinSupportWindowAfterDelivery(
+    order.status,
+    supportDeliveredAtIso,
+  );
 
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
@@ -653,8 +672,8 @@ const OrderDetails: React.FC = () => {
               </button>
             </div>
 
-            {/* Support Section */}
-            {order.status === 'delivered' && (
+            {/* Support Section — only within 4 hours of delivery timestamp */}
+            {showSupportTicketSection && (
               <div className="bg-white rounded-2xl p-4 shadow-sm">
                 <div className="mb-3 flex items-start gap-3">
                   <img

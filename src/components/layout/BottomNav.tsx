@@ -19,7 +19,30 @@ const BottomNav: React.FC = () => {
   const { items } = useCart();
   const { isLoggedIn } = useAuth();
   const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
+  const accountRootPath = `${basePath}/account`;
   const cartItemCount = items.length;
+
+  /** Treat subpages (FAQ, wallet, …) as part of Account tab; bar tap always opens settings root. */
+  const accountSectionPaths = [
+    `${basePath}/account`,
+    `${basePath}/profile`,
+    `${basePath}/faq`,
+    `${basePath}/wallet`,
+    `${basePath}/addresses`,
+    `${basePath}/refer`,
+    `${basePath}/customer-support`,
+  ];
+
+  const isAccountSectionActive = () =>
+    accountSectionPaths.some(
+      (p) =>
+        location.pathname === p || location.pathname.startsWith(`${p}/`),
+    );
+
+  const handleAccountNavClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate(accountRootPath);
+  };
 
   const handleBasketClick = (e: React.MouseEvent) => {
     if (!isLoggedIn) {
@@ -168,13 +191,14 @@ const BottomNav: React.FC = () => {
             </Link>
 
             <Link
-              to={`${basePath}/account`}
-              className={`flex flex-col items-center justify-center flex-1 relative ${isActive([`${basePath}/account`, `${basePath}/profile`])
+              to={accountRootPath}
+              onClick={handleAccountNavClick}
+              className={`flex flex-col items-center justify-center flex-1 relative ${isAccountSectionActive()
                 ? theme.classes.bottomNavActiveText
                 : theme.classes.bottomNavInactiveText
                 }`}
             >
-              {isActive([`${basePath}/account`, `${basePath}/profile`]) && (
+              {isAccountSectionActive() && (
                 <img
                   src={storeGreenBanner}
                   alt=""
@@ -184,12 +208,12 @@ const BottomNav: React.FC = () => {
               <img
                 src={accountIcon}
                 alt="Account"
-                className={`w-5 h-5 mb-0.5 relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`])
+                className={`w-5 h-5 mb-0.5 relative z-10 ${isAccountSectionActive()
                   ? "brightness-0 invert"
                   : "opacity-90"
                   }`}
               />
-              <span className={`text-[10px] font-medium relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`]) ? "text-white" : "text-[#19411f]"}`}>Account</span>
+              <span className={`text-[10px] font-medium relative z-10 ${isAccountSectionActive() ? "text-white" : "text-[#19411f]"}`}>Account</span>
             </Link>
           </div>
         </div>
@@ -308,13 +332,14 @@ const BottomNav: React.FC = () => {
           </Link>
 
           <Link
-            to={`${basePath}/account`}
-            className={`flex flex-col items-center justify-center flex-1 relative ${isActive([`${basePath}/account`, `${basePath}/profile`])
+            to={accountRootPath}
+            onClick={handleAccountNavClick}
+            className={`flex flex-col items-center justify-center flex-1 relative ${isAccountSectionActive()
               ? theme.classes.bottomNavActiveText
               : theme.classes.bottomNavInactiveText
               }`}
           >
-            {isActive([`${basePath}/account`, `${basePath}/profile`]) && (
+            {isAccountSectionActive() && (
               <img
                 src={activeBg}
                 alt=""
@@ -324,12 +349,12 @@ const BottomNav: React.FC = () => {
             <img
               src={accountIcon}
               alt="Account"
-              className={`w-5 h-5 mb-0.5 relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`])
+              className={`w-5 h-5 mb-0.5 relative z-10 ${isAccountSectionActive()
                 ? ""
                 : "opacity-90"
                 }`}
             />
-            <span className={`text-[10px] font-medium relative z-10 ${isActive([`${basePath}/account`, `${basePath}/profile`]) ? "text-gray-700" : ""}`}>Account</span>
+            <span className={`text-[10px] font-medium relative z-10 ${isAccountSectionActive() ? "text-gray-700" : ""}`}>Account</span>
           </Link>
         </div>
       </div>

@@ -42,8 +42,8 @@ const Layout: React.FC = () => {
   ];
   const isAuthRoute = authRoutes.includes(location.pathname);
 
-  // Routes that should not show BottomNav (location pages, support question form)
-  const routesWithoutBottomNav = ["/location"];
+  // Routes that should not show BottomNav (landing, location pages, support question form)
+  const routesWithoutBottomNav = ["/home", "/location"];
   const shouldHideBottomNav = routesWithoutBottomNav.includes(
     location.pathname
   ) || location.pathname.includes("/customer-support/questions");

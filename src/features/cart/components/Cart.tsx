@@ -164,7 +164,12 @@ function applyServerCartData(
   setTotals(totalsFromCartData(cartData));
   setStoreName((cartData.store_name || '').trim());
   const sid = cartData.store;
-  setStoreId(typeof sid === 'number' && Number.isFinite(sid) ? sid : null);
+  if (sid == null) {
+    setStoreId(null);
+  } else {
+    const n = Number(sid as number | string);
+    setStoreId(Number.isFinite(n) ? n : null);
+  }
 }
 
 function parseAddressCoordinates(address: Address | null): { lat: number; lng: number } | null {
@@ -213,7 +218,8 @@ interface Coupon {
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
 const fetchCoupons = async (): Promise<Coupon[]> => {
-  const storeId = storeService.getStoreIdForProducts() ?? 4;
+  const storeId = storeService.getStoreIdForProducts();
+  if (storeId == null) return [];
   const res = await api.get(`${getApiUrl()}/cart/coupons/?store_id=${storeId}`);
   const json = res.data;
   return Array.isArray(json) ? json : (json.data ?? json.results ?? json.coupons ?? []);
@@ -592,19 +598,32 @@ const Cart: React.FC = () => {
 
   const deliveryStoreSyncKey = useRef('');
 
-  const syncPersistedStoreWithCart = useCallback(async (cartData: CartData) => {
-    if (!isLoggedIn) return;
-    const sid = cartData.store;
-    if (sid == null || !Number.isFinite(Number(sid))) return;
-    try {
-      const persisted = storeService.getSelectedStoreId();
-      if (persisted !== sid) {
-        await storeService.switchStore(sid);
+  /**
+   * Account "Select Store" is source of truth when set. If the server cart is still on
+   * another store, move the basket to the selected store — do not call switchStore(sid)
+   * from the cart (that reverted Account choice and showed Sodala vs Malviya mismatch).
+   */
+  const reconcileCartStoreWithAccountSelection = useCallback(
+    async (cartData: CartData): Promise<CartData> => {
+      if (!isLoggedIn) return cartData;
+      if (cartData.store == null) return cartData;
+      const cartStoreNum = Number(cartData.store as number | string);
+      if (!Number.isFinite(cartStoreNum)) return cartData;
+      try {
+        const persisted = storeService.getSelectedStoreId();
+        if (persisted == null) {
+          await storeService.switchStore(cartStoreNum);
+          return cartData;
+        }
+        if (persisted === cartStoreNum) return cartData;
+        await cartService.switchCartStore(persisted);
+        return await cartService.getCartData();
+      } catch {
+        return cartData;
       }
-    } catch {
-      /* cart UI still correct; Account may show stale selection until revisit */
-    }
-  }, [isLoggedIn]);
+    },
+    [isLoggedIn],
+  );
 
   const navigateToProductDetail = (item: (typeof items)[number]) => {
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
@@ -691,9 +710,9 @@ const Cart: React.FC = () => {
         setCartTotals((prev) => mergeTotalsFromApplyResponse(response, prev, d));
       } else {
         try {
-          const cartData = await cartService.getCartData();
+          const raw = await cartService.getCartData();
+          const cartData = await reconcileCartStoreWithAccountSelection(raw);
           applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
-          await syncPersistedStoreWithCart(cartData);
         } catch (_) {}
       }
 
@@ -714,9 +733,9 @@ const Cart: React.FC = () => {
       await removeCouponAPI();
       setAppliedPromoCode(null);
       setPromoDiscount(0);
-      const cartData = await cartService.getCartData();
+      const raw = await cartService.getCartData();
+      const cartData = await reconcileCartStoreWithAccountSelection(raw);
       applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
-      await syncPersistedStoreWithCart(cartData);
       toast.success('Promo code removed');
     } catch (error: any) {
       toast.error(error.message || 'Failed to remove promo code');
@@ -769,7 +788,13 @@ const Cart: React.FC = () => {
     const formattedDate = format(normalizedDate, 'dd MMM yyyy');
     setIsLoadingSlots(true);
     try {
-      const storeId = cartStoreId ?? storeService.getStoreIdForProducts() ?? 4;
+      const storeId = cartStoreId ?? storeService.getStoreIdForProducts();
+      if (storeId == null) {
+        setAvailableSlots([]);
+        setSelectedSlotId(null);
+        setSelectedTimeSlot('');
+        return;
+      }
       const params = new URLSearchParams();
       params.set('store_id', String(storeId));
       const response = await api.get(`/delivery/slots/available/?${params.toString()}`);
@@ -893,27 +918,28 @@ const Cart: React.FC = () => {
     }
   }, [isLoggedIn, isLoadingAddress, isLoadingCartTotals, isSyncing]);
 
-  // Fetch cart totals
-  // Depend on `items` so the summary auto-refreshes when quantities or items change
+  // Fetch cart totals — debounce so rapid `items` updates (context/local sync) don't spam GET /cart/.
   useEffect(() => {
-    const fetchCartTotals = async () => {
-      if (!isLoggedIn) return;
-      try {
-        setIsLoadingCartTotals(true);
-        const cartData = await cartService.getCartData();
-        applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
-        await syncPersistedStoreWithCart(cartData);
-      } catch (_) {
-        setCartTotals(null);
-        setCartStoreName('');
-        setCartStoreId(null);
-      } finally {
-        setIsLoadingCartTotals(false);
-        setHasLoadedCartTotalsOnce(true);
-      }
-    };
-    fetchCartTotals();
-  }, [isLoggedIn, items, syncPersistedStoreWithCart]);
+    const id = window.setTimeout(() => {
+      void (async () => {
+        if (!isLoggedIn) return;
+        try {
+          setIsLoadingCartTotals(true);
+          const raw = await cartService.getCartData();
+          const cartData = await reconcileCartStoreWithAccountSelection(raw);
+          applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
+        } catch (_) {
+          setCartTotals(null);
+          setCartStoreName('');
+          setCartStoreId(null);
+        } finally {
+          setIsLoadingCartTotals(false);
+          setHasLoadedCartTotalsOnce(true);
+        }
+      })();
+    }, 320);
+    return () => clearTimeout(id);
+  }, [isLoggedIn, items, reconcileCartStoreWithAccountSelection]);
 
   // Nearest operational store vs cart store — suggest switch (app parity; no auto-switch).
   useEffect(() => {
@@ -995,10 +1021,10 @@ const Cart: React.FC = () => {
     let cancelled = false;
     (async () => {
       try {
-        const cartData = await cartService.setCartDeliveryAddress(id);
+        const raw = await cartService.setCartDeliveryAddress(id);
         if (!cancelled) {
+          const cartData = await reconcileCartStoreWithAccountSelection(raw);
           applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
-          void syncPersistedStoreWithCart(cartData);
         }
       } catch (e) {
         console.warn('cart delivery-address sync failed', e);
@@ -1007,7 +1033,7 @@ const Cart: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isLoggedIn, defaultAddress?.id, syncPersistedStoreWithCart]);
+  }, [isLoggedIn, defaultAddress?.id, reconcileCartStoreWithAccountSelection]);
 
   // Selected address vs store coverage (same API as address save flow).
   useEffect(() => {
@@ -1295,9 +1321,9 @@ const Cart: React.FC = () => {
       await loadCartFromAPI();
       setIsLoadingCartTotals(true);
       try {
-        const cartData = await cartService.getCartData();
+        const raw = await cartService.getCartData();
+        const cartData = await reconcileCartStoreWithAccountSelection(raw);
         applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
-        await syncPersistedStoreWithCart(cartData);
       } catch (_) {
         setCartTotals(null);
         setCartStoreName('');
@@ -1339,10 +1365,10 @@ const Cart: React.FC = () => {
       await loadCartFromAPI();
       try {
         setIsLoadingCartTotals(true);
-        const cartData = await cartService.getCartData();
+        const raw = await cartService.getCartData();
+        const cartData = await reconcileCartStoreWithAccountSelection(raw);
         latestCartData = cartData;
         applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
-        await syncPersistedStoreWithCart(cartData);
       } catch (_) {} finally { setIsLoadingCartTotals(false); }
     } catch (_) {
       toast.error("We couldn't update your basket. Check your connection and try checkout again.");

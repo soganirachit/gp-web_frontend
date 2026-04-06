@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { SEO } from "../SEO";
 import { trackViewContent, trackAddToCart } from "../../lib/metaPixel";
@@ -25,6 +25,8 @@ import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import {
   GUEST_STORE_UPDATED_EVENT,
   storeService,
+  DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES,
+  formatFreeDeliveryThresholdForDisplay,
 } from "../../services/store.service";
 
 interface ProductImage {
@@ -40,6 +42,8 @@ interface StoreInfo {
   store_price: string;
   available_quantity: number;
   in_stock: boolean;
+  /** From product detail API when backend includes store pricing rules */
+  free_delivery_threshold?: string;
 }
 
 interface ProductDetail {
@@ -110,6 +114,8 @@ const StorePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
+  const [freeDeliveryThresholdDisplay, setFreeDeliveryThresholdDisplay] =
+    useState<string>(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
   const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
     useState(false);
   const [balanceDetails, setBalanceDetails] = useState({
@@ -150,12 +156,48 @@ const StorePage: React.FC = () => {
   }, [items, product, selectedVariant?.id]);
   const basketQuantity = activeCartLine?.quantity ?? 0;
 
+  const resolveFreeDeliveryDisplay = useCallback(
+    async (pd: ProductDetail | null) => {
+      if (!pd) {
+        setFreeDeliveryThresholdDisplay(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
+        return;
+      }
+      const fromProduct = formatFreeDeliveryThresholdForDisplay(
+        pd.store_info?.free_delivery_threshold,
+      );
+      if (fromProduct) {
+        setFreeDeliveryThresholdDisplay(fromProduct);
+        return;
+      }
+      const storeId =
+        storeService.getStoreIdForProducts() || pd.store_info?.store_id;
+      if (!storeId) {
+        setFreeDeliveryThresholdDisplay(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
+        return;
+      }
+      try {
+        const stores = await storeService.getAllStores();
+        const row = stores.find((s) => s.id === storeId);
+        const fmt = formatFreeDeliveryThresholdForDisplay(
+          row?.free_delivery_threshold,
+        );
+        setFreeDeliveryThresholdDisplay(
+          fmt ?? DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES,
+        );
+      } catch {
+        setFreeDeliveryThresholdDisplay(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
+      }
+    },
+    [],
+  );
+
   const fetchProductBySlug = async () => {
     try {
       setLoading(true);
       setError(null);
       if (!slug) {
         setError("No product slug provided");
+        setFreeDeliveryThresholdDisplay(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
         return;
       }
       
@@ -194,9 +236,12 @@ const StorePage: React.FC = () => {
         console.error("Error fetching best sellers:", err);
         setRelatedProducts([]);
       }
+
+      await resolveFreeDeliveryDisplay(productData);
     } catch (error: any) {
       console.error("Error fetching product:", error);
       setError(error.message || "Failed to fetch product details");
+      setFreeDeliveryThresholdDisplay(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
     } finally {
       setLoading(false);
     }
@@ -213,6 +258,15 @@ const StorePage: React.FC = () => {
     window.addEventListener(GUEST_STORE_UPDATED_EVENT, h);
     return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, h);
   }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (!product) return;
+    const onFocus = () => {
+      void resolveFreeDeliveryDisplay(product);
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [product, resolveFreeDeliveryDisplay]);
 
   // Fire ViewContent pixel when product data loads (any product, any category)
   useEffect(() => {
@@ -770,7 +824,9 @@ const StorePage: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-base font-semibold text-[#19411F]">Free Delivery</p>
-                  <p className="text-sm text-gray-600 mt-0.5">Above ₹149/-</p>
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    Above ₹{freeDeliveryThresholdDisplay}/-
+                  </p>
                 </div>
               </div>
             </div>
@@ -851,6 +907,13 @@ const StorePage: React.FC = () => {
                   <button
                     type="button"
                     className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-60"
+                    onTouchEnd={(e) => {
+                      if (isUpdatingBasket) return;
+                      /* iOS Safari fires a synthetic click after touchend; without this the click runs
+                         after state updates and applies basketQuantity+1 twice (1→3). */
+                      e.preventDefault();
+                      void handleAdjustBasketQuantity(basketQuantity - 1);
+                    }}
                     onClick={() => handleAdjustBasketQuantity(basketQuantity - 1)}
                     aria-label="Decrease quantity"
                     disabled={isUpdatingBasket}
@@ -863,6 +926,11 @@ const StorePage: React.FC = () => {
                   <button
                     type="button"
                     className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#19411F] text-white transition-colors hover:bg-[#1e5a1c] disabled:opacity-60"
+                    onTouchEnd={(e) => {
+                      if (isUpdatingBasket) return;
+                      e.preventDefault();
+                      void handleAdjustBasketQuantity(basketQuantity + 1);
+                    }}
                     onClick={() => handleAdjustBasketQuantity(basketQuantity + 1)}
                     aria-label="Increase quantity"
                     disabled={isUpdatingBasket}

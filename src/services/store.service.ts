@@ -1,4 +1,4 @@
-import axios, { AxiosError } from "axios";
+import axios, { AxiosError, type AxiosResponse } from "axios";
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
 import { addressService } from "./address.service";
@@ -83,6 +83,22 @@ export interface Store {
   distance_km?: number;
 }
 
+/** UI fallback when product + stores API do not expose a threshold. */
+export const DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES = "149";
+
+/** Format API `free_delivery_threshold` (e.g. `"999.00"`) for ₹ display. */
+export function formatFreeDeliveryThresholdForDisplay(
+  raw: string | number | null | undefined,
+): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  const n = parseFloat(s.replace(/,/g, ""));
+  if (!Number.isFinite(n) || n < 0) return null;
+  const rounded = Math.round(n * 100) / 100;
+  if (Number.isInteger(rounded)) return String(rounded);
+  return String(rounded);
+}
 
 class StoreService {
   /**
@@ -302,6 +318,21 @@ class StoreService {
   }
 
   /**
+   * Store id for cart/product API calls: same as {@link getStoreIdForProducts}, then
+   * (when null) {@link getStoreFromLocation} which may set temporary store for guests.
+   * Never returns a hardcoded fallback id.
+   */
+  async resolveStoreIdForApiAsync(): Promise<number | null> {
+    const direct = this.getStoreIdForProducts();
+    if (direct != null) return direct;
+    try {
+      return await this.getStoreFromLocation();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Request user location and get nearest store for logged-out users
    * Returns the store ID if successful
    */
@@ -372,7 +403,25 @@ export interface Banner {
   sort_order: number;
 }
 
+type BannersApiResponse = { success: boolean; data: Banner[] };
+
+/** Coalesce concurrent identical requests (Strict Mode double-mount, duplicate effects, etc.). */
+const bannersRequestByStoreKey = new Map<
+  string,
+  Promise<AxiosResponse<BannersApiResponse>>
+>();
+
 // Uses raw axios (no JWT) — banners are public; sending a stale token can cause 401
-export const getStoreBanners = (storeId: number | string) =>
-  axios.get<{ success: boolean; data: Banner[] }>(`${getApiUrl()}/stores/${storeId}/banners/`);
+export function getStoreBanners(storeId: number | string) {
+  const key = String(storeId);
+  const existing = bannersRequestByStoreKey.get(key);
+  if (existing) return existing;
+  const req = axios
+    .get<BannersApiResponse>(`${getApiUrl()}/stores/${storeId}/banners/`)
+    .finally(() => {
+      bannersRequestByStoreKey.delete(key);
+    });
+  bannersRequestByStoreKey.set(key, req);
+  return req;
+}
 

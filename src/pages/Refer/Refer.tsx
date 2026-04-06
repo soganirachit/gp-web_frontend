@@ -66,6 +66,15 @@ function heroGradientStops(primary: string): [string, string, string] {
   ];
 }
 
+/** Soft pastel strip on the refer card — colorful but not loud. */
+function cardSheetTopBarGradientCss(primary: string): string {
+  const c0 = mixHex(primary, '#ffffff', 0.92);
+  const c1 = mixHex(primary, '#ffffff', 0.76);
+  const c2 = mixHex(mixHex(primary, ACCENT_ORANGE, 0.28), '#ffffff', 0.62);
+  const c3 = mixHex(ACCENT_ORANGE, '#fff7ed', 0.7);
+  return `linear-gradient(90deg, ${c0} 0%, ${c1} 34%, ${c2} 68%, ${c3} 100%)`;
+}
+
 const shareChannels = [
   {
     key: 'whatsapp',
@@ -116,6 +125,11 @@ const Refer: React.FC = () => {
   const borderSoft =
     primary.length === 7 ? `${primary}22` : primary;
 
+  const cardTopBarStyle = useMemo(
+    () => ({ background: cardSheetTopBarGradientCss(primary) }),
+    [primary],
+  );
+
   const copyInvite = useCallback(async () => {
     const text = getReferralShareText();
     try {
@@ -149,7 +163,7 @@ const Refer: React.FC = () => {
         className="relative overflow-hidden text-white"
         style={heroBg}
       >
-        <div
+        {/* <div
           className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/12 blur-2xl"
           aria-hidden
         />
@@ -160,7 +174,7 @@ const Refer: React.FC = () => {
         <div
           className="pointer-events-none absolute bottom-8 left-6 h-24 w-24 rounded-full border border-white/15 bg-white/5"
           aria-hidden
-        />
+        /> */}
 
         <div className="relative mx-auto flex max-w-lg items-center gap-2 px-4 py-3 sm:px-5">
           <button
@@ -219,13 +233,7 @@ const Refer: React.FC = () => {
           className="mx-auto max-w-lg overflow-hidden rounded-[1.75rem] border bg-white shadow-[0_20px_50px_-18px_rgba(17,24,39,0.18)]"
           style={{ borderColor: borderSoft }}
         >
-          <div
-            className="h-1 w-full"
-            style={{
-              background: `linear-gradient(90deg, transparent 0%, ${primary} 42%, ${ACCENT_ORANGE} 100%)`,
-            }}
-            aria-hidden
-          />
+          <div className="h-1 w-full" style={cardTopBarStyle} aria-hidden />
 
           <div className="px-6 pb-6 pt-5 sm:px-7 sm:pb-7 sm:pt-6">
             <motion.h2

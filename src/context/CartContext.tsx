@@ -179,9 +179,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         try {
           let storeId: number | null = null;
           try {
-            storeId = storeService.getStoreIdForProducts();
+            storeId = await storeService.resolveStoreIdForApiAsync();
           } catch (storeError) {
-            console.error('Error getting store ID:', storeError);
+            console.error('Error resolving store ID:', storeError);
           }
           if (!storeId) {
             console.error('Store ID not available - item updated in local cart only');
@@ -219,28 +219,13 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         try {
           let storeId: number | null = null;
           try {
-            storeId = storeService.getStoreIdForProducts();
+            storeId = await storeService.resolveStoreIdForApiAsync();
             console.log('Retrieved storeId:', storeId, 'for productId:', newItem.productId);
-            
-            // If storeId is not available, try to get it from location
-            if (!storeId) {
-              console.log('Store ID not found, attempting to get from location...');
-              try {
-                const locationStoreId = await storeService.getStoreFromLocation();
-                if (locationStoreId) {
-                  storeId = locationStoreId;
-                  console.log('Successfully retrieved storeId from location:', storeId);
-                  // If user is logged in, also save it as selected store
-                  if (token) {
-                    localStorage.setItem('selectedStoreId', locationStoreId.toString());
-                  }
-                }
-              } catch (locationError) {
-                console.error('Error getting store from location:', locationError);
-              }
+            if (storeId && token && !storeService.getSelectedStoreId()) {
+              localStorage.setItem('selectedStoreId', storeId.toString());
             }
           } catch (storeError) {
-            console.error('Error getting store ID:', storeError);
+            console.error('Error resolving store ID:', storeError);
           }
           
           if (!storeId) {
@@ -398,9 +383,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         try {
           let storeId: number | null = null;
           try {
-            storeId = storeService.getStoreIdForProducts();
+            storeId = await storeService.resolveStoreIdForApiAsync();
           } catch (storeError) {
-            console.error('Error getting store ID:', storeError);
+            console.error('Error resolving store ID:', storeError);
           }
           if (!storeId) {
             console.error('Store ID not available');
@@ -666,9 +651,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
           try {
             let storeId: number | null = null;
             try {
-              storeId = storeService.getStoreIdForProducts();
+              storeId = await storeService.resolveStoreIdForApiAsync();
             } catch (storeError) {
-              console.error('Error getting store ID:', storeError);
+              console.error('Error resolving store ID:', storeError);
             }
             if (!storeId) {
               console.error('Store ID not available');
