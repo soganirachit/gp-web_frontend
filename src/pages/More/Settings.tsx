@@ -581,173 +581,175 @@ const Settings: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white mt-4 rounded-xl shadow-sm p-3 sm:p-4">
-            <h3 className="text-[15px] font-medium text-gray-900 mb-3">Select Store</h3>
-            <div ref={dropdownRef} className="relative w-full">
-              {/* Custom Dropdown Button */}
-              <button
-                type="button"
-                onClick={() => setIsStoreDropdownOpen(!isStoreDropdownOpen)}
-                disabled={isLoadingStores || stores.length === 0}
-                className="w-full bg-gray-50 border border-gray-200 text-gray-700 py-3 pl-3 sm:pl-4 pr-8 sm:pr-10 rounded-lg text-left text-sm sm:text-base focus:outline-none focus:bg-white focus:border-gray-500 transition-colors flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span className="flex min-w-0 flex-1 items-center gap-2 truncate">
-                  <span className="truncate">
-                    {isLoadingStores
-                      ? 'Loading stores...'
-                      : selectedStore || (stores.length === 0 ? 'No stores available' : 'Choose a store')
-                    }
-                  </span>
-                  {selectedStoreId != null &&
-                    (() => {
-                      const sel = stores.find((s) => s.id === selectedStoreId);
-                      if (!sel) return null;
-                      if (!storeIsOnline(sel)) {
-                        return (
-                          <span className="shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
-                            Offline
-                          </span>
-                        );
+          {feature === 'gpStore' && (
+            <div className="bg-white mt-4 rounded-xl shadow-sm p-3 sm:p-4">
+              <h3 className="text-[15px] font-medium text-gray-900 mb-3">Select Store</h3>
+              <div ref={dropdownRef} className="relative w-full">
+                {/* Custom Dropdown Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsStoreDropdownOpen(!isStoreDropdownOpen)}
+                  disabled={isLoadingStores || stores.length === 0}
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-700 py-3 pl-3 sm:pl-4 pr-8 sm:pr-10 rounded-lg text-left text-sm sm:text-base focus:outline-none focus:bg-white focus:border-gray-500 transition-colors flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="flex min-w-0 flex-1 items-center gap-2 truncate">
+                    <span className="truncate">
+                      {isLoadingStores
+                        ? 'Loading stores...'
+                        : selectedStore || (stores.length === 0 ? 'No stores available' : 'Choose a store')
                       }
-                      if (!storeIsWithinDeliveryRadius(sel)) {
-                        return (
-                          <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
-                            Outside delivery area
-                          </span>
-                        );
-                      }
-                      return null;
-                    })()}
-                </span>
-                <FaChevronRight
-                  className={`transform transition-transform flex-shrink-0 text-xs text-gray-400 ${isStoreDropdownOpen ? 'rotate-180' : 'rotate-90'}`}
-                  style={{ marginLeft: '8px' }}
-                />
-              </button>
-
-              {/* Custom Dropdown Options */}
-              {isStoreDropdownOpen && stores.length > 0 && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setIsStoreDropdownOpen(false)}
-                  />
-                  <div
-                    className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // If there's a selected store, show warning before clearing
-                        if (selectedStoreId !== null) {
-                          setPendingStoreId(null);
-                          setPendingStoreName('');
-                          setShowStoreSwitchWarning(true);
-                          setIsStoreDropdownOpen(false);
-                        } else {
-                          // No store selected - just close dropdown
-                          setIsStoreDropdownOpen(false);
+                    </span>
+                    {selectedStoreId != null &&
+                      (() => {
+                        const sel = stores.find((s) => s.id === selectedStoreId);
+                        if (!sel) return null;
+                        if (!storeIsOnline(sel)) {
+                          return (
+                            <span className="shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
+                              Offline
+                            </span>
+                          );
                         }
-                      }}
-                      className={`w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base transition-colors truncate ${!selectedStore
-                          ? 'bg-gray-100 text-gray-900'
-                          : 'text-gray-700 hover:bg-gray-50'
-                        }`}
+                        if (!storeIsWithinDeliveryRadius(sel)) {
+                          return (
+                            <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                              Outside delivery area
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                  </span>
+                  <FaChevronRight
+                    className={`transform transition-transform flex-shrink-0 text-xs text-gray-400 ${isStoreDropdownOpen ? 'rotate-180' : 'rotate-90'}`}
+                    style={{ marginLeft: '8px' }}
+                  />
+                </button>
+
+                {/* Custom Dropdown Options */}
+                {isStoreDropdownOpen && stores.length > 0 && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setIsStoreDropdownOpen(false)}
+                    />
+                    <div
+                      className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
                     >
-                      Choose a store
-                    </button>
-                    {stores.map((store) => {
-                      const online = storeIsOnline(store);
-                      const withinRadius = storeIsWithinDeliveryRadius(store);
-                      const selectable = storeIsSelectable(store);
-                      return (
                       <button
-                        key={store.id}
                         type="button"
-                        aria-disabled={!selectable && selectedStoreId !== store.id}
                         onClick={() => {
-                          if (selectedStoreId === store.id) {
-                            setIsStoreDropdownOpen(false);
-                            return;
-                          }
-                          if (!online) {
-                            toast.error('This store is offline. Please choose another store.');
-                            return;
-                          }
-                          if (!withinRadius) {
-                            toast.error(
-                              'This store is outside the delivery range for your address. Update your address or choose a closer store.'
-                            );
-                            return;
-                          }
+                          // If there's a selected store, show warning before clearing
                           if (selectedStoreId !== null) {
-                            setPendingStoreId(store.id);
-                            setPendingStoreName(store.name);
+                            setPendingStoreId(null);
+                            setPendingStoreName('');
                             setShowStoreSwitchWarning(true);
                             setIsStoreDropdownOpen(false);
                           } else {
-                            setSelectedStore(store.name);
-                            setSelectedStoreId(store.id);
-                            localStorage.setItem('selectedStoreId', String(store.id));
+                            // No store selected - just close dropdown
                             setIsStoreDropdownOpen(false);
                           }
                         }}
-                        className={`w-full px-3 sm:px-4 py-3 text-left text-sm sm:text-base transition-colors ${
-                          !selectable && selectedStoreId !== store.id
-                            ? 'cursor-not-allowed opacity-60'
-                            : ''
-                        } ${selectedStoreId === store.id
-                            ? 'bg-gray-100 text-gray-900 font-medium'
-                            : selectable
-                              ? 'text-gray-700 hover:bg-gray-50'
-                              : 'text-gray-700'
+                        className={`w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base transition-colors truncate ${!selectedStore
+                            ? 'bg-gray-100 text-gray-900'
+                            : 'text-gray-700 hover:bg-gray-50'
                           }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate">{store.name}</div>
-                            {store.distance_km != null && (
-                              <div className="mt-0.5 text-xs text-gray-500">
-                                {store.distance_km.toFixed(1)} km away
-                                {parseMaxDeliveryRadiusKm(store) != null && (
-                                  <span className="text-gray-400">
-                                    {' '}
-                                    · Delivers up to {parseMaxDeliveryRadiusKm(store)!.toFixed(1)} km
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                            {!withinRadius && store.distance_km != null && parseMaxDeliveryRadiusKm(store) != null && (
-                              <div className="mt-1 text-xs font-medium text-amber-700">
-                                Outside delivery area from your address
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex shrink-0 flex-col items-end gap-1">
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                                online
-                                  ? 'bg-emerald-50 text-emerald-800'
-                                  : 'bg-red-50 text-red-700'
-                              }`}
-                            >
-                              {online ? 'Online' : 'Offline'}
-                            </span>
-                            {online && !withinRadius && (
-                              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
-                                Too far
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                        Choose a store
                       </button>
-                    );
-                    })}
-                  </div>
-                </>
-              )}
+                      {stores.map((store) => {
+                        const online = storeIsOnline(store);
+                        const withinRadius = storeIsWithinDeliveryRadius(store);
+                        const selectable = storeIsSelectable(store);
+                        return (
+                        <button
+                          key={store.id}
+                          type="button"
+                          aria-disabled={!selectable && selectedStoreId !== store.id}
+                          onClick={() => {
+                            if (selectedStoreId === store.id) {
+                              setIsStoreDropdownOpen(false);
+                              return;
+                            }
+                            if (!online) {
+                              toast.error('This store is offline. Please choose another store.');
+                              return;
+                            }
+                            if (!withinRadius) {
+                              toast.error(
+                                'This store is outside the delivery range for your address. Update your address or choose a closer store.'
+                              );
+                              return;
+                            }
+                            if (selectedStoreId !== null) {
+                              setPendingStoreId(store.id);
+                              setPendingStoreName(store.name);
+                              setShowStoreSwitchWarning(true);
+                              setIsStoreDropdownOpen(false);
+                            } else {
+                              setSelectedStore(store.name);
+                              setSelectedStoreId(store.id);
+                              localStorage.setItem('selectedStoreId', String(store.id));
+                              setIsStoreDropdownOpen(false);
+                            }
+                          }}
+                          className={`w-full px-3 sm:px-4 py-3 text-left text-sm sm:text-base transition-colors ${
+                            !selectable && selectedStoreId !== store.id
+                              ? 'cursor-not-allowed opacity-60'
+                              : ''
+                          } ${selectedStoreId === store.id
+                              ? 'bg-gray-100 text-gray-900 font-medium'
+                              : selectable
+                                ? 'text-gray-700 hover:bg-gray-50'
+                                : 'text-gray-700'
+                            }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate">{store.name}</div>
+                              {store.distance_km != null && (
+                                <div className="mt-0.5 text-xs text-gray-500">
+                                  {store.distance_km.toFixed(1)} km away
+                                  {parseMaxDeliveryRadiusKm(store) != null && (
+                                    <span className="text-gray-400">
+                                      {' '}
+                                      · Delivers up to {parseMaxDeliveryRadiusKm(store)!.toFixed(1)} km
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {!withinRadius && store.distance_km != null && parseMaxDeliveryRadiusKm(store) != null && (
+                                <div className="mt-1 text-xs font-medium text-amber-700">
+                                  Outside delivery area from your address
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex shrink-0 flex-col items-end gap-1">
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                                  online
+                                    ? 'bg-emerald-50 text-emerald-800'
+                                    : 'bg-red-50 text-red-700'
+                                }`}
+                              >
+                                {online ? 'Online' : 'Offline'}
+                              </span>
+                              {online && !withinRadius && (
+                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                                  Too far
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Menu Items */}
           <div className="bg-white mt-4 rounded-xl overflow-hidden shadow-sm">

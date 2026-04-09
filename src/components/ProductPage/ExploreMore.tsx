@@ -1,9 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { IoArrowBack } from "react-icons/io5";
-import { productService, getEffectivePrice, getBasePrice, showStrikeBaseOnCard } from "../../services/product.service";
+import {
+  productService,
+  getEffectivePrice,
+  getBasePrice,
+  showStrikeBaseOnCard,
+  PRODUCT_AVAILABILITY_DAILY,
+  PRODUCT_AVAILABILITY_STORE,
+} from "../../services/product.service";
 import type { Product, BestSeller } from "../../services/product.service";
-import { basePackService, BasePack } from "../../services/basepack.service";
 import { storeService } from "../../services/store.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import ProductCard from "../common/ProductCard";
@@ -24,7 +30,6 @@ const ExploreMore: React.FC = () => {
   const [bestSellers, setBestSellers] = useState<BestSeller[]>([]);
   const [premiumProducts, setPremiumProducts] = useState<BestSeller[]>([]);
   const [allStoreProducts, setAllStoreProducts] = useState<BestSeller[]>([]);
-  const [basePacks, setBasePacks] = useState<BasePack[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [displayedCount, setDisplayedCount] = useState(6);
@@ -44,7 +49,8 @@ const ExploreMore: React.FC = () => {
       const productSlug = product.slug || product.id;
       navigate(`/gp-store/product/${productSlug}`, { state: { product } });
     } else {
-      navigate(`/gp-daily/product/${product.id}`, { state: { product } });
+      const pathSlug = product.slug ?? product.id;
+      navigate(`/gp-daily/product/${encodeURIComponent(String(pathSlug))}`, { state: { product } });
     }
   };
 
@@ -69,7 +75,8 @@ const ExploreMore: React.FC = () => {
               "best-seller",
               storeId || undefined,
               abortController.signal,
-              "-order_count"
+              "-order_count",
+              PRODUCT_AVAILABILITY_STORE,
             );
             if (id !== fetchIdRef.current) return;
             setBestSellers(fetched || []);
@@ -90,7 +97,8 @@ const ExploreMore: React.FC = () => {
             const fetched = await productService.getProductsByOrdering(
               undefined,
               storeId || undefined,
-              abortController.signal
+              abortController.signal,
+              PRODUCT_AVAILABILITY_STORE,
             );
             if (id !== fetchIdRef.current) return;
             setAllStoreProducts(fetched || []);
@@ -100,21 +108,24 @@ const ExploreMore: React.FC = () => {
                 const fetched = await productService.getProductsByOrdering(
                   undefined,
                   storeId || undefined,
-                  abortController.signal
+                  abortController.signal,
+                  PRODUCT_AVAILABILITY_STORE,
                 );
                 if (id !== fetchIdRef.current) return;
                 setAllStoreProducts(fetched || []);
               }
         } else {
-          // GP Daily
-          const [productsResult, basePacksResult] = await Promise.all([
-            productService.getAllProducts(),
-            basePackService.getAllBasePacks().catch(() => []),
-          ]);
+          // GP Daily — scoped to selected/temporary store when available
+          const dailyStoreId = storeService.getStoreIdForProducts();
+          const productsResult = await productService.getAllProducts({
+            availabilityType: PRODUCT_AVAILABILITY_DAILY,
+            storeId: dailyStoreId || undefined,
+          });
           if (id !== fetchIdRef.current) return;
-          const activeProducts = productsResult.filter((item: Product) => item.isActive);
+          const activeProducts = productsResult.filter(
+            (item: Product) => item.isActive !== false,
+          );
           setProducts(activeProducts);
-          setBasePacks(basePacksResult);
         }
       } catch (error) {
         if (id !== fetchIdRef.current) return;
@@ -152,12 +163,18 @@ const ExploreMore: React.FC = () => {
       return bestSellers;
     }
 
-    // GP Daily filtering logic
-    if (section === "Puja Packs") return basePacks;
+    // GP Daily filtering logic (category names match gp-store Product page)
+    if (section === "Puja Packs") {
+      return products.filter(
+        (item) =>
+          item.category?.toUpperCase() === "PUJA" && item.isAvailable,
+      );
+    }
 
     if (section === "Exotic Packs") {
       return products.filter(
-        (item) => item.category?.toUpperCase() === "EXOTIC" && item.isAvailable
+        (item) =>
+          item.category?.toUpperCase() === "EXOTIC" && item.isAvailable,
       );
     }
 

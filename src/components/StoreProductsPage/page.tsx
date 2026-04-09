@@ -5,7 +5,14 @@ import { MdKeyboardArrowDown } from "react-icons/md";
 import { FaChevronRight, FaSearch } from "react-icons/fa";
 import { IoFilterOutline, IoSwapVerticalOutline } from "react-icons/io5";
 import locationhomeIcon from "../../assets/svg/gp_daily svg/locationhome.svg";
-import { productService, Category, getEffectivePrice, getBasePrice, showStrikeBaseOnCard } from "../../services/product.service";
+import {
+  productService,
+  Category,
+  getEffectivePrice,
+  getBasePrice,
+  showStrikeBaseOnCard,
+  PRODUCT_AVAILABILITY_STORE,
+} from "../../services/product.service";
 import { storeService } from "../../services/store.service";
 import { addressService } from "../../services/address.service";
 import { ProductBrowseSkeleton } from "../common/PageSkeletons";
@@ -150,7 +157,9 @@ const StoreProductsPages: React.FC = () => {
           // Fetch all products for the store (no special ordering)
           const result = await productService.getProductsByOrdering(
             undefined,
-            storeId || undefined
+            storeId || undefined,
+            undefined,
+            PRODUCT_AVAILABILITY_STORE,
           );
           setProducts(result || []);
         }

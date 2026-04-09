@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import "react-datepicker/dist/react-datepicker.css";
 import { basePackService } from "../../services/basepack.service";
@@ -6,7 +6,17 @@ import { BasePack } from "../../services/basepack.service";
 import { walletService } from "../../services/wallet.service";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { productService } from "../../services/product.service";
+import {
+  productService,
+  PRODUCT_AVAILABILITY_DAILY,
+  PRODUCT_AVAILABILITY_STORE,
+  getEffectivePrice,
+  getBasePrice,
+  resolveProductImageUrl,
+  showStrikeBase,
+  showStrikeBaseOnCard,
+} from "../../services/product.service";
+import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { Product } from "../../services/product.service";
 // Import icons from assets
 import WalletImage from "../../assets/icon/Wallet.png";
@@ -14,9 +24,14 @@ import ProfileImage from "../../assets/icon/Profile.png";
 import logo from "../../assets/All/logo.png";
 import { ProductDetailSkeleton } from "../common/PageSkeletons";
 import { IoArrowBack } from "react-icons/io5";
+import { FaChevronRight, FaMinus, FaPlus } from "react-icons/fa";
+import { ProductImageTag } from "../common/ProductImageTag";
 import cautionIcon from "../../assets/svg/gp_daily svg/caution.svg";
 import deliveryTruckIcon from "../../assets/svg/gp_daily svg/delivery_truck.svg";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import { storeService } from "../../services/store.service";
+import { useCart } from "../../context/CartContext";
+import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
 
 // Add interface for content items
 // interface ContentItem {
@@ -158,13 +173,15 @@ const ExistingSubscriptionModal: React.FC<ExistingSubscriptionModalProps> = ({
 );
 
 const ProductPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { feature, theme } = useFeatureTheme();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+  const { items, addToCart, updateQuantity, removeFromCart } = useCart();
+  const productListAvailability =
+    feature === 'gpStore' ? PRODUCT_AVAILABILITY_STORE : PRODUCT_AVAILABILITY_DAILY;
 
-  // Add quantity state
-  const [quantity, setQuantity] = useState(1);
+  // `quantity` state removed — PDP now uses cart quantity (gp-store behavior)
 
   // State management
   const [selectedType, setSelectedType] = useState<SubscriptionType>("DAILY");
@@ -177,6 +194,14 @@ const ProductPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"Description" | "Product Info" | "More">("Description");
   const [combineProducts, setCombineProducts] = useState<Product[]>([]);
+
+  const activeCartLine = useMemo(() => {
+    if (!product) return null;
+    return items.find((item) => String(item.productId) === String((product as any).id)) ?? null;
+  }, [items, product]);
+  const basketQuantity = activeCartLine?.quantity ?? 0;
+  const [isUpdatingBasket, setIsUpdatingBasket] = useState(false);
+  const [stockLimitMessage, setStockLimitMessage] = useState<string | null>(null);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
     useState(false);
@@ -201,6 +226,7 @@ const ProductPage: React.FC = () => {
   const [otherBasePacks, setOtherBasePacks] = useState<BasePack[]>([]);
   const [, setExoticFlowers] = useState<Product[]>([]);
   const [products, setProducts] = useState<GarlandProduct[]>([]);
+  const [bestSellers, setBestSellers] = useState<any[]>([]);
 
   // Add new state for custom days
   const [showDeliveryDays, setShowDeliveryDays] = useState(false);
@@ -216,34 +242,73 @@ const ProductPage: React.FC = () => {
     { day: "Sun", enabled: true },
   ];
 
+  /** One request per page load — avoids duplicate GETs cancelled by useEffect cleanup when `product.id` hydrates. */
+  const loadBestSellers = async (
+    excludeSlug: string,
+    excludeProductId?: string | number | null,
+  ) => {
+    try {
+      const storeId = storeService.getStoreIdForProducts();
+      const list = await productService.getProductsByLabel(
+        "best-seller",
+        storeId ?? undefined,
+        undefined,
+        "-order_count",
+        productListAvailability,
+      );
+      const filtered = list
+        .filter((p: any) => {
+          if (String(p.slug ?? "") === excludeSlug) return false;
+          if (
+            excludeProductId != null &&
+            String(p.id) === String(excludeProductId)
+          ) {
+            return false;
+          }
+          return true;
+        })
+        .slice(0, 12);
+      setBestSellers(filtered);
+    } catch (e) {
+      console.error("Error fetching best sellers:", e);
+      setBestSellers([]);
+    }
+  };
+
   // Fetch product or base pack data
   const fetchProductData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      if (!id) {
-        setError("No product ID provided");
+      if (!slug) {
+        setError("No product slug provided");
         return;
       }
 
       if (!localStorage.getItem("phoneNumber")) {
         navigate(`${basePath}/login`, {
           state: {
-            returnUrl: `${basePath}/product/${id}`,
+            returnUrl: `${basePath}/product/${encodeURIComponent(slug ?? "")}`,
           },
         });
         return;
       }
 
-      // Try to fetch as Product first
+      // Customer API: GET /products/{slug}/ (Postman — not numeric id)
       try {
-        const productData = await productService.getProductById(id);
+        const productData = await productService.getProductBySlug(slug);
         setProduct(productData);
+        await loadBestSellers(slug, productData?.id ?? null);
       } catch (productError) {
-        // If product fetch fails, try base pack
+        // Legacy base packs only: GET /basepacks/{id}/ — do not call with a product slug (404).
+        const legacyNumericId = /^\d+$/.test(String(slug));
+        if (!legacyNumericId) {
+          setError("Failed to fetch product details");
+          return;
+        }
         try {
-          const data = await basePackService.getProductById(id);
+          const data = await basePackService.getProductById(slug);
           const extendedData: ExtendedBasePack = {
             ...data,
             mrpPerPackDaily: Math.ceil(data.sellingPrice * 1.2),
@@ -255,27 +320,40 @@ const ProductPage: React.FC = () => {
             surcharge: 0,
           };
           setBasePack(extendedData);
+          await loadBestSellers(slug, data?.id ?? null);
         } catch (basePackError) {
           setError("Failed to fetch product details");
         }
       }
 
       // Fetch combine products (other flower packs)
-      const allProducts = await productService.getAllProducts();
+      const sid = storeService.getStoreIdForProducts();
+      const allProducts = await productService.getAllProducts({
+        availabilityType: productListAvailability,
+        storeId: sid || undefined,
+      });
       const otherProducts = allProducts
-        .filter((p) => p.id !== id && p.isAvailable && p.isActive)
+        .filter((p) => {
+          const pSlug = (p as Product & { slug?: string }).slug;
+          if (pSlug && pSlug === slug) return false;
+          return String(p.id) !== String(slug) && p.isAvailable && p.isActive;
+        })
         .slice(0, 5);
       setCombineProducts(otherProducts);
 
-      // Fetch other base packs
-      const allPacks = await basePackService.getAllBasePacks();
-      const otherPacks = allPacks.filter((pack) => pack.id !== id).slice(0, 3);
-      setOtherBasePacks(otherPacks);
+      // Optional legacy list — many deployments no longer expose GET /basepacks/ (404). Do not fail the product page.
+      try {
+        const allPacks = await basePackService.getAllBasePacks();
+        const otherPacks = allPacks.filter((pack) => String(pack.id) !== String(slug)).slice(0, 3);
+        setOtherBasePacks(otherPacks);
+      } catch {
+        setOtherBasePacks([]);
+      }
     } catch (error: any) {
       if (error.message === "Session expired. Please login again.") {
         navigate(`${basePath}/login`, {
           state: {
-            returnUrl: `${basePath}/product/${id}`,
+            returnUrl: `${basePath}/product/${encodeURIComponent(slug ?? "")}`,
           },
         });
       } else {
@@ -290,7 +368,11 @@ const ProductPage: React.FC = () => {
   useEffect(() => {
     const fetchOtherPacks = async () => {
       try {
-        const allProducts = await productService.getAllProducts();
+        const sid = storeService.getStoreIdForProducts();
+        const allProducts = await productService.getAllProducts({
+          availabilityType: productListAvailability,
+          storeId: sid || undefined,
+        });
         const exoticProducts = allProducts.filter(
           (product) => product.type === "EXOTIC"
         );
@@ -300,15 +382,22 @@ const ProductPage: React.FC = () => {
       }
     };
 
-    if (id) {
+    if (slug) {
       fetchOtherPacks();
     }
-  }, [id]);
+  }, [slug]);
 
   // Fetch product data on mount
   useEffect(() => {
     fetchProductData();
-  }, [id, navigate]);
+  }, [slug, navigate]);
+
+  const handleBestSellerCardClick = (item: any) => {
+    const pathSlug = item.slug ?? item.id;
+    navigate(`${basePath}/product/${encodeURIComponent(String(pathSlug))}`, {
+      state: { product: item },
+    });
+  };
 
   // Format date for display
   // const formatDate = (date: Date): string => {
@@ -319,41 +408,60 @@ const ProductPage: React.FC = () => {
   //   });
   // };
 
-  // Add function to calculate price display
+  // Price row — same fields as gp-store product detail (discount %, strike)
   const getPriceDisplay = () => {
     const currentProduct = product || basePack;
-    if (!currentProduct) return { price: 0, originalPrice: 0, savings: 0 };
+    if (!currentProduct) {
+      return {
+        price: 0,
+        originalPrice: 0,
+        savings: 0,
+        discountPercentage: 0,
+        showStrike: false,
+      };
+    }
 
-    let price = 0;
-    // Calculate original price as 20% more than selling price (static calculation)
-    let originalPrice = 0;
-
-    const basePrice = currentProduct.sellingPrice;
-
-    // Calculate static original price (20% markup)
-    const staticOriginalPrice = Math.ceil(basePrice * 1.2);
-
-    // Always show price per pack, not total
-    price = basePrice;
-    originalPrice = staticOriginalPrice;
-
-    const savings = originalPrice - price;
-
-    return { price, originalPrice, savings };
+    const p = currentProduct as unknown as Record<string, unknown>;
+    const price = getEffectivePrice(currentProduct);
+    let originalPrice = getBasePrice(currentProduct);
+    if (originalPrice <= 0 && price > 0) {
+      originalPrice = Math.ceil(price * 1.2);
+    }
+    const discountPercentage =
+      p.discount_percentage != null && Number(p.discount_percentage) >= 0
+        ? Number(p.discount_percentage)
+        : originalPrice > 0 && price < originalPrice
+          ? Math.round(((originalPrice - price) / originalPrice) * 100)
+          : 0;
+    const showStrike =
+      showStrikeBase(currentProduct) ||
+      (originalPrice > 0 && price < originalPrice && discountPercentage > 0);
+    const savings = Math.max(0, originalPrice - price);
+    return { price, originalPrice, savings, discountPercentage, showStrike };
   };
 
-  // Get product image
+  /** BOM lines from catalog product detail (`bom_items`), same shape as store detail. */
+  const bomDisplayRows = useMemo(() => {
+    const p = product ? (product as unknown as Record<string, unknown>) : null;
+    if (!p) return [];
+    const raw = p.bom_items;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((row: Record<string, unknown>, index: number) => ({
+      id: row.id ?? row.inventory_item_id ?? `bom-${index}`,
+      name: String(
+        row.inventory_item_name ?? row.name ?? row.item_name ?? "Item",
+      ),
+      quantity: row.quantity ?? row.qty ?? 1,
+      unit: String(row.inventory_item_unit ?? row.unit ?? "").trim(),
+      isPerishable: row.is_perishable as boolean | undefined,
+    }));
+  }, [product]);
+
+  // Get product image — API uses primary_image / images[]; legacy uses imagesUrl
   const getProductImage = () => {
     const currentProduct = product || basePack;
-    if (!currentProduct) return "";
-
-    if (product?.imagesUrl) {
-      if (Array.isArray(product.imagesUrl)) {
-        return product.imagesUrl[0] || "";
-      }
-      return product.imagesUrl;
-    }
-    return (basePack as any)?.imagesUrl || "";
+    if (!currentProduct) return "/placeholder.svg";
+    return resolveProductImageUrl(currentProduct as unknown as Record<string, unknown>);
   };
 
   // Get product name
@@ -371,25 +479,28 @@ const ProductPage: React.FC = () => {
     return product?.contents || basePack?.contents || [];
   };
 
-  // Get includes list - fetch from backend or use static fallback
-  const getIncludesList = (): string[] => {
+  /** Legacy base-pack contents only — used when `bom_items` is empty. */
+  const getIncludesFallbackLabels = (): string[] => {
     const contents = getProductContents();
-
-    // If we have contents from backend, extract names
     if (contents && contents.length > 0) {
-      return contents.map(item => item.name);
+      return contents.map((item) => item.name).filter(Boolean);
     }
-
-    // Static fallback list (matches screenshot)
-    return ["Bel Leaves", "Lotus", "Marigold", "White Lotus"];
+    return [];
   };
 
   // Get product weight
   const getProductWeight = () => {
-    if (product?.weight) {
-      return `${product.weight} gms`;
+    const p = product as (Product & { unit_value?: string; unit?: string }) | null;
+    if (p?.weight != null && String(p.weight).trim() !== "") {
+      return `${p.weight} gms`;
     }
-    return "120 gms"; // Default
+    if (p?.unit_value && p?.unit) {
+      return `${p.unit_value} ${p.unit}`.trim();
+    }
+    if (p?.unit_value) {
+      return String(p.unit_value);
+    }
+    return "120 gms";
   };
 
   // Handle combine product quantity
@@ -410,25 +521,27 @@ const ProductPage: React.FC = () => {
         toast.error("Please login to continue");
         navigate(`${basePath}/login`, {
           state: {
-            returnUrl: `${basePath}/product/${id}`,
+            returnUrl: `${basePath}/product/${encodeURIComponent(slug ?? "")}`,
           },
         });
         return;
       }
 
       const currentProduct = product || basePack;
-      if (!currentProduct || !id) {
+      if (!currentProduct || !slug) {
         toast.error("Product information not available");
         setIsCheckingBalance(false);
         return;
       }
 
+      const resolvedEntityId = product?.id ?? basePack?.id;
+
       setIsCheckingBalance(true);
 
       // Set minimum days and calculate price
       const minDays = selectedType === "CUSTOM" ? selectedDays.length : 7;
-      const pricePerPack = currentProduct.sellingPrice;
-      const totalPrice = pricePerPack * minDays * quantity;
+      const pricePerPack = getEffectivePrice(currentProduct);
+      const totalPrice = pricePerPack * minDays * 1;
 
 
 
@@ -452,17 +565,15 @@ const ProductPage: React.FC = () => {
       }
 
       // If we have sufficient balance, prepare subscription details
-      const productImage = product
-        ? (Array.isArray(product.imagesUrl) ? product.imagesUrl[0] : product.imagesUrl)
-        : (basePack as any)?.imagesUrl;
+      const productImage = getProductImage();
 
       const subscriptionDetails = {
-        basePackId: id,
-        productId: product?.id || id,
+        basePackId: resolvedEntityId,
+        productId: product?.id ?? resolvedEntityId,
         type: selectedType, // This will be either "DAILY" or "CUSTOM"
         startDate: startDate.toISOString(),
         amount: pricePerPack,
-        quantity: quantity,
+        quantity: 1,
         packDetails: {
           name: currentProduct.name,
           description: currentProduct.description,
@@ -498,7 +609,7 @@ const ProductPage: React.FC = () => {
       navigate(`${basePath}/address-selection`, {
         state: {
           subscriptionDetails,
-          basePackId: id,
+          basePackId: resolvedEntityId,
         },
       });
       toast.success("Proceeding to address selection");
@@ -509,7 +620,7 @@ const ProductPage: React.FC = () => {
       ) {
         toast.error(error.message || "Please login to continue");
         navigate(`${basePath}/login`, {
-          state: { returnUrl: `${basePath}/product/${id}` },
+          state: { returnUrl: `${basePath}/product/${encodeURIComponent(slug ?? "")}` },
         });
         return;
       }
@@ -519,13 +630,67 @@ const ProductPage: React.FC = () => {
     }
   };
 
+  const handleAddToBasket = async () => {
+    if (!product) {
+      toast.error("Product information not available");
+      return;
+    }
+    try {
+      const { price } = getPriceDisplay();
+      const productImage = getProductImage();
+      await addToCart({
+        productId: product.id as unknown as number,
+        productSlug: (product.slug ?? slug ?? String(product.id)) as string,
+        name: product.name,
+        image: productImage || "/placeholder.svg",
+        price,
+        quantity: 1,
+        variant: null,
+        categorySlug: (product as unknown as { category_slug?: string }).category_slug,
+      });
+      toast.success("Product added to basket!");
+    } catch (error: unknown) {
+      console.error("Error adding to cart:", error);
+      toast.error("Failed to add product to basket. Please try again.");
+    }
+  };
+
+  const handleAdjustBasketQuantity = async (nextQty: number) => {
+    if (!activeCartLine || isUpdatingBasket) return;
+    setIsUpdatingBasket(true);
+    setStockLimitMessage(null);
+    try {
+      if (nextQty < 1) {
+        await removeFromCart(activeCartLine.id);
+      } else {
+        await updateQuantity(activeCartLine.id, nextQty, activeCartLine.customizedMessage);
+      }
+    } catch (error: unknown) {
+      const rawMessage = errorMessageFromCatch(error, "");
+      const msg = String(rawMessage).toLowerCase();
+      const isStockError =
+        msg.includes("stock") ||
+        msg.includes("insufficient") ||
+        msg.includes("available quantity") ||
+        msg.includes("only") ||
+        msg.includes("out of stock");
+      if (isStockError) {
+        setStockLimitMessage("Exceeded item limit");
+      } else {
+        toast.error(rawMessage || "Failed to update basket quantity. Please try again.");
+      }
+    } finally {
+      setIsUpdatingBasket(false);
+    }
+  };
+
   const handleRechargeWallet = () => {
     setShowInsufficientBalanceModal(false);
     navigate(`${basePath}/wallet`, {
       state: {
         requiredAmount: balanceDetails.shortageAmount,
         currentBalance: balanceDetails.currentBalance,
-        returnUrl: `/product/${id}`,
+        returnUrl: `${basePath}/product/${encodeURIComponent(slug ?? "")}`,
         subscriptionType: balanceDetails.subscriptionType,
         minimumDays: 7,
         maximumDays: selectedType === "DAILY" ? 30 : 14,
@@ -555,13 +720,18 @@ const ProductPage: React.FC = () => {
 
   // Add function to handle product click
   const handleProductClick = (item: GarlandProduct | BasePack | Product) => {
-    navigate(`${basePath}/product/${item.id}`);
+    const pathSlug = "slug" in item && item.slug ? item.slug : item.id;
+    navigate(`${basePath}/product/${encodeURIComponent(String(pathSlug))}`);
   };
 
   // Update the fetchGarlandProducts function
   const fetchGarlandProducts = async () => {
     try {
-      const allProducts = await productService.getAllProducts();
+      const sid = storeService.getStoreIdForProducts();
+      const allProducts = await productService.getAllProducts({
+        availabilityType: productListAvailability,
+        storeId: sid || undefined,
+      });
       const garlandProducts = allProducts.filter(
         (product): product is GarlandProduct => product.type === "GARLAND"
       );
@@ -617,79 +787,75 @@ const ProductPage: React.FC = () => {
 
         {/* Main Content */}
         <div className="px-4">
-          {/* Product Image */}
+          {/* Product Image — frame matches gp-store */}
           <div className="mt-4">
-            <div className="aspect-square w-full rounded-xl overflow-hidden">
+            <div className="relative aspect-square w-full overflow-hidden rounded-xl border-2 border-gray-900">
               <img
                 src={getProductImage()}
                 alt={getProductName()}
-                className="w-full h-full object-cover"
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  if (el.src.includes("placeholder.svg")) return;
+                  el.src = "/placeholder.svg";
+                }}
               />
             </div>
           </div>
 
-          {/* Product Info - Name, Price, Weight */}
-          <div className="mt-4">
-            <div className="flex justify-between items-start gap-3">
-              <h1 className="text-3xl font-semibold text-gray-900 flex-1">
-                {getProductName()}
-              </h1>
-              <span className="text-base font-medium text-gray-900 bg-[rgb(250,162,34)] px-5 py-2 rounded-2xl whitespace-nowrap">
-                {getProductWeight()}
+          {/* Product name + orange unit capsule — vertically centered as one row */}
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <h1 className="m-0 min-w-0 flex-1 font-ibm-plex-serif text-2xl font-bold leading-snug text-gray-900">
+              {formatProductTitleCase(getProductName())}
+            </h1>
+            <span
+              className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[#FAA222] px-3 py-[0.4375rem] text-sm font-semibold leading-normal text-gray-900 whitespace-nowrap"
+              aria-label="Unit"
+            >
+              {getProductWeight()}
+            </span>
+          </div>
+
+          {/* Price row — same scale as store (current + struck MRP) */}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <span className="text-2xl font-bold text-gray-900">
+              ₹{Math.round(getPriceDisplay().price)}/Pack
+            </span>
+            {getPriceDisplay().showStrike && (
+              <span className="text-xl font-medium text-gray-500 line-through">
+                ₹{Math.round(getPriceDisplay().originalPrice)}
               </span>
-            </div>
-
-            {/* Price Section */}
-            <div className="mt-3 flex items-center gap-3">
-              <span className="text-2xl font-bold text-gray-900">
-                ₹{getPriceDisplay().price}/Pack
-              </span>
-              {getPriceDisplay().originalPrice > getPriceDisplay().price && (
-                <span className="text-2xl font-bold text-gray-500 line-through">
-                  ₹{getPriceDisplay().originalPrice}
-                </span>
-              )}
-            </div>
+            )}
           </div>
 
-          {/* Includes Section */}
+          {/* Includes — from API `bom_items`; single horizontal row, scroll on overflow, scrollbar hidden */}
           <div className="mt-4">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">Includes</h3>
-            <div className="flex gap-1.5 sm:gap-2 flex-wrap">
-              {getIncludesList().map((item, index) => (
-                <span
-                  key={index}
-                  className="flex-1 min-w-[calc(50%-0.375rem)] sm:min-w-0 text-xs sm:text-sm font-medium text-gray-900 bg-white border border-[rgb(250,162,34)] px-2 sm:px-4 py-1.5 sm:py-2 rounded-2xl text-center"
-                >
-                  {item}
-                </span>
-              ))}
+            <h3 className="mb-3 text-base font-semibold text-gray-900">Includes</h3>
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2 no-scrollbar">
+              {bomDisplayRows.length > 0
+                ? bomDisplayRows.map((row) => (
+                    <span
+                      key={String(row.id)}
+                      className="inline-flex shrink-0 items-center whitespace-nowrap rounded-xl border border-[#FAA222] bg-white px-3 py-2 text-sm font-medium text-gray-900"
+                    >
+                      {row.name}
+                    </span>
+                  ))
+                : getIncludesFallbackLabels().map((label, index) => (
+                    <span
+                      key={`${label}-${index}`}
+                      className="inline-flex shrink-0 items-center whitespace-nowrap rounded-xl border border-[#FAA222] bg-white px-3 py-2 text-sm font-medium text-gray-900"
+                    >
+                      {label}
+                    </span>
+                  ))}
             </div>
+            {bomDisplayRows.length === 0 && getIncludesFallbackLabels().length === 0 && (
+              <p className="text-sm text-gray-500">No ingredient list for this product.</p>
+            )}
           </div>
 
-          {/* Quantity Section */}
-          <div className="mt-6 pl-4 pr-12 ">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Quantity</h3>
-              <div className="flex items-center gap-4">
-                <button
-                  className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 hover:bg-[rgb(250,162,34)] hover:text-white transition-colors"
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                >
-                  <span className="text-xl leading-none">−</span>
-                </button>
-                <span className="text-lg font-medium w-8 text-center">
-                  {quantity}
-                </span>
-                <button
-                  className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 hover:bg-[rgb(250,162,34)] hover:text-white transition-colors"
-                  onClick={() => setQuantity(quantity + 1)}
-                >
-                  <span className="text-xl leading-none">+</span>
-                </button>
-              </div>
-            </div>
-          </div>
+          {/* Quantity control removed — handled by Add to Basket control below */}
 
           {/* Combine with Section */}
           {combineProducts.length > 0 && (
@@ -697,7 +863,7 @@ const ProductPage: React.FC = () => {
               <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-3 sm:mb-4">Combine with</h3>
               <div className="flex overflow-x-auto gap-3 sm:gap-4 pb-2 no-scrollbar">
                 {combineProducts.map((item) => {
-                  const itemImage = Array.isArray(item.imagesUrl) ? item.imagesUrl[0] : item.imagesUrl;
+                  const itemImage = resolveProductImageUrl(item as unknown as Record<string, unknown>);
                   const itemQty = combineQuantities[item.id] || 0;
                   return (
                     <div
@@ -755,124 +921,57 @@ const ProductPage: React.FC = () => {
             </div>
           )}
 
-          {/* Select Delivery Days Section */}
-          <div className="mt-6">
-            <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm">
-              <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-3 sm:mb-4">Select Delivery Days</h3>
-
-              {/* Delivery Frequency Tabs */}
-              <div className="flex gap-1.5 sm:gap-2 mb-3 sm:mb-4 w-full sm:w-[70%]">
-                <button
-                  onClick={() => {
-                    setDeliveryFrequency("Daily");
-                    setSelectedType("DAILY");
-                    setSelectedDays([]);
-                  }}
-                  className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-semibold transition-colors ${deliveryFrequency === "Daily"
-                    ? "bg-[rgb(250,162,34)] text-gray-900"
-                    : "bg-white border-2 border-gray-400 text-gray-900"
-                    }`}
-                >
-                  Daily
-                </button>
-                <button
-                  onClick={() => {
-                    setDeliveryFrequency("Mon-Sat");
-                    setSelectedType("CUSTOM");
-                    setSelectedDays(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
-                  }}
-                  className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-semibold transition-colors ${deliveryFrequency === "Mon-Sat"
-                    ? "bg-[rgb(250,162,34)] text-gray-900"
-                    : "bg-white border-2 border-gray-400 text-gray-900"
-                    }`}
-                >
-                  Mon-Sat
-                </button>
-                <button
-                  onClick={() => {
-                    setDeliveryFrequency("Customize");
-                    setSelectedType("CUSTOM");
-                    // Pre-select all days when switching to Customize mode
-                    setSelectedDays(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
-                  }}
-                  className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-semibold transition-colors ${deliveryFrequency === "Customize"
-                    ? "bg-[rgb(250,162,34)] text-gray-900"
-                    : "bg-white border-2 border-gray-400 text-gray-900"
-                    }`}
-                >
-                  Customize
-                </button>
+          {/* Add to Basket / Quantity Controls (gp-store behavior; daily theme) */}
+          {basketQuantity > 0 ? (
+            <div className="mb-4 mt-6 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="shrink-0 text-base font-medium text-gray-900">Quantity</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-60"
+                    onClick={() => handleAdjustBasketQuantity(basketQuantity - 1)}
+                    aria-label="Decrease quantity"
+                    disabled={isUpdatingBasket}
+                  >
+                    <FaMinus className="block text-[9px] leading-none" aria-hidden />
+                  </button>
+                  <span className="min-w-[1.125rem] px-0.5 text-center text-base font-semibold tabular-nums leading-none text-gray-900">
+                    {basketQuantity}
+                  </span>
+                  <button
+                    type="button"
+                    className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FAA222] text-white transition-colors hover:bg-[#e8941a] disabled:opacity-60"
+                    onClick={() => handleAdjustBasketQuantity(basketQuantity + 1)}
+                    aria-label="Increase quantity"
+                    disabled={isUpdatingBasket}
+                  >
+                    <FaPlus className="block text-[9px] leading-none" aria-hidden />
+                  </button>
+                </div>
               </div>
-
-              {/* Individual Day Selectors */}
-              {(deliveryFrequency === "Customize" || deliveryFrequency === "Mon-Sat") && (
-                <div className="mb-3 sm:mb-4">
-                  <div className="flex gap-0.5 sm:gap-1 justify-between">
-                    {weekDays.map((day) => (
-                      <button
-                        key={day.day}
-                        onClick={() => {
-                          if (deliveryFrequency === "Customize" && day.enabled) {
-                            handleDaySelection(day.day);
-                          }
-                        }}
-                        className={`w-14 sm:w-20 h-8 sm:h-10 rounded-2xl flex items-center justify-center text-xs sm:text-sm font-semibold transition-colors ${!day.enabled
-                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          : selectedDays.includes(day.day)
-                            ? "bg-[rgb(250,162,34)] text-gray-900"
-                            : "bg-white border-2 border-gray-400 text-gray-900"
-                          }`}
-                        disabled={!day.enabled || deliveryFrequency === "Mon-Sat"}
-                      >
-                        {day.day}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              {stockLimitMessage && (
+                <p className="mt-2 text-sm font-medium text-red-600">
+                  {stockLimitMessage}
+                </p>
               )}
-
-              {/* Warning Message */}
-              {deliveryFrequency === "Customize" && selectedDays.length > 0 && selectedDays.length < 3 && (
-                <div className="mb-3 sm:mb-4 bg-pink-100 rounded-2xl p-2.5 sm:p-3 flex items-start gap-1.5 sm:gap-2">
-                  <img src={cautionIcon} alt="Warning" className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs sm:text-sm font-bold text-gray-700">
-                    Please select at least 3 days for a 1-week subscription
-                  </p>
-                </div>
-              )}
-
-              {/* Subscribe Button */}
-              <button
-                onClick={() => {
-                  if (deliveryFrequency === "Daily") {
-                    setSelectedType("DAILY");
-                  } else {
-                    setSelectedType("CUSTOM");
-                  }
-                  handleSubscribe();
-                }}
-                disabled={deliveryFrequency === "Customize" && selectedDays.length < 3}
-                className={`w-full py-3 sm:py-3.5 rounded-2xl text-sm sm:text-[15px] font-semibold ${deliveryFrequency === "Customize" && selectedDays.length < 3
-                  ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                  : "bg-[rgb(250,162,34)] text-black hover:opacity-90"
-                  }`}
-              >
-                {deliveryFrequency === "Daily"
-                  ? `Subscribe for ₹${getPriceDisplay().price}/Pack`
-                  : deliveryFrequency === "Mon-Sat"
-                    ? `Subscribe for ₹${getPriceDisplay().price}/Pack`
-                    : selectedDays.length >= 3
-                      ? `Subscribe for ₹${getPriceDisplay().price}/Pack`
-                      : "Select at least 3 days to subscribe"}
-              </button>
             </div>
-          </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void handleAddToBasket()}
+              className="w-full bg-[#FAA222] mt-6 text-gray-900 py-3.5 rounded-[25px] text-base font-semibold mb-6 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center hover:bg-[#e8941a] transition-colors"
+              disabled={!product}
+            >
+              Add to Basket
+            </button>
+          )}
 
-          {/* Delivery Information Banner */}
-          <div className="mt-6">
-            <div className="bg-[rgb(250,162,34)] bg-opacity-20 rounded-lg p-4 flex items-center gap-3">
-              <img src={deliveryTruckIcon} alt="Delivery" className="w-20 h-20 flex-shrink-0" />
-              <p className="text-base font-bold text-gray-800 flex-1">
+          {/* Delivery Information Banner — light peach card */}
+          <div className="mt-5 sm:mt-6">
+            <div className="bg-[#FEF3E2] rounded-2xl p-4 sm:p-5 flex items-center gap-3 sm:gap-4 shadow-md border border-amber-100/60">
+              <img src={deliveryTruckIcon} alt="" className="w-16 h-16 sm:w-[72px] sm:h-[72px] flex-shrink-0 object-contain" />
+              <p className="text-sm sm:text-base font-semibold text-gray-900 leading-snug flex-1">
                 Orders placed before 8 PM will be delivered next day. Sunday deliveries available on request.
               </p>
             </div>
@@ -927,6 +1026,78 @@ const ProductPage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Best Sellers — same layout as gp-store product detail; daily theme */}
+          {bestSellers.length > 0 && (
+            <div className="mt-10 mb-8">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="font-ibm-plex-serif text-gp-section font-semibold text-gray-900">
+                  Best Sellers
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => navigate(`${basePath}/Products`)}
+                  className="gp-link-row shrink-0 text-gray-600 hover:text-gray-900"
+                >
+                  <span>Explore More</span>
+                  <FaChevronRight className="text-xs" />
+                </button>
+              </div>
+              <div className="gp-h-scroll-track">
+                {bestSellers.map((item) => (
+                  <div
+                    key={item.id ?? item.slug}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleBestSellerCardClick(item)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleBestSellerCardClick(item);
+                      }
+                    }}
+                    className="gp-store-card-scroll hover:shadow-md transition-shadow"
+                  >
+                    <div className="relative aspect-square overflow-hidden bg-[#f8f6f1]">
+                      <ProductImageTag labels={item.labels} variant="daily" />
+                      <img
+                        src={resolveProductImageUrl(item as unknown as Record<string, unknown>)}
+                        alt={item.name}
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/placeholder.svg";
+                        }}
+                      />
+                    </div>
+                    <div className="gp-store-card-scroll-inner">
+                      <h3 className="mb-1 truncate text-sm font-semibold text-gray-900">
+                        {formatProductTitleCase(String(item.name ?? ""))}
+                      </h3>
+                      <div className="mb-1 min-h-[1.25rem] shrink-0">
+                        {item.short_description ? (
+                          <p className="truncate text-xs text-gray-500">
+                            {formatProductTitleCase(String(item.short_description))}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="mt-auto flex items-center justify-between gap-2">
+                        <p className="text-base font-bold text-gray-900">
+                          <span>₹{getEffectivePrice(item)}</span>
+                          {showStrikeBaseOnCard(item) && (
+                            <span className="ml-1 font-medium text-gray-500 line-through">
+                              ₹{getBasePrice(item)}
+                            </span>
+                          )}
+                        </p>
+                        <FaChevronRight className="flex-shrink-0 text-sm text-gray-400" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Existing modals */}

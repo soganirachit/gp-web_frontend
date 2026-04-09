@@ -30,7 +30,6 @@ const Layout: React.FC = () => {
     "/gp-daily/otp-verification",
     "/gp-daily/name-input",
     "/gp-daily/allset",
-    "/gp-daily/startup",
     "/gp-store/login",
     "/gp-store/otp-verification",
     "/gp-store/name-input",

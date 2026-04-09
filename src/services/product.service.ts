@@ -1,13 +1,20 @@
 import { AxiosError } from "axios";
 import api from "./api";
+import { getApiUrl } from "../config/api.config";
 
 // Product API endpoints - using the configured api instance
 // The api instance baseURL should be: http://185.137.122.250:8083/api/v1
 // So we use relative paths like '/products/...'
 const PRODUCTS_BASE = '/products';
 
+/** Query param for GET /products/ — see API: `daily` → daily + both; `store` → store + both (excludes store-only when using `daily`). */
+export const PRODUCT_AVAILABILITY_DAILY = "daily";
+export const PRODUCT_AVAILABILITY_STORE = "store";
+
 export interface Product {
   id: string;
+  /** URL segment for GET /products/{slug}/ (customer API); numeric id alone is not valid for that endpoint. */
+  slug?: string;
   productId?: string;
   name: string;
   sku?: string;
@@ -88,17 +95,39 @@ export interface BestSeller {
 }
 
 export const productService = {
-  async getAllProducts(): Promise<Product[]> {
+  /**
+   * GET /products/ — optional `availability_type` (e.g. `daily` for daily + both, `store` for store + both).
+   */
+  async getAllProducts(opts?: {
+    storeId?: number;
+    availabilityType?: string;
+    signal?: AbortSignal;
+  }): Promise<Product[]> {
     try {
-      const response = await api.get(PRODUCTS_BASE);
-      if (response.data && Array.isArray(response.data.data)) {
-        return response.data.data;
-      } else if (Array.isArray(response.data)) {
-        return response.data;
-      } else {
-        console.error("Unexpected response format:", response.data);
-        return [];
+      const params: Record<string, string | number> = {};
+      if (opts?.storeId) params.store_id = opts.storeId;
+      if (opts?.availabilityType) params.availability_type = opts.availabilityType;
+
+      const response = await api.get(`${PRODUCTS_BASE}/`, {
+        params: Object.keys(params).length ? params : undefined,
+        signal: opts?.signal,
+      });
+      const d = response.data;
+      // Paginated DRF: { count, next, previous, results: [...] }
+      if (d?.results && Array.isArray(d.results)) {
+        return d.results;
       }
+      if (d?.success && Array.isArray(d.data)) {
+        return d.data;
+      }
+      if (Array.isArray(d?.data)) {
+        return d.data;
+      }
+      if (Array.isArray(d)) {
+        return d;
+      }
+      console.error("Unexpected response format:", d);
+      return [];
     } catch (error: unknown) {
       console.error("Error fetching products:", error);
       if (error instanceof Error || error instanceof AxiosError) {
@@ -108,6 +137,7 @@ export const productService = {
     }
   },
 
+  /** Prefer `getProductBySlug` for customer flows — public catalog detail is GET /products/{slug}/ per API (numeric id returns 404). */
   async getProductById(id: string): Promise<Product> {
     try {
       const response = await api.get(`${PRODUCTS_BASE}/${id}`);
@@ -128,13 +158,12 @@ export const productService = {
 
   async getProductBySlug(slug: string): Promise<any> {
     try {
-      const response = await api.get(`${PRODUCTS_BASE}/${slug}`);
-      if (response.data && response.data.success && response.data.data) {
-        return response.data.data;
-      } else if (response.data && response.data.data) {
-        return response.data.data;
-      } else if (response.data) {
-        return response.data;
+      const response = await api.get(`${PRODUCTS_BASE}/${encodeURIComponent(slug)}/`);
+      const d = response.data;
+      if (d && typeof d === "object" && !Array.isArray(d)) {
+        if ("success" in d && d.success && d.data != null) return d.data;
+        if ("data" in d && d.data != null) return d.data;
+        return d;
       }
       throw new Error("Invalid response format");
     } catch (error: unknown) {
@@ -235,11 +264,17 @@ export const productService = {
 
   // Calls GET api/v1/products/ with optional ordering param
   // ordering=undefined → All Packs (no ordering, plain list)
-  async getProductsByOrdering(ordering?: string, storeId?: number, signal?: AbortSignal): Promise<BestSeller[]> {
+  async getProductsByOrdering(
+    ordering?: string,
+    storeId?: number,
+    signal?: AbortSignal,
+    availabilityType?: string,
+  ): Promise<BestSeller[]> {
     try {
       const params: Record<string, any> = {};
       if (ordering) params.ordering = ordering;
       if (storeId) params.store_id = storeId;
+      if (availabilityType) params.availability_type = availabilityType;
 
       const response = await api.get(`${PRODUCTS_BASE}/`, { params, signal });
 
@@ -300,12 +335,14 @@ export const productService = {
     labelSlug: string,
     storeId?: number,
     signal?: AbortSignal,
-    ordering?: string
+    ordering?: string,
+    availabilityType?: string,
   ): Promise<BestSeller[]> {
     try {
       const params: Record<string, string | number> = { label: labelSlug };
       if (storeId) params.store_id = storeId;
       if (ordering) params.ordering = ordering;
+      if (availabilityType) params.availability_type = availabilityType;
 
       const response = await api.get(`${PRODUCTS_BASE}/`, { params, signal });
 
@@ -414,6 +451,48 @@ export const productService = {
     }
   },
 };
+
+/**
+ * Absolute image URL for catalog payloads (`GET /products/`, `GET /products/{slug}/`).
+ * Uses `primary_image`, then `imagesUrl`, then `images[].image`, with `/media/` prefix for relative paths.
+ */
+export function resolveProductImageUrl(item: Record<string, unknown> | null | undefined): string {
+  if (item == null) return "/placeholder.svg";
+
+  const convertToFullUrl = (imagePath: string): string => {
+    if (!imagePath) return "/placeholder.svg";
+    if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
+      return imagePath;
+    }
+    const apiUrl = getApiUrl();
+    const baseUrl = apiUrl.replace("/api/v1", "");
+    if (imagePath.startsWith("src/")) {
+      const cleanPath = imagePath.replace("src/", "");
+      return `${baseUrl}/media/${cleanPath}`;
+    }
+    return `${baseUrl}/media/${imagePath}`;
+  };
+
+  const primary = item.primary_image;
+  if (typeof primary === "string" && primary) {
+    return convertToFullUrl(primary);
+  }
+
+  const imagesUrl = item.imagesUrl;
+  if (Array.isArray(imagesUrl) && imagesUrl[0]) {
+    return convertToFullUrl(String(imagesUrl[0]));
+  }
+  if (typeof imagesUrl === "string" && imagesUrl) {
+    return convertToFullUrl(imagesUrl);
+  }
+
+  const imgs = item.images as Array<{ image?: string }> | undefined;
+  if (imgs?.[0]?.image) {
+    return convertToFullUrl(imgs[0].image);
+  }
+
+  return "/placeholder.svg";
+}
 
 /**
  * Price display helpers — use effective_price for all customer-facing amounts.

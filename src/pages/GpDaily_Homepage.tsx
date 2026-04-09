@@ -5,7 +5,6 @@ import { MdKeyboardArrowDown } from "react-icons/md";
 import { motion } from "framer-motion";
 import logo from "../assets/All/logo.png";
 import { walletService } from "../services/wallet.service";
-import { basePackService, BasePack } from "../services/basepack.service";
 import {
   subscriptionService,
   Subscription,
@@ -13,14 +12,14 @@ import {
 import { orderService } from "@/services/order.service";
 import ErrorBoundary from "../components/ErrorBoundary";
 import useGoogleMaps from "../hooks/useGoogleMaps";
-import { productService } from "../services/product.service";
+import { productService, PRODUCT_AVAILABILITY_DAILY } from "../services/product.service";
+import { storeService } from "../services/store.service";
 import type { Product as ProductType } from "../services/product.service";
 import { addressService } from "../services/address.service";
 import { customerService } from "../services/getcustomer.service";
 import { toast } from "react-hot-toast";
 import ProductCard from "../components/common/ProductCard";
 import { GpDailyHomeSkeleton } from "../components/common/PageSkeletons";
-import Spinner from "../components/common/Spinner";
 import ProfileIcon from "../assets/icon/Profile.png";
 import { SearchBar } from "../components/common/SearchBar";
 import smallgendaIcon from "../assets/svg/smallgenda.svg";
@@ -34,7 +33,6 @@ import locationhomeIcon from "../assets/svg/gp_daily svg/locationhome.svg";
 import profilehomeIcon from "../assets/svg/gp_daily svg/profilehome.svg";
 import profilelogoIcon from "../assets/svg/gp_daily svg/profilelogo.svg";
 import alertIcon from "../assets/svg/gp_daily svg/lowbalance.svg";
-import { useFeatureTheme } from "../context/FeatureThemeContext";
 
 interface DayInfo {
   date: string;
@@ -46,18 +44,19 @@ interface DayInfo {
 const Home2: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { feature } = useFeatureTheme();
-  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+  /** This route is always GP Daily — do not derive from theme context (query can override context). */
+  const basePath = "/gp-daily";
   const [, setDays] = useState<DayInfo[]>([]);
   const [deliveryLocation, setDeliveryLocation] = useState<string>("");
   const [addressType, setAddressType] = useState<string>("Home");
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  /** Sync once from storage so we do not mount as false and trigger a second subscription fetch */
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    () => !!localStorage.getItem("phoneNumber")
+  );
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
-  const [basePacks, setBasePacks] = useState<BasePack[]>([]);
-  const [isLoadingPacks, setIsLoadingPacks] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [productsFetchError, setProductsFetchError] = useState<string | null>(null);
   const [activeSubscriptions, setActiveSubscriptions] = useState<
     Subscription[]
   >([]);
@@ -111,6 +110,7 @@ const Home2: React.FC = () => {
     }
   };
 
+  /** Single list request — avoids duplicate calls (was fetchSubscriptions + fetchActiveSubscriptions). */
   const fetchSubscriptions = async () => {
     try {
       setIsLoadingSubscriptions(true);
@@ -118,11 +118,11 @@ const Home2: React.FC = () => {
         await subscriptionService.getCustomerSubscriptions();
 
       if (fetchedSubscriptions && fetchedSubscriptions.length > 0) {
-        const active = fetchedSubscriptions.find(
+        const active = fetchedSubscriptions.filter(
           (sub) => sub.status === "ACTIVE"
         );
-        setActiveSubscriptions(fetchedSubscriptions);
-        setSelectedSubscription(active || null);
+        setActiveSubscriptions(active);
+        setSelectedSubscription(active[0] ?? null);
       } else {
         setActiveSubscriptions([]);
         setSelectedSubscription(null);
@@ -131,26 +131,6 @@ const Home2: React.FC = () => {
       console.error("Error fetching subscriptions:", error);
       setActiveSubscriptions([]);
       setSelectedSubscription(null);
-    } finally {
-      setIsLoadingSubscriptions(false);
-    }
-  };
-
-  const fetchActiveSubscriptions = async () => {
-    try {
-      setIsLoadingSubscriptions(true);
-      const subscriptions =
-        await subscriptionService.getCustomerSubscriptions();
-      const active = subscriptions.filter((sub) => sub.status === "ACTIVE");
-      setActiveSubscriptions(active);
-
-      if (active.length > 0) {
-        setSelectedSubscription(active[0]);
-      }
-    } catch (error) {
-      console.error("Error fetching subscriptions:", error);
-      setActiveSubscriptions([]);
-      setIsLoadingSubscriptions(false);
     } finally {
       setIsLoadingSubscriptions(false);
     }
@@ -169,52 +149,45 @@ const Home2: React.FC = () => {
     }
   };
 
-  const fetchBasePacks = async () => {
-    try {
-      setIsLoadingPacks(true);
-      setError(null);
-
-      if (!localStorage.getItem("phoneNumber")) {
-        navigate(`${basePath}/login`, { state: { returnUrl: location.pathname } });
-        return;
-      }
-
-      const packs = await basePackService.getAllBasePacks();
-      setBasePacks(packs);
-    } catch (error: any) {
-      console.error("Error fetching base packs:", error);
-      if (
-        error.message === "Authentication required" ||
-        error.message.includes("Session expired")
-      ) {
-        navigate(`${basePath}/login`, { state: { returnUrl: location.pathname } });
-      } else {
-        setError(error.message || "Failed to load base packs");
-      }
-    } finally {
-      setIsLoadingPacks(false);
-    }
-  };
-
   const fetchProducts = async () => {
     try {
       setIsLoadingProducts(true);
-      const fetchedProducts = await productService.getAllProducts();
+      setProductsFetchError(null);
 
-      const normalizedProducts = fetchedProducts.map((product) => ({
-        ...product,
-        type: product?.type?.toUpperCase(),
-        category: product?.category?.toUpperCase(),
-      }));
+      if (!localStorage.getItem("phoneNumber")) {
+        const existing = storeService.getTemporaryStoreId();
+        if (!existing) {
+          try {
+            await storeService.getStoreFromLocation();
+          } catch {
+            /* browse still works without store; API may return broader catalog */
+          }
+        }
+      }
+      const storeId = storeService.getStoreIdForProducts();
 
-      // Debug: Log available categories to understand data structure
-      const uniqueCategories = [...new Set(normalizedProducts.map(p => p.category))];
-      console.log("Available categories in products:", uniqueCategories);
+      const fetchedProducts = await productService.getAllProducts({
+        availabilityType: PRODUCT_AVAILABILITY_DAILY,
+        storeId: storeId || undefined,
+      });
+
+      const normalizedProducts = fetchedProducts
+        .filter((product) => product.isActive !== false)
+        .map((product) => ({
+          ...product,
+          type: product?.type?.toUpperCase(),
+          category: product?.category?.toUpperCase(),
+        }));
 
       setProducts(normalizedProducts);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error fetching products:", error);
       setProducts([]);
+      const msg =
+        error && typeof error === "object" && "message" in error
+          ? String((error as Error).message)
+          : "Failed to load products";
+      setProductsFetchError(msg);
     } finally {
       setIsLoadingProducts(false);
     }
@@ -315,15 +288,19 @@ const Home2: React.FC = () => {
     if (isLoggedIn) {
       fetchWalletBalance();
       fetchSubscriptions();
-      fetchActiveSubscriptions();
       fetchOrdersByCustomerId();
       fetchCustomerName();
+    } else {
+      setIsLoadingBalance(false);
     }
 
-    fetchBasePacks();
     fetchProducts();
     validateDeliveryZone(false);
-    fetchLatestAddress();
+    if (localStorage.getItem("access_token")) {
+      fetchLatestAddress();
+    } else {
+      setIsLoadingAddress(false);
+    }
   }, [fetchLatestAddress]);
 
   useEffect(() => {
@@ -356,12 +333,6 @@ const Home2: React.FC = () => {
       validateDeliveryZone(false);
     }
   }, [deliveryLocation]);
-
-  useEffect(() => {
-    if (isLoggedIn) {
-      fetchActiveSubscriptions();
-    }
-  }, [isLoggedIn]);
 
   useEffect(() => {
     const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -401,8 +372,9 @@ const Home2: React.FC = () => {
     setDays(nextSevenDays);
   }, [selectedSubscription]);
 
-  const handleProductClick = (product: ProductType | BasePack) => {
-    navigate(`/gp-daily/product/${product.id}`);
+  const handleProductClick = (product: ProductType) => {
+    const pathSlug = product.slug ?? product.id;
+    navigate(`/gp-daily/product/${encodeURIComponent(String(pathSlug))}`);
   };
 
   const handleLocationClick = () => {
@@ -427,7 +399,17 @@ const Home2: React.FC = () => {
     return `Tomorrow - ${days[tomorrow.getDay()]}, ${tomorrow.getDate()} ${months[tomorrow.getMonth()]}`;
   };
 
-  const isPageLoading = isLoadingAddress || isLoadingBalance || isLoadingPacks || isLoadingProducts;
+  const isPageLoading =
+    isLoadingAddress || isLoadingBalance || isLoadingProducts;
+
+  /** Same category filters as gp-store Product browse (PUJA / EXOTIC). */
+  const pujaPacksForHome = useMemo(
+    () =>
+      products.filter(
+        (item) => item.category === "PUJA" && item.isAvailable,
+      ),
+    [products],
+  );
 
   const exoticPacksForHome = useMemo(
     () =>
@@ -436,9 +418,6 @@ const Home2: React.FC = () => {
       ),
     [products],
   );
-
-  const hasAnyDailyHomePacks =
-    basePacks.length > 0 || exoticPacksForHome.length > 0;
 
   if (isPageLoading) {
     return <GpDailyHomeSkeleton />;
@@ -527,7 +506,7 @@ const Home2: React.FC = () => {
 
           <div className="px-4 py-4 space-y-4">
               {/* Order in Hold Banner - Only show after balance is loaded */}
-              {!isLoadingBalance && walletBalance < 100 && (
+              {!isLoadingBalance && walletBalance < 10000 && (
                 <div className="bg-[#FE5053] rounded-2xl p-4 text-white">
                   <div className="flex items-start gap-3 mb-3">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -600,30 +579,29 @@ const Home2: React.FC = () => {
 
           {/* Main Content */}
           <div className="px-4 py-4 space-y-6">
-            {/* Puja Packs Section */}
+            {/* Puja Packs — products API, category PUJA (same as gp-store browse) */}
             <div>
-              <div className="flex items-center justify-between gap-2 mb-4">
-                <h2 className="text-lg xs:text-xl sm:text-2xl font-semibold text-gray-800 min-w-0 pr-2">Puja Packs</h2>
-                {basePacks.length > 0 && (
+              <div className="flex items-center justify-between gap-2 mb-4 min-w-0">
+                <h2 className="text-lg xs:text-xl sm:text-2xl font-semibold text-gray-800 min-w-0 flex-1 pr-2">
+                  Puja Packs
+                </h2>
                 <button
-                  onClick={() => navigate("/explore-more?category=Puja Flowers&section=Puja Packs")}
-                  className="flex items-center gap-1 text-gray-900 text-sm font-medium"
+                  type="button"
+                  onClick={() =>
+                    navigate(`${basePath}/Products?${new URLSearchParams({ category: "puja" }).toString()}`)
+                  }
+                  className="flex shrink-0 items-center gap-1 text-[#19411f] text-sm font-semibold"
                 >
                   <span>Explore More</span>
                   <FaChevronRight className="text-xs" />
                 </button>
-                )}
               </div>
 
-              {isLoadingPacks ? (
-                <div className="flex justify-center items-center h-40" style={{ backgroundColor: '#f8f6f1' }}>
-                  <Spinner size={48} />
-                </div>
-              ) : error ? (
-                <div className="text-red-500 text-center py-4">{error}</div>
+              {productsFetchError ? (
+                <div className="text-red-500 text-center py-4 text-sm">{productsFetchError}</div>
               ) : (
                 <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
-                  {basePacks.map((pack, index) => (
+                  {pujaPacksForHome.slice(0, 6).map((pack, index) => (
                     <div key={pack.id} className="w-[min(46vw,10.75rem)] xs:w-[11rem] flex-shrink-0 snap-start">
                       <ProductCard
                         imageUrl={getImageUrl(pack.imagesUrl)}
@@ -632,59 +610,65 @@ const Home2: React.FC = () => {
                         price={`₹${pack.sellingPrice}/Day`}
                         showDailyButton={true}
                         showBestsellerTag={index === 0}
-                        onClick={() => handleProductClick(pack as unknown as ProductType)}
+                        onClick={() => handleProductClick(pack)}
                       />
                     </div>
                   ))}
                 </div>
               )}
+              {!productsFetchError && pujaPacksForHome.length === 0 && (
+                <p className="text-center text-sm text-gray-500 py-2">No Puja packs available right now.</p>
+              )}
             </div>
 
-            {/* Exotic Packs Section */}
+            {/* Exotic Packs — products API, category EXOTIC */}
             <div>
-              <div className="flex items-center justify-between gap-2 mb-4">
-                <h2 className="text-lg xs:text-xl sm:text-2xl font-semibold text-gray-800 min-w-0 pr-2">Exotic Packs</h2>
-                {exoticPacksForHome.length > 0 && (
+              <div className="flex items-center justify-between gap-2 mb-4 min-w-0">
+                <h2 className="text-lg xs:text-xl sm:text-2xl font-semibold text-gray-800 min-w-0 flex-1 pr-2">
+                  Exotic Packs
+                </h2>
                 <button
-                  onClick={() => navigate("/explore-more?category=Exotic Flowers&section=Exotic Packs")}
-                  className="flex items-center gap-1 text-gray-900 text-sm font-medium"
+                  type="button"
+                  onClick={() =>
+                    navigate(`${basePath}/Products?${new URLSearchParams({ category: "exotic" }).toString()}`)
+                  }
+                  className="flex shrink-0 items-center gap-1 text-[#19411f] text-sm font-semibold"
                 >
                   <span>Explore More</span>
                   <FaChevronRight className="text-xs" />
                 </button>
-                )}
               </div>
 
               <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
-                  {exoticPacksForHome
-                  .slice(0, 6)
-                  .map((item, index) => (
-                    <div key={item.id} className="w-[min(46vw,10.75rem)] xs:w-[11rem] flex-shrink-0 snap-start">
-                      <ProductCard
-                        imageUrl={getImageUrl(item.imagesUrl)}
-                        packName={item.name}
-                        description={item.description || "Mixed flowers daily"}
-                        price={`₹${item.sellingPrice}/Day`}
-                        showDailyButton={true}
-                        showBestsellerTag={index === 0 || index === 2}
-                        onClick={() => handleProductClick(item)}
-                      />
-                    </div>
-                  ))}
+                {exoticPacksForHome.slice(0, 6).map((item, index) => (
+                  <div key={item.id} className="w-[min(46vw,10.75rem)] xs:w-[11rem] flex-shrink-0 snap-start">
+                    <ProductCard
+                      imageUrl={getImageUrl(item.imagesUrl)}
+                      packName={item.name}
+                      description={item.description || "Mixed flowers daily"}
+                      price={`₹${item.sellingPrice}/Day`}
+                      showDailyButton={true}
+                      showBestsellerTag={index === 0 || index === 2}
+                      onClick={() => handleProductClick(item)}
+                    />
+                  </div>
+                ))}
               </div>
+              {exoticPacksForHome.length === 0 && (
+                <p className="text-center text-sm text-gray-500 py-2">No exotic packs available right now.</p>
+              )}
             </div>
 
-            {/* View All Category — only when at least one pack strip has items */}
-            {hasAnyDailyHomePacks && (
+            {/* Full product browse — always visible (route: /gp-daily/Products) */}
             <div className="flex justify-center pt-4">
               <button
+                type="button"
                 onClick={() => navigate(`${basePath}/Products`)}
                 className="w-full max-w-md bg-[#FAA222] text-gray-700 py-3 rounded-lg font-medium text-sm hover:bg-[#DD7600] transition-colors"
               >
                 View All Category
               </button>
             </div>
-            )}
 
             {/* Quote of the Day Section */}
             <div>

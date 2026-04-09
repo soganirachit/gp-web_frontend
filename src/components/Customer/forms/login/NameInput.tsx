@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { authService } from "../../../../services/auth.service";
 import { toast } from "react-hot-toast";
@@ -8,8 +8,9 @@ import { useFeatureTheme } from "../../../../context/FeatureThemeContext";
 
 const NameInput: React.FC = () => {
   const navigate = useNavigate();
-  const { feature, theme } = useFeatureTheme();
-  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+  const location = useLocation();
+  const { theme } = useFeatureTheme();
+  const basePath = location.pathname.startsWith("/gp-store") ? "/gp-store" : "/gp-daily";
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -266,7 +267,7 @@ const NameInput: React.FC = () => {
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                className={`w-5 h-5 border-2 border-t-transparent rounded-full mx-auto ${feature === 'gpDaily' ? 'border-black' : 'border-white'}`}
+                className={`w-5 h-5 border-2 border-t-transparent rounded-full mx-auto ${theme.feature === "gpDaily" ? "border-black" : "border-white"}`}
               />
             ) : (
               "Continue"

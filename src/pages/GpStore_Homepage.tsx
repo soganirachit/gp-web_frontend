@@ -7,7 +7,15 @@ import { motion } from "framer-motion";
 import { useFeatureTheme } from "../context/FeatureThemeContext";
 import { addressService } from "../services/address.service";
 import { customerService } from "../services/getcustomer.service";
-import { productService, Category, BestSeller, getEffectivePrice, getBasePrice, showStrikeBaseOnCard } from "../services/product.service";
+import {
+  productService,
+  Category,
+  BestSeller,
+  getEffectivePrice,
+  getBasePrice,
+  showStrikeBaseOnCard,
+  PRODUCT_AVAILABILITY_STORE,
+} from "../services/product.service";
 import { storeService } from "../services/store.service";
 import { toast } from "react-hot-toast";
 import { StoreHomeSkeleton } from "../components/common/PageSkeletons";
@@ -81,8 +89,8 @@ const GpStore_Homepage: React.FC = () => {
                 (list || []).map((p) => productService.normalizeToBestSeller(p as Record<string, unknown>));
 
             const [allPacksRaw, premiumRaw] = await Promise.all([
-                productService.getProductsByOrdering(undefined, sid, signal),
-                productService.getProductsByLabel("premium", sid, signal, "-order_count"),
+                productService.getProductsByOrdering(undefined, sid, signal, PRODUCT_AVAILABILITY_STORE),
+                productService.getProductsByLabel("premium", sid, signal, "-order_count", PRODUCT_AVAILABILITY_STORE),
             ]);
 
             setProducts(normalizeList(allPacksRaw as unknown[]));
@@ -155,7 +163,8 @@ const GpStore_Homepage: React.FC = () => {
                 "best-seller",
                 storeId || undefined,
                 signal,
-                "-order_count"
+                "-order_count",
+                PRODUCT_AVAILABILITY_STORE,
             );
             setBestSellers(fetchedBestSellers);
         } catch (error: any) {

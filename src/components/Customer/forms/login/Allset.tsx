@@ -1,13 +1,10 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useFeatureTheme } from '../../../../context/FeatureThemeContext';
 import allsetLogo from '../../../../assets/All/allset_logo.png';
 
 function Allset() {
   const navigate = useNavigate();
-  const { feature } = useFeatureTheme();
-  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
 
   useEffect(() => {
     // Auto-navigate to home after 2 seconds

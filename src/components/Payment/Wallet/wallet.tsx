@@ -241,6 +241,9 @@ const Wallet = () => {
     return <WalletPageSkeleton />;
   }
 
+  /** One horizontal gutter for all cards (Pixel / iPhone / narrow Android). */
+  const pagePad = "px-4 sm:px-5 md:px-6";
+
   return (
     <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom overflow-x-clip">
       <div className="mx-auto w-full max-w-[min(800px,100vw)]">
@@ -258,8 +261,8 @@ const Wallet = () => {
           </div>
         )}
 
-        {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
+        {/* Header — same inset as body cards */}
+        <div className={`sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200 ${pagePad} pt-6 pb-4`}>
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -268,22 +271,28 @@ const Wallet = () => {
             >
               <IoArrowBack size={24} />
             </button>
-            <h1 className="text-2xl font-bold font-serif text-gray-900">My Wallet</h1>
+            <h1 className="text-xl font-semibold font-serif text-gray-900">My Wallet</h1>
           </div>
         </div>
 
+        <div className={`${pagePad} space-y-4 pb-20`}>
         {/* Balance Card */}
-        <div className="mx-4 md:mx-6 bg-[#27A155] text-white rounded-[32px] p-6 md:p-8 shadow-sm relative overflow-hidden">
+        <div className="w-full bg-[#27A155] text-white rounded-[28px] sm:rounded-[32px] px-5 py-4 sm:px-6 sm:py-5 md:px-7 md:py-5 shadow-sm relative overflow-hidden">
 
-          <div className="flex justify-between items-start mb-6">
-            <span className="text-sm md:text-base font-bold tracking-wider opacity-90 uppercase self-center">Available Balance</span>
-            <button className="flex items-center gap-2 px-4 py-2 bg-transparent rounded-2xl text-sm font-semibold border-2 border-white hover:bg-white/10 transition-colors">
-              <img src={depositIcon} alt="History" className="w-5 h-5" />
-              Deposit History
+          <div className="flex justify-between items-center gap-3 mb-3 min-h-[2.25rem]">
+            <span className="text-[11px] font-semibold tracking-wider opacity-90 uppercase leading-none">
+              Available Balance
+            </span>
+            <button
+              type="button"
+              className="flex items-center justify-center gap-1.5 shrink-0 px-3 py-1.5 bg-transparent rounded-2xl text-[11px] font-semibold border-2 border-white/90 text-white hover:bg-white/10 transition-colors"
+            >
+              <img src={depositIcon} alt="" className="w-4 h-4 sm:w-5 sm:h-5 opacity-95" aria-hidden />
+              <span className="whitespace-nowrap">Deposit History</span>
             </button>
           </div>
 
-          <div className="text-6xl md:text-7xl font-bold mb-6">
+          <div className="text-4xl sm:text-5xl md:text-5xl font-semibold mb-4">
             {isLoadingBalance ? (
               <Spinner size={48} variant="light" className="flex-shrink-0" />
             ) : (
@@ -291,44 +300,43 @@ const Wallet = () => {
             )}
           </div>
 
-          <div className="w-full h-[1px] bg-white/40 mb-4"></div>
+          <div className="w-full h-[1px] bg-white/40 mb-3"></div>
 
-          <div className="text-base md:text-lg font-normal opacity-90">
+          <div className="text-[12px] font-normal opacity-90">
             Last deposit ₹1,000
           </div>
         </div>
 
         {/* Low Balance Alert */}
         {!isLoadingBalance && balance < 100000 && (
-          <div className="bg-[#FE5053] rounded-2xl p-6 text-white mx-4 md:mx-6 md:p-6 flex items-center mt-4 h-20 ">
-            <div className="flex items-start gap-3 m-3">
-              <img src={lowbalanceIcon} alt="Low Balance" className="w-6 h-6" />
-              <div className="flex-1">
-                <h3 className="font-bold text-md mb-1">Low Balance</h3>
-                <p className="text-sm text-white/90">
-                  Your wallet balance is low. Recharge Now!                </p>
+          <div className="w-full bg-[#FE5053] rounded-2xl px-4 py-3 text-white flex items-center">
+            <div className="flex items-center gap-3 w-full min-h-[3rem]">
+              <img src={lowbalanceIcon} alt="" className="w-7 h-7 shrink-0" aria-hidden />
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm leading-tight">Low Balance</h3>
+                <p className="text-[11px] font-normal text-white/95 mt-0.5 leading-snug">
+                  Your wallet balance is low. Recharge Now!
+                </p>
               </div>
-
-
             </div>
           </div>
         )}
 
         {/* Add Money Section */}
-        <div className="mx-4 md:mx-6 mt-6">
-          <h2 className="text-2xl md:text-2xl font-semibold mb-4">Add Money To Wallet</h2>
+        <div className="w-full">
+          <h2 className="text-xl font-serif font-semibold text-gray-900">Add Money To Wallet</h2>
 
           {/* Quick Amount Buttons */}
-          <div className="grid grid-cols-2 gap-2 xs:grid-cols-4 xs:gap-3 md:gap-4 mb-6">
+          <div className="mt-3 grid grid-cols-2 gap-2 xs:grid-cols-4 xs:gap-3 md:gap-4 mb-5">
             {QUICK_AMOUNTS.map((amount) => (
               <button
                 key={amount}
                 type="button"
                 onClick={() => handleQuickAmount(amount)}
-                className={`py-2.5 md:py-3 rounded-2xl border-2 text-sm xs:text-base font-medium ${customAmount === amount.toString()
+                className={`py-2 rounded-2xl border-2 text-sm xs:text-base font-medium ${customAmount === amount.toString()
                   ? "border-[#FAA222] text-black bg-[#FAA222]"
                   : "border-gray-200 text-gray-600 bg-white "
-                  } md:text-lg`}
+                  }`}
               >
                 ₹{amount}
               </button>
@@ -338,14 +346,14 @@ const Wallet = () => {
 
 
           <div className="mb-4">
-            <label className="block text-gray-900 font-medium mb-2 md:text-lg">
+            <label className="block text-gray-900 font-medium mb-2">
               Enter Amount
             </label>
             <input
               type="text"
               value={customAmount}
               onChange={handleAmountChange}
-              className={`w-full p-3 md:p-4 border-2 rounded-2xl text-lg md:text-xl ${customAmount && parseInt(customAmount) < MIN_AMOUNT
+              className={`w-full p-3 border-2 rounded-2xl text-base ${customAmount && parseInt(customAmount) < MIN_AMOUNT
                 ? "border-red-300 bg-red-50"
                 : "border-gray-400"
                 }`}
@@ -387,13 +395,12 @@ const Wallet = () => {
               });
 
               try {
-                // Call the add-to-payment endpoint to verify and update wallet
-                // await walletService.verifyPayment({
-                //   razorpay_payment_id: data.razorpay_payment_id,
-                //   razorpay_order_id: data.razorpay_order_id,
-                //   razorpay_signature: data.razorpay_signature,
-                //   amount: amount,
-                // });
+                await walletService.verifyPayment({
+                  razorpay_payment_id: data.razorpay_payment_id,
+                  razorpay_order_id: data.razorpay_order_id,
+                  razorpay_signature: data.razorpay_signature,
+                  amount,
+                });
 
                 // Payment verified successfully, remove from pending
                 removePendingPayment(pendingPaymentId);
@@ -450,7 +457,7 @@ const Wallet = () => {
                 error.message || "Payment failed. Please try again."
               );
             }}
-            className="w-full py-3.5 md:py-4 bg-[#FAA222] text-black rounded-2xl font-medium md:text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="block w-full py-2.5 bg-[#FAA222] text-black rounded-2xl text-sm font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
             buttonText={
               isProcessingPayment ? "Processing..." : `Proceed to Pay ₹${customAmount}`
             }
@@ -508,32 +515,35 @@ const Wallet = () => {
             </button> */}
         </div>
 
-        {/* Enable Auto-Pay Section */}
-        <div className="mx-4 md:mx-6 mt-6 bg-white rounded-2xl p-4 flex items-center justify-between border border-gray-100 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className=" mb-8 w-12 h-12 rounded-full bg-green-50 flex items-center justify-center shrink-0">
-              <img src={enableIcon} alt="Auto Pay" className="w-6 h-6" />
+        {/* Enable Auto-Pay — single row (reference): icon | copy | Disable, same width as sections above */}
+        <div className="w-full rounded-2xl border border-gray-200 bg-white p-3.5 sm:p-4 shadow-sm">
+          <div className="flex flex-row items-center gap-2.5 sm:gap-3">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#e8f5ec] sm:h-11 sm:w-11"
+              aria-hidden
+            >
+              <img src={enableIcon} alt="" className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-            <div className="flex-1">
-              <h3 className="font-medium text-gray-800 text-md md:text-lg leading-tight">
-                Enable Auto-Pay for<br className="block md:hidden" /> Subscription Payments
+            <div className="min-w-0 flex-1">
+              <h3 className="text-[12px] font-semibold leading-snug text-gray-900 sm:text-[13px]">
+                Enable Auto-Pay for Subscription Payments
               </h3>
-              <p className="text-[15px] md:text-sm text-gray-500 mt-1 leading-tight">
+              <p className="mt-0.5 text-[11px] font-normal leading-snug text-gray-500">
                 Your subscription payments will auto-deduct from wallet.
               </p>
             </div>
+            <button
+              type="button"
+              className="shrink-0 rounded-2xl bg-[#FAA222] px-3 py-2 text-center text-xs font-semibold text-black shadow-sm hover:bg-[#E5931F]"
+            >
+              Disable
+            </button>
           </div>
-          <button className=" mb-8 px-5 py-2 bg-[#FAA222] text-black font-semibold rounded-2xl text-sm md:text-md shadow-sm hover:bg-[#E5931F] transition-colors">
-            Disable
-          </button>
         </div>
 
-
-
-
         {/* Combined Transactions & Payment History */}
-        <div className="mx-4 md:mx-6 mt-8 mb-20">
-          <h2 className="text-xl md:text-2xl font-medium mb-4">
+        <div className="w-full pt-4">
+          <h2 className="mb-4 font-serif text-xl font-semibold text-gray-900">
             Recent Transactions
           </h2>
 
@@ -585,8 +595,8 @@ const Wallet = () => {
                               <IoMdArrowDown className="text-red-500 md:text-xl -rotate-[135deg]" />
                             )}
                           </div>
-                          <div>
-                            <div className="font-medium md:text-lg">
+                          <div className="min-w-0">
+                            <div className="truncate text-[13px] font-medium text-gray-900">
                               {isTransaction
                                 ? `${item.type === 'CREDIT' ? 'Credit' : 'Debit'} - ${item.description}`
                                 : 'Wallet Recharge'}
@@ -597,11 +607,11 @@ const Wallet = () => {
                               </div>
                             )} */}
                             {!isTransaction && (item as any).razorpayOrderId && (
-                              <div className="text-xs md:text-sm text-gray-400">
+                              <div className="truncate text-xs text-gray-400 md:text-sm">
                                 Order ID: {(item as any).razorpayOrderId}
                               </div>
                             )}
-                            <div className="text-sm text-gray-500">
+                            <div className="text-[11px] font-normal text-gray-500">
                               {format(
                                 new Date(item.createdAt),
                                 "dd MMM yyyy • h:mm a"
@@ -630,6 +640,7 @@ const Wallet = () => {
                 })}
             </div>
           )}
+        </div>
         </div>
 
         {/* Coupon Modal */}

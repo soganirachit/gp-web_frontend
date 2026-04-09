@@ -6,7 +6,6 @@ import { MdLocationOn } from 'react-icons/md';
 import { FaTag, FaPlus, FaMinus, FaTimes, FaCheck } from 'react-icons/fa';
 import { useCart } from '../../../context/CartContext';
 import { useAuth } from '../../../context/AuthContext';
-import { useFeatureTheme } from '../../../context/FeatureThemeContext';
 import { addressService, Address } from '../../../services/address.service';
 import { storeService } from '../../../services/store.service';
 import DatePicker from 'react-datepicker';
@@ -29,6 +28,13 @@ import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
 import { errorMessageFromCatch } from '../../../utils/apiErrorMessage';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
+import cautionIcon from '../../../assets/svg/gp_daily svg/caution.svg';
+
+const BASE_PATH = '/gp-daily';
+const BROWSE_PRODUCTS_PATH = '/gp-daily/Products';
+const ADDRESS_SELECTION_PATH = '/gp-daily/address-selection';
+const ACCENT = '#FAA222';
+const ACCENT_HOVER = '#e8941a';
 
 /**
  * Survives component remounts (e.g. React Strict Mode) so we only show one toast per
@@ -299,12 +305,12 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                   }, 300);
                 }}
                 placeholder="e.g. POOJA10"
-                className="min-w-0 flex-1 rounded-xl border-2 border-gray-200 px-3 py-2 text-sm font-medium uppercase tracking-wider outline-none transition-colors focus:border-[#19411F] sm:px-4 sm:py-2.5"
+                className="min-w-0 flex-1 rounded-xl border-2 border-gray-200 px-3 py-2 text-sm font-medium uppercase tracking-wider outline-none transition-colors focus:border-[#FAA222] sm:px-4 sm:py-2.5"
               />
               <button
                 onClick={handleManualApply}
                 disabled={!manualCode.trim() || isApplying}
-                className="flex shrink-0 items-center justify-center rounded-xl bg-[#19411F] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#1e5a1c] disabled:cursor-not-allowed disabled:opacity-50 sm:px-5 sm:py-2.5"
+                className="flex shrink-0 items-center justify-center rounded-xl bg-[#FAA222] px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-[#e8941a] disabled:cursor-not-allowed disabled:opacity-50 sm:px-5 sm:py-2.5"
               >
                 {isApplying ? '...' : 'Apply'}
               </button>
@@ -313,7 +319,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
               <p
                 role="status"
                 className={`mt-2.5 text-xs font-medium leading-snug sm:text-sm ${
-                  applyHint.kind === 'success' ? 'text-green-700' : 'text-red-600'
+                  applyHint.kind === 'success' ? 'text-amber-700' : 'text-red-600'
                 }`}
               >
                 {applyHint.text}
@@ -343,7 +349,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                 <p className="text-sm text-gray-500">{fetchError}</p>
                 <button
                   onClick={loadCoupons}
-                  className="mt-2 text-sm text-[#19411F] font-medium hover:underline"
+                  className="mt-2 text-sm text-[#FAA222] font-medium hover:underline"
                 >
                   Retry
                 </button>
@@ -359,17 +365,17 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                       key={coupon.id}
                       className={`flex items-center justify-between gap-2 rounded-xl border-2 p-3 transition-colors sm:rounded-2xl sm:p-4 ${
                         isApplied
-                          ? 'border-[#19411F] bg-[#f0f7f0]'
+                          ? 'border-[#FAA222] bg-[#fff3e0]'
                           : 'border-dashed border-gray-300 bg-gray-50'
                       }`}
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <FaTag className={`text-base flex-shrink-0 ${isApplied ? 'text-[#19411F]' : 'text-gray-400'}`} />
+                        <FaTag className={`text-base flex-shrink-0 ${isApplied ? 'text-[#FAA222]' : 'text-gray-400'}`} />
                         <div className="min-w-0">
                           {/* Code + discount badge */}
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-bold text-gray-900 tracking-wider text-sm">{coupon.code}</p>
-                            <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">
+                            <span className="text-xs bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full">
                               {coupon.discount_label}
                             </span>
                           </div>
@@ -389,8 +395,8 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                         disabled={isApplying}
                         className={`ml-3 flex-shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
                           isApplied
-                            ? 'bg-[#19411F] text-white'
-                            : 'bg-white border border-[#19411F] text-[#19411F] hover:bg-[#19411F] hover:text-white'
+                            ? 'bg-[#FAA222] text-gray-900'
+                            : 'bg-white border border-[#FAA222] text-gray-900 hover:bg-[#FAA222]'
                         }`}
                       >
                         {isApplied ? (
@@ -419,8 +425,7 @@ const Cart: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoggedIn, phoneNumber: authPhoneNumber } = useAuth();
-  const { feature } = useFeatureTheme();
-  const browseProductsPath = feature === 'gpStore' ? '/gp-store/products' : '/gp-daily/Products';
+  const browseProductsPath = BROWSE_PRODUCTS_PATH;
   const { storePendingPayment, getPendingPayments, removePendingPayment, retryWithBackoff } = useNetworkRecovery();
   const {
     items,
@@ -445,22 +450,37 @@ const Cart: React.FC = () => {
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   // (Bouquet message editing uses inline UI; no overflow menu needed)
 
+  // gp-daily "Select Delivery Days" UI state (subscription-style selector)
+  const [deliveryFrequency, setDeliveryFrequency] = useState<'Daily' | 'Mon-Sat' | 'Customize'>('Daily');
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const weekDays = [
+    { day: 'Mon', enabled: true },
+    { day: 'Tue', enabled: true },
+    { day: 'Wed', enabled: true },
+    { day: 'Thu', enabled: true },
+    { day: 'Fri', enabled: true },
+    { day: 'Sat', enabled: true },
+    { day: 'Sun', enabled: true },
+  ];
+
+  const handleDaySelection = (day: string) => {
+    setSelectedDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  };
+
   // Check authentication and redirect if session expired
   useEffect(() => {
     if (!isLoggedIn || !localStorage.getItem('access_token')) {
-      const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
-      navigate(`${basePath}/login`, {
+      navigate(`${BASE_PATH}/login`, {
         state: { returnUrl: location.pathname, fromCart: true },
         replace: true
       });
     }
-  }, [isLoggedIn, navigate, location.pathname, feature]);
+  }, [isLoggedIn, navigate, location.pathname]);
 
   // Listen for tokenRemoved event (session expiration)
   useEffect(() => {
     const handleTokenRemoved = () => {
-      const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
-      navigate(`${basePath}/login`, { 
+      navigate(`${BASE_PATH}/login`, { 
         state: { returnUrl: location.pathname, fromCart: true },
         replace: true 
       });
@@ -470,7 +490,7 @@ const Cart: React.FC = () => {
     return () => {
       window.removeEventListener('tokenRemoved', handleTokenRemoved);
     };
-  }, [navigate, location.pathname, feature]);
+  }, [navigate, location.pathname]);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editMessage, setEditMessage] = useState<string>('');
   const datePickerRef = useRef<HTMLDivElement>(null);
@@ -508,20 +528,13 @@ const Cart: React.FC = () => {
   };
 
   const navigateToProductDetail = (item: (typeof items)[number]) => {
-    const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
-    if (feature === 'gpStore') {
-      const slug = item.productSlug?.trim();
-      if (!slug) return;
-      navigate(`${basePath}/product/${encodeURIComponent(slug)}`);
-      return;
-    }
     const dailySlug = item.productSlug?.trim();
     if (dailySlug) {
-      navigate(`${basePath}/product/${encodeURIComponent(dailySlug)}`);
+      navigate(`${BASE_PATH}/product/${encodeURIComponent(dailySlug)}`);
       return;
     }
     if (!item.productId) return;
-    navigate(`${basePath}/product/${encodeURIComponent(String(item.productId))}`);
+    navigate(`${BASE_PATH}/product/${encodeURIComponent(String(item.productId))}`);
   };
 
   const isSlotSelectable = (slot: DeliverySlot, date: Date) => {
@@ -1049,16 +1062,14 @@ const Cart: React.FC = () => {
   };
 
   const handleEditAddress = () => {
-    const addressPath = feature === 'gpStore' ? '/gp-store/address-selection' : '/gp-daily/address-selection';
-    navigate(addressPath, { state: { fromCart: true } });
+    navigate(ADDRESS_SELECTION_PATH, { state: { fromCart: true } });
   };
 
   const handleCheckout = async () => {
-    const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
     if (items.length === 0) { toast.error('Your cart is empty'); return; }
     if (!deliveryInfo) { toast.error('Please select delivery date and time'); return; }
     if (!isLoggedIn) {
-      navigate(`${basePath}/login`, { state: { returnUrl: `${basePath}/basket`, fromCart: true } });
+      navigate(`${BASE_PATH}/login`, { state: { returnUrl: `${BASE_PATH}/basket`, fromCart: true } });
       return;
     }
 
@@ -1075,7 +1086,7 @@ const Cart: React.FC = () => {
       return;
     }
 
-    if (!defaultAddress) { toast.error('Please add a delivery address'); navigate(`${basePath}/addresses`); return; }
+    if (!defaultAddress) { toast.error('Please add a delivery address'); navigate(`${BASE_PATH}/addresses`); return; }
 
     try {
       setIsProcessingPayment(true);
@@ -1130,8 +1141,7 @@ const Cart: React.FC = () => {
     );
     clearCart();
     toast.success('Order placed successfully!');
-    const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
-    navigate(`${basePath}/payment-success`, {
+    navigate(`${BASE_PATH}/payment-success`, {
       state: { orderId: orderNumber, orderNumber, amount },
     });
   };
@@ -1276,8 +1286,7 @@ const Cart: React.FC = () => {
 
   // Auth guard
   if (!isLoggedIn || !localStorage.getItem('access_token')) {
-    const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
-    return <Navigate to={`${basePath}/login`} state={{ returnUrl: location.pathname, fromCart: true }} replace />;
+    return <Navigate to={`${BASE_PATH}/login`} state={{ returnUrl: location.pathname, fromCart: true }} replace />;
   }
 
   // Full-page loader: initial paint + first totals fetch + first-time sync — not checkout-triggered syncCartToAPI()
@@ -1310,7 +1319,7 @@ const Cart: React.FC = () => {
       <SEO
         title="My Basket — Genda Phool"
         description="Your Genda Phool basket"
-        canonical="https://customerapp.mygendaphool.com/gp-store/basket"
+        canonical="https://customerapp.mygendaphool.com/gp-daily/basket"
         noIndex={true}
       />
       <div className="mx-auto flex min-h-screen w-full max-w-[min(800px,100vw)] flex-1 flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]">
@@ -1337,7 +1346,7 @@ const Cart: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate(browseProductsPath)}
-              className="mt-2 rounded-full bg-[#19411F] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1e5a1c]"
+              className="mt-2 rounded-full bg-[#FAA222] px-6 py-2.5 text-sm font-semibold text-gray-900 transition-colors hover:bg-[#e8941a]"
             >
               Browse Products
             </button>
@@ -1370,12 +1379,7 @@ const Cart: React.FC = () => {
                                 <span className="font-normal text-gray-600"> ({item.variant.name})</span>
                               )}
                             </h3>
-                            {deliveryInfo && (
-                              <div className="mt-0.5 text-xs leading-snug text-gray-600">
-                                <div>Delivery: {deliveryInfo.deliveryDate}</div>
-                                <div>Time Slot: {deliveryInfo.timeSlot}</div>
-                              </div>
-                            )}
+                            {/* gp-daily: delivery date/time not shown per item */}
                           </div>
                           <button
                             type="button"
@@ -1415,7 +1419,7 @@ const Cart: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleQuantityDelta(item.id, 1)}
-                              className="touch-target-compact flex h-6 w-6 items-center justify-center rounded-full bg-[#19411F] text-white transition-colors hover:bg-[#1e5a1c]"
+                              className="touch-target-compact flex h-6 w-6 items-center justify-center rounded-full bg-[#FAA222] text-gray-900 transition-colors hover:bg-[#e8941a]"
                               aria-label="Increase quantity"
                             >
                               <FaPlus className="text-[7px]" />
@@ -1449,9 +1453,9 @@ const Cart: React.FC = () => {
                           setEditingItemId(item.id);
                           setEditMessage('');
                         }}
-                        className="touch-target-compact mt-2 ml-[5.25rem] mr-1 inline-flex h-auto w-auto items-center gap-2 rounded-full border border-[#19411F] bg-white px-3 py-1.5 text-[11px] font-semibold leading-snug text-[#19411F] hover:bg-[#f1f7f2] sm:ml-24"
+                        className="touch-target-compact mt-2 ml-[5.25rem] mr-1 inline-flex h-auto w-auto items-center gap-2 rounded-full border border-[#FAA222] bg-white px-3 py-1.5 text-[11px] font-semibold leading-snug text-[#FAA222] hover:bg-[#fff7ea] sm:ml-24"
                       >
-                        <span className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-[#19411F] text-[#19411F]">
+                        <span className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-[#FAA222] text-[#FAA222]">
                           <svg width="10" height="10" viewBox="0 0 20 20" fill="none" aria-hidden>
                             <path d="M10 4.5V15.5M4.5 10H15.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                           </svg>
@@ -1467,7 +1471,7 @@ const Cart: React.FC = () => {
                         value={editMessage}
                         onChange={(e) => { if (e.target.value.length <= 500) setEditMessage(e.target.value); }}
                         placeholder="Add a customized message"
-                        className="min-h-[4.75rem] w-full resize-none rounded-lg border border-gray-200 bg-[#fafafa] px-3 py-2.5 text-xs leading-snug text-gray-900 outline-none focus:border-[#19411F]"
+                        className="min-h-[4.75rem] w-full resize-none rounded-lg border border-gray-200 bg-[#fafafa] px-3 py-2.5 text-xs leading-snug text-gray-900 outline-none focus:border-[#FAA222]"
                         rows={2}
                         maxLength={500}
                       />
@@ -1482,7 +1486,7 @@ const Cart: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleSaveEdit(item.id)}
-                          className="touch-target-compact inline-flex h-auto items-center rounded-lg bg-[#19411F] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#1e5a1c]"
+                          className="touch-target-compact inline-flex h-auto items-center rounded-lg bg-[#FAA222] px-3.5 py-2 text-xs font-semibold text-gray-900 hover:bg-[#e8941a]"
                         >
                           Save
                         </button>
@@ -1502,109 +1506,97 @@ const Cart: React.FC = () => {
                 </div>
               ))}
 
-              {/* Delivery Date and Time */}
-              <div className="bg-white rounded-[25px] p-4 shadow-sm relative">
-                <h3 className="text-base font-semibold text-gray-900 mb-3">Delivery Date</h3>
-                <div className="grid grid-cols-2 gap-2 xs:grid-cols-4 mb-4">
-                  {(['today', 'tomorrow', 'dayAfter', 'pickDate'] as const).map((opt) => {
-                    const isTodayDisabled =
-                      opt === 'today' && !isLoadingSlots && !hasSelectableTodaySlots;
-                    return (
-                    <button
-                      key={opt}
-                      type="button"
-                      disabled={isTodayDisabled}
-                      onClick={() => handleDateOptionSelect(opt)}
-                      className={`px-2 py-2 min-h-[40px] xs:min-h-[36px] rounded-xl text-[10px] xs:text-[10px] font-medium transition-colors flex items-center justify-center gap-1 text-center leading-tight ${
-                        isTodayDisabled
-                          ? 'cursor-not-allowed border border-gray-200 bg-gray-50 text-gray-400'
-                          : selectedDateOption === opt
-                            ? 'bg-[#19411F] text-white'
-                            : 'bg-white text-gray-700 border border-gray-200'
-                      }`}
-                    >
-                      {opt === 'pickDate' && <BsCalendar4 className="flex-shrink-0 text-[10px]" aria-hidden />}
-                      <span className="min-w-0 [overflow-wrap:anywhere]">
-                        {opt === 'today' ? 'Today' : opt === 'tomorrow' ? 'Tomorrow' : opt === 'dayAfter' ? 'Day After' : 'Pick Date'}
-                      </span>
-                    </button>
-                    );
-                  })}
+              {/* Select Delivery Days (daily UI) */}
+              <div className="bg-white rounded-[22px] p-4 shadow-sm relative">
+                <h3 className="text-lg sm:text-xl font-semibold font-serif text-gray-900 mb-3 sm:mb-4 tracking-tight">
+                  Select Delivery Days
+                </h3>
+
+                <div className="flex gap-2 mb-3 sm:mb-4 w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeliveryFrequency('Daily');
+                      setSelectedDays([]);
+                    }}
+                    className={`flex-1 min-h-[38px] py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                      deliveryFrequency === 'Daily'
+                        ? 'bg-[#FAA222] text-gray-900 shadow-sm'
+                        : 'bg-white border border-gray-200 text-gray-900 shadow-sm'
+                    }`}
+                  >
+                    Daily
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeliveryFrequency('Mon-Sat');
+                      setSelectedDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+                    }}
+                    className={`flex-1 min-h-[38px] py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                      deliveryFrequency === 'Mon-Sat'
+                        ? 'bg-[#FAA222] text-gray-900 shadow-sm'
+                        : 'bg-white border border-gray-200 text-gray-900 shadow-sm'
+                    }`}
+                  >
+                    Mon-Sat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeliveryFrequency('Customize');
+                      setSelectedDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+                    }}
+                    className={`flex-1 min-h-[38px] py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                      deliveryFrequency === 'Customize'
+                        ? 'bg-[#FAA222] text-gray-900 shadow-sm'
+                        : 'bg-white border border-gray-200 text-gray-900 shadow-sm'
+                    }`}
+                  >
+                    Customize
+                  </button>
                 </div>
 
-                <h3 className="text-base font-semibold text-gray-900 mb-3 mt-4">
-                  Time Slot
-                  {isLoadingSlots && <span className="ml-2 text-xs font-normal text-gray-400">Loading...</span>}
-                </h3>
-                
-                {showDatePicker && (
-                  <>
-                    <div
-                      className="fixed inset-0 bg-black bg-opacity-20 z-40"
-                      onClick={() => setShowDatePicker(false)}
-                    />
-                    {/* Centered date picker modal; stays within viewport on all screen sizes */}
-                    <div
-                      ref={datePickerRef}
-                      className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1.2rem)] max-w-sm bg-white rounded-xl shadow-2xl z-50 p-4 border border-gray-200"
-                    >
-                      <style>{`
-                        .react-datepicker { border: none !important; font-family: inherit; }
-                        .react-datepicker__header { background-color: white !important; border-bottom: 1px solid #e5e7eb !important; padding-top: 0.75rem; }
-                        .react-datepicker__current-month { font-weight: 600; color: #111827; margin-bottom: 0.5rem; }
-                        .react-datepicker__day-name { color: #6b7280; font-weight: 500; width: 2.5rem; line-height: 2.5rem; }
-                        .react-datepicker__day { width: 2.5rem; line-height: 2.5rem; margin: 0.125rem; border-radius: 50%; color: #111827; }
-                        .react-datepicker__day:hover { border-radius: 50%; background-color: #f3f4f6; }
-                        .react-datepicker__day--selected, .react-datepicker__day--keyboard-selected { background-color: #19411F !important; color: white !important; border-radius: 50%; }
-                        .react-datepicker__day--today { font-weight: 600; }
-                        .react-datepicker__navigation { top: 1rem; }
-                        .react-datepicker__navigation-icon::before { border-color: #6b7280; }
-                      `}</style>
-                      <DatePicker
-                        selected={deliveryInfo?.selectedDate || null}
-                        onChange={handleDatePickerChange}
-                        minDate={
-                          isLoadingSlots || hasSelectableTodaySlots
-                            ? startOfDay(new Date())
-                            : addDays(startOfDay(new Date()), 1)
-                        }
-                        inline
-                        calendarClassName="!border-0 !shadow-none"
-                        className="w-full"
-                      />
-                    </div>
-                  </>
-                )}
-
-                <div className="w-full">
-                  {isLoadingSlots ? (
-                    <div className="text-xs text-gray-400 py-2 text-center">Checking availability...</div>
-                  ) : slotsToShow.length === 0 ? (
-                    <div className="text-xs text-red-500 py-2 text-center">No slots available for this date</div>
-                  ) : (
-                    <div
-                      className="grid w-full min-w-0 gap-2"
-                      style={{
-                        gridTemplateColumns: `repeat(${slotsToShow.length}, minmax(0, 1fr))`,
-                      }}
-                    >
-                      {slotsToShow.map((slot) => (
+                {(deliveryFrequency === 'Customize' || deliveryFrequency === 'Mon-Sat') && (
+                  <div className="mb-3 sm:mb-4">
+                    <div className="flex gap-1.5 justify-between">
+                      {weekDays.map((d) => (
                         <button
-                          key={slot.id}
+                          key={d.day}
                           type="button"
-                          onClick={() => handleTimeSlotSelect(slot)}
-                          className={`w-full min-w-0 px-1.5 py-2 min-h-[36px] rounded-xl text-[10px] xs:text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5 ${
-                            selectedSlotId === slot.id
-                              ? 'bg-[#19411F] text-white'
-                              : 'bg-white text-gray-700 border border-gray-200'
+                          onClick={() => {
+                            if (deliveryFrequency === 'Customize' && d.enabled) handleDaySelection(d.day);
+                          }}
+                          className={`flex-1 min-w-0 max-w-[3.25rem] sm:max-w-none h-8 sm:h-9 rounded-xl flex items-center justify-center text-[10px] sm:text-xs font-semibold transition-all ${
+                            !d.enabled
+                              ? 'bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed'
+                              : selectedDays.includes(d.day)
+                                ? 'bg-[#FAA222] text-gray-900 shadow-sm'
+                                : 'bg-white border border-gray-200 text-gray-900 opacity-70'
                           }`}
+                          disabled={!d.enabled || deliveryFrequency === 'Mon-Sat'}
                         >
-                          {slot.start_time && slot.end_time ? formatSlotTimeRange(slot.start_time, slot.end_time) : (slot.slot_name || 'Slot')}
+                          {d.day}
                         </button>
                       ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+
+                {deliveryFrequency === 'Customize' && selectedDays.length > 0 && selectedDays.length < 3 && (
+                  <div className="mb-3 sm:mb-4 bg-[#FDE8EC] rounded-xl px-3 py-2.5 flex items-start gap-2 border border-[#f5ccd6]/60">
+                    <img
+                      src={cautionIcon}
+                      alt=""
+                      className="mt-0.5 h-4 w-4 sm:h-5 sm:w-5 shrink-0 opacity-90"
+                    />
+                    <p className="text-xs sm:text-sm font-semibold text-gray-900 leading-snug">
+                      Please select at least 3 days for a 1-week subscription
+                    </p>
+                  </div>
+                )}
+
+                {/* Subscribe button removed as requested */}
               </div>
 
               {/* Delivery Details */}
@@ -1625,7 +1617,7 @@ const Cart: React.FC = () => {
                 ) : defaultAddress ? (
                   <div>
                     <div className="mb-1 flex items-center gap-2">
-                      <MdLocationOn className="flex-shrink-0 text-lg text-[#19411F]" />
+                      <MdLocationOn className="flex-shrink-0 text-lg text-[#FAA222]" />
                       <span className="truncate text-sm font-medium text-gray-900">{defaultAddress.type}</span>
                     </div>
                     <p className="line-clamp-3 pl-7 text-sm leading-snug text-gray-600">
@@ -1635,7 +1627,7 @@ const Cart: React.FC = () => {
                 ) : (
                   <div>
                     <p className="mb-2 text-sm text-gray-500">No address found</p>
-                    <button type="button" onClick={handleEditAddress} className="text-sm font-medium text-[#19411F] hover:underline">
+                    <button type="button" onClick={handleEditAddress} className="text-sm font-medium text-[#FAA222] hover:underline">
                       Add Address
                     </button>
                   </div>
@@ -1643,17 +1635,17 @@ const Cart: React.FC = () => {
               </div>
 
               {/* ── Promo Code ─────────────────────────────────────────────── */}
-              <div className="bg-white rounded-2xl py-2.5 px-3 shadow-sm border-2 border-[#19411F]">
+              <div className="bg-white rounded-2xl py-2.5 px-3 shadow-sm border-2 border-[#FAA222]">
                 {appliedPromoCode ? (
                   <div className="flex items-center justify-between gap-2 min-h-0">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-8 h-8 shrink-0 rounded-full bg-[#f0f7f0] flex items-center justify-center">
-                        <FaCheck className="text-[#19411F] text-xs" />
+                      <div className="w-8 h-8 shrink-0 rounded-full bg-[#fff3e0] flex items-center justify-center">
+                        <FaCheck className="text-[#FAA222] text-xs" />
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-gray-900 truncate">"{appliedPromoCode}" applied</p>
                         {promoDiscount > 0 && (
-                          <p className="text-xs text-[#19411F] font-medium">You save ₹{promoDiscount.toLocaleString('en-IN')}</p>
+                          <p className="text-xs text-[#FAA222] font-medium">You save ₹{promoDiscount.toLocaleString('en-IN')}</p>
                         )}
                       </div>
                     </div>
@@ -1668,10 +1660,10 @@ const Cart: React.FC = () => {
                     className="w-full flex items-center justify-between gap-2 py-0.5 min-h-0"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <FaTag className="text-[#19411F] text-sm shrink-0" aria-hidden />
+                      <FaTag className="text-[#FAA222] text-sm shrink-0" aria-hidden />
                       <span className="text-sm font-semibold text-gray-900">Add Promo Code</span>
                     </div>
-                    <FaPlus className="text-[#19411F] text-sm shrink-0" aria-hidden />
+                    <FaPlus className="text-[#FAA222] text-sm shrink-0" aria-hidden />
                   </button>
                 )}
               </div>
@@ -1715,7 +1707,7 @@ const Cart: React.FC = () => {
                   )}
                   {/* Show promo line only if backend hasn't merged it into discount already */}
                   {appliedPromoCode && promoDiscount > 0 && discount === 0 && (
-                    <div className="flex justify-between text-sm text-[#19411F] font-medium">
+                    <div className="flex justify-between text-sm text-[#FAA222] font-medium">
                       <span>Promo ({appliedPromoCode})</span>
                       <span>-₹{promoDiscount.toLocaleString('en-IN')}</span>
                     </div>
@@ -1723,7 +1715,7 @@ const Cart: React.FC = () => {
                 </div>
                 <div className="flex justify-between items-center pt-4 border-t border-gray-200">
                   <span className="text-lg font-bold text-gray-900">Total</span>
-                  <span className="text-xl font-bold text-[#19411F]">₹{total.toLocaleString('en-IN')}</span>
+                  <span className="text-xl font-bold text-[#FAA222]">₹{total.toLocaleString('en-IN')}</span>
                 </div>
               </div>
 
@@ -1751,7 +1743,7 @@ const Cart: React.FC = () => {
               <button
                 onClick={handleCheckout}
                 disabled={isProcessingPayment}
-                className="w-full bg-[#19411F] text-white py-4 rounded-[25px] text-base font-semibold hover:bg-[#1e5a1c] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-[#FAA222] text-gray-900 py-4 rounded-[25px] text-base font-semibold hover:bg-[#e8941a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isProcessingPayment && (
                   <Spinner size={22} variant="light" className="!inline-flex" />

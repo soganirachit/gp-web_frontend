@@ -77,7 +77,11 @@ api.interceptors.response.use(
         localStorage.removeItem("gp_store_cart");
         localStorage.removeItem("gp_store_cart_delivery_info");
         window.dispatchEvent(new Event("tokenRemoved"));
-        window.location.href = "/login";
+        {
+          const p = typeof window !== "undefined" ? window.location.pathname : "";
+          const loginPath = p.startsWith("/gp-daily") ? "/gp-daily/login" : "/gp-store/login";
+          window.location.href = loginPath;
+        }
         return Promise.reject(refreshError);
       }
     }

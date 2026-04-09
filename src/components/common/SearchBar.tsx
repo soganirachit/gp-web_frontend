@@ -145,8 +145,11 @@ export function SearchBar({
   const handleProductSuggestionClick = (item: ProductSuggestion) => {
     setShowSuggestions(false);
     setQuery('');
-    const identifier = productBasePath === '/gp-daily' ? String(item.id) : (item.slug || String(item.id));
-    navigate(`${productBasePath}/product/${identifier}`, { state: { product: item } });
+    const identifier =
+      productBasePath === '/gp-daily'
+        ? String(item.slug ?? item.id)
+        : item.slug || String(item.id);
+    navigate(`${productBasePath}/product/${encodeURIComponent(identifier)}`, { state: { product: item } });
   };
 
   const handleOrderSuggestionClick = (order: OrderSuggestion) => {

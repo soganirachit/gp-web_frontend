@@ -1,581 +1,598 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { MdLocationOn, MdKeyboardArrowDown } from "react-icons/md";
-import { FaChevronRight, FaSearch } from "react-icons/fa";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { MdKeyboardArrowDown } from "react-icons/md";
+import { IoSwapVerticalOutline } from "react-icons/io5";
+import { FaChevronRight } from "react-icons/fa";
+import { SEO } from "../SEO";
 import { addressService } from "../../services/address.service";
-import { productService } from "../../services/product.service";
-import type { Product } from "../../services/product.service";
-import { basePackService, BasePack } from "../../services/basepack.service";
-import ProductCard from "../common/ProductCard";
+import {
+  productService,
+  type Category,
+  getEffectivePrice,
+  getBasePrice,
+  showStrikeBaseOnCard,
+  resolveProductImageUrl,
+} from "../../services/product.service";
+import { storeService } from "../../services/store.service";
+import { getApiUrl } from "../../config/api.config";
+import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
+import { ProductImageTag } from "../common/ProductImageTag";
 import { ProductBrowseSkeleton } from "../common/PageSkeletons";
-import SearchIcon from "../../assets/icon/Search.png";
-import ProfileIcon from "../../assets/icon/Profile.png";
-import walletImage from "../../assets/icon/Wallet.png";
-import scooterIcon from "../../assets/svg/gp_daily svg/scooter.svg";
-import pujaIcon from "../../assets/icon/puja.svg";
-import exoticIcon from "../../assets/icon/exotic.svg";
-import sortIcon from "../../assets/svg/gp_daily svg/sort.svg";
-import filterIcon from "../../assets/svg/gp_daily svg/filter.svg";
-import orangeCover from "../../assets/svg/gp_daily svg/orange_cover.svg";
+import { SearchBar } from "../common/SearchBar";
 import locationhomeIcon from "../../assets/svg/gp_daily svg/locationhome.svg";
+import scooterIcon from "../../assets/svg/gp_daily svg/scooter.svg";
 
-const ProductPage: React.FC = () => {
+const DAILY_AVAILABILITY = "daily" as const;
+
+const ProductBrowsePage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const category = searchParams.get("category");
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // State management
-  const [activeTab, setActiveTab] = useState("Puja Flowers");
-  const [activeSubCategory, setActiveSubCategory] = useState("All");
-  const [products, setProducts] = useState<Product[]>([]);
-  const [basePacks, setBasePacks] = useState<BasePack[]>([]);
+  const categorySlug = useMemo(() => searchParams.get("category"), [searchParams]);
+  const stateCategoryName = useMemo(
+    () => (location.state as { categoryName?: string } | null)?.categoryName,
+    [location.state],
+  );
+
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [sortBy, setSortBy] = useState("Price");
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [deliveryLocation, setDeliveryLocation] = useState<string>("");
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+  const [categoryName, setCategoryName] = useState("All Products");
+  const [deliveryLocation, setDeliveryLocation] = useState("");
+  const [addressType, setAddressType] = useState("Home");
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
+  const [displayedProducts, setDisplayedProducts] = useState(6);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch address
+  const basePath = "/gp-daily";
+
   const fetchLatestAddress = useCallback(async () => {
     try {
       setIsLoadingAddress(true);
       const addresses = await addressService.getAllAddresses();
+      const defaultAddress = addresses.find((addr) => addr.isDefault);
+      const selected =
+        defaultAddress ||
+        addresses.sort(
+          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        )[0];
 
-      const latestAddress = addresses
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-      [0];
-
-      if (latestAddress) {
-        const formattedAddress = [
-          latestAddress.houseNo,
-          latestAddress.streetName,
-          latestAddress.area,
-          latestAddress.city,
-          latestAddress.state,
-          latestAddress.pincode
-        ].filter(Boolean).join(', ');
-
-        setDeliveryLocation(formattedAddress);
+      if (selected) {
+        const formatted = [
+          selected.houseNo,
+          selected.streetName,
+          selected.area,
+          selected.city,
+          selected.state,
+          selected.pincode,
+        ]
+          .filter(Boolean)
+          .join(", ");
+        setDeliveryLocation(formatted);
+        setAddressType(selected.type || "Home");
       } else {
-        setDeliveryLocation('');
+        setDeliveryLocation("");
+        setAddressType("Home");
       }
-    } catch (error) {
-      console.error('Error fetching address:', error);
-      setDeliveryLocation(localStorage.getItem('userLocation') || '');
+    } catch {
+      setDeliveryLocation(localStorage.getItem("userLocation") || "");
+      setAddressType("Home");
     } finally {
       setIsLoadingAddress(false);
     }
   }, []);
 
   useEffect(() => {
-    if (category === "puja" || category === "pujaflowers") {
-      setActiveTab("Puja Flowers");
-      setActiveSubCategory("All");
-    } else if (category === "exotic") {
-      setActiveTab("Exotic Flowers");
-      setActiveSubCategory("All");
-    }
-  }, [category]);
+    const fetchCategories = async () => {
+      try {
+        setIsLoadingCategories(true);
+        const storeId = storeService.getStoreIdForProducts();
+        let fetched = await productService.getCategories(
+          storeId || undefined,
+          DAILY_AVAILABILITY,
+        );
+        if (!fetched.length) {
+          fetched = await productService.getCategories(storeId || undefined, "store");
+        }
+        const active = fetched
+          .filter((c) => c.is_active)
+          .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+        setCategories(active);
+      } catch (e) {
+        console.error("Error fetching categories:", e);
+        setCategories([]);
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
-    fetchLatestAddress();
-  }, [fetchLatestAddress]);
-
-  // Fetch data
-  useEffect(() => {
-    const fetchData = async () => {
+    const run = async () => {
       try {
         setIsLoading(true);
         setError(null);
 
-        const [productsResult, basePacksResult] = await Promise.all([
-          productService.getAllProducts(),
-          basePackService.getAllBasePacks().catch(() => []) // Handle error gracefully
-        ]);
+        if (!localStorage.getItem("phoneNumber")) {
+          const existing = storeService.getTemporaryStoreId();
+          if (!existing) {
+            try {
+              await storeService.getStoreFromLocation();
+            } catch (e) {
+              console.error(e);
+            }
+          }
+        }
 
-        const activeProducts = productsResult.filter((item: Product) => item.isActive);
-        setProducts(activeProducts);
-        setBasePacks(basePacksResult);
-      } catch (error) {
-        console.error("Error fetching data:", error);
+        const storeId = storeService.getStoreIdForProducts();
+
+        if (stateCategoryName) {
+          setCategoryName(stateCategoryName);
+        } else if (categorySlug) {
+          const formatted = categorySlug
+            .split("-")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+          setCategoryName(formatted);
+        } else {
+          setCategoryName("All Products");
+        }
+
+        let list: any[] = [];
+        const rawAll = async () => {
+          const r = await productService.getAllProducts({
+            availabilityType: DAILY_AVAILABILITY,
+            storeId: storeId || undefined,
+          });
+          return r.filter((p: any) => p.isActive !== false);
+        };
+
+        if (!categorySlug) {
+          list = await rawAll();
+        } else if (categorySlug === "puja" || categorySlug === "pujaflowers") {
+          const all = await rawAll();
+          list = all.filter((p) => p.category?.toUpperCase() === "PUJA");
+          setCategoryName("Puja Flowers");
+        } else if (categorySlug === "exotic") {
+          const all = await rawAll();
+          list = all.filter((p) => p.category?.toUpperCase() === "EXOTIC");
+          setCategoryName("Exotic Flowers");
+        } else {
+          const result = await productService.getProductsByCategory(
+            categorySlug,
+            storeId || undefined,
+            DAILY_AVAILABILITY,
+          );
+          list = result || [];
+        }
+
+        setProducts(list);
+        setDisplayedProducts(6);
+      } catch (e) {
+        console.error(e);
         setError("Failed to load products");
+        setProducts([]);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchData();
-  }, []);
+    run();
+    fetchLatestAddress();
+  }, [categorySlug, stateCategoryName, fetchLatestAddress]);
 
-  // Helper function to get image URL
-  const getImageUrl = (imagesUrl?: string | string[]): string => {
-    if (!imagesUrl) return "/placeholder.svg";
-    if (Array.isArray(imagesUrl)) {
-      return imagesUrl[0] || "/placeholder.svg";
-    }
-    return imagesUrl;
+  useEffect(() => {
+    if (!categorySlug || stateCategoryName) return;
+    const cat = categories.find((c) => c.slug === categorySlug);
+    if (cat?.name) setCategoryName(cat.name);
+  }, [categories, categorySlug, stateCategoryName]);
+
+  const sortProducts = (items: any[], sortType: string) => {
+    return [...items].sort((a, b) => {
+      switch (sortType) {
+        case "Price": {
+          return getEffectivePrice(a) - getEffectivePrice(b);
+        }
+        case "Popularity":
+          return 0;
+        case "New": {
+          const idA = a.id?.toString() || "";
+          const idB = b.id?.toString() || "";
+          return idB.localeCompare(idA);
+        }
+        case "Special":
+          return 0;
+        default:
+          return 0;
+      }
+    });
   };
 
-  const handleProductClick = (product: Product | BasePack) => {
-    navigate(`/product/${product.id}`, { state: { product } });
+  const handleProductClick = (product: any) => {
+    const pathSlug = product?.slug ?? product?.id;
+    if (pathSlug == null || pathSlug === "") return;
+    navigate(`${basePath}/product/${encodeURIComponent(String(pathSlug))}`, { state: { product } });
   };
 
   const handleLocationClick = () => {
-    navigate('/location', { state: { returnUrl: '/Products' } });
+    navigate(`${basePath}/addresses`);
   };
 
-  // Filter products by category and type
-  const pujaProducts = products.filter((item) => item.category === "PUJA");
-  const exoticProducts = products.filter((item) => item.category === "EXOTIC");
-
-  // Filter by type for subcategories (Puja Flowers)
-  const pujaPackProducts = basePacks;
-  const bouquetProducts = pujaProducts.filter((item) => item.type?.toUpperCase() === "BOUQUET");
-  const garlandProducts = pujaProducts.filter((item) => item.type?.toUpperCase() === "GARLAND");
-  const comboPackProducts = pujaProducts.filter((item) => item.type?.toUpperCase() === "COMBO");
-
-  // Filter by type for subcategories (Exotic Flowers)
-  // Exotic Packs are all exotic products (matching gp-daily homepage logic)
-  const exoticPackProducts = exoticProducts.filter((item) => item.isAvailable);
-  const exoticBouquetProducts = exoticProducts.filter((item) => item.type?.toUpperCase() === "BOUQUET");
-  const exoticGarlandProducts = exoticProducts.filter((item) => item.type?.toUpperCase() === "GARLAND");
-  const exoticComboPackProducts = exoticProducts.filter((item) => item.type?.toUpperCase() === "COMBO");
-
-  // Get products based on active subcategory
-  const getFilteredProducts = () => {
-    if (activeTab === "Exotic Flowers") {
-      // For Exotic Flowers, filter by subcategory
-      switch (activeSubCategory) {
-        case "Bouquets":
-          return exoticBouquetProducts.filter((item) => item.isAvailable);
-        case "Garlands":
-          return exoticGarlandProducts.filter((item) => item.isAvailable);
-        case "Combo Pack":
-          return exoticComboPackProducts.filter((item) => item.isAvailable);
-        case "All":
-        default:
-          return exoticProducts.filter((item) => item.isAvailable);
-      }
-    }
-
-    // For Puja Flowers, filter by subcategory
-    switch (activeSubCategory) {
-      case "Puja Packs":
-        return pujaPackProducts;
-      case "Bouquets":
-        return bouquetProducts.filter((item) => item.isAvailable);
-      case "Garlands":
-        return garlandProducts.filter((item) => item.isAvailable);
-      case "Combo Pack":
-        return comboPackProducts.filter((item) => item.isAvailable);
-      case "All":
-      default:
-        return pujaProducts.filter((item) => item.isAvailable);
+  const handleCategoryClick = (slug: string | null) => {
+    if (slug) {
+      setSearchParams({ category: slug });
+    } else {
+      setSearchParams({});
     }
   };
 
-  const filteredProducts = getFilteredProducts();
+  const handleLoadMore = () => setDisplayedProducts((p) => p + 6);
 
-  if (isLoading || isLoadingAddress) {
+  const sortedProducts = sortProducts(products, sortBy);
+  const filteredProducts =
+    searchQuery.trim() === ""
+      ? sortedProducts
+      : sortedProducts.filter((item) => {
+          const q = searchQuery.toLowerCase();
+          const name = String(item.name ?? "").toLowerCase();
+          const desc = String(item.description ?? item.short_description ?? "").toLowerCase();
+          return name.includes(q) || desc.includes(q);
+        });
+  const visibleProducts = filteredProducts.slice(0, displayedProducts);
+  const hasMoreProducts = filteredProducts.length > displayedProducts;
+
+  const isPageLoading = isLoading || isLoadingCategories || isLoadingAddress;
+
+  const seoDescription = useMemo(() => {
+    if (!categorySlug) {
+      return "Browse daily flower subscriptions and products from Genda Phool.";
+    }
+    const cat = categories.find((c) => c.slug === categorySlug);
+    return `Shop ${cat?.name || categoryName} — fresh flowers delivered daily.`;
+  }, [categorySlug, categories, categoryName]);
+
+  if (isPageLoading) {
     return <ProductBrowseSkeleton />;
   }
 
+  const seoTitle =
+    categoryName && categoryName !== "All Products"
+      ? `${categoryName} — Genda Phool Daily`
+      : "Products — Genda Phool Daily";
+
+  /** GP Daily accent (replaces gp-store #19411f) */
+  const chipActive = "bg-[#FAA222] text-gray-900";
+  const chipInactive = "bg-transparent text-[#222222]";
+  const sortSelectedRow = "bg-[#FAA222] text-gray-900";
+
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
-      <div className="mx-auto min-h-screen w-full max-w-[min(800px,100vw)] bg-[#f8f6f1] pb-nav-bottom">
-        {/* Top Navigation Bar */}
-        <div className="bg-[#f8f6f1] sticky top-0 z-20 px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            {/* Location Section */}
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
-              <img
-                src={locationhomeIcon}
-                alt="Location"
-                className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0"
-              />
+      <SEO
+        title={seoTitle}
+        description={seoDescription}
+        canonical={`https://customerapp.mygendaphool.com/gp-daily/Products${
+          categorySlug ? `?category=${encodeURIComponent(categorySlug)}` : ""
+        }`}
+      />
+      <div className="mx-auto min-h-screen w-full min-w-0 max-w-[min(800px,100vw)] overflow-x-hidden bg-[#f8f6f1] pb-nav-bottom">
+        <div className="sticky top-0 z-20 bg-[#f8f6f1] border-b border-gray-200">
+          <div className="px-4 pt-6 pb-3">
+            <div className="flex items-center gap-1.5 mb-3">
+              <img src={locationhomeIcon} alt="" className="w-4 h-4 flex-shrink-0" />
               <div
                 className="flex items-center gap-1 cursor-pointer min-w-0 flex-1"
                 onClick={handleLocationClick}
               >
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm sm:text-base font-bold text-gray-800">Home</span>
-                  <span className="text-xs sm:text-sm text-gray-600 truncate font-medium">
-                    {isLoadingAddress ? 'Loading...' : deliveryLocation || 'Tap to set address'}
+                  <span className="text-sm font-bold text-gray-800">{addressType}</span>
+                  <span className="text-xs text-gray-600 truncate font-medium">
+                    {isLoadingAddress ? "Loading..." : deliveryLocation || "Tap to set address"}
                   </span>
                 </div>
-                <MdKeyboardArrowDown className="text-gray-600 flex-shrink-0 text-lg sm:text-xl" />
+                <MdKeyboardArrowDown className="text-gray-600 flex-shrink-0 text-lg" />
               </div>
             </div>
 
-            {/* Right Side Icons */}
-            {/* <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
-              <img
-                src={SearchIcon}
-                alt="Search"
-                className="w-6 h-6 sm:w-7 sm:h-7 cursor-pointer"
-                onClick={() => navigate('/search')}
-                />
-                <img
-                  src={walletImage}
-                  alt="Wallet"
-                className="w-10 h-10 sm:w-10 sm:h-10 cursor-pointer"
-                onClick={() => navigate('/wallet')}
-              />
-            </div> */}
+            <SearchBar
+              mode="product"
+              storeId={storeService.getStoreIdForProducts() ?? undefined}
+              productBasePath={basePath}
+              searchPagePath="/search"
+              value={searchQuery}
+              onChange={setSearchQuery}
+            />
           </div>
 
-          {/* Search Bar */}
-          <div className="mt-2 sm:mt-3">
-            <div
-              className="rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 cursor-pointer shadow-sm border border-[#808080]"
-              onClick={() => navigate('/search')}
-            >
-              <span className="flex-1 text-left text-gray-400 text-sm sm:text-base font-medium">Search anything.....</span>
-              <FaSearch className="text-gray-400 w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-            </div>
-          </div>
-        </div>
-
-        {/* Primary and Secondary Category Filters */}
-        <div className="bg-[#f8f6f1] px-4 pt-4">
-          <div className="bg-white rounded-2xl p-2 mb-3 border border-gray-200">
-            <div className="relative flex gap-2">
-              {/* Sliding Orange Background */}
-              <div
-                className={`absolute top-0 bottom-0 transition-all duration-300 ease-in-out ${activeTab === "Puja Flowers" ? "left-2" : "left-1/2"
+          <div className="px-4 pb-3 relative">
+            <div className="flex gap-2.5 overflow-x-auto no-scrollbar">
+              <button
+                type="button"
+                onClick={() => handleCategoryClick(null)}
+                className={`touch-target-compact inline-flex flex-shrink-0 items-center rounded-lg px-3.5 py-2 text-xs leading-snug font-medium transition-colors ${
+                  !categorySlug ? chipActive : chipInactive
+                }`}
+              >
+                All
+              </button>
+              {categories.map((c) => (
+                <button
+                  type="button"
+                  key={c.id}
+                  onClick={() => handleCategoryClick(c.slug)}
+                  className={`touch-target-compact inline-flex flex-shrink-0 items-center rounded-lg px-3.5 py-2 text-xs leading-snug font-medium transition-colors whitespace-nowrap ${
+                    categorySlug === c.slug ? chipActive : chipInactive
                   }`}
-                style={{
-                  width: "calc(50% - 0.5rem)",
-                }}
-              >
-                <img
-                  src={orangeCover}
-                  alt=""
-                  className="w-full h-full object-cover"
-                  style={{ borderRadius: "0.75rem" }}
-                />
-              </div>
-
-              {/* Buttons */}
-              <button
-                onClick={() => {
-                  setActiveTab("Puja Flowers");
-                  setActiveSubCategory("All");
-                }}
-                className="relative z-10 flex-1 py-1.5 sm:py-2.5 px-4 text-center rounded-lg transition-all duration-300 text-sm sm:text-base font-medium flex items-center justify-center gap-2 bg-transparent"
-              >
-                <img
-                  src={pujaIcon}
-                  alt="Puja"
-                  className={`w-5 h-5 sm:w-7 sm:h-7 transition-opacity duration-300 ${activeTab === "Puja Flowers" ? "opacity-100" : "opacity-50"
-                    }`}
-                  style={activeTab === "Puja Flowers" ? { filter: "brightness(0) saturate(100%)" } : {}}
-                />
-                <span className={activeTab === "Puja Flowers" ? "text-[#222222]" : "text-gray-400"}>
-                  Puja Flowers
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab("Exotic Flowers");
-                  setActiveSubCategory("All");
-                }}
-                className="relative z-10 flex-1 py-1.5 sm:py-2.5 px-4 text-center rounded-lg transition-all duration-300 text-sm sm:text-base font-medium flex items-center justify-center gap-2 bg-transparent"
-              >
-                <img
-                  src={exoticIcon}
-                  alt="Exotic"
-                  className={`w-5 h-5 sm:w-7 sm:h-7 transition-opacity duration-300 ${activeTab === "Exotic Flowers" ? "opacity-100" : "opacity-50"
-                    }`}
-                  style={activeTab === "Exotic Flowers" ? { filter: "brightness(0) saturate(100%)" } : {}}
-                />
-                <span className={activeTab === "Exotic Flowers" ? "text-[#222222]" : "text-gray-400"}>
-                  Exotic Flowers
-                </span>
-              </button>
-            </div>
-          </div>
-          <div className="flex gap-2 overflow-x-auto no-scrollbar items-center px-4">
-            {activeTab === "Puja Flowers"
-              ? ["All", "Puja Packs", "Bouquets", "Garlands"].map((subCat) => (
-                activeSubCategory === subCat ? (
-                  <button
-                    key={subCat}
-                    onClick={() => setActiveSubCategory(subCat)}
-                    className="px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-300 bg-[rgb(250,162,34)] text-gray-900"
-                  >
-                    {subCat}
-                  </button>
-                ) : (
-                  <button
-                    key={subCat}
-                    onClick={() => setActiveSubCategory(subCat)}
-                    className="px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-300 text-gray-900 bg-white border border-gray-200"
-                  >
-                    {subCat}
-                  </button>
-                )
-              ))
-              : ["All", "Bouquets", "Garlands", "Combo Pack"].map((subCat) => (
-                activeSubCategory === subCat ? (
-                  <button
-                    key={subCat}
-                    onClick={() => setActiveSubCategory(subCat)}
-                    className="px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-300 bg-[rgb(250,162,34)] text-gray-900"
-                  >
-                    {subCat}
-                  </button>
-                ) : (
-                  <button
-                    key={subCat}
-                    onClick={() => setActiveSubCategory(subCat)}
-                    className="px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-300 text-gray-900 bg-white border border-gray-200"
-                  >
-                    {subCat}
-                  </button>
-                )
-              ))
-            }
-          </div>
-        </div>
-
-        {/* Sort and Filter Buttons */}
-        <div className="bg-[#f8f6f1] px-8 py-2 flex items-center justify-start gap-2">
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#f8f6f1] border border-gray-200 rounded-xl text-sm font-medium text-[#222222] hover:bg-[#f1eee7] transition-colors">
-            <img src={sortIcon} alt="Sort" className="w-4 h-4" />
-            Sort
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#f8f6f1] border border-gray-200 rounded-xl text-sm font-medium text-[#222222] hover:bg-[#f1eee7] transition-colors">
-            <img src={filterIcon} alt="Filter" className="w-4 h-4" />
-            Filter
-          </button>
-        </div>
-
-        {/* Delivery Information Banner */}
-        <div className="px-4">
-          <div className="bg-white py-2 rounded-2xl">
-            <div className="flex items-center gap-2 text-sm text-gray-700 px-4">
-              <img src={scooterIcon} alt="Scooter" className="w-5 h-5" />
-              <span>Free Delivery - 5-25 min slots in Vadodara</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="px-4 py-4">
-          {error ? (
-            <div className="text-red-500 text-center py-4 text-base">
-              {error}
-            </div>
-          ) : (activeTab === "Puja Flowers" && activeSubCategory === "All") || (activeTab === "Exotic Flowers" && activeSubCategory === "All") ? (
-            // Show sections for "All" subcategory
-            <div className="space-y-6">
-              {/* Puja Packs Section - Only for Puja Flowers */}
-              {activeTab === "Puja Flowers" && (
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-gray-800">Puja Packs</h2>
-                    <button
-                      onClick={() => {
-                        navigate(`/explore-more?category=Puja Flowers&section=Puja Packs`);
-                      }}
-                      className="flex items-center gap-1 text-gray-900 text-sm font-medium"
-                    >
-                      <span>Explore More</span>
-                      <FaChevronRight className="text-xs" />
-                    </button>
-                  </div>
-                  <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                    {pujaPackProducts.slice(0, 3).map((pack, index) => (
-                      <div key={pack.id} className="flex-shrink-0 w-[calc((100%-2rem)/3)] min-w-[calc((100%-2rem)/3)]">
-                        <ProductCard
-                          imageUrl={getImageUrl(pack.imagesUrl)}
-                          packName={pack.name}
-                          description={pack.description || "Mixed flowers daily"}
-                          price={`₹${pack.sellingPrice}/Day`}
-                          showDailyButton={true}
-                          showBestsellerTag={index === 0}
-                          onClick={() => handleProductClick(pack as unknown as Product)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Exotic Packs Section - Only for Exotic Flowers */}
-              {activeTab === "Exotic Flowers" && (
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-gray-800">Exotic Packs</h2>
-                    <button
-                      onClick={() => {
-                        navigate(`/explore-more?category=Exotic Flowers&section=Exotic Packs`);
-                      }}
-                      className="flex items-center gap-1 text-gray-900 text-sm font-medium"
-                    >
-                      <span>Explore More</span>
-                      <FaChevronRight className="text-xs" />
-                    </button>
-                  </div>
-                  <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                    {exoticPackProducts.slice(0, 3).map((item, index) => (
-                      <div key={item.id} className="flex-shrink-0 w-[calc((100%-2rem)/3)] min-w-[calc((100%-2rem)/3)]">
-                        <ProductCard
-                          imageUrl={getImageUrl(item.imagesUrl)}
-                          packName={item.name}
-                          description={item.description || "Mixed flowers daily"}
-                          price={`₹${item.sellingPrice}/Day`}
-                          showDailyButton={true}
-                          showBestsellerTag={index === 0}
-                          onClick={() => handleProductClick(item)}
-                        />
-                      </div>
-                    ))}
-                    {exoticPackProducts.length === 0 && (
-                      <div className="w-full text-center py-8 text-gray-500">
-                        No exotic packs found
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Bouquets Section */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-800">Bouquets</h2>
-                  <button
-                    onClick={() => {
-                      navigate(`/explore-more?category=${activeTab}&section=Bouquets`);
-                    }}
-                    className="flex items-center gap-1 text-gray-900 text-sm font-medium"
-                  >
-                    <span>Explore More</span>
-                    <FaChevronRight className="text-xs" />
-                  </button>
-                </div>
-                <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                  {(activeTab === "Puja Flowers" ? bouquetProducts : exoticBouquetProducts).filter(item => item.isAvailable).slice(0, 3).map((item, index) => (
-                    <div key={item.id} className="flex-shrink-0 w-[calc((100%-2rem)/3)] min-w-[calc((100%-2rem)/3)]">
-                      <ProductCard
-                        imageUrl={getImageUrl(item.imagesUrl)}
-                        packName={item.name}
-                        description={item.description || "Mixed flowers daily"}
-                        price={`₹${item.sellingPrice}/Day`}
-                        showDailyButton={true}
-                        showBestsellerTag={index === 0 || index === 2}
-                        onClick={() => handleProductClick(item)}
-                      />
-                    </div>
-                  ))}
-                  {((activeTab === "Puja Flowers" ? bouquetProducts : exoticBouquetProducts).filter(item => item.isAvailable).length === 0) && (
-                    <div className="w-full text-center py-8 text-gray-500">
-                      No bouquets found
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Garlands Section */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-800">Garlands</h2>
-                  <button
-                    onClick={() => {
-                      navigate(`/explore-more?category=${activeTab}&section=Garlands`);
-                    }}
-                    className="flex items-center gap-1 text-gray-900 text-sm font-medium"
-                  >
-                    <span>Explore More</span>
-                    <FaChevronRight className="text-xs" />
-                  </button>
-                </div>
-                <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                  {(activeTab === "Puja Flowers" ? garlandProducts : exoticGarlandProducts).filter(item => item.isAvailable).slice(0, 3).map((item, index) => (
-                    <div key={item.id} className="flex-shrink-0 w-[calc((100%-2rem)/3)] min-w-[calc((100%-2rem)/3)]">
-                      <ProductCard
-                        imageUrl={getImageUrl(item.imagesUrl)}
-                        packName={item.name}
-                        description={item.description || "Mixed flowers daily"}
-                        price={`₹${item.sellingPrice}/Day`}
-                        showDailyButton={true}
-                        showBestsellerTag={index === 0}
-                        onClick={() => handleProductClick(item)}
-                      />
-                    </div>
-                  ))}
-                  {((activeTab === "Puja Flowers" ? garlandProducts : exoticGarlandProducts).filter(item => item.isAvailable).length === 0) && (
-                    <div className="w-full text-center py-8 text-gray-500">
-                      No garlands found
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Combo Pack Section */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-800">Combo Pack</h2>
-                  <button
-                    onClick={() => {
-                      navigate(`/explore-more?category=${activeTab}&section=Combo Pack`);
-                    }}
-                    className="flex items-center gap-1 text-gray-900 text-sm font-medium"
-                  >
-                    <span>Explore More</span>
-                    <FaChevronRight className="text-xs" />
-                  </button>
-                </div>
-                <div className="flex overflow-x-auto gap-4 no-scrollbar pb-4">
-                  {(activeTab === "Puja Flowers" ? comboPackProducts : exoticComboPackProducts).filter(item => item.isAvailable).slice(0, 3).map((item, index) => (
-                    <div key={item.id} className="flex-shrink-0 w-[calc((100%-2rem)/3)] min-w-[calc((100%-2rem)/3)]">
-                      <ProductCard
-                        imageUrl={getImageUrl(item.imagesUrl)}
-                        packName={item.name}
-                        description={item.description || "Mixed flowers daily"}
-                        price={`₹${item.sellingPrice}/Day`}
-                        showDailyButton={true}
-                        showBestsellerTag={index === 0 || index === 2}
-                        onClick={() => handleProductClick(item)}
-                      />
-                    </div>
-                  ))}
-                  {((activeTab === "Puja Flowers" ? comboPackProducts : exoticComboPackProducts).filter(item => item.isAvailable).length === 0) && (
-                    <div className="w-full text-center py-8 text-gray-500">
-                      No combo packs found
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            // Show grid view for selected subcategory or Exotic Flowers
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 xs:gap-4 items-start">
-              {filteredProducts.map((item, index) => (
-                <div key={item.id} className="flex-shrink-0">
-                  <ProductCard
-                    imageUrl={getImageUrl(item.imagesUrl || (item as BasePack).imagesUrl)}
-                    packName={item.name}
-                    description={item.description || "Mixed flowers daily"}
-                    price={`₹${item.sellingPrice}/Day`}
-                    showDailyButton={true}
-                    showBestsellerTag={index === 0 || index === 2}
-                    onClick={() => handleProductClick(item)}
-                  />
-                </div>
+                >
+                  {c.name}
+                </button>
               ))}
-              {filteredProducts.length === 0 && (
-                <div className="col-span-full text-center py-8 text-gray-500">
-                  No products found in this category
+            </div>
+
+            <div className="mt-2.5 flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                className="touch-target-compact inline-flex items-center gap-1.5 rounded-lg border border-[#D8D3CD] bg-[#f8f6f1] px-3.5 py-2 text-xs leading-snug font-medium text-gray-700 shadow-[0_1px_0_rgba(0,0,0,0.03)] transition-colors hover:bg-[#f1eee7]"
+              >
+                <IoSwapVerticalOutline className="h-4 w-4 shrink-0" />
+                <span>Sort</span>
+              </button>
+              <button
+                type="button"
+                className="touch-target-compact inline-flex items-center gap-1.5 rounded-lg border border-[#D8D3CD] bg-[#f8f6f1] px-3.5 py-2 text-xs leading-snug font-medium text-gray-700 shadow-[0_1px_0_rgba(0,0,0,0.03)] transition-colors hover:bg-[#f1eee7]"
+              >
+                <svg
+                  className="h-4 w-4 shrink-0"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden
+                >
+                  <g clipPath="url(#clip0_daily_filter)">
+                    <path
+                      d="M13.9997 2.66699H9.33301"
+                      stroke="currentColor"
+                      strokeWidth="1.33333"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M6.66667 2.66699H2"
+                      stroke="currentColor"
+                      strokeWidth="1.33333"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M14 8H8"
+                      stroke="currentColor"
+                      strokeWidth="1.33333"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M5.33333 8H2"
+                      stroke="currentColor"
+                      strokeWidth="1.33333"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M14.0003 13.333H10.667"
+                      stroke="currentColor"
+                      strokeWidth="1.33333"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M8 13.333H2"
+                      stroke="currentColor"
+                      strokeWidth="1.33333"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M9.33301 1.33301V3.99967"
+                      stroke="currentColor"
+                      strokeWidth="1.33333"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M5.33301 6.66699V9.33366"
+                      stroke="currentColor"
+                      strokeWidth="1.33333"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M10.667 12V14.6667"
+                      stroke="currentColor"
+                      strokeWidth="1.33333"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </g>
+                  <defs>
+                    <clipPath id="clip0_daily_filter">
+                      <rect width="16" height="16" fill="white" />
+                    </clipPath>
+                  </defs>
+                </svg>
+                <span>Filter</span>
+              </button>
+            </div>
+
+            {isSortDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsSortDropdownOpen(false)} />
+                <div className="absolute left-4 right-4 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                  {[
+                    { value: "Price", label: "Sort by Price" },
+                    { value: "Popularity", label: "Sort by Popularity" },
+                    { value: "New", label: "Sort by New" },
+                    { value: "Special", label: "Sort by Special" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setSortBy(option.value);
+                        setIsSortDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 ${
+                        sortBy === option.value ? sortSelectedRow : "text-gray-700 hover:text-gray-900"
+                      }`}
+                    >
+                      <span className="text-sm font-medium">{option.label}</span>
+                      {sortBy === option.value && (
+                        <svg className="w-4 h-4 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="px-4 py-3">
+          <div className="bg-white py-2 rounded-2xl border border-gray-100 shadow-sm mb-4">
+            <div className="flex items-center gap-2 text-sm text-gray-700 px-4">
+              <img src={scooterIcon} alt="" className="w-5 h-5" />
+              <span>Free Delivery — 5–25 min slots in Vadodara</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-4 py-5">
+          {error ? (
+            <div className="text-red-500 text-center py-4 text-base">{error}</div>
+          ) : (
+            <>
+              <h1 className="text-[clamp(1.125rem,4vw,1.5rem)] font-bold text-gray-900 mb-4 leading-tight [overflow-wrap:anywhere]">
+                {categoryName}
+              </h1>
+
+              {visibleProducts.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No products found in this category.</p>
+                </div>
+              ) : (
+                <div className="gp-store-grid-2 mb-6">
+                  {visibleProducts.map((item) => {
+                    const row = item as Record<string, unknown>;
+                    const key = row.id ?? row.slug ?? String(row.name);
+                    const eff = getEffectivePrice(item);
+                    const labels = (Array.isArray(row.labels) && row.labels.length > 0
+                      ? row.labels
+                      : null) as { name?: string; slug?: string }[] | null;
+                    const shortDesc =
+                      typeof row.short_description === "string"
+                        ? row.short_description
+                        : typeof row.description === "string"
+                          ? row.description
+                          : "";
+                    return (
+                      <div
+                        key={String(key)}
+                        className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-shadow hover:shadow-md cursor-pointer"
+                        onClick={() => handleProductClick(item)}
+                      >
+                        <div className="aspect-square bg-white overflow-hidden relative">
+                          <ProductImageTag labels={labels ?? undefined} variant="daily" />
+                          <img
+                            src={resolveProductImageUrl(row)}
+                            alt={String(row.name ?? "Product")}
+                            loading="lazy"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const img = e.target as HTMLImageElement;
+                              const currentSrc = img.src;
+                              const apiUrl = getApiUrl();
+                              const baseUrl = apiUrl.replace("/api/v1", "");
+                              const pi = row.primary_image;
+                              if (typeof pi === "string" && pi.startsWith("src/")) {
+                                const cleanPath = pi.replace("src/", "");
+                                if (currentSrc.includes("/media/")) {
+                                  img.src = `${baseUrl}/${cleanPath}`;
+                                } else {
+                                  img.src = `${baseUrl}/media/${pi}`;
+                                }
+                                return;
+                              }
+                              img.src = "/placeholder.svg";
+                            }}
+                          />
+                        </div>
+                        <div className="flex min-h-0 flex-1 flex-col p-3">
+                          <div className="mb-1 flex min-h-[2.75rem] items-start justify-between gap-1.5">
+                            <h3 className="min-w-0 flex-1 pr-1 text-sm font-semibold leading-snug text-gray-900 line-clamp-2">
+                              {formatProductTitleCase(String(row.name ?? ""))}
+                            </h3>
+                            <span className="shrink-0 rounded-md bg-[#FAA222] px-2 py-0.5 text-[10px] font-semibold leading-tight text-gray-900">
+                              Daily
+                            </span>
+                          </div>
+                          <div className="mb-1 min-h-[1.25rem] shrink-0">
+                            {shortDesc ? (
+                              <p className="truncate text-xs text-gray-500">
+                                {formatProductTitleCase(shortDesc)}
+                              </p>
+                            ) : (
+                              <p className="truncate text-xs text-gray-500">Mixed flowers daily</p>
+                            )}
+                          </div>
+                          <div className="mt-auto flex items-center justify-between gap-2">
+                            <p className="text-base font-bold text-gray-900">
+                              <span>
+                                ₹{Math.round(eff)}
+                                /Day
+                              </span>
+                              {showStrikeBaseOnCard(item) && (
+                                <span className="ml-1 text-gray-500 font-medium line-through">
+                                  ₹{getBasePrice(item)}
+                                </span>
+                              )}
+                            </p>
+                            <FaChevronRight className="flex-shrink-0 text-sm text-gray-400" />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
-            </div>
+
+              {hasMoreProducts && (
+                <div className="flex justify-center mb-6">
+                  <button
+                    type="button"
+                    onClick={handleLoadMore}
+                    className="inline-flex min-h-[44px] items-center justify-center px-6 py-2.5 text-sm font-medium text-gray-700 underline rounded-lg transition-colors hover:bg-gray-200"
+                  >
+                    Load More
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
-
       </div>
     </div>
   );
 };
 
-export default ProductPage;
+export default ProductBrowsePage;

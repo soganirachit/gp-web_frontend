@@ -4,10 +4,9 @@ import { SEO } from '../components/SEO';
 import { trackPageView } from '../lib/metaPixel';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureTheme } from '../context/FeatureThemeContext';
-import { FEATURE_FLAGS } from '../config/features';
 import { MdLocationOn, MdKeyboardArrowDown, MdAccessTime } from 'react-icons/md';
 import { FaLeaf, FaUsers, FaBox } from 'react-icons/fa';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { addressService, Address } from '../services/address.service';
 import { storeService } from '../services/store.service';
 import { OffersBannerCarousel } from '../components/OffersBannerCarousel';
@@ -37,7 +36,6 @@ const HomePage: React.FC = () => {
   const [deliveryLocation, setDeliveryLocation] = useState<string>('');
   const [addressType, setAddressType] = useState<string>('Home');
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
-  const [showComingSoonModal, setShowComingSoonModal] = useState(false);
   const [isStoryExpanded, setIsStoryExpanded] = useState(false);
   const [offersStoreId] = useState(() => storeService.getStoreIdForProducts() ?? 4);
 
@@ -221,16 +219,14 @@ const HomePage: React.FC = () => {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, delay: 0.1 }}
-              className={`min-w-0 bg-[#FFF5E6] rounded-2xl p-1.5 sm:p-2.5 cursor-pointer hover:shadow-lg transition-shadow relative overflow-hidden flex flex-col ${!FEATURE_FLAGS.gpDailyEnabled ? 'opacity-60' : ''}`}
+              className="min-w-0 bg-[#FFF5E6] rounded-2xl p-1.5 sm:p-2.5 cursor-pointer hover:shadow-lg transition-shadow relative overflow-hidden flex flex-col"
               onClick={() => {
-                if (FEATURE_FLAGS.gpDailyEnabled) {
-                  if (isLoggedIn) {
-                    navigate('/gp-daily', { state: { mode: 'daily' } });
-                  } else {
-                    navigate('/gp-daily/startup', { state: { mode: 'daily' } });
-                  }
+                if (isLoggedIn) {
+                  navigate("/gp-daily", { state: { mode: "daily" } });
                 } else {
-                  setShowComingSoonModal(true);
+                  navigate("/gp-daily/login", {
+                    state: { mode: "daily", returnUrl: "/gp-daily" },
+                  });
                 }
               }}
             >
@@ -508,41 +504,6 @@ const HomePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Coming Soon Modal for GP Daily */}
-      <AnimatePresence>
-        {showComingSoonModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            onClick={() => setShowComingSoonModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="text-center">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  Coming Soon!
-                </h3>
-                <p className="text-gray-600 mb-6">
-                  Genda Phool Daily is currently not available in your area. We're working hard to bring this service to you soon!
-                </p>
-                <button
-                  onClick={() => setShowComingSoonModal(false)}
-                  className="w-full py-3 bg-[#FAA222] text-black font-semibold rounded-xl hover:bg-[#DD7600] transition-colors"
-                >
-                  Got it
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

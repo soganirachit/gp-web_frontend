@@ -24,6 +24,7 @@ interface SubscriptionDetails {
   basePackId: string;
   type: "DAILY" | "CUSTOM" | "Daily" | "custom";
   startDate: string;
+  quantity?: number;
   amount: number;
   packDetails: {
     name: string;
@@ -636,6 +637,14 @@ const ConfirmSubscription: React.FC = () => {
           throw new Error("Please select at least one delivery day for custom subscription");
         }
 
+        const qty =
+          typeof subscriptionDetails.quantity === "number" &&
+          subscriptionDetails.quantity > 0
+            ? Math.floor(subscriptionDetails.quantity)
+            : Math.max(
+                1,
+                parseInt(String(subscriptionDetails.quantity ?? "1"), 10) || 1,
+              );
         // Prepare confirm request data
         const confirmData = {
           basePackId: subscriptionDetails.basePackId,
@@ -643,6 +652,7 @@ const ConfirmSubscription: React.FC = () => {
           type: subscriptionDetails.type.toUpperCase() as "DAILY" | "CUSTOM",
           startDate: startDate,
           selectedDays: selectedDays,
+          quantity: qty,
         };
 
         // Log the confirm request data

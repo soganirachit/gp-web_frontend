@@ -3,14 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
 import { SearchBar } from '../common/SearchBar';
 import { basePackService, BasePack } from '../../services/basepack.service';
-import { productService, Product, getEffectivePrice } from '../../services/product.service';
+import {
+  productService,
+  Product,
+  getEffectivePrice,
+  PRODUCT_AVAILABILITY_DAILY,
+  PRODUCT_AVAILABILITY_STORE,
+} from '../../services/product.service';
 import { trackSearch } from '../../lib/metaPixel';
 import walletImage from '../../assets/icon/Wallet.png';
 import profileImage from '../../assets/icon/Profile.png';
 import logo from '../../assets/All/logo.png';
+import { useFeatureTheme } from '../../context/FeatureThemeContext';
+import { storeService } from '../../services/store.service';
 
 const SearchPage: React.FC = () => {
   const navigate = useNavigate();
+  const { feature } = useFeatureTheme();
+  const listAvailability =
+    feature === 'gpStore' ? PRODUCT_AVAILABILITY_STORE : PRODUCT_AVAILABILITY_DAILY;
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [basePacks, setBasePacks] = useState<BasePack[]>([]);
@@ -20,9 +31,13 @@ const SearchPage: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const storeId = storeService.getStoreIdForProducts();
         const [packs, prods] = await Promise.all([
           basePackService.getAllBasePacks(),
-          productService.getAllProducts()
+          productService.getAllProducts({
+            availabilityType: listAvailability,
+            storeId: storeId || undefined,
+          }),
         ]);
         setBasePacks(packs);
         setProducts(prods);
@@ -60,7 +75,9 @@ const SearchPage: React.FC = () => {
   };
 
   const handleProductClick = (item: Product | BasePack) => {
-    navigate(`/product/${item.id}`, { state: { product: item } });
+    const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+    const pathSlug = 'slug' in item && item.slug ? item.slug : item.id;
+    navigate(`${basePath}/product/${encodeURIComponent(String(pathSlug))}`, { state: { product: item } });
   };
 
   return (

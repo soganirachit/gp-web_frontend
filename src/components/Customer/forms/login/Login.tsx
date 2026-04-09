@@ -20,8 +20,9 @@ const Login = () => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const navigate = useNavigate();
     const location = useLocation();
-    const { theme, feature } = useFeatureTheme();
-    const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
+    const { theme } = useFeatureTheme();
+    /** Same `<Login />` mounts at `/gp-daily/login` and `/gp-store/login` — derive from URL, not theme context (context can disagree with path). */
+    const basePath = location.pathname.startsWith("/gp-store") ? "/gp-store" : "/gp-daily";
 
     // Array of images to cycle through
     const images = [theme.assets.loginHero, theme.assets.otpHero];
@@ -124,7 +125,7 @@ const Login = () => {
     };
 
     const handleSkip = () => {
-        navigate('/gp-store');
+        navigate(basePath, { replace: true });
     };
 
     return (

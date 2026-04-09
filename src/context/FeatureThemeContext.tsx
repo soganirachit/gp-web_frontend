@@ -10,7 +10,6 @@ import {
   type FeatureTheme,
   featureThemes,
   getFeatureFromPath,
-  FEATURE_FLAGS,
 } from "../config/features";
 
 interface FeatureThemeContextValue {
@@ -34,24 +33,26 @@ export const FeatureThemeProvider: React.FC<FeatureThemeProviderProps> = ({
 }) => {
   const location = useLocation();
 
-  // Check query params for feature first, then pathname
   const getFeatureFromQuery = (): Feature | null => {
     const params = new URLSearchParams(location.search);
     const featureParam = params.get("feature");
     if (featureParam === "gpStore") return "gpStore";
-    if (featureParam === "gpDaily") {
-      // If gp-daily is disabled, return gpStore instead
-      return FEATURE_FLAGS.gpDailyEnabled ? "gpDaily" : "gpStore";
-    }
+    if (featureParam === "gpDaily") return "gpDaily";
     return null;
   };
 
-  let activeFeature = feature ?? getFeatureFromQuery() ?? getFeatureFromPath(location.pathname);
-  
-  // Force gpStore if gp-daily is disabled and user tried to access gp-daily
-  if (activeFeature === "gpDaily" && !FEATURE_FLAGS.gpDailyEnabled) {
-    activeFeature = "gpStore";
-  }
+  /** URL path wins over `?feature=` so `/gp-daily/*` stays Daily even when home had `?feature=gpStore`. */
+  const featureFromPathPrefix = (): Feature | null => {
+    if (location.pathname.startsWith("/gp-daily")) return "gpDaily";
+    if (location.pathname.startsWith("/gp-store")) return "gpStore";
+    return null;
+  };
+
+  const activeFeature =
+    feature ??
+    featureFromPathPrefix() ??
+    getFeatureFromQuery() ??
+    getFeatureFromPath(location.pathname);
 
   const value = useMemo(
     () => ({

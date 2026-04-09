@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 import Spinner from "../../common/Spinner";
 import { loadRazorpayScript } from "../../../lib/razorpayLoader";
+import { walletService } from "../../../services/wallet.service";
 
 declare global {
   interface Window {
@@ -70,23 +70,15 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
   const handlePayment = async () => {
     try {
       setIsLoading(true);
-      // Call your backend to create an order
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL}/wallet/create-razorpay-order`,
-        { amount, purpose },
-        {
-          withCredentials: true,
-          timeout: 30000,
-        }
-      );
+      const data = await walletService.createRazorpayOrder(amount, purpose);
 
-      if (!response.data.success) {
-        throw new Error(response.data.message);
+      if (!data.order?.id) {
+        throw new Error("Could not create Razorpay order");
       }
 
       await loadRazorpayScript();
 
-      const { order, key_id, customer } = response.data;
+      const { order, key_id, customer } = data;
 
       const options = {
         key: key_id,

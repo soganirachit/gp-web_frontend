@@ -697,12 +697,20 @@ const AddressSelection: React.FC = () => {
         }
 
         // Prepare confirm request data
+        const qty =
+          typeof parsedData.quantity === "number" && parsedData.quantity > 0
+            ? Math.floor(parsedData.quantity)
+            : Math.max(
+                1,
+                parseInt(String(parsedData.quantity ?? "1"), 10) || 1,
+              );
         const confirmData = {
           basePackId: parsedData.basePackId,
           deliveryAddressId: selectedAddress.id,
           type: parsedData.type.toUpperCase() as "DAILY" | "CUSTOM",
           startDate: startDate,
           selectedDays: selectedDays,
+          quantity: qty,
         };
 
         // Then confirm the subscription

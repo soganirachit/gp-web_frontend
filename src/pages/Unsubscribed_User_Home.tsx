@@ -9,7 +9,7 @@ import Banner2 from '../assets/Banner/Banner1.png'
 import Banner3 from '../assets/Banner/Banner1.png'
 const StoryImage = '/story.png';
 import { useNavigate } from 'react-router-dom';
-import { productService } from '../services/product.service';
+import { productService, PRODUCT_AVAILABILITY_DAILY } from '../services/product.service';
 import Delivered from '../assets/icon/Frame.png'
 import Emplooyes from '../assets/icon/Employees.png'
 import Truck from '../assets/icon/Truck.png'
@@ -22,6 +22,7 @@ import { UnsubscribedHomeSkeleton } from '../components/common/PageSkeletons';
 
 interface Product {
   id: string;
+  slug?: string;
   name: string;
   description: string;
   imageUrl?: string;
@@ -40,7 +41,8 @@ function Unsubscribed_User_Home() {
   const sliderRef = useRef<Slider | null>(null);
 
   const handleProductClick = (item: Product) => {
-    navigate(`/product/${item.id}`);
+    const pathSlug = item.slug ?? item.id;
+    navigate(`/gp-daily/product/${encodeURIComponent(String(pathSlug))}`);
   };
 
   const handlePageClick = () => {
@@ -51,7 +53,9 @@ function Unsubscribed_User_Home() {
     const fetchProducts = async () => {
       try {
         setIsLoadingProducts(true);
-        const data = await productService.getAllProducts();
+        const data = await productService.getAllProducts({
+          availabilityType: PRODUCT_AVAILABILITY_DAILY,
+        });
         setProducts(data as Product[]);
       } catch (error) {
         console.error('Error fetching products:', error);

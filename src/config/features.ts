@@ -147,10 +147,6 @@ export const getFeatureFromPath = (pathname: string): Feature => {
     return "gpStore";
   }
   if (pathname.startsWith("/gp-daily")) {
-    // If gp-daily is disabled, redirect to gp-store
-    if (!FEATURE_FLAGS.gpDailyEnabled) {
-      return "gpStore";
-    }
     return "gpDaily";
   }
   // Default to gpStore if gp-daily is disabled, otherwise gpDaily

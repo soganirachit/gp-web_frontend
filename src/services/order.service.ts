@@ -106,16 +106,9 @@ class OrderService {
         }
     }
 
-    async getOrdersByCustomerId() {
-        try {
-            const response = await api.get(`${getApiUrl()}/order`);
-            if (response.status === 200) {
-                return response.data.data;
-            }
-            return [];
-        } catch {
-            return [];
-        }
+    /** Customer orders list — same as {@link getOrders} (backend exposes `GET /orders/`, not `/order`). */
+    async getOrdersByCustomerId(): Promise<any[]> {
+        return this.getOrders();
     }
 
     /**

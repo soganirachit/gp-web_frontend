@@ -37,8 +37,8 @@ const OTPVerification: React.FC = () => {
   const phoneNumber = locState.phoneNumber;
   const returnUrl = locState.returnUrl;
   const fromCart = locState.fromCart;
-  const { theme, feature } = useFeatureTheme();
-  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+  const { theme } = useFeatureTheme();
+  const basePath = location.pathname.startsWith("/gp-store") ? "/gp-store" : "/gp-daily";
 
   const [otp, setOtp] = useState<string[]>(new Array(6).fill(""));
   const [countdown, setCountdown] = useState<number>(0);
@@ -67,7 +67,7 @@ const OTPVerification: React.FC = () => {
       navigate(`${basePath}/login`);
       return;
     }
-  }, [phoneNumber, navigate]);
+  }, [phoneNumber, navigate, basePath]);
 
   // Countdown timer — only runs when countdown > 0 (after resend is clicked)
   useEffect(() => {
