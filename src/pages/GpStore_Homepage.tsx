@@ -16,13 +16,14 @@ import {
   showStrikeBaseOnCard,
   PRODUCT_AVAILABILITY_STORE,
 } from "../services/product.service";
-import { storeService } from "../services/store.service";
+import { GUEST_STORE_UPDATED_EVENT, storeService } from "../services/store.service";
 import { toast } from "react-hot-toast";
 import { StoreHomeSkeleton } from "../components/common/PageSkeletons";
 import { SearchBar } from "../components/common/SearchBar";
 import ErrorBoundary from "../components/ErrorBoundary";
 import SearchIcon from "../assets/icon/Search.png";
 import { useAuth } from "../context/AuthContext";
+import { GP_OPEN_GUEST_AREA_MODAL_EVENT } from "../config/guestAreaModalCopy";
 // Note: If truckstore.svg doesn't exist, rename truckhome.svg to truckstore.svg
 import truckStoreIcon from "../assets/svg/gp_store_svg/truckhome.svg";
 import storeGreenBanner from "../assets/svg/gp_store_svg/greenbanner.svg";
@@ -224,9 +225,15 @@ const GpStore_Homepage: React.FC = () => {
         }
     }, [isLoggedIn]);
 
+    /**
+     * Catalog loads intentionally do NOT use AbortController.
+     * Aborting on effect cleanup causes DevTools "(canceled)" for every in-flight GET when:
+     * - React 18 Strict Mode remounts, or
+     * - User navigates e.g. home → /gp-store/products (same endpoints refetch there).
+     * Outdated responses are harmless to apply briefly; identical GETs are coalesced in api.ts.
+     */
     useEffect(() => {
         let isMounted = true;
-        const abortController = new AbortController();
         let fetchTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
         const initializeStore = async () => {
@@ -242,14 +249,6 @@ const GpStore_Homepage: React.FC = () => {
                     setIsLoadingAddress(false);
                 }
 
-                const existingTempStoreId = storeService.getTemporaryStoreId();
-                if (!existingTempStoreId) {
-                    try {
-                        await storeService.getStoreFromLocation();
-                    } catch (error: any) {
-                        console.error("Error getting store from location:", error);
-                    }
-                }
             }
 
             if (!isMounted) return;
@@ -258,9 +257,9 @@ const GpStore_Homepage: React.FC = () => {
                 if (!isMounted) return;
                 const sid = storeService.getStoreIdForProducts();
                 if (isMounted) setStoreId(sid ?? null);
-                fetchProducts(abortController.signal);
-                fetchCategories(abortController.signal);
-                fetchBestSellers(abortController.signal);
+                void fetchProducts();
+                void fetchCategories();
+                void fetchBestSellers();
             };
 
             fetchTimeoutId = setTimeout(runCatalogFetch, 0);
@@ -271,12 +270,32 @@ const GpStore_Homepage: React.FC = () => {
         return () => {
             isMounted = false;
             if (fetchTimeoutId != null) clearTimeout(fetchTimeoutId);
-            abortController.abort();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    useEffect(() => {
+        if (isLoggedIn) return;
+        const onGuestStore = () => {
+            const sid = storeService.getStoreIdForProducts();
+            setStoreId(sid ?? null);
+            void fetchProducts();
+            void fetchCategories();
+            void fetchBestSellers();
+        };
+        window.addEventListener(GUEST_STORE_UPDATED_EVENT, onGuestStore);
+        return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, onGuestStore);
+    }, [isLoggedIn]);
+
     const handleLocationClick = () => {
+        if (!isLoggedIn) {
+            window.dispatchEvent(
+                new CustomEvent(GP_OPEN_GUEST_AREA_MODAL_EVENT, {
+                    detail: { dismissible: true, variant: "need_location" },
+                }),
+            );
+            return;
+        }
         navigate(`${basePath}/addresses`);
     };
 
@@ -421,7 +440,17 @@ const GpStore_Homepage: React.FC = () => {
                                 <div
                                     key={category.id}
                                     className="flex min-w-0 flex-col items-stretch cursor-pointer"
-                                    onClick={() => navigate(`${basePath}/products?category=${category.slug}`, { state: { categoryName: category.name, categorySlug: category.slug } })}
+                                    onClick={() =>
+                                        navigate(
+                                            `/gp-store/products?category=${category.slug}`,
+                                            {
+                                                state: {
+                                                    categoryName: category.name,
+                                                    categorySlug: category.slug,
+                                                },
+                                            },
+                                        )
+                                    }
                                 >
                                     <div
                                         className="aspect-square w-full rounded-2xl overflow-hidden mb-1.5 shadow-sm flex items-center justify-center shrink-0"
@@ -465,8 +494,8 @@ const GpStore_Homepage: React.FC = () => {
                                 </h2>
                                 <button
                                     type="button"
-                                    onClick={() => navigate(`${basePath}/products`)}
-                                    className="gp-cta-pill-dark mt-3 w-fit"
+                                    onClick={() => navigate("/gp-store/products")}
+                                    className="gp-cta-pill-dark relative z-20 mt-3 w-fit"
                                 >
                                     SHOP NOW
                                 </button>
@@ -481,7 +510,7 @@ const GpStore_Homepage: React.FC = () => {
                             {products.length > 0 && (
                             <button
                                 type="button"
-                                onClick={() => navigate(`${basePath}/products`)}
+                                onClick={() => navigate("/gp-store/products")}
                                 className="gp-link-row shrink-0"
                             >
                                 <span>Explore More</span>
@@ -540,7 +569,7 @@ const GpStore_Homepage: React.FC = () => {
                             {filteredBestSellers.length > 0 && (
                             <button
                                 type="button"
-                               onClick={() => navigate(`${basePath}/products`)}
+                                onClick={() => navigate("/gp-store/products")}
                                 className="gp-link-row shrink-0"
                             >
                                 <span>Explore More</span>
@@ -606,7 +635,7 @@ const GpStore_Homepage: React.FC = () => {
                             {premiumProducts.length > 0 && (
                             <button
                                 type="button"
-                                onClick={() => navigate(`${basePath}/products`)}
+                                onClick={() => navigate("/gp-store/products")}
                                 className="gp-link-row shrink-0"
                             >
                                 <span>Explore More</span>

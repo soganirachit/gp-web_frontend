@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { SEO } from "../SEO";
 import { trackViewContent, trackAddToCart } from "../../lib/metaPixel";
@@ -27,6 +27,13 @@ import { useAuth } from "../../context/AuthContext";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
 import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
+import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import {
+  GUEST_STORE_UPDATED_EVENT,
+  storeService,
+  DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES,
+  formatFreeDeliveryThresholdForDisplay,
+} from "../../services/store.service";
 
 interface ProductImage {
   id: number;
@@ -41,6 +48,8 @@ interface StoreInfo {
   store_price: string;
   available_quantity: number;
   in_stock: boolean;
+  /** From product detail API when backend includes store pricing rules */
+  free_delivery_threshold?: string;
 }
 
 interface ProductDetail {
@@ -103,12 +112,16 @@ const StorePage: React.FC = () => {
   const location = useLocation();
   const { items, addToCart, updateQuantity, removeFromCart } = useCart();
   const { isLoggedIn } = useAuth();
+  const { theme, basePath } = useFeatureTheme();
+  const [guestStoreEpoch, setGuestStoreEpoch] = useState(0);
   const [selectedType] = useState<SubscriptionType>("Daily");
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
+  const [freeDeliveryThresholdDisplay, setFreeDeliveryThresholdDisplay] =
+    useState<string>(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
   const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
     useState(false);
   const [balanceDetails, setBalanceDetails] = useState({
@@ -149,28 +162,49 @@ const StorePage: React.FC = () => {
   }, [items, product, selectedVariant?.id]);
   const basketQuantity = activeCartLine?.quantity ?? 0;
 
+  const resolveFreeDeliveryDisplay = useCallback(
+    async (pd: ProductDetail | null) => {
+      if (!pd) {
+        setFreeDeliveryThresholdDisplay(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
+        return;
+      }
+      const fromProduct = formatFreeDeliveryThresholdForDisplay(
+        pd.store_info?.free_delivery_threshold,
+      );
+      if (fromProduct) {
+        setFreeDeliveryThresholdDisplay(fromProduct);
+        return;
+      }
+      const storeId =
+        storeService.getStoreIdForProducts() || pd.store_info?.store_id;
+      if (!storeId) {
+        setFreeDeliveryThresholdDisplay(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
+        return;
+      }
+      try {
+        const stores = await storeService.getAllStores();
+        const row = stores.find((s) => s.id === storeId);
+        const fmt = formatFreeDeliveryThresholdForDisplay(
+          row?.free_delivery_threshold,
+        );
+        setFreeDeliveryThresholdDisplay(
+          fmt ?? DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES,
+        );
+      } catch {
+        setFreeDeliveryThresholdDisplay(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
+      }
+    },
+    [],
+  );
+
   const fetchProductBySlug = async () => {
     try {
       setLoading(true);
       setError(null);
       if (!slug) {
         setError("No product slug provided");
+        setFreeDeliveryThresholdDisplay(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
         return;
-      }
-      
-      // Initialize temporary store ID if user is not logged in
-      const isLoggedIn = !!localStorage.getItem("phoneNumber");
-      if (!isLoggedIn) {
-        const { storeService } = await import("../../services/store.service");
-        const existingTempStoreId = storeService.getTemporaryStoreId();
-        if (!existingTempStoreId) {
-          try {
-            await storeService.getStoreFromLocation();
-          } catch (error: any) {
-            console.error("Error getting store from location:", error);
-            // Continue without store ID - product might still load
-          }
-        }
       }
       
       // Product fetching works without authentication - token is optional
@@ -209,9 +243,12 @@ const StorePage: React.FC = () => {
         console.error("Error fetching best sellers:", err);
         setRelatedProducts([]);
       }
+
+      await resolveFreeDeliveryDisplay(productData);
     } catch (error: any) {
       console.error("Error fetching product:", error);
       setError(error.message || "Failed to fetch product details");
+      setFreeDeliveryThresholdDisplay(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
     } finally {
       setLoading(false);
     }
@@ -220,7 +257,23 @@ const StorePage: React.FC = () => {
   useEffect(() => {
     fetchProductBySlug();
     setSelectedImageIndex(0); // reset gallery when slug changes
-  }, [slug, navigate]);
+  }, [slug, navigate, guestStoreEpoch]);
+
+  useEffect(() => {
+    if (isLoggedIn) return;
+    const h = () => setGuestStoreEpoch((e) => e + 1);
+    window.addEventListener(GUEST_STORE_UPDATED_EVENT, h);
+    return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, h);
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (!product) return;
+    const onFocus = () => {
+      void resolveFreeDeliveryDisplay(product);
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [product, resolveFreeDeliveryDisplay]);
 
   // Fire ViewContent pixel when product data loads (any product, any category)
   useEffect(() => {
@@ -272,13 +325,17 @@ const StorePage: React.FC = () => {
     return '';
   };
 
+  /** Same ordering as `orderedImages` (primary, then gallery) — keep in sync for cart line image. */
   const getProductImage = () => {
     if (!product) return "/placeholder.svg";
-    if (product.primary_image) return product.primary_image;
-    if (product.images && product.images.length > 0) {
-      // Sort by display_order and get the first one
-      const sortedImages = [...product.images].sort((a, b) => a.display_order - b.display_order);
-      return sortedImages[0].image;
+    const p = String(product.primary_image || "").trim();
+    if (p) return p;
+    if (product.images?.length) {
+      const sorted = [...product.images].sort(
+        (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0),
+      );
+      const u = String(sorted.find((i) => i.image?.trim())?.image || "").trim();
+      if (u) return u;
     }
     return "/placeholder.svg";
   };
@@ -289,11 +346,7 @@ const StorePage: React.FC = () => {
         return;
       }
       
-      if (!isLoggedIn) {
-        toast.error("Please login to continue");
-        navigate("/login", { state: { returnUrl: `/gp-store/product/${slug}` } });
-        return;
-      }
+      if (!isLoggedIn) return;
 
       const { price } = getPriceDisplay();
       
@@ -367,7 +420,9 @@ const StorePage: React.FC = () => {
     try {
       if (!localStorage.getItem("phoneNumber")) {
         toast.error("Please login to continue");
-        navigate("/login", { state: { returnUrl: `/gp-store/product/${slug}` } });
+        navigate(`${basePath}/login`, {
+          state: { returnUrl: `${basePath}/product/${slug}` },
+        });
         return;
       }
       if (!product || !slug) {
@@ -435,19 +490,26 @@ const StorePage: React.FC = () => {
 
   const categoryName = product?.category_name || "Products";
 
-  // Build the ordered image list for the gallery.
-  // Uses the images[] array (sorted by display_order) and falls back to primary_image.
-  // Works for any product regardless of how many images it has.
-  // Must be declared before any early return (Rules of Hooks).
+  // Build the ordered image list: primary first, then gallery rows (by display_order), deduped by URL.
+  // API often sets primary_image and also lists extra files only under images[] — using only one source hides photos.
   const orderedImages = useMemo(() => {
     if (!product) return [];
     const list: { src: string; alt: string }[] = [];
-    if (product.images && product.images.length > 0) {
-      const sorted = [...product.images].sort((a, b) => a.display_order - b.display_order);
-      sorted.forEach(img => list.push({ src: img.image, alt: img.alt_text || product.name }));
-    } else if (product.primary_image) {
-      list.push({ src: product.primary_image, alt: product.name });
-    } else {
+    const seen = new Set<string>();
+    const push = (src: string | null | undefined, alt: string) => {
+      const u = src != null ? String(src).trim() : '';
+      if (!u || seen.has(u)) return;
+      seen.add(u);
+      list.push({ src: u, alt });
+    };
+    push(product.primary_image, product.name);
+    if (product.images?.length) {
+      const sorted = [...product.images].sort(
+        (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0),
+      );
+      sorted.forEach((img) => push(img.image, img.alt_text || product.name));
+    }
+    if (list.length === 0) {
       list.push({ src: '/placeholder.svg', alt: product.name });
     }
     return list;
@@ -780,7 +842,9 @@ const StorePage: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-base font-semibold text-[#19411F]">Free Delivery</p>
-                  <p className="text-sm text-gray-600 mt-0.5">Above ₹149/-</p>
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    Above ₹{freeDeliveryThresholdDisplay}/-
+                  </p>
                 </div>
               </div>
             </div>
@@ -861,6 +925,13 @@ const StorePage: React.FC = () => {
                   <button
                     type="button"
                     className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-60"
+                    onTouchEnd={(e) => {
+                      if (isUpdatingBasket) return;
+                      /* iOS Safari fires a synthetic click after touchend; without this the click runs
+                         after state updates and applies basketQuantity+1 twice (1→3). */
+                      e.preventDefault();
+                      void handleAdjustBasketQuantity(basketQuantity - 1);
+                    }}
                     onClick={() => handleAdjustBasketQuantity(basketQuantity - 1)}
                     aria-label="Decrease quantity"
                     disabled={isUpdatingBasket}
@@ -873,6 +944,11 @@ const StorePage: React.FC = () => {
                   <button
                     type="button"
                     className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#19411F] text-white transition-colors hover:bg-[#1e5a1c] disabled:opacity-60"
+                    onTouchEnd={(e) => {
+                      if (isUpdatingBasket) return;
+                      e.preventDefault();
+                      void handleAdjustBasketQuantity(basketQuantity + 1);
+                    }}
                     onClick={() => handleAdjustBasketQuantity(basketQuantity + 1)}
                     aria-label="Increase quantity"
                     disabled={isUpdatingBasket}
@@ -887,6 +963,25 @@ const StorePage: React.FC = () => {
                 </p>
               )}
             </div>
+          ) : !isLoggedIn ? (
+            <button
+              type="button"
+              onClick={() =>
+                navigate(`${basePath}/login`, {
+                  state: { returnUrl: `${basePath}/product/${slug}` },
+                })
+              }
+              className={`w-full mt-6 py-3.5 rounded-[25px] text-base font-semibold mb-6 flex items-center justify-center ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
+              disabled={
+                !product ||
+                product.in_stock === false ||
+                product.is_available === false
+              }
+            >
+              {product?.in_stock !== false && product?.is_available !== false
+                ? "Log in to add to basket"
+                : "Out of Stock"}
+            </button>
           ) : (
             <button
               onClick={createStoreOrder}

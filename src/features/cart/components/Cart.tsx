@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { IoArrowBack, IoCreateOutline, IoTrashOutline } from 'react-icons/io5';
+import { IoArrowBack, IoCreateOutline, IoStorefrontOutline, IoTrashOutline } from 'react-icons/io5';
 import { BsCalendar4 } from 'react-icons/bs';
 import { MdLocationOn } from 'react-icons/md';
 import { FaTag, FaPlus, FaMinus, FaTimes, FaCheck } from 'react-icons/fa';
@@ -8,10 +8,10 @@ import { useCart } from '../../../context/CartContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useFeatureTheme } from '../../../context/FeatureThemeContext';
 import { addressService, Address } from '../../../services/address.service';
-import { storeService } from '../../../services/store.service';
+import { storeService, storeIsWithinDeliveryRadius } from '../../../services/store.service';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import { format, addDays, isToday, isTomorrow, startOfDay } from 'date-fns';
+import { format, addDays, isAfter, isBefore, isToday, isTomorrow, startOfDay } from 'date-fns';
 import toast from 'react-hot-toast';
 import CartRazorpayPayment from '../../../components/Payment/Rezorpay/CartRazorpayPayment';
 import { paymentService } from '../../../services/payment.service';
@@ -28,6 +28,7 @@ import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
 import { errorMessageFromCatch } from '../../../utils/apiErrorMessage';
+import { DELIVERY_DATE_MAX_DAYS_FROM_TODAY } from '../../../constants/deliveryBooking';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
 
 /**
@@ -60,8 +61,11 @@ const formatSlotTimeRange = (start: string, end: string): string => {
   return `${startStr}-${endStr}${e.period}`;
 };
 
-const getSlotDisplayLabel = (slot: DeliverySlot): string =>
-  slot.start_time && slot.end_time ? formatSlotTimeRange(slot.start_time, slot.end_time) : slot.slot_name || '';
+const getSlotDisplayLabel = (slot: DeliverySlot): string => {
+  if (!slot.start_time || !slot.end_time) return slot.slot_name || '';
+  const { start, end } = getSlotWindowMinutes(slot);
+  return formatSlotTimeRange(minutesToTimeStr(start), minutesToTimeStr(end));
+};
 
 /** Same heuristics as StoreProductsDisplayPage — cart update API stock errors. */
 const isStockLimitError = (raw: unknown): boolean => {
@@ -80,6 +84,41 @@ const toMinutes = (timeStr: string): number => {
   const [h = '0', m = '0'] = (timeStr || '').split(':');
   return Number(h) * 60 + Number(m);
 };
+
+/** For formatSlotTimeRange after normalizing minutes. */
+const minutesToTimeStr = (mins: number): string => {
+  const h = Math.floor(mins / 60) % 24;
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+};
+
+/**
+ * Same-day slot window in minutes from midnight.
+ * Fixes common backend typo: 1 PM stored as "01:00:00" for Afternoon (e.g. 13:00–16:00).
+ */
+function getSlotWindowMinutes(slot: DeliverySlot): { start: number; end: number } {
+  const rawStart = toMinutes(slot.start_time);
+  const end = toMinutes(slot.end_time);
+  let start = rawStart;
+  if (end <= start) return { start, end };
+
+  const name = (slot.slot_name || '').toLowerCase();
+  const startsVeryEarly = rawStart < 7 * 60;
+  const endsAfternoon = end >= 13 * 60;
+  const afternoonLike =
+    name.includes('afternoon') || name.includes('evening') || name.includes('noon');
+
+  if (startsVeryEarly && endsAfternoon && (afternoonLike || rawStart <= 2 * 60)) {
+    const parts = (slot.start_time || '').split(':');
+    const h = Number(parts[0] ?? 0);
+    const mi = Number(parts[1] ?? 0);
+    if (Number.isFinite(h) && h >= 0 && h <= 6) {
+      const shifted = (h + 12) * 60 + (Number.isFinite(mi) ? mi : 0);
+      if (shifted < end) start = shifted;
+    }
+  }
+  return { start, end };
+}
 
 interface ApplyCouponResponse {
   message?: string;
@@ -115,6 +154,31 @@ function totalsFromCartData(cartData: CartData): CartTotalsState {
     total: parseFloat(cartData.total || '0') || 0,
     deliveryAddressId: id === undefined || id === null ? null : Number(id),
   };
+}
+
+function applyServerCartData(
+  cartData: CartData,
+  setTotals: React.Dispatch<React.SetStateAction<CartTotalsState | null>>,
+  setStoreName: React.Dispatch<React.SetStateAction<string>>,
+  setStoreId: React.Dispatch<React.SetStateAction<number | null>>,
+) {
+  setTotals(totalsFromCartData(cartData));
+  setStoreName((cartData.store_name || '').trim());
+  const sid = cartData.store;
+  if (sid == null) {
+    setStoreId(null);
+  } else {
+    const n = Number(sid as number | string);
+    setStoreId(Number.isFinite(n) ? n : null);
+  }
+}
+
+function parseAddressCoordinates(address: Address | null): { lat: number; lng: number } | null {
+  const raw = address?.coordinates?.trim();
+  if (!raw) return null;
+  const [a, b] = raw.split(',').map((s) => parseFloat(s.trim()));
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return { lat: a, lng: b };
 }
 
 function mergeTotalsFromApplyResponse(
@@ -155,7 +219,8 @@ interface Coupon {
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
 const fetchCoupons = async (): Promise<Coupon[]> => {
-  const storeId = storeService.getStoreIdForProducts() ?? 4;
+  const storeId = storeService.getStoreIdForProducts();
+  if (storeId == null) return [];
   const res = await api.get(`${getApiUrl()}/cart/coupons/?store_id=${storeId}`);
   const json = res.data;
   return Array.isArray(json) ? json : (json.data ?? json.results ?? json.coupons ?? []);
@@ -419,7 +484,7 @@ const Cart: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoggedIn, phoneNumber: authPhoneNumber } = useAuth();
-  const { feature } = useFeatureTheme();
+  const { feature, theme } = useFeatureTheme();
   const browseProductsPath = feature === 'gpStore' ? '/gp-store/products' : '/gp-daily/Products';
   const { storePendingPayment, getPendingPayments, removePendingPayment, retryWithBackoff } = useNetworkRecovery();
   const {
@@ -438,10 +503,13 @@ const Cart: React.FC = () => {
   const [defaultAddress, setDefaultAddress] = useState<Address | null>(null);
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerRangeMessage, setDatePickerRangeMessage] = useState<string | null>(null);
   const [selectedDateOption, setSelectedDateOption] = useState<'today' | 'tomorrow' | 'dayAfter' | 'pickDate'>('tomorrow');
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const [availableSlots, setAvailableSlots] = useState<DeliverySlot[]>([]);
+  /** Recompute "today" slot eligibility as the clock moves (same calendar day). */
+  const [slotsNowTick, setSlotsNowTick] = useState(0);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   // (Bouquet message editing uses inline UI; no overflow menu needed)
 
@@ -471,6 +539,12 @@ const Cart: React.FC = () => {
       window.removeEventListener('tokenRemoved', handleTokenRemoved);
     };
   }, [navigate, location.pathname, feature]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setSlotsNowTick((n) => n + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editMessage, setEditMessage] = useState<string>('');
   const datePickerRef = useRef<HTMLDivElement>(null);
@@ -489,7 +563,24 @@ const Cart: React.FC = () => {
   const [promoDiscount, setPromoDiscount] = useState<number>(0);
 
   const [cartTotals, setCartTotals] = useState<CartTotalsState | null>(null);
+  /** Fulfilment store label for basket (from GET /cart/ `store_name`). */
+  const [cartStoreName, setCartStoreName] = useState('');
+  /** Numeric store on server cart — used for nearest-store suggestion (app parity). */
+  const [cartStoreId, setCartStoreId] = useState<number | null>(null);
   const [isLoadingCartTotals, setIsLoadingCartTotals] = useState(false);
+  /** Nearest operational store for saved address — user confirms switch (no auto-switch). */
+  const [suggestedStoreForAddress, setSuggestedStoreForAddress] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [isSwitchingSuggestedStore, setIsSwitchingSuggestedStore] = useState(false);
+  /** Same confirmation as Account store switch (Settings page modal). */
+  const [showSuggestedStoreSwitchModal, setShowSuggestedStoreSwitchModal] = useState(false);
+  /** Closest store by distance is offline (ordering unavailable). */
+  const [deliveryStoreOffline, setDeliveryStoreOffline] = useState(false);
+  /** True when selected address is outside service area for current store (validate-coverage API). */
+  const [addressOutsideDelivery, setAddressOutsideDelivery] = useState<boolean | null>(null);
+  const [isCheckingDeliveryCoverage, setIsCheckingDeliveryCoverage] = useState(false);
   /** After first totals fetch, refreshes (e.g. during checkout) must not show the full-page loader */
   const [hasLoadedCartTotalsOnce, setHasLoadedCartTotalsOnce] = useState(false);
   /** After first successful address + totals + sync idle, checkout must not full-screen when sync runs again */
@@ -506,6 +597,35 @@ const Cart: React.FC = () => {
       [itemId]: (prev[itemId] ?? 0) + 1,
     }));
   };
+
+  const deliveryStoreSyncKey = useRef('');
+
+  /**
+   * Account "Select Store" is source of truth when set. If the server cart is still on
+   * another store, move the basket to the selected store — do not call switchStore(sid)
+   * from the cart (that reverted Account choice and showed Sodala vs Malviya mismatch).
+   */
+  const reconcileCartStoreWithAccountSelection = useCallback(
+    async (cartData: CartData): Promise<CartData> => {
+      if (!isLoggedIn) return cartData;
+      if (cartData.store == null) return cartData;
+      const cartStoreNum = Number(cartData.store as number | string);
+      if (!Number.isFinite(cartStoreNum)) return cartData;
+      try {
+        const persisted = storeService.getSelectedStoreId();
+        if (persisted == null) {
+          await storeService.switchStore(cartStoreNum);
+          return cartData;
+        }
+        if (persisted === cartStoreNum) return cartData;
+        await cartService.switchCartStore(persisted);
+        return await cartService.getCartData();
+      } catch {
+        return cartData;
+      }
+    },
+    [isLoggedIn],
+  );
 
   const navigateToProductDetail = (item: (typeof items)[number]) => {
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
@@ -527,13 +647,17 @@ const Cart: React.FC = () => {
   const isSlotSelectable = (slot: DeliverySlot, date: Date) => {
     // For non-today dates, all API-available slots stay selectable.
     if (!isToday(date)) return true;
-    // For today: only slots strictly ahead of current time are selectable.
-    // This also disables the currently running slot as requested.
+    // For today: bookable until normalized window ends (handles 01:00→13:00 afternoon typo).
     const now = new Date();
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const slotStartMinutes = toMinutes(slot.start_time);
-    return slotStartMinutes > nowMinutes;
+    const { end } = getSlotWindowMinutes(slot);
+    return end > nowMinutes;
   };
+
+  const sortSlotsByStart = (slots: DeliverySlot[]) =>
+    [...slots].sort(
+      (a, b) => getSlotWindowMinutes(a).start - getSlotWindowMinutes(b).start,
+    );
 
   /** Slots the user can actually book for the currently selected delivery date (past slots for "today" are omitted from UI). */
   const slotsToShow = useMemo(() => {
@@ -544,14 +668,38 @@ const Cart: React.FC = () => {
           ? new Date(deliveryInfo.selectedDate)
           : new Date();
     const day = startOfDay(raw);
-    return availableSlots.filter((slot) => isSlotSelectable(slot, day));
-  }, [availableSlots, deliveryInfo?.selectedDate]);
+    return sortSlotsByStart(availableSlots.filter((slot) => isSlotSelectable(slot, day)));
+  }, [availableSlots, deliveryInfo?.selectedDate, slotsNowTick]);
 
   /** True when at least one slot can still be booked for today (after load). */
   const hasSelectableTodaySlots = useMemo(() => {
     const today = startOfDay(new Date());
     return availableSlots.some((slot) => isSlotSelectable(slot, today));
-  }, [availableSlots]);
+  }, [availableSlots, slotsNowTick]);
+
+  const deliveryDateMaxStart = useMemo(
+    () => startOfDay(addDays(new Date(), DELIVERY_DATE_MAX_DAYS_FROM_TODAY)),
+    [slotsNowTick],
+  );
+
+  /** Matches `DatePicker` minDate (today vs tomorrow when today has no bookable slots). */
+  const datePickerMinStart = useMemo(
+    () =>
+      isLoadingSlots || hasSelectableTodaySlots
+        ? startOfDay(new Date())
+        : addDays(startOfDay(new Date()), 1),
+    [isLoadingSlots, hasSelectableTodaySlots, slotsNowTick],
+  );
+
+  const datePickerSelected = useMemo(() => {
+    if (!deliveryInfo?.selectedDate) return null;
+    const d = startOfDay(
+      deliveryInfo.selectedDate instanceof Date
+        ? deliveryInfo.selectedDate
+        : new Date(deliveryInfo.selectedDate),
+    );
+    return isAfter(d, deliveryDateMaxStart) ? deliveryDateMaxStart : d;
+  }, [deliveryInfo?.selectedDate, deliveryDateMaxStart]);
 
   useEffect(() => {
     const state = location.state as { addressUpdated?: boolean } | null;
@@ -593,8 +741,9 @@ const Cart: React.FC = () => {
         setCartTotals((prev) => mergeTotalsFromApplyResponse(response, prev, d));
       } else {
         try {
-          const cartData = await cartService.getCartData();
-          setCartTotals(totalsFromCartData(cartData));
+          const raw = await cartService.getCartData();
+          const cartData = await reconcileCartStoreWithAccountSelection(raw);
+          applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
         } catch (_) {}
       }
 
@@ -615,8 +764,9 @@ const Cart: React.FC = () => {
       await removeCouponAPI();
       setAppliedPromoCode(null);
       setPromoDiscount(0);
-      const cartData = await cartService.getCartData();
-      setCartTotals(totalsFromCartData(cartData));
+      const raw = await cartService.getCartData();
+      const cartData = await reconcileCartStoreWithAccountSelection(raw);
+      applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
       toast.success('Promo code removed');
     } catch (error: any) {
       toast.error(error.message || 'Failed to remove promo code');
@@ -669,18 +819,26 @@ const Cart: React.FC = () => {
     const formattedDate = format(normalizedDate, 'dd MMM yyyy');
     setIsLoadingSlots(true);
     try {
-      const storeId = storeService.getStoreIdForProducts() ?? 4;
+      const storeId = cartStoreId ?? storeService.getStoreIdForProducts();
+      if (storeId == null) {
+        setAvailableSlots([]);
+        setSelectedSlotId(null);
+        setSelectedTimeSlot('');
+        return;
+      }
       const params = new URLSearchParams();
       params.set('store_id', String(storeId));
       const response = await api.get(`/delivery/slots/available/?${params.toString()}`);
       const raw = Array.isArray(response.data) ? response.data : (response.data?.data ?? response.data?.results ?? []);
       // API returns [{ slot: { id, slot_name, start_time, end_time }, is_available }, ...] — flatten and filter
-      const slots: DeliverySlot[] = raw
-        .filter((item: any) => item?.is_available !== false && item?.slot)
-        .map((item: any) => {
-          const s = item.slot;
-          return { id: s.id, slot_name: s.slot_name, start_time: s.start_time, end_time: s.end_time };
-        });
+      const slots: DeliverySlot[] = sortSlotsByStart(
+        raw
+          .filter((item: any) => item?.is_available !== false && item?.slot)
+          .map((item: any) => {
+            const s = item.slot;
+            return { id: s.id, slot_name: s.slot_name, start_time: s.start_time, end_time: s.end_time };
+          }),
+      );
       setAvailableSlots(slots);
       const selectableSlots = slots.filter((slot) => isSlotSelectable(slot, normalizedDate));
       // Auto-select only selectable slots for today; keep existing behavior for other dates.
@@ -791,24 +949,100 @@ const Cart: React.FC = () => {
     }
   }, [isLoggedIn, isLoadingAddress, isLoadingCartTotals, isSyncing]);
 
-  // Fetch cart totals
-  // Depend on `items` so the summary auto-refreshes when quantities or items change
+  // Fetch cart totals — debounce so rapid `items` updates (context/local sync) don't spam GET /cart/.
   useEffect(() => {
-    const fetchCartTotals = async () => {
-      if (!isLoggedIn) return;
+    const id = window.setTimeout(() => {
+      void (async () => {
+        if (!isLoggedIn) return;
+        try {
+          setIsLoadingCartTotals(true);
+          const raw = await cartService.getCartData();
+          const cartData = await reconcileCartStoreWithAccountSelection(raw);
+          applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
+        } catch (_) {
+          setCartTotals(null);
+          setCartStoreName('');
+          setCartStoreId(null);
+        } finally {
+          setIsLoadingCartTotals(false);
+          setHasLoadedCartTotalsOnce(true);
+        }
+      })();
+    }, 320);
+    return () => clearTimeout(id);
+  }, [isLoggedIn, items, reconcileCartStoreWithAccountSelection]);
+
+  // Nearest operational store vs cart store — suggest switch (app parity; no auto-switch).
+  useEffect(() => {
+    if (!isLoggedIn || !defaultAddress || isLoadingCartTotals) return;
+    const addrId = String(defaultAddress.id ?? '');
+    const key = `${addrId}:${cartStoreId ?? ''}`;
+    if (deliveryStoreSyncKey.current === key) return;
+
+    const coords = parseAddressCoordinates(defaultAddress);
+    if (!coords) {
+      setDeliveryStoreOffline(false);
+      setSuggestedStoreForAddress(null);
+      deliveryStoreSyncKey.current = key;
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
       try {
-        setIsLoadingCartTotals(true);
-        const cartData = await cartService.getCartData();
-        setCartTotals(totalsFromCartData(cartData));
-      } catch (_) {
-        setCartTotals(null);
-      } finally {
-        setIsLoadingCartTotals(false);
-        setHasLoadedCartTotalsOnce(true);
+        const operational = await storeService.getNearestStore(coords.lat, coords.lng);
+        if (cancelled) return;
+        if (operational) {
+          setDeliveryStoreOffline(false);
+          if (cartStoreId != null && operational.id !== cartStoreId) {
+            const storesList = await storeService.getAllStores(coords.lat, coords.lng);
+            const currentRow = storesList.find((s) => s.id === cartStoreId);
+            if (currentRow && storeIsWithinDeliveryRadius(currentRow)) {
+              setSuggestedStoreForAddress(null);
+            } else {
+              setSuggestedStoreForAddress({ id: operational.id, name: operational.name });
+            }
+          } else {
+            setSuggestedStoreForAddress(null);
+          }
+          deliveryStoreSyncKey.current = key;
+          return;
+        }
+
+        setSuggestedStoreForAddress(null);
+        const stores = await storeService.getAllStores(coords.lat, coords.lng);
+        if (cancelled) return;
+        const sorted = [...stores].sort((a, b) => {
+          const da = Number(a.distance_km);
+          const db = Number(b.distance_km);
+          const na = Number.isFinite(da) ? da : Number.POSITIVE_INFINITY;
+          const nb = Number.isFinite(db) ? db : Number.POSITIVE_INFINITY;
+          return na - nb;
+        });
+        const nearestAny = sorted[0];
+        if (!nearestAny) {
+          setDeliveryStoreOffline(false);
+          deliveryStoreSyncKey.current = key;
+          return;
+        }
+        if (nearestAny.is_online === false) {
+          setDeliveryStoreOffline(true);
+          deliveryStoreSyncKey.current = key;
+          return;
+        }
+        setDeliveryStoreOffline(false);
+        deliveryStoreSyncKey.current = key;
+      } catch {
+        if (!cancelled) {
+          setDeliveryStoreOffline(false);
+          setSuggestedStoreForAddress(null);
+        }
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-    fetchCartTotals();
-  }, [isLoggedIn, items]);
+  }, [isLoggedIn, defaultAddress, isLoadingCartTotals, cartStoreId]);
 
   // Sync selected profile address to server cart so delivery_fee matches checkout (distance-based).
   useEffect(() => {
@@ -818,8 +1052,11 @@ const Cart: React.FC = () => {
     let cancelled = false;
     (async () => {
       try {
-        const cartData = await cartService.setCartDeliveryAddress(id);
-        if (!cancelled) setCartTotals(totalsFromCartData(cartData));
+        const raw = await cartService.setCartDeliveryAddress(id);
+        if (!cancelled) {
+          const cartData = await reconcileCartStoreWithAccountSelection(raw);
+          applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
+        }
       } catch (e) {
         console.warn('cart delivery-address sync failed', e);
       }
@@ -827,7 +1064,55 @@ const Cart: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isLoggedIn, defaultAddress?.id]);
+  }, [isLoggedIn, defaultAddress?.id, reconcileCartStoreWithAccountSelection]);
+
+  // Selected address vs store coverage (same API as address save flow).
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setAddressOutsideDelivery(null);
+      return;
+    }
+    const coords = defaultAddress?.coordinates;
+    if (!coords || !addressService.validateCoordinatesFormat(coords)) {
+      setAddressOutsideDelivery(null);
+      return;
+    }
+    let cancelled = false;
+    setIsCheckingDeliveryCoverage(true);
+    void addressService
+      .validateAddressInDeliveryArea(coords)
+      .then((res) => {
+        if (!cancelled) setAddressOutsideDelivery(!res.isValid);
+      })
+      .catch(() => {
+        if (!cancelled) setAddressOutsideDelivery(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsCheckingDeliveryCoverage(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, defaultAddress?.coordinates, defaultAddress?.id]);
+
+  // If cart payload omits `store_name`, resolve label from cart / selected store id.
+  useEffect(() => {
+    if (!isLoggedIn || cartStoreName.trim()) return;
+    const sid = cartStoreId ?? storeService.getStoreIdForProducts();
+    if (!sid) return;
+    let cancelled = false;
+    void storeService
+      .getAllStores()
+      .then((list) => {
+        if (cancelled) return;
+        const found = list.find((s) => s.id === sid);
+        if (found?.name) setCartStoreName(found.name);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, cartStoreName, cartStoreId, items.length]);
 
   // Prefill Razorpay contact/name/email from profile (state was never set before → empty mobile on Razorpay)
   useEffect(() => {
@@ -897,11 +1182,22 @@ const Cart: React.FC = () => {
       setSelectedDateOption('tomorrow');
       fetchSlotsForDate(tomorrow);
     } else {
-      const dateObj = deliveryInfo.selectedDate instanceof Date
+      let dateObj = deliveryInfo.selectedDate instanceof Date
         ? deliveryInfo.selectedDate
         : deliveryInfo.selectedDate
           ? new Date(deliveryInfo.selectedDate)
           : tomorrow;
+      const maxStart = startOfDay(addDays(new Date(), DELIVERY_DATE_MAX_DAYS_FROM_TODAY));
+      if (isAfter(startOfDay(dateObj), maxStart)) {
+        dateObj = maxStart;
+        updateDeliveryInfo({
+          ...(deliveryInfo ?? {}),
+          deliveryDate: format(dateObj, 'dd MMM yyyy'),
+          timeSlot: '',
+          slotId: undefined,
+          selectedDate: dateObj,
+        });
+      }
       if (isToday(dateObj)) setSelectedDateOption('today');
       else if (isTomorrow(dateObj)) setSelectedDateOption('tomorrow');
       else {
@@ -916,9 +1212,45 @@ const Cart: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Lets users tap greyed days and see why (react-datepicker does not call onChange for disabled days). */
+  const renderDeliveryDayContents = useCallback(
+    (dayOfMonth: number, date?: Date) => {
+      if (!date) return dayOfMonth;
+      const d = startOfDay(date);
+      const tooEarly = isBefore(d, datePickerMinStart);
+      const tooLate = isAfter(d, deliveryDateMaxStart);
+      if (!tooEarly && !tooLate) {
+        return dayOfMonth;
+      }
+      return (
+        <span
+          className="inline-flex size-full min-h-[2.5rem] min-w-[2.5rem] items-center justify-center"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (tooLate) {
+              setDatePickerRangeMessage(
+                `You can only pre-order up to ${DELIVERY_DATE_MAX_DAYS_FROM_TODAY} days in advance.`,
+              );
+            } else {
+              setDatePickerRangeMessage("That date isn’t available for delivery.");
+            }
+          }}
+        >
+          {dayOfMonth}
+        </span>
+      );
+    },
+    [datePickerMinStart, deliveryDateMaxStart],
+  );
+
   const handleDateOptionSelect = (option: 'today' | 'tomorrow' | 'dayAfter' | 'pickDate') => {
     setSelectedDateOption(option);
-    if (option === 'pickDate') { setShowDatePicker(true); return; }
+    if (option === 'pickDate') {
+      setDatePickerRangeMessage(null);
+      setShowDatePicker(true);
+      return;
+    }
     const dateMap = { today: new Date(), tomorrow: addDays(new Date(), 1), dayAfter: addDays(new Date(), 2) };
     const selectedDate = startOfDay(dateMap[option]);
     updateDeliveryInfo({ deliveryDate: format(selectedDate, 'dd MMM yyyy'), timeSlot: '', slotId: undefined, selectedDate });
@@ -927,10 +1259,20 @@ const Cart: React.FC = () => {
 
   const handleDatePickerChange = (date: Date | null) => {
     if (date) {
-      const today = startOfDay(new Date());
       const pickedDate = startOfDay(date);
-      if (pickedDate < today) return;
+      if (isBefore(pickedDate, datePickerMinStart)) {
+        setDatePickerRangeMessage("That date isn’t available for delivery.");
+        return;
+      }
+      if (isAfter(pickedDate, deliveryDateMaxStart)) {
+        setDatePickerRangeMessage(
+          `You can only pre-order up to ${DELIVERY_DATE_MAX_DAYS_FROM_TODAY} days in advance.`,
+        );
+        return;
+      }
+      setDatePickerRangeMessage(null);
       setShowDatePicker(false);
+      const today = startOfDay(new Date());
       const dayAfter = addDays(today, 2);
       if (isToday(pickedDate)) setSelectedDateOption('today');
       else if (isTomorrow(pickedDate)) setSelectedDateOption('tomorrow');
@@ -944,6 +1286,7 @@ const Cart: React.FC = () => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setDatePickerRangeMessage(null);
         setShowDatePicker(false);
       }
     };
@@ -1053,6 +1396,49 @@ const Cart: React.FC = () => {
     navigate(addressPath, { state: { fromCart: true } });
   };
 
+  const performSwitchToSuggestedStore = async () => {
+    if (!suggestedStoreForAddress) {
+      setShowSuggestedStoreSwitchModal(false);
+      return;
+    }
+    const target = suggestedStoreForAddress;
+    try {
+      setIsSwitchingSuggestedStore(true);
+      await cartService.switchCartStore(target.id);
+      await storeService.switchStore(target.id);
+      deliveryStoreSyncKey.current = '';
+      await loadCartFromAPI();
+      setIsLoadingCartTotals(true);
+      try {
+        const raw = await cartService.getCartData();
+        const cartData = await reconcileCartStoreWithAccountSelection(raw);
+        applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
+      } catch (_) {
+        setCartTotals(null);
+        setCartStoreName('');
+        setCartStoreId(null);
+      } finally {
+        setIsLoadingCartTotals(false);
+      }
+      setSuggestedStoreForAddress(null);
+      setShowSuggestedStoreSwitchModal(false);
+      toast.success(`Store switched to ${target.name}.`);
+    } catch (e: unknown) {
+      toast.error(errorMessageFromCatch(e, 'Could not switch store for this address.'));
+    } finally {
+      setIsSwitchingSuggestedStore(false);
+    }
+  };
+
+  const openSuggestedStoreSwitchModal = () => {
+    if (!suggestedStoreForAddress) return;
+    setShowSuggestedStoreSwitchModal(true);
+  };
+
+  const cancelSuggestedStoreSwitchModal = () => {
+    setShowSuggestedStoreSwitchModal(false);
+  };
+
   const handleCheckout = async () => {
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
     if (items.length === 0) { toast.error('Your cart is empty'); return; }
@@ -1062,13 +1448,16 @@ const Cart: React.FC = () => {
       return;
     }
 
+    let latestCartData: CartData | null = null;
     try {
       await syncCartToAPI();
       await loadCartFromAPI();
       try {
         setIsLoadingCartTotals(true);
-        const cartData = await cartService.getCartData();
-        setCartTotals(totalsFromCartData(cartData));
+        const raw = await cartService.getCartData();
+        const cartData = await reconcileCartStoreWithAccountSelection(raw);
+        latestCartData = cartData;
+        applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
       } catch (_) {} finally { setIsLoadingCartTotals(false); }
     } catch (_) {
       toast.error("We couldn't update your basket. Check your connection and try checkout again.");
@@ -1076,6 +1465,115 @@ const Cart: React.FC = () => {
     }
 
     if (!defaultAddress) { toast.error('Please add a delivery address'); navigate(`${basePath}/addresses`); return; }
+
+    if (addressOutsideDelivery === true) {
+      toast.error(
+        'We are not delivering to this address from your current store. Open Account to change store, or choose a different address.',
+      );
+      return;
+    }
+
+    if (suggestedStoreForAddress) {
+      toast.error(
+        'Use "Switch store" below for this delivery address, or choose another address.',
+      );
+      return;
+    }
+    if (deliveryStoreOffline) {
+      toast.error(
+        'The store for your delivery address is offline. Open Account to choose another store.',
+      );
+      return;
+    }
+
+    if (!selectedSlotId) {
+      toast.error('Please select a delivery time slot');
+      return;
+    }
+
+    const selectedDeliveryDay = deliveryInfo.selectedDate
+      ? startOfDay(
+          deliveryInfo.selectedDate instanceof Date
+            ? deliveryInfo.selectedDate
+            : new Date(deliveryInfo.selectedDate),
+        )
+      : null;
+    if (
+      selectedDeliveryDay &&
+      isAfter(selectedDeliveryDay, deliveryDateMaxStart)
+    ) {
+      toast.error(
+        `Please choose a delivery date within the next ${DELIVERY_DATE_MAX_DAYS_FROM_TODAY} days.`,
+      );
+      return;
+    }
+
+    const checkoutCoords = parseAddressCoordinates(defaultAddress);
+    if (!checkoutCoords) {
+      toast.error(
+        'This delivery address has no map location. Please edit the address and try again.',
+      );
+      return;
+    }
+
+    try {
+      const cartForStore = latestCartData ?? (await cartService.getCartData());
+      const storeIdForCheckout =
+        typeof cartForStore.store === 'number' ? cartForStore.store : null;
+
+      const operational = await storeService.getNearestStore(
+        checkoutCoords.lat,
+        checkoutCoords.lng,
+      );
+      if (operational) {
+        if (storeIdForCheckout != null && storeIdForCheckout !== operational.id) {
+          const storesList = await storeService.getAllStores(
+            checkoutCoords.lat,
+            checkoutCoords.lng,
+          );
+          const currentRow = storesList.find((s) => s.id === storeIdForCheckout);
+          if (!(currentRow && storeIsWithinDeliveryRadius(currentRow))) {
+            toast.error(
+              'Use "Switch store" below for this delivery address, or choose another address.',
+            );
+            return;
+          }
+        }
+        setDeliveryStoreOffline(false);
+      } else {
+        const storesNear = await storeService.getAllStores(checkoutCoords.lat, checkoutCoords.lng);
+        const sorted = [...storesNear].sort((a, b) => {
+          const da = Number(a.distance_km);
+          const db = Number(b.distance_km);
+          const na = Number.isFinite(da) ? da : Number.POSITIVE_INFINITY;
+          const nb = Number.isFinite(db) ? db : Number.POSITIVE_INFINITY;
+          return na - nb;
+        });
+        const nearestAny = sorted[0];
+        if (nearestAny?.is_online === false) {
+          setDeliveryStoreOffline(true);
+          toast.error(
+            'Sorry — the nearest store for this address is offline.',
+          );
+          return;
+        }
+        setDeliveryStoreOffline(false);
+      }
+
+      const storesNearAddress = await storeService.getAllStores(
+        checkoutCoords.lat,
+        checkoutCoords.lng,
+      );
+      const storeRow = storesNearAddress.find((s) => s.id === storeIdForCheckout);
+      if (storeRow && storeRow.is_online === false) {
+        setDeliveryStoreOffline(true);
+        toast.error('Sorry — this store is currently offline.');
+        return;
+      }
+    } catch (e: unknown) {
+      toast.error(errorMessageFromCatch(e, 'Could not verify the store for this delivery address.'));
+      return;
+    }
 
     try {
       setIsProcessingPayment(true);
@@ -1085,11 +1583,6 @@ const Cart: React.FC = () => {
       } else if (deliveryInfo.deliveryDate) {
         try { deliveryDateFormatted = format(new Date(deliveryInfo.deliveryDate), 'yyyy-MM-dd'); }
         catch { deliveryDateFormatted = format(addDays(new Date(), 1), 'yyyy-MM-dd'); }
-      }
-      if (!selectedSlotId) {
-        toast.error('Please select a delivery time slot');
-        setIsProcessingPayment(false);
-        return;
       }
       const checkoutData = {
         delivery_address_id: Number(defaultAddress.id),
@@ -1114,8 +1607,12 @@ const Cart: React.FC = () => {
         items.map(item => ({ id: item.productId, price: item.price, quantity: item.quantity })),
         total
       );
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to initiate payment. Please try again.');
+    } catch (error: unknown) {
+      const msg =
+        error instanceof Error
+          ? error.message
+          : 'Failed to initiate payment. Please try again.';
+      toast.error(msg);
       setIsProcessingPayment(false);
     }
   };
@@ -1269,6 +1766,19 @@ const Cart: React.FC = () => {
     return [address.houseNo, address.streetName, address.area, address.city, address.state, address.pincode].filter(Boolean).join(', ');
   };
 
+  const displayStoreName =
+    cartStoreName.trim() || (isLoadingCartTotals ? '' : 'Selected store');
+  const deliveryBlockedByCoverage = addressOutsideDelivery === true;
+  const deliveryBlockedByStoreMismatch = suggestedStoreForAddress != null;
+
+  const showUnifiedDeliveryAlert =
+    suggestedStoreForAddress != null ||
+    deliveryBlockedByCoverage ||
+    deliveryStoreOffline;
+
+  const suggestedStoreNameButtonClass =
+    'gp-cart-suggested-store-blink inline border-0 bg-transparent p-0 align-baseline font-semibold text-red-900 underline decoration-red-700 underline-offset-2 hover:text-red-950 disabled:cursor-not-allowed disabled:opacity-55';
+
   const razorpayPrefillContact =
     customerInfo.contact ||
     formatPhoneForDisplay(authPhoneNumber || localStorage.getItem('phoneNumber') || '') ||
@@ -1305,6 +1815,21 @@ const Cart: React.FC = () => {
         }
         .gp-cart-stock-shake {
           animation: gp-cart-stock-shake 0.45s ease-in-out;
+        }
+        @keyframes gp-cart-suggested-store-blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.45; }
+        }
+        .gp-cart-suggested-store-blink {
+          animation: gp-cart-suggested-store-blink 1.15s ease-in-out infinite;
+        }
+        .gp-cart-suggested-store-blink:disabled {
+          animation: none;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .gp-cart-suggested-store-blink {
+            animation: none;
+          }
         }
       `}</style>
       <SEO
@@ -1541,7 +2066,10 @@ const Cart: React.FC = () => {
                   <>
                     <div
                       className="fixed inset-0 bg-black bg-opacity-20 z-40"
-                      onClick={() => setShowDatePicker(false)}
+                      onClick={() => {
+                        setDatePickerRangeMessage(null);
+                        setShowDatePicker(false);
+                      }}
                     />
                     {/* Centered date picker modal; stays within viewport on all screen sizes */}
                     <div
@@ -1559,19 +2087,28 @@ const Cart: React.FC = () => {
                         .react-datepicker__day--today { font-weight: 600; }
                         .react-datepicker__navigation { top: 1rem; }
                         .react-datepicker__navigation-icon::before { border-color: #6b7280; }
+                        .react-datepicker__day--disabled { pointer-events: auto; }
                       `}</style>
                       <DatePicker
-                        selected={deliveryInfo?.selectedDate || null}
+                        selected={datePickerSelected}
                         onChange={handleDatePickerChange}
-                        minDate={
-                          isLoadingSlots || hasSelectableTodaySlots
-                            ? startOfDay(new Date())
-                            : addDays(startOfDay(new Date()), 1)
-                        }
+                        minDate={datePickerMinStart}
+                        maxDate={deliveryDateMaxStart}
+                        onMonthChange={() => setDatePickerRangeMessage(null)}
+                        renderDayContents={renderDeliveryDayContents}
                         inline
                         calendarClassName="!border-0 !shadow-none"
                         className="w-full"
                       />
+                      {datePickerRangeMessage ? (
+                        <p
+                          className="mt-3 text-center text-sm font-semibold text-amber-800"
+                          role="status"
+                          aria-live="polite"
+                        >
+                          {datePickerRangeMessage}
+                        </p>
+                      ) : null}
                     </div>
                   </>
                 )}
@@ -1599,7 +2136,7 @@ const Cart: React.FC = () => {
                               : 'bg-white text-gray-700 border border-gray-200'
                           }`}
                         >
-                          {slot.start_time && slot.end_time ? formatSlotTimeRange(slot.start_time, slot.end_time) : (slot.slot_name || 'Slot')}
+                          {getSlotDisplayLabel(slot) || 'Slot'}
                         </button>
                       ))}
                     </div>
@@ -1623,14 +2160,38 @@ const Cart: React.FC = () => {
                 {isLoadingAddress ? (
                   <p className="text-sm text-gray-500">Loading address...</p>
                 ) : defaultAddress ? (
-                  <div>
-                    <div className="mb-1 flex items-center gap-2">
-                      <MdLocationOn className="flex-shrink-0 text-lg text-[#19411F]" />
-                      <span className="truncate text-sm font-medium text-gray-900">{defaultAddress.type}</span>
+                  <div className="space-y-5">
+                    <div>
+                      <div className="mb-1 flex items-center gap-2">
+                        <IoStorefrontOutline
+                          className="h-5 w-5 flex-shrink-0 text-[#19411F]"
+                          aria-hidden
+                        />
+                        <span className="truncate text-sm font-medium text-gray-900">From</span>
+                      </div>
+                      <p className="line-clamp-3 pl-7 text-sm leading-snug text-gray-600">
+                        {isLoadingCartTotals && !cartStoreName.trim() ? (
+                          <span className="text-gray-400">Loading store…</span>
+                        ) : (
+                          displayStoreName
+                        )}
+                      </p>
                     </div>
-                    <p className="line-clamp-3 pl-7 text-sm leading-snug text-gray-600">
-                      {formatAddress(defaultAddress)}
-                    </p>
+                    <div>
+                      <div className="mb-1 flex items-center gap-2">
+                        <MdLocationOn className="flex-shrink-0 text-lg text-[#19411F]" aria-hidden />
+                        <span className="truncate text-sm font-medium text-gray-900">To</span>
+                      </div>
+                      <p className="line-clamp-2 pl-7 text-sm font-medium leading-snug text-gray-900">
+                        {defaultAddress.type}
+                      </p>
+                      <p className="line-clamp-4 pl-7 text-sm leading-snug text-gray-600">
+                        {formatAddress(defaultAddress)}
+                      </p>
+                      {isCheckingDeliveryCoverage && defaultAddress.coordinates && (
+                        <p className="mt-2 pl-7 text-xs text-gray-400">Checking delivery area…</p>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div>
@@ -1641,6 +2202,36 @@ const Cart: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {showUnifiedDeliveryAlert ? (
+                <div
+                  className="min-w-0 rounded-[12px] border border-red-600 bg-red-50 px-3 py-2.5 shadow-sm"
+                  role="alert"
+                >
+                  {deliveryStoreOffline ? (
+                    <p className="text-[13px] font-semibold leading-snug text-red-900">
+                      The nearest store for this area is offline — try another address.
+                    </p>
+                  ) : suggestedStoreForAddress ? (
+                    <p className="m-0 text-[13px] font-semibold leading-snug text-red-900">
+                      This store doesn&apos;t deliver to your address—try the nearest store:{' '}
+                      <button
+                        type="button"
+                        disabled={isSwitchingSuggestedStore}
+                        onClick={openSuggestedStoreSwitchModal}
+                        title={`Switch to ${suggestedStoreForAddress.name}`}
+                        className={suggestedStoreNameButtonClass}
+                      >
+                        {suggestedStoreForAddress.name}
+                      </button>
+                    </p>
+                  ) : (
+                    <p className="m-0 text-[13px] font-semibold leading-snug text-red-900">
+                      The current store is not delivering to this address. Update your delivery address or switch store.
+                    </p>
+                  )}
+                </div>
+              ) : null}
 
               {/* ── Promo Code ─────────────────────────────────────────────── */}
               <div className="bg-white rounded-2xl py-2.5 px-3 shadow-sm border-2 border-[#19411F]">
@@ -1701,18 +2292,14 @@ const Cart: React.FC = () => {
                     </span>
                     <span>₹{deliveryFee.toLocaleString('en-IN')}</span>
                   </div>
-                  {tax > 0 && (
-                    <div className="flex justify-between text-sm text-gray-700">
-                      <span>GST</span>
-                      <span>₹{tax.toLocaleString('en-IN')}</span>
-                    </div>
-                  )}
-                  {discount > 0 && (
-                    <div className="flex justify-between text-sm text-gray-700">
-                      <span>Discount</span>
-                      <span>-₹{discount.toLocaleString('en-IN')}</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>GST</span>
+                    <span>₹{tax.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>Discount</span>
+                    <span>-₹{discount.toLocaleString('en-IN')}</span>
+                  </div>
                   {/* Show promo line only if backend hasn't merged it into discount already */}
                   {appliedPromoCode && promoDiscount > 0 && discount === 0 && (
                     <div className="flex justify-between text-sm text-[#19411F] font-medium">
@@ -1750,7 +2337,12 @@ const Cart: React.FC = () => {
               {/* Checkout */}
               <button
                 onClick={handleCheckout}
-                disabled={isProcessingPayment}
+                disabled={
+                  isProcessingPayment ||
+                  deliveryBlockedByCoverage ||
+                  deliveryBlockedByStoreMismatch ||
+                  deliveryStoreOffline
+                }
                 className="w-full bg-[#19411F] text-white py-4 rounded-[25px] text-base font-semibold hover:bg-[#1e5a1c] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isProcessingPayment && (
@@ -1763,6 +2355,40 @@ const Cart: React.FC = () => {
         )}
 
       </div>
+
+      {/* Store switch confirmation — same copy/layout as Settings */}
+      {showSuggestedStoreSwitchModal && (
+        <div className="fixed inset-0 z-[99997] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-3 text-center text-lg font-semibold text-gray-900">Switch Store?</h3>
+            <p className="mb-6 text-center text-sm text-gray-600">
+              Due to the change in store, items in your cart might get affected. Do you want to continue?
+            </p>
+            <div className="space-y-3">
+              <button
+                type="button"
+                disabled={isSwitchingSuggestedStore}
+                onClick={() => void performSwitchToSuggestedStore()}
+                className="w-full rounded-lg py-3 text-base font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                style={{
+                  backgroundColor: theme.colors.primary,
+                  color: feature === 'gpStore' ? 'white' : 'black',
+                }}
+              >
+                {isSwitchingSuggestedStore ? 'Please wait…' : 'Continue'}
+              </button>
+              <button
+                type="button"
+                disabled={isSwitchingSuggestedStore}
+                onClick={cancelSuggestedStoreSwitchModal}
+                className="w-full rounded-lg py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Promo Code Modal */}
       {showPromoModal && (

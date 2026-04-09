@@ -208,6 +208,7 @@ const Login = () => {
                                     placeholder="Enter your WhatsApp number"
                                     pattern="[0-9]*"
                                     maxLength={10}
+                                    data-testid="gp-login-phone-input"
                                 />
                             </div>
                         </div>

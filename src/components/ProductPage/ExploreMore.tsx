@@ -9,6 +9,7 @@ import {
   PRODUCT_AVAILABILITY_DAILY,
   PRODUCT_AVAILABILITY_STORE,
 } from "../../services/product.service";
+
 import type { Product, BestSeller } from "../../services/product.service";
 import { storeService } from "../../services/store.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
@@ -54,7 +55,8 @@ const ExploreMore: React.FC = () => {
     }
   };
 
-  // Fetch data based on category/section query params
+  // Fetch data based on category/section query params.
+  // We still use an AbortController to stop in-flight requests on unmount / param changes.
   useEffect(() => {
     const id = ++fetchIdRef.current;
     const abortController = new AbortController();
@@ -86,7 +88,7 @@ const ExploreMore: React.FC = () => {
             const fetched = await productService.getProductsByLabel(
               "premium",
               storeId || undefined,
-              abortController.signal,
+              undefined,
               "-order_count"
             );
             if (id !== fetchIdRef.current) return;
@@ -139,7 +141,6 @@ const ExploreMore: React.FC = () => {
     };
 
     fetchData();
-
     return () => {
       abortController.abort();
     };

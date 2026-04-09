@@ -1,4 +1,8 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import axios, {
+  AxiosError,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+} from "axios";
 import { authService } from "./auth.service";
 
 const api = axios.create({
@@ -7,6 +11,61 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+/**
+ * Axios 1.x sets `defaults.adapter` to `['xhr','http','fetch']`, not a function.
+ * Without resolving it, GET dedupe never enabled (was always broken in this app).
+ */
+function getUnderlyingAxiosAdapter():
+  | ((config: InternalAxiosRequestConfig) => Promise<AxiosResponse>)
+  | null {
+  const raw = axios.defaults.adapter as unknown;
+  if (typeof raw === "function") {
+    return raw as (config: InternalAxiosRequestConfig) => Promise<AxiosResponse>;
+  }
+  if (raw != null && typeof axios.getAdapter === "function") {
+    try {
+      return axios.getAdapter(raw as never) as (
+        config: InternalAxiosRequestConfig
+      ) => Promise<AxiosResponse>;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+const underlyingAxiosAdapter = getUnderlyingAxiosAdapter();
+
+/** Coalesce concurrent identical GET/HEAD calls (Strict Mode, duplicate effects, multiple subscribers). */
+const dedupeGetsEnabled =
+  import.meta.env.VITE_API_DEDUPE_GETS !== "false" &&
+  underlyingAxiosAdapter != null;
+
+const inflightIdempotent = new Map<string, Promise<AxiosResponse>>();
+
+function dedupeKeyForConfig(config: InternalAxiosRequestConfig): string | null {
+  const method = (config.method || "get").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") return null;
+  const h = config.headers;
+  const skip =
+    (typeof (h as { get?: (k: string) => string })?.get === "function"
+      ? (h as { get: (k: string) => string }).get("X-Skip-Request-Dedupe")
+      : (h as Record<string, unknown>)?.["X-Skip-Request-Dedupe"]) != null;
+  if (skip) return null;
+  try {
+    return `${method} ${axios.getUri(config)}`;
+  } catch {
+    return null;
+  }
+}
+
+function withCallerConfig(
+  res: AxiosResponse,
+  cfg: InternalAxiosRequestConfig,
+): AxiosResponse {
+  return { ...res, config: cfg };
+}
 
 // Track if we're currently refreshing to avoid multiple parallel refresh calls
 let isRefreshing = false;
@@ -33,6 +92,29 @@ api.interceptors.request.use(
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
     }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Request interceptor — share one in-flight GET/HEAD per URL (after auth header is set).
+// Adapter runs only when dispatch runs (after transforms), not inside the interceptor.
+api.interceptors.request.use(
+  (config) => {
+    if (!dedupeGetsEnabled) return config;
+    const key = dedupeKeyForConfig(config);
+    if (!key) return config;
+
+    config.adapter = (cfg) => {
+      let shared = inflightIdempotent.get(key);
+      if (!shared) {
+        shared = underlyingAxiosAdapter!(cfg).finally(() => {
+          inflightIdempotent.delete(key);
+        });
+        inflightIdempotent.set(key, shared);
+      }
+      return shared.then((res) => withCallerConfig(res, cfg));
+    };
     return config;
   },
   (error) => Promise.reject(error)

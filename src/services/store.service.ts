@@ -1,6 +1,63 @@
-import axios, { AxiosError } from "axios";
+import axios, { AxiosError, type AxiosResponse } from "axios";
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
+import { addressService } from "./address.service";
+
+/** Dispatched on `window` after a guest picks a store from the city picker (home / products refresh). */
+export const GUEST_STORE_UPDATED_EVENT = "gp-guest-temporary-store-updated";
+
+export function notifyGuestTemporaryStoreUpdated(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(GUEST_STORE_UPDATED_EVENT));
+  }
+}
+
+/** Thrown / attached when logged-out user is outside coverage or location unavailable. */
+export const GUEST_NEED_CITY_PICKER_CODE = "GUEST_NEED_CITY_PICKER";
+
+export interface CityOption {
+  id: number;
+  name: string;
+  state: string;
+}
+
+function storeIsOperationalWeb(s: Store): boolean {
+  if (typeof s.is_online === "boolean") return s.is_online;
+  return true;
+}
+
+function parseMaxDeliveryRadiusKm(s: Store): number | null {
+  const raw = s.max_delivery_radius_km;
+  if (raw == null || raw === "") return null;
+  const n = parseFloat(String(raw));
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Same rule as mobile: `distance_km` vs `max_delivery_radius_km` from GET /stores/?lat=&lng= */
+export function storeIsWithinDeliveryRadius(s: Store): boolean {
+  const maxR = parseMaxDeliveryRadiusKm(s);
+  const d = s.distance_km;
+  if (maxR == null || d == null || Number.isNaN(Number(d))) return true;
+  return Number(d) <= maxR;
+}
+
+function storeIsSelectableWeb(s: Store): boolean {
+  return storeIsOperationalWeb(s) && storeIsWithinDeliveryRadius(s);
+}
+
+/** Normalize for comparing API `city` with the city the user selected. */
+export function normalizeCityLabel(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Keep only stores whose `city` matches the chosen city (API `?city=` may be broad). */
+export function filterStoresBelongingToCity(
+  stores: Store[],
+  cityName: string,
+): Store[] {
+  const target = normalizeCityLabel(cityName);
+  return stores.filter((s) => normalizeCityLabel(s.city ?? "") === target);
+}
 
 export interface Store {
   id: number;
@@ -26,6 +83,22 @@ export interface Store {
   distance_km?: number;
 }
 
+/** UI fallback when product + stores API do not expose a threshold. */
+export const DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES = "149";
+
+/** Format API `free_delivery_threshold` (e.g. `"999.00"`) for ₹ display. */
+export function formatFreeDeliveryThresholdForDisplay(
+  raw: string | number | null | undefined,
+): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  const n = parseFloat(s.replace(/,/g, ""));
+  if (!Number.isFinite(n) || n < 0) return null;
+  const rounded = Math.round(n * 100) / 100;
+  if (Number.isInteger(rounded)) return String(rounded);
+  return String(rounded);
+}
 
 class StoreService {
   /**
@@ -56,6 +129,34 @@ class StoreService {
     }
   }
 
+  /**
+   * Unique city names from online stores (GET /stores/). Guest picker — no hardcoded list.
+   */
+  async getUniqueCitiesFromOnlineStores(): Promise<CityOption[]> {
+    const stores = await this.getAllStores();
+    const operational = stores.filter(storeIsOperationalWeb);
+    const byKey = new Map<string, { name: string; state: string }>();
+    for (const s of operational) {
+      const raw = (s.city ?? "").trim();
+      if (!raw) continue;
+      const key = raw.toLowerCase();
+      if (!byKey.has(key)) {
+        byKey.set(key, {
+          name: raw,
+          state: (s.state ?? "").trim(),
+        });
+      }
+    }
+    const sorted = [...byKey.entries()].sort((a, b) =>
+      a[1].name.localeCompare(b[1].name, undefined, { sensitivity: "base" }),
+    );
+    return sorted.map(([, v], i) => ({
+      id: i + 1,
+      name: v.name,
+      state: v.state,
+    }));
+  }
+
   async getNearestStore(latitude: number, longitude: number): Promise<Store | null> {
     try {
       const response = await axios.get(`${getApiUrl()}/stores/nearest/`, {
@@ -66,7 +167,8 @@ class StoreService {
       });
 
       if (response.data.success && response.data.data) {
-        return response.data.data;
+        const store = response.data.data as Store;
+        return storeIsOperationalWeb(store) ? store : null;
       }
       return null;
     } catch (error) {
@@ -76,6 +178,82 @@ class StoreService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Online stores in a city (guest picker). Backend: GET /stores/?city=
+   */
+  async getStoresInCity(cityName: string): Promise<Store[]> {
+    try {
+      const response = await axios.get(`${getApiUrl()}/stores/`, {
+        params: { city: cityName },
+      });
+      if (response.data.success && Array.isArray(response.data.data)) {
+        const list = (response.data.data as Store[]).filter(storeIsOperationalWeb);
+        const inCity = filterStoresBelongingToCity(list, cityName);
+        return inCity.sort((a, b) => a.name.localeCompare(b.name));
+      }
+      return [];
+    } catch (error) {
+      console.error("Error fetching stores by city:", error);
+      if (error instanceof AxiosError) {
+        throw new Error(error.response?.data?.message || error.message || "Failed to fetch stores");
+      }
+      throw error;
+    }
+  }
+
+  private async findFirstSelectableStoreNear(latitude: number, longitude: number): Promise<Store | null> {
+    const stores = await this.getAllStores(latitude, longitude);
+    if (!stores.length) return null;
+    const sorted = [...stores].sort((a, b) => {
+      const da = Number(a.distance_km);
+      const db = Number(b.distance_km);
+      const na = Number.isFinite(da) ? da : Number.POSITIVE_INFINITY;
+      const nb = Number.isFinite(db) ? db : Number.POSITIVE_INFINITY;
+      return na - nb;
+    });
+    return sorted.find(storeIsSelectableWeb) ?? null;
+  }
+
+  private rejectCityPicker(message?: string): never {
+    const err = new Error(message || "Choose a city to browse") as Error & { code?: string };
+    err.code = GUEST_NEED_CITY_PICKER_CODE;
+    throw err;
+  }
+
+  /**
+   * Resolve a guest store from device coordinates: validates coverage, then nearest selectable store.
+   */
+  async resolveGuestStoreFromCoordinates(latitude: number, longitude: number): Promise<number> {
+    let coverageOk = false;
+    try {
+      const cov = await addressService.validateAddressInDeliveryArea(`${latitude},${longitude}`);
+      coverageOk = !!cov.isValid;
+    } catch {
+      coverageOk = false;
+    }
+
+    if (!coverageOk) {
+      this.clearTemporaryStoreId();
+      this.rejectCityPicker();
+    }
+
+    let store = await this.getNearestStore(latitude, longitude);
+    if (store && !storeIsSelectableWeb(store)) {
+      store = null;
+    }
+    if (!store) {
+      store = await this.findFirstSelectableStoreNear(latitude, longitude);
+    }
+
+    if (store) {
+      this.setTemporaryStoreId(store.id);
+      return store.id;
+    }
+
+    this.clearTemporaryStoreId();
+    this.rejectCityPicker();
   }
 
   async switchStore(storeId: number): Promise<void> {
@@ -140,13 +318,32 @@ class StoreService {
   }
 
   /**
+   * Store id for cart/product API calls: same as {@link getStoreIdForProducts}, then
+   * (when null) {@link getStoreFromLocation} which may set temporary store for guests.
+   * Never returns a hardcoded fallback id.
+   */
+  async resolveStoreIdForApiAsync(): Promise<number | null> {
+    const direct = this.getStoreIdForProducts();
+    if (direct != null) return direct;
+    try {
+      return await this.getStoreFromLocation();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Request user location and get nearest store for logged-out users
    * Returns the store ID if successful
    */
   async getStoreFromLocation(): Promise<number | null> {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
-        reject(new Error("Geolocation is not supported by your browser"));
+        const err = new Error("Geolocation is not supported by your browser") as Error & {
+          code?: string;
+        };
+        err.code = GUEST_NEED_CITY_PICKER_CODE;
+        reject(err);
         return;
       }
 
@@ -160,21 +357,8 @@ class StoreService {
         async (position) => {
           try {
             const { latitude, longitude } = position.coords;
-            const nearestStore = await this.getNearestStore(latitude, longitude);
-            
-            if (nearestStore) {
-              this.setTemporaryStoreId(nearestStore.id);
-              resolve(nearestStore.id);
-            } else {
-              // If no nearest store, try to get all stores and use the first one
-              const stores = await this.getAllStores(latitude, longitude);
-              if (stores.length > 0) {
-                this.setTemporaryStoreId(stores[0].id);
-                resolve(stores[0].id);
-              } else {
-                reject(new Error("No stores available in your area"));
-              }
-            }
+            const id = await this.resolveGuestStoreFromCoordinates(latitude, longitude);
+            resolve(id);
           } catch (error) {
             console.error("Error getting store from location:", error);
             reject(error);
@@ -193,7 +377,9 @@ class StoreService {
               errorMessage = "Location request timed out.";
               break;
           }
-          reject(new Error(errorMessage));
+          const err = new Error(errorMessage) as Error & { code?: string };
+          err.code = GUEST_NEED_CITY_PICKER_CODE;
+          reject(err);
         },
         options
       );
@@ -217,7 +403,25 @@ export interface Banner {
   sort_order: number;
 }
 
+type BannersApiResponse = { success: boolean; data: Banner[] };
+
+/** Coalesce concurrent identical requests (Strict Mode double-mount, duplicate effects, etc.). */
+const bannersRequestByStoreKey = new Map<
+  string,
+  Promise<AxiosResponse<BannersApiResponse>>
+>();
+
 // Uses raw axios (no JWT) — banners are public; sending a stale token can cause 401
-export const getStoreBanners = (storeId: number | string) =>
-  axios.get<{ success: boolean; data: Banner[] }>(`${getApiUrl()}/stores/${storeId}/banners/`);
+export function getStoreBanners(storeId: number | string) {
+  const key = String(storeId);
+  const existing = bannersRequestByStoreKey.get(key);
+  if (existing) return existing;
+  const req = axios
+    .get<BannersApiResponse>(`${getApiUrl()}/stores/${storeId}/banners/`)
+    .finally(() => {
+      bannersRequestByStoreKey.delete(key);
+    });
+  bannersRequestByStoreKey.set(key, req);
+  return req;
+}
 

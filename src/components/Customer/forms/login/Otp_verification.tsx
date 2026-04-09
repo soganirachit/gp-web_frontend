@@ -364,7 +364,7 @@ const OTPVerification: React.FC = () => {
           </div>
 
           <form onSubmit={(e) => { e.preventDefault(); handleVerify(); }} className="space-y-4 sm:space-y-5 md:space-y-6">
-            <div className="flex gap-2 sm:gap-3 justify-center">
+            <div className="flex gap-2 sm:gap-3 justify-center" data-testid="gp-otp-fields">
               {otp.map((data, index) => (
                 <input
                   key={index}
@@ -376,6 +376,7 @@ const OTPVerification: React.FC = () => {
                   onPaste={(e) => handlePaste(e)}
                   className={`w-10 h-12 sm:w-12 sm:h-14 md:w-14 md:h-16 border-2 rounded-lg sm:rounded-xl text-center text-lg sm:text-xl md:text-2xl font-semibold focus:outline-none focus:ring-2 transition-all duration-200 bg-white ${theme.classes.otpInputBorder}`}
                   disabled={isSubmitting}
+                  data-testid={index === 0 ? "gp-otp-input-first" : undefined}
                 />
               ))}
             </div>

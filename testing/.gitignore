@@ -1,2 +1,3 @@
 generated/
 reports/playwright-html/
+e2e/.env.local

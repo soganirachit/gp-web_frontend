@@ -13,12 +13,14 @@ import {
   showStrikeBaseOnCard,
   PRODUCT_AVAILABILITY_STORE,
 } from "../../services/product.service";
-import { storeService } from "../../services/store.service";
 import { addressService } from "../../services/address.service";
 import { ProductBrowseSkeleton } from "../common/PageSkeletons";
 import { SearchBar } from "../common/SearchBar";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import { useAuth } from "../../context/AuthContext";
+import { GUEST_STORE_UPDATED_EVENT, storeService } from "../../services/store.service";
 import { getApiUrl } from "../../config/api.config";
+import { GP_OPEN_GUEST_AREA_MODAL_EVENT } from "../../config/guestAreaModalCopy";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
 
@@ -26,8 +28,10 @@ const StoreProductsPages: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { feature } = useFeatureTheme();
+  const { feature, theme } = useFeatureTheme();
+  const { isLoggedIn } = useAuth();
   const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
+  const [guestStoreEpoch, setGuestStoreEpoch] = useState(0);
 
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -48,10 +52,15 @@ const StoreProductsPages: React.FC = () => {
   const categorySlug = useMemo(() => searchParams.get('category'), [searchParams]);
   const stateCategoryName = useMemo(() => location.state?.categoryName, [location.state?.categoryName]);
 
-  // Fetch address
+  // Fetch address — logged-in only. Guests calling /addresses/ get 401; web api.ts then redirects to /login.
   const fetchLatestAddress = useCallback(async () => {
     try {
       setIsLoadingAddress(true);
+      if (!isLoggedIn) {
+        setDeliveryLocation("");
+        setAddressType("Home");
+        return;
+      }
       const addresses = await addressService.getAllAddresses();
       const defaultAddress = addresses.find(addr => addr.isDefault);
       const selectedAddress = defaultAddress || addresses
@@ -80,7 +89,7 @@ const StoreProductsPages: React.FC = () => {
     } finally {
       setIsLoadingAddress(false);
     }
-  }, []);
+  }, [isLoggedIn]);
 
   // Fetch categories
   useEffect(() => {
@@ -105,7 +114,14 @@ const StoreProductsPages: React.FC = () => {
     };
 
     fetchCategories();
-  }, []);
+  }, [guestStoreEpoch]);
+
+  useEffect(() => {
+    if (isLoggedIn) return;
+    const onPick = () => setGuestStoreEpoch((e) => e + 1);
+    window.addEventListener(GUEST_STORE_UPDATED_EVENT, onPick);
+    return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, onPick);
+  }, [isLoggedIn]);
 
   // Fetch products
   useEffect(() => {
@@ -113,19 +129,6 @@ const StoreProductsPages: React.FC = () => {
       try {
         setIsLoading(true);
         setError(null);
-        
-        // Initialize temporary store ID if user is not logged in
-        if (!localStorage.getItem("phoneNumber")) {
-          const existingTempStoreId = storeService.getTemporaryStoreId();
-          if (!existingTempStoreId) {
-            try {
-              await storeService.getStoreFromLocation();
-            } catch (error: any) {
-              console.error("Error getting store from location:", error);
-              // Continue without store ID - products might still load
-            }
-          }
-        }
         
         // Get category name from location state or use default
         if (stateCategoryName) {
@@ -174,7 +177,7 @@ const StoreProductsPages: React.FC = () => {
 
     fetchData();
     fetchLatestAddress();
-  }, [categorySlug, stateCategoryName, fetchLatestAddress]);
+  }, [categorySlug, stateCategoryName, fetchLatestAddress, isLoggedIn, guestStoreEpoch]);
 
   const getItemPrice = (item: any): number => getEffectivePrice(item);
 
@@ -214,6 +217,14 @@ const StoreProductsPages: React.FC = () => {
   };
 
   const handleLocationClick = () => {
+    if (!isLoggedIn) {
+      window.dispatchEvent(
+        new CustomEvent(GP_OPEN_GUEST_AREA_MODAL_EVENT, {
+          detail: { dismissible: true, variant: "need_location" },
+        }),
+      );
+      return;
+    }
     navigate(`${basePath}/addresses`);
   };
 

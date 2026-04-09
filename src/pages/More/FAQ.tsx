@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { faqService, FAQ as FAQItem } from '../../services/faq.service';
+import { normalizeFaqDeliveryWindowCopy } from '../../utils/faqDeliveryCopy';
 import { ContentRowsSkeleton } from '../../components/common/PageSkeletons';
 
 interface FAQSection {
@@ -117,7 +118,7 @@ const FAQ: React.FC = () => {
                           className="w-full px-4 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
                         >
                           <span className="flex-1 text-sm font-medium text-gray-800 pr-3">
-                            {faq.question}
+                            {normalizeFaqDeliveryWindowCopy(faq.question)}
                           </span>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             {isExpanded ? (
@@ -132,7 +133,7 @@ const FAQ: React.FC = () => {
                           <div className="px-4 pb-4">
                             <div className="pt-2 border-t border-gray-100">
                               <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
-                                {faq.answer}
+                                {normalizeFaqDeliveryWindowCopy(faq.answer)}
                               </p>
                             </div>
                           </div>

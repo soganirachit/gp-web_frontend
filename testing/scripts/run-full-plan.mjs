@@ -67,7 +67,7 @@ function main() {
     pw = { ok: true, skipped: true };
     sections.push("- **Playwright:** SKIPPED (`SKIP_PLAYWRIGHT=1`)");
   } else {
-    pw = run("npx playwright test --config=testing/e2e/playwright.config.ts", {
+    pw = run("npx playwright test --config=testing/e2e/playwright.config.mjs", {
       env: { CI: process.env.CI || "" },
     });
     if (pw.ok) {
@@ -85,7 +85,13 @@ function main() {
   if (api.out) sections.push("```json\n" + api.out.trim() + "\n```");
 
   sections.push(``);
-  sections.push(`## 6. Coverage summary`);
+  sections.push(`## 6. API smoke (authenticated JWT — testing/e2e/.env.local)`);
+  const apiAuth = run("node testing/scripts/api-authenticated-smoke.mjs", { silent: true });
+  sections.push(apiAuth.ok ? "- **api-auth-smoke:** PASS or SKIPPED" : `- **api-auth-smoke:** FAIL`);
+  if (apiAuth.out) sections.push("```json\n" + apiAuth.out.trim() + "\n```");
+
+  sections.push(``);
+  sections.push(`## 7. Coverage summary`);
   try {
     const stats = JSON.parse(
       fs.readFileSync(path.join(ROOT, "testing", "generated", "stats.json"), "utf8")
@@ -100,15 +106,22 @@ function main() {
   }
 
   sections.push(``);
-  sections.push(`## 7. Manual / follow-up before production`);
+  sections.push(`## 8. Manual / follow-up before production`);
   sections.push(`- [ ] Execute \`testing/generated/EXECUTION_CHECKLIST.md\` — all ★ rows`);
   sections.push(`- [ ] Run connected flows J1–J6 with real OTP on staging`);
   sections.push(`- [ ] Razorpay **live** vs **test** key verification`);
   sections.push(`- [ ] Cross-browser spot check (Safari iOS, Chrome Android)`);
   sections.push(`- [ ] Verify \`VITE_GP_DAILY_ENABLED\` matches release config`);
+  sections.push(`- [ ] \`testing/e2e/.env.local\` with JWT for full auth E2E + \`npm run test:api-auth-smoke\``);
   sections.push(``);
   sections.push(`---`);
   sections.push(`*Artifacts: \`testing/generated/\` · Scenarios: \`testing/scenarios/gp-frontend-scenarios.json\`*`);
+
+  const strictE2e = process.env.STRICT_E2E === "1";
+  const e2eFailed = !pw.skipped && !pw.ok;
+  if (e2eFailed && strictE2e) {
+    sections.push(`\n> **STRICT_E2E=1:** failing process due to Playwright.\n`);
+  }
 
   const body = sections.join("\n");
   fs.writeFileSync(reportPath, body, "utf8");
@@ -116,9 +129,6 @@ function main() {
   console.log("\nReport written:", reportPath);
   console.log("Latest symlink copy:", latestPath);
 
-  const strictE2e = process.env.STRICT_E2E === "1";
-  const e2eFailed = !pw.skipped && !pw.ok;
-  if (e2eFailed && strictE2e) sections.push(`\n> **STRICT_E2E=1:** failing process due to Playwright.\n`);
   const exitBad = !build.ok || !stat.ok || (strictE2e && e2eFailed);
   process.exitCode = exitBad ? 1 : 0;
 }

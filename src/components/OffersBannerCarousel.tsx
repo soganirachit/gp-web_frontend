@@ -4,7 +4,15 @@ import { getStoreBanners, Banner } from '../services/store.service';
 import { useFeatureTheme } from '../context/FeatureThemeContext';
 
 interface Props {
-  storeId: number | string;
+  /** Resolved store (guest temp / logged-in selected). Omit or null = no banners request. */
+  storeId?: number | string | null;
+}
+
+function parseStoreIdForBanners(raw: Props['storeId']): number | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = typeof raw === 'string' ? parseInt(raw.trim(), 10) : raw;
+  if (!Number.isFinite(n) || n < 1) return null;
+  return n;
 }
 
 const AUTO_SLIDE_INTERVAL = 4000;
@@ -55,11 +63,29 @@ export function OffersBannerCarousel({ storeId }: Props) {
   const fallbackGradients = theme.feature === 'gpDaily' ? FALLBACK_GRADIENTS_GP_DAILY : FALLBACK_GRADIENTS_GP_STORE;
 
   useEffect(() => {
+    const id = parseStoreIdForBanners(storeId);
+    if (id == null) {
+      setBanners([]);
+      setActiveIndex(0);
+      setImgErrors({});
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    getStoreBanners(storeId)
-      .then(res => setBanners(normalizeBannersFromResponse(res.data)))
-      .catch(() => setBanners([]))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    getStoreBanners(id)
+      .then(res => {
+        if (!cancelled) setBanners(normalizeBannersFromResponse(res.data));
+      })
+      .catch(() => {
+        if (!cancelled) setBanners([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [storeId]);
 
   const startAutoSlide = useCallback(() => {

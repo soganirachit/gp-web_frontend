@@ -806,6 +806,49 @@ const AddressSelection: React.FC = () => {
     mapRef.current = null;
   }, []);
 
+  /** Merge Geocoding API JSON `results` into address form fields (used by GPS and map drag). */
+  const applyGeocodeJsonToForm = (data: { results?: unknown[] }, lat: number, lng: number) => {
+    if (!data.results?.length) return;
+    const formattedAddress: Record<string, string> = {};
+
+    (data.results as { address_components?: google.maps.GeocoderAddressComponent[] }[]).forEach(
+      (result) => {
+        if (!result.address_components) return;
+        result.address_components.forEach((component) => {
+          component.types.forEach((type: string) => {
+            if (type === 'street_number' && !formattedAddress.houseNo) {
+              formattedAddress.houseNo = component.long_name;
+            }
+            if (type === 'route' && !formattedAddress.streetName) {
+              formattedAddress.streetName = component.long_name;
+            }
+            if (type === 'sublocality_level_1' && !formattedAddress.area) {
+              formattedAddress.area = component.long_name;
+            }
+            if (type === 'locality' && !formattedAddress.city) {
+              formattedAddress.city = component.long_name;
+            }
+            if (type === 'administrative_area_level_1' && !formattedAddress.state) {
+              formattedAddress.state = component.long_name;
+            }
+            if (type === 'postal_code' && !formattedAddress.pincode) {
+              formattedAddress.pincode = component.long_name;
+            }
+            if (type === 'administrative_area_level_2' && !formattedAddress.district) {
+              formattedAddress.district = component.long_name;
+            }
+          });
+        });
+      }
+    );
+
+    setFormData((prev) => ({
+      ...prev,
+      ...formattedAddress,
+      coordinates: `${lat},${lng}`,
+    }));
+  };
+
   const getCurrentLocation = () => {
     // Prevent duplicate calls
     if (isLocationRequestInProgress.current) return;
@@ -828,43 +871,7 @@ const AddressSelection: React.FC = () => {
             const data = await response.json();
 
             if (data.results && data.results.length > 0) {
-              const formattedAddress: any = {};
-
-              data.results.forEach((result: any) => {
-                if (result.address_components) {
-                  result.address_components.forEach((component: any) => {
-                    component.types.forEach((type: string) => {
-                      if (type === 'street_number' && !formattedAddress.houseNo) {
-                        formattedAddress.houseNo = component.long_name;
-                      }
-                      if (type === 'route' && !formattedAddress.streetName) {
-                        formattedAddress.streetName = component.long_name;
-                      }
-                      if (type === 'sublocality_level_1' && !formattedAddress.area) {
-                        formattedAddress.area = component.long_name;
-                      }
-                      if (type === 'locality' && !formattedAddress.city) {
-                        formattedAddress.city = component.long_name;
-                      }
-                      if (type === 'administrative_area_level_1' && !formattedAddress.state) {
-                        formattedAddress.state = component.long_name;
-                      }
-                      if (type === 'postal_code' && !formattedAddress.pincode) {
-                        formattedAddress.pincode = component.long_name;
-                      }
-                      if (type === 'administrative_area_level_2' && !formattedAddress.district) {
-                        formattedAddress.district = component.long_name;
-                      }
-                    });
-                  });
-                }
-              });
-
-              setFormData(prev => ({
-                ...prev,
-                ...formattedAddress,
-                coordinates: `${latitude},${longitude}`
-              }));
+              applyGeocodeJsonToForm(data, latitude, longitude);
 
               setShowMapLocationHint(true);
               window.setTimeout(() => setShowMapLocationHint(false), 4000);
@@ -901,21 +908,32 @@ const AddressSelection: React.FC = () => {
   };
 
   const handleMapDrag = () => {
-    if (mapRef.current) {
-      const center = mapRef.current.getCenter();
-      if (center) {
-        const newPosition = {
-          lat: center.lat(),
-          lng: center.lng()
-        };
-        setSelectedPosition(newPosition);
-        setFormData(prev => ({
-          ...prev,
-          coordinates: `${newPosition.lat},${newPosition.lng}`
-        }));
-        setLocationValidation(null);
-      }
+    if (!mapRef.current) return;
+    const center = mapRef.current.getCenter();
+    if (!center) return;
+    const lat = center.lat();
+    const lng = center.lng();
+    setSelectedPosition({ lat, lng });
+    setLocationValidation(null);
+
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      setFormData((prev) => ({ ...prev, coordinates: `${lat},${lng}` }));
+      return;
     }
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`
+        );
+        const data = await response.json();
+        applyGeocodeJsonToForm(data, lat, lng);
+      } catch (error) {
+        console.error('Error reverse-geocoding map position:', error);
+        setFormData((prev) => ({ ...prev, coordinates: `${lat},${lng}` }));
+      }
+    })();
   };
 
 

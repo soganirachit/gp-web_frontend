@@ -8,7 +8,7 @@ import { MdLocationOn, MdKeyboardArrowDown, MdAccessTime } from 'react-icons/md'
 import { FaLeaf, FaUsers, FaBox } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { addressService, Address } from '../services/address.service';
-import { storeService } from '../services/store.service';
+import { storeService, GUEST_STORE_UPDATED_EVENT } from '../services/store.service';
 import { OffersBannerCarousel } from '../components/OffersBannerCarousel';
 import ProfileIcon from '../assets/icon/Profile.png';
 import { SearchBar } from '../components/common/SearchBar';
@@ -28,6 +28,7 @@ import logoSvg from '../assets/svg/logo.svg';
 import profilehomeIcon from '../assets/svg/gp_daily svg/profilehome.svg';
 import profilelogoIcon from '../assets/svg/gp_daily svg/profilelogo.svg';
 import locationhomeIcon from '../assets/svg/gp_daily svg/locationhome.svg';
+import { SOCIAL_URLS } from '../config/socialUrls';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -37,7 +38,23 @@ const HomePage: React.FC = () => {
   const [addressType, setAddressType] = useState<string>('Home');
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [isStoryExpanded, setIsStoryExpanded] = useState(false);
-  const [offersStoreId] = useState(() => storeService.getStoreIdForProducts() ?? 4);
+  const [offersStoreId, setOffersStoreId] = useState<number | null>(() =>
+    storeService.getStoreIdForProducts(),
+  );
+
+  const refreshOffersStoreId = useCallback(() => {
+    setOffersStoreId((prev) => {
+      const next = storeService.getStoreIdForProducts();
+      return prev === next ? prev : next;
+    });
+  }, []);
+
+  // Single effect: avoids duplicate refresh on mount (was two useEffects × Strict Mode = 4 store updates).
+  useEffect(() => {
+    refreshOffersStoreId();
+    window.addEventListener(GUEST_STORE_UPDATED_EVENT, refreshOffersStoreId);
+    return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, refreshOffersStoreId);
+  }, [isLoggedIn, refreshOffersStoreId]);
 
   // Function to fetch the latest address from API (only when logged in — avoids wrong JWT for guests)
   const fetchLatestAddress = useCallback(async () => {
@@ -130,8 +147,8 @@ const HomePage: React.FC = () => {
           "openingHours": "Mo-Su 06:00-20:00",
           "priceRange": "₹₹",
           "sameAs": [
-            "https://www.facebook.com/gendaphool",
-            "https://www.instagram.com/gendaphool"
+            SOCIAL_URLS.facebook,
+            SOCIAL_URLS.instagramMyGendaPhool
           ]
         }}
       />
@@ -287,6 +304,18 @@ const HomePage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.3 }}
             className="mb-6 cursor-pointer rounded-2xl bg-[#FFF5F5] p-3 transition-shadow hover:shadow-lg sm:p-5 relative overflow-hidden"
+            role="link"
+            tabIndex={0}
+            aria-label="Sajawat by Genda Phool on Instagram"
+            onClick={() =>
+              window.open(SOCIAL_URLS.instagramSajawat, '_blank', 'noopener,noreferrer')
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                window.open(SOCIAL_URLS.instagramSajawat, '_blank', 'noopener,noreferrer');
+              }
+            }}
           >
             <div className="flex flex-col xs:flex-row items-stretch xs:items-start gap-3 sm:gap-5 min-w-0">
               <div className="min-w-0 flex-1 pt-0.5">
@@ -301,6 +330,10 @@ const HomePage: React.FC = () => {
                 <button
                   type="button"
                   className="flex w-full items-center justify-center gap-1 rounded-lg bg-[#A91F23] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#8B1A1D] sm:inline-flex sm:w-auto sm:justify-start sm:px-5 sm:py-2.5 sm:text-sm md:px-6"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open(SOCIAL_URLS.instagramSajawat, '_blank', 'noopener,noreferrer');
+                  }}
                 >
                   <span className="text-center">Free Consultation</span>
                   <span className="shrink-0" aria-hidden>

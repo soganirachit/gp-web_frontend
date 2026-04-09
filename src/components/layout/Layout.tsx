@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import BottomNav from "./BottomNav";
+import { GuestStoreLocationBootstrap } from "../store/GuestStoreLocationBootstrap";
 import { FeatureThemeProvider } from "../../context/FeatureThemeContext";
 import { FadingOutlet } from "../common/PageFade";
 import { trackPageView } from "../../lib/metaPixel";
@@ -40,8 +41,8 @@ const Layout: React.FC = () => {
   ];
   const isAuthRoute = authRoutes.includes(location.pathname);
 
-  // Routes that should not show BottomNav (location pages, support question form)
-  const routesWithoutBottomNav = ["/location"];
+  // Routes that should not show BottomNav (landing, location pages, support question form)
+  const routesWithoutBottomNav = ["/home", "/location"];
   const shouldHideBottomNav = routesWithoutBottomNav.includes(
     location.pathname
   ) || location.pathname.includes("/customer-support/questions");
@@ -63,10 +64,11 @@ const Layout: React.FC = () => {
     <FeatureThemeProvider>
     {/* Fix_V0.9: data-testid for Playwright / QA without changing layout behaviour */}
     <div className="min-h-screen bg-[#f8f6f1]" data-testid="gp-root-layout">
+      <GuestStoreLocationBootstrap />
       {/* Fixed Header - Hide on auth routes */}
       {/* {!isAuthRoute && <FixedHeader />} */}
 
-      <main className={!isAuthRoute && !shouldHideTopPadding ? "pt-4" : ""}>
+      <main className={!isAuthRoute && !shouldHideTopPadding ? "pt-0" : ""}>
           <div
             className={
               isAuthRoute

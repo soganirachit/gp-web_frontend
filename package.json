@@ -9,9 +9,13 @@
     "preview": "vite preview",
     "test:generate": "node testing/scripts/generate-artifacts.mjs",
     "test:api-smoke": "node testing/scripts/api-smoke.mjs",
+    "test:api-auth-smoke": "node testing/scripts/api-authenticated-smoke.mjs",
     "test:static-smoke": "node testing/scripts/static-smoke.mjs",
-    "test:e2e": "playwright test --config=testing/e2e/playwright.config.ts",
+    "test:e2e": "playwright test --config=testing/e2e/playwright.config.mjs",
+    "test:e2e:auth-db": "node testing/scripts/e2e-auth-via-db.mjs",
+    "test:e2e:auth-db:run": "node testing/scripts/e2e-auth-via-db.mjs --e2e",
     "test:gp-plan": "node testing/scripts/run-full-plan.mjs",
+    "test:gp-plan:full": "npm run test:e2e:auth-db && npm run test:gp-plan",
     "test:gp-plan:no-e2e": "SKIP_PLAYWRIGHT=1 node testing/scripts/run-full-plan.mjs"
   },
   "dependencies": {
@@ -41,6 +45,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^8.56.0",
+    "@playwright/test": "^1.49.1",
     "@types/node": "^20.11.19",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
@@ -51,11 +56,11 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
     "globals": "^13.24.0",
+    "pg": "^8.20.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
-    "vite": "^5.1.3",
-    "@playwright/test": "^1.49.1"
+    "vite": "^5.1.3"
   }
 }
