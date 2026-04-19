@@ -12,6 +12,8 @@ import { useFeatureTheme } from '../../context/FeatureThemeContext';
 interface Order {
   id: string;
   order_number?: string;
+  /** Backend list field — used to hide subscription rows on GP Store “My Orders”. */
+  order_type?: string;
   status: string;
   createdAt: string;
   deliveryDate?: string;
@@ -38,8 +40,8 @@ const MyOrders: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(4);
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    void fetchOrders();
+  }, [feature]);
 
   const fetchOrders = async () => {
     try {
@@ -52,6 +54,7 @@ const MyOrders: React.FC = () => {
           return {
             id: order.id?.toString() || order.order_number || Math.random().toString(),
             order_number: order.order_number || `Order #${order.id}`,
+            order_type: String(order.order_type ?? order.orderType ?? '').trim() || undefined,
             status: order.status || 'pending',
             createdAt: order.created_at || order.createdAt || new Date().toISOString(),
             deliveryDate: order.delivery_date || order.deliveryDate,
@@ -73,7 +76,14 @@ const MyOrders: React.FC = () => {
         const sortedOrders = transformedOrders.sort((a: Order, b: Order) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
-        setOrders(sortedOrders);
+        /** GP Store “My Orders” is for store purchases only — subscription deliveries live under Daily. */
+        const isSubscriptionRow = (o: Order) =>
+          String(o.order_type || '').toLowerCase() === 'subscription';
+        const listOrders =
+          feature === 'gpStore'
+            ? sortedOrders.filter((o) => !isSubscriptionRow(o))
+            : sortedOrders;
+        setOrders(listOrders);
       } else {
         setOrders([]);
       }

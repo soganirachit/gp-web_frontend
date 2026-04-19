@@ -1,73 +1,194 @@
 import React, { useState, useEffect } from "react";
-import { FaArrowLeft } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { subscriptionService } from "../../services/subscription.service";
+import {
+  subscriptionService,
+  type Subscription,
+} from "../../services/subscription.service";
+import { orderService } from "../../services/order.service";
 import { toast } from "react-hot-toast";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import walletImage from "../../assets/icon/Wallet.png";
 import profileImage from "../../assets/icon/Profile.png";
 import Low_Balance from "../../assets/icon/LowBalance.png";
-import { IoArrowBack } from "react-icons/io5";
+import {
+  IoArrowBack,
+  IoChevronDown,
+  IoChevronUp,
+  IoCreateOutline,
+} from "react-icons/io5";
+import modifySubIcon from "../../assets/svg/cancelpage/modify.svg";
+import pauseSubIcon from "../../assets/svg/cancelpage/pause.svg";
+import cancelSubIcon from "../../assets/svg/cancelpage/cancel..svg";
 import Spinner from "../../components/common/Spinner";
 import { SubscriptionFlowSkeleton } from "../common/PageSkeletons";
 import { format } from "date-fns";
 import orangeCover from "../../assets/svg/gp_daily svg/orange_cover.svg";
 import redBox from "../../assets/svg/gp_daily svg/redbox.svg";
 import greenBox from "../../assets/svg/gp_daily svg/greenbox.svg";
-interface Subscription {
-  id: string;
-  customerId: string;
-  type: "DAILY" | "CUSTOM";
-  status: "ACTIVE" | "PAUSED" | "CANCELLED" | "INACTIVE";
-  startDate: Date;
-  endDate?: Date;
-  selectedDays: string[];
-  basePackId: string;
-  productDetails?: {
-    name: string;
-    description: string;
-    imagesUrl: string[];
-    contents: {
-      id: string;
-      name: string;
-      quantity: number;
-    }[];
+import { useFeatureTheme } from "../../context/FeatureThemeContext";
+
+const WEEK_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+function dayStringToApiInt(day: string): number | undefined {
+  const s = String(day).trim().toLowerCase();
+  if (s.startsWith("mon")) return 0;
+  if (s.startsWith("tue")) return 1;
+  if (s.startsWith("wed")) return 2;
+  if (s.startsWith("thu")) return 3;
+  if (s.startsWith("fri")) return 4;
+  if (s.startsWith("sat")) return 5;
+  if (s.startsWith("sun")) return 6;
+  return undefined;
+}
+
+function selectedDaysToApiInts(days: string[]): number[] {
+  const map: Record<string, number> = {
+    MONDAY: 0,
+    MON: 0,
+    TUESDAY: 1,
+    TUE: 1,
+    WEDNESDAY: 2,
+    WED: 2,
+    THURSDAY: 3,
+    THU: 3,
+    FRIDAY: 4,
+    FRI: 4,
+    SATURDAY: 5,
+    SAT: 5,
+    SUNDAY: 6,
+    SUN: 6,
   };
-  orderContents?: {
-    name: string;
-    description: string;
-    sellingPricePerPackDaily: number;
-    sellingPricePerPackAlternate: number;
-    contents: {
-      id: string;
-      name: string;
-      quantity: number;
-    }[];
-  };
-  deliveryAddress?: {
-    id: string;
-    houseNo: string;
-    streetName: string;
-    area: string;
-    city: string;
-    state: string;
-    pincode: string;
-    phoneNumber: string;
-    societyName?: string;
-    district?: string;
-    isDefault: boolean;
-  };
-  amount?: number;
-  createdAt: Date;
-  walletBalance?: number;
-  deliveryPreference?: string;
-  deliveryDays?: string[];
+  const out: number[] = [];
+  for (const d of days) {
+    const key = String(d).trim().toUpperCase().replace(/\.$/, "");
+    const n = map[key] ?? dayStringToApiInt(d);
+    if (n != null) out.push(n);
+  }
+  return [...new Set(out)].sort((a, b) => a - b);
+}
+
+function getDeliveryDayInts(subscription: Subscription): number[] {
+  if (subscription.deliveryDayInts?.length) {
+    return subscription.deliveryDayInts;
+  }
+  const fromSelected = selectedDaysToApiInts(subscription.selectedDays || []);
+  if (fromSelected.length) return fromSelected;
+  if (
+    subscription.deliveryPreference === "DAILY" ||
+    subscription.type === "DAILY"
+  ) {
+    return [0, 1, 2, 3, 4, 5, 6];
+  }
+  return [];
+}
+
+/** JS `Date.getDay()`: 0 Sun … 6 Sat → delivery int 0 Mon … 6 Sun (same as `WEEK_SHORT` index). */
+function jsWeekdayToDeliveryInt(jsDay: number): number {
+  return jsDay === 0 ? 6 : jsDay - 1;
+}
+
+/**
+ * Local hour (0–23) after which today's subscribed day no longer counts as "next delivery"
+ * (same-day ordering / morning route is assumed closed).
+ */
+const SAME_DAY_NEXT_DELIVERY_CUTOFF_HOUR = 12;
+
+/**
+ * Next calendar day on a subscribed weekday (`getDeliveryDayInts`), from today onward.
+ * If today is a delivery day but {@link SAME_DAY_NEXT_DELIVERY_CUTOFF_HOUR} has passed, today is skipped.
+ */
+function computeNextDeliveryFromSubscribedDays(
+  subscription: Subscription,
+): Date | null {
+  if (
+    subscription.status === "PAUSED" ||
+    subscription.status === "INACTIVE" ||
+    subscription.status === "CANCELLED"
+  ) {
+    return null;
+  }
+  const ints = getDeliveryDayInts(subscription);
+  if (!ints.length) return null;
+
+  const allowed = new Set(ints);
+  const now = new Date();
+  const todayMidnight = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
+  const cutoffToday = new Date(todayMidnight);
+  cutoffToday.setHours(SAME_DAY_NEXT_DELIVERY_CUTOFF_HOUR, 0, 0, 0);
+  const skipTodayBecauseSlotPassed = now.getTime() >= cutoffToday.getTime();
+
+  for (let add = 0; add <= 28; add++) {
+    const d = new Date(todayMidnight);
+    d.setDate(todayMidnight.getDate() + add);
+    const ui = jsWeekdayToDeliveryInt(d.getDay());
+    if (!allowed.has(ui)) continue;
+    if (add === 0 && skipTodayBecauseSlotPassed) continue;
+    return d;
+  }
+  return null;
+}
+
+const GP_DAILY_BASE = "/gp-daily";
+
+function subscriptionOrderListTitle(o: Record<string, unknown>): string {
+  const items = o.items as unknown[] | undefined;
+  if (Array.isArray(items) && items.length > 0) {
+    const p = (items[0] as Record<string, unknown>)?.product as
+      | Record<string, unknown>
+      | undefined;
+    const name = p?.name;
+    if (typeof name === "string" && name.trim()) return name;
+  }
+  const num = o.order_number;
+  if (typeof num === "string" && num.trim()) return num;
+  return "Subscription order";
+}
+
+function subscriptionOrderListDate(o: Record<string, unknown>): string {
+  const raw =
+    (o.delivery_date as string) ||
+    (o.deliveryDate as string) ||
+    (o.created_at as string) ||
+    (o.createdAt as string);
+  if (!raw || typeof raw !== "string") return "—";
+  try {
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return "—";
+    return format(d, "MMM d, yyyy");
+  } catch {
+    return "—";
+  }
+}
+
+function orderStatusBadgeClass(status: string): string {
+  const s = (status || "").toLowerCase();
+  if (s.includes("cancel")) return "bg-[#FEE2E2] text-[#EF4444]";
+  if (s.includes("deliver")) return "bg-[#DCFCE7] text-[#166534]";
+  return "bg-gray-100 text-gray-700";
+}
+
+function formatOrderStatusPill(status: string): string {
+  const s = (status || "unknown").toLowerCase().replace(/_/g, " ");
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function isSubscriptionOrderType(o: Record<string, unknown>): boolean {
+  const t = String(o.order_type ?? o.orderType ?? "")
+    .trim()
+    .toLowerCase();
+  return t === "subscription";
 }
 
 const ManageMySubscription: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { theme } = useFeatureTheme();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -77,7 +198,15 @@ const ManageMySubscription: React.FC = () => {
   const [showSuccessToast] = useState(false);
   const [editingDays, setEditingDays] = useState<string[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [activeTab, setActiveTab] = useState<'subscriptions' | 'history'>('subscriptions');
+  const [activeTab, setActiveTab] = useState<"subscriptions" | "history">(() =>
+    new URLSearchParams(location.search).get("tab") === "history"
+      ? "history"
+      : "subscriptions",
+  );
+  const [historyOrders, setHistoryOrders] = useState<Record<string, unknown>[]>(
+    [],
+  );
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
 
@@ -102,6 +231,11 @@ const ManageMySubscription: React.FC = () => {
   });
 
   const [validationError, setValidationError] = useState<string>("");
+  const [openActionsMenuId, setOpenActionsMenuId] = useState<string | null>(null);
+  /** PACKS accordion per subscription; default expanded when key missing */
+  const [packsExpandedBySubId, setPacksExpandedBySubId] = useState<
+    Record<string, boolean>
+  >({});
 
   // Days of the week
   // const daysOfWeek = ['Mon', 'Tues', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'];
@@ -110,113 +244,80 @@ const ManageMySubscription: React.FC = () => {
     fetchSubscriptionDetails();
   }, []);
 
-  // Helper function to calculate next delivery date
-  const calculateNextDeliveryDate = (subscription: Subscription) => {
-    // If subscription is paused or inactive, return null
-    if (subscription.status === "PAUSED" || subscription.status === "INACTIVE") {
-      return null;
-    }
-
-    const today = new Date();
-    const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-
-    // Map days to numbers for calculation - handle various formats
-    const dayMap: { [key: string]: number } = {
-      'sunday': 0, 'sun': 0,
-      'monday': 1, 'mon': 1,
-      'tuesday': 2, 'tue': 2, 'tues': 2,
-      'wednesday': 3, 'wed': 3,
-      'thursday': 4, 'thu': 4, 'thur': 4, 'thurs': 4,
-      'friday': 5, 'fri': 5,
-      'saturday': 6, 'sat': 6
+  useEffect(() => {
+    if (openActionsMenuId == null) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const id = openActionsMenuId;
+      const safe =
+        typeof CSS !== "undefined" && typeof CSS.escape === "function"
+          ? CSS.escape(id)
+          : id.replace(/["\\]/g, "");
+      const root = document.querySelector(`[data-subscription-actions="${safe}"]`);
+      if (root && !root.contains(e.target as Node)) {
+        setOpenActionsMenuId(null);
+      }
     };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [openActionsMenuId]);
 
-    // For DAILY delivery preference or type
-    if (subscription.deliveryPreference === "DAILY" || subscription.type === "DAILY") {
-      // For daily delivery (Mon-Sat), find next weekday
-      let nextDeliveryDate = new Date(today);
-      nextDeliveryDate.setDate(today.getDate() + 1);
+  useEffect(() => {
+    const q = new URLSearchParams(location.search).get("tab");
+    setActiveTab(q === "history" ? "history" : "subscriptions");
+  }, [location.search]);
 
-      // If tomorrow is Sunday, skip to Monday
-      if (nextDeliveryDate.getDay() === 0) {
-        nextDeliveryDate.setDate(nextDeliveryDate.getDate() + 1);
+  useEffect(() => {
+    if (activeTab !== "history") return;
+    let cancelled = false;
+    void (async () => {
+      setHistoryLoading(true);
+      try {
+        const list = await orderService.getOrders({
+          order_type: "subscription",
+        });
+        if (cancelled) return;
+        const arr = Array.isArray(list) ? list : [];
+        const sorted = [...arr].sort((a: any, b: any) => {
+          const ta = new Date(a.created_at || a.createdAt || 0).getTime();
+          const tb = new Date(b.created_at || b.createdAt || 0).getTime();
+          return tb - ta;
+        });
+        const asRecords = sorted.map((o) =>
+          o !== null && typeof o === "object"
+            ? (o as Record<string, unknown>)
+            : {},
+        );
+        /** API may still return mixed types — keep only subscription orders */
+        setHistoryOrders(asRecords.filter((row) => isSubscriptionOrderType(row)));
+      } catch {
+        if (!cancelled) setHistoryOrders([]);
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
       }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
 
-      return nextDeliveryDate;
+  /** Card footer — next delivery from subscribed weekdays + today (then API fallback). */
+  const getNextDeliveryLine = (subscription: Subscription) => {
+    if (
+      subscription.status === "PAUSED" ||
+      subscription.status === "INACTIVE" ||
+      subscription.status === "CANCELLED"
+    ) {
+      return "No upcoming delivery";
     }
-
-    // For CUSTOM delivery preference or type
-    if (subscription.deliveryPreference === "CUSTOM" || subscription.type === "CUSTOM") {
-      let subscribedDays: number[] = [];
-
-      // Try to get delivery days from multiple possible sources
-      const deliveryDays = subscription.deliveryDays || subscription.selectedDays || [];
-
-      if (deliveryDays.length > 0) {
-        subscribedDays = deliveryDays.map(day => {
-          const dayKey = day.toLowerCase().trim();
-          return dayMap[dayKey] !== undefined ? dayMap[dayKey] : -1;
-        }).filter(day => day !== -1);
-      }
-
-      // If no custom days found, default to Mon-Sun for custom subscriptions
-      if (subscribedDays.length === 0) {
-        subscribedDays = [1, 2, 3, 4, 5, 6, 7]; // Mon-Sun
-      }
-
-      // Find the next delivery day
-      let daysToAdd = 1;
-
-      // Look for the next subscribed day within the next 7 days
-      while (daysToAdd <= 7) {
-        const nextDay = (currentDay + daysToAdd) % 7;
-        if (subscribedDays.includes(nextDay)) {
-          const nextDeliveryDate = new Date(today);
-          nextDeliveryDate.setDate(today.getDate() + daysToAdd);
-          return nextDeliveryDate;
-        }
-        daysToAdd++;
-      }
+    const fromSchedule = computeNextDeliveryFromSubscribedDays(subscription);
+    if (fromSchedule) {
+      return `Next Delivery: ${format(fromSchedule, "EEE, d MMM")}`;
     }
-
-    // Fallback: if no specific preference, default to tomorrow (skip Sunday)
-    let nextDeliveryDate = new Date(today);
-    nextDeliveryDate.setDate(today.getDate() + 1);
-
-    // If tomorrow is Sunday, skip to Monday
-    if (nextDeliveryDate.getDay() === 0) {
-      nextDeliveryDate.setDate(nextDeliveryDate.getDate() + 1);
+    const apiNext = subscription.nextDeliveryDate;
+    if (apiNext && !Number.isNaN(apiNext.getTime())) {
+      return `Next Delivery: ${format(apiNext, "EEE, d MMM")}`;
     }
-
-    return nextDeliveryDate;
-  };
-
-  // Helper function to format next delivery display
-  const getNextDeliveryDisplay = (subscription: Subscription) => {
-    const nextDate = calculateNextDeliveryDate(subscription);
-
-    if (!nextDate) {
-      // Only show "No upcoming delivery" for paused/inactive subscriptions
-      if (subscription.status === "PAUSED" || subscription.status === "INACTIVE") {
-        return "No upcoming delivery";
-      }
-      // For active subscriptions, show default message
-      return "Next: Tomorrow, 7:00 AM";
-    }
-
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-
-    // Check if it's tomorrow
-    if (nextDate.toDateString() === tomorrow.toDateString()) {
-      return "Next: Tomorrow, 7:00 AM";
-    } else {
-      // Format the date
-      const dayName = nextDate.toLocaleDateString('en-US', { weekday: 'long' });
-      const formattedDate = format(nextDate, 'MMM d');
-      return `Next: ${dayName}, ${formattedDate}, 7:00 AM`;
-    }
+    return "Next Delivery: —";
   };
 
   const fetchSubscriptionDetails = async () => {
@@ -270,26 +371,6 @@ const ManageMySubscription: React.FC = () => {
     return dayMap[day.toLowerCase()] || day;
   };
 
-  // Open edit modal with current subscription days
-  const handleEditClick = (subscription: Subscription) => {
-    setSelectedSubscription(subscription);
-
-    // Get the days from the subscription, handling both deliveryDays and selectedDays
-    const days = subscription.deliveryDays || subscription.selectedDays || [];
-
-    // Normalize day names to full day names (e.g., 'mon' -> 'Monday')
-    const normalizedDays = days.map(day => {
-      // If day is already in full format, return as is
-      if (['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].includes(day)) {
-        return day;
-      }
-      return normalizeDayName(day);
-    });
-
-    setEditingDays([...normalizedDays]);
-    setShowEditModal(true);
-  };
-
   // Handle updating subscription days
   const handleUpdateSubscription = async () => {
     if (!selectedSubscription) return;
@@ -322,22 +403,6 @@ const ManageMySubscription: React.FC = () => {
       toast.error(error.message || "Failed to update subscription");
     } finally {
       setIsUpdating(false);
-    }
-  };
-
-
-
-  const handleResume = async (subscriptionId: string) => {
-    try {
-      await subscriptionService.toggleSubscriptionStatus(subscriptionId);
-      await fetchSubscriptionDetails();
-      toast.success("Subscription resumed successfully");
-    } catch (error: any) {
-      if (error.message?.includes("login")) {
-        toast.error("Please login to resume subscription");
-      } else {
-        toast.error(error.message || "Failed to resume subscription");
-      }
     }
   };
 
@@ -377,371 +442,309 @@ const ManageMySubscription: React.FC = () => {
   };
 
   const renderSubscriptionCard = (subscription: Subscription) => {
-    const formattedAmount = subscription?.amount
-      ? subscription.amount.toFixed(2)
-      : "0.00";
     const isActive = subscription.status === "ACTIVE";
+    const isCancelled = subscription.status === "CANCELLED";
     const isPaused =
       subscription.status === "PAUSED" || subscription.status === "INACTIVE";
+
+    const lineItems =
+      subscription.lineItems && subscription.lineItems.length > 0
+        ? subscription.lineItems
+        : [
+            {
+              name: subscription.productDetails?.name || "Subscription",
+              imageUrl: subscription.productDetails?.imagesUrl?.[0],
+              quantity: 1,
+              unitPrice: subscription.amount ?? 0,
+              subtotal:
+                subscription.totalAmount ??
+                subscription.amount ??
+                0,
+            },
+          ];
+
+    const itemsSubtotal = lineItems.reduce((s, li) => s + li.subtotal, 0);
+    const totalDisplay =
+      subscription.totalAmount != null && Number.isFinite(subscription.totalAmount)
+        ? subscription.totalAmount
+        : itemsSubtotal;
+
+    const formatRupees = (n: number) =>
+      Number.isFinite(n) ? Math.round(n).toLocaleString("en-IN") : "0";
+
+    const formatQty = (q: number) => {
+      if (!Number.isFinite(q)) return "1";
+      return Number.isInteger(q) ? String(q) : String(q);
+    };
+
+    const deliveryInts = getDeliveryDayInts(subscription);
+
+    const primaryLine = lineItems[0];
+    const headline =
+      primaryLine?.name ||
+      subscription.productDetails?.name ||
+      "Subscription";
+    const freqLabel =
+      subscription.deliveryPreference === "DAILY" ||
+      subscription.type === "DAILY"
+        ? "Daily"
+        : "Custom";
+    const totalPackQty = lineItems.reduce(
+      (s, li) => s + (Number(li.quantity) || 1),
+      0
+    );
+    const subIdKey = String(subscription.id);
+    const packsExpanded = packsExpandedBySubId[subIdKey] ?? true;
+
+    const statusBadge = isActive ? (
+      <span className="shrink-0 rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-xs font-semibold text-[#166534]">
+        Active
+      </span>
+    ) : isCancelled ? (
+      <span className="shrink-0 rounded-full bg-[#FCE7F3] px-2.5 py-0.5 text-xs font-semibold text-[#DC2626]">
+        Cancelled
+      </span>
+    ) : isPaused ? (
+      <span className="shrink-0 rounded-full bg-[#FFF3CD] px-2.5 py-0.5 text-xs font-semibold text-[#664D03]">
+        Paused
+      </span>
+    ) : (
+      <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700">
+        {subscription.status}
+      </span>
+    );
 
     return (
       <div
         key={subscription.id}
-        className="bg-white rounded-[16px] p-4 mb-3 shadow-sm"
+        className="relative mb-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
       >
-        <div className="flex items-start gap-3">
-          <div className="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-            {subscription.productDetails?.imagesUrl ? (
+        {/* Card header — summary row + status / edit (design ref) */}
+        <div className="flex gap-3">
+          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-100">
+            {primaryLine?.imageUrl ? (
               <img
-                src={subscription.productDetails.imagesUrl[0]}
-                alt={subscription.productDetails.name}
-                className="w-full h-full object-cover"
+                src={primaryLine.imageUrl}
+                alt={headline}
+                className="h-full w-full object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                <span className="text-xl font-medium text-gray-400">
-                  {subscription.productDetails?.name?.charAt(0) || "M"}
-                </span>
+              <div className="flex h-full w-full items-center justify-center bg-gray-200 text-lg font-medium text-gray-400">
+                {headline.charAt(0)}
               </div>
             )}
           </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between mb-1">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-[15px] font-medium text-[#1A1A1A] truncate">
-                    {subscription.productDetails?.name || "Marigold Puja"}
-                  </h3>
-                  {isPaused && (
-                    <span className="px-2 py-0.5 bg-[#FFF3CD] text-[#664D03] text-xs font-medium rounded-full">
-                      Paused
-                    </span>
-                  )}
-                  {/* {isActive && (
-                    <span className="px-2 py-0.5 bg-[#DCFCE7] text-[#166534] text-xs font-medium rounded-full">
-                      Active
-                    </span>
-                  )} */}
-                  {/* {isActive && (
-                    <button 
-                      onClick={() => handleEditClick(subscription)}
-                      className="px-2 py-0.5 bg-[#DCFCE7] text-[#166534] text-xs font-medium rounded-full"
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-[15px] font-bold text-[#1A1A1A]">
+                  {headline}
+                  <span className="font-semibold text-gray-500"> · </span>
+                  <span className="font-semibold text-[#1A1A1A]">{freqLabel}</span>
+                </h3>
+                <p className="mt-0.5 text-sm text-[#6B7280]">
+                  {totalPackQty} pack{totalPackQty === 1 ? "" : "s"} in subscription
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                {statusBadge}
+                {isActive ? (
+                  <div
+                    className="relative"
+                    data-subscription-actions={subscription.id}
+                  >
+                    <button
+                      type="button"
+                      aria-label="Subscription actions"
+                      aria-expanded={openActionsMenuId === subscription.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenActionsMenuId((prev) =>
+                          prev === subscription.id ? null : subscription.id
+                        );
+                      }}
+                      className="rounded-lg p-1.5 text-[#1A1A1A] hover:bg-gray-100"
                     >
-                      Edit
+                      <IoCreateOutline className="text-xl" aria-hidden />
                     </button>
-                  )} */}
-                </div>
-                <p className="text-[#666666] text-sm">
-                  {subscription.deliveryPreference === "DAILY"
-                    ? "Daily • mon-sun"
-                    : subscription.deliveryPreference === "CUSTOM" && subscription.deliveryDays?.length
-                      ? `Custom • ${subscription.deliveryDays.map(day => {
-                        const dayMap: { [key: string]: string } = {
-                          'sunday': 'Sun', 'sun': 'Sun',
-                          'monday': 'Mon', 'mon': 'Mon',
-                          'tuesday': 'Tue', 'tue': 'Tue',
-                          'wednesday': 'Wed', 'wed': 'Wed',
-                          'thursday': 'Thu', 'thu': 'Thu',
-                          'friday': 'Fri', 'fri': 'Fri',
-                          'saturday': 'Sat', 'sat': 'Sat'
-                        };
-                        return dayMap[day.toLowerCase()] || day;
-                      }).join(", ")}`
-                      : "Custom • No specific days"}
-                </p>
+                    {openActionsMenuId === subscription.id ? (
+                      <div
+                        className="absolute right-0 top-full z-50 mt-1 min-w-[10.5rem] overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
+                        role="menu"
+                        aria-orientation="vertical"
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium text-gray-800 transition-colors hover:bg-gray-50"
+                          onClick={() => {
+                            setOpenActionsMenuId(null);
+                            setSelectedSubscription(subscription);
+                            navigate("/gp-daily/modify-Subscription", {
+                              state: { subscription },
+                            });
+                          }}
+                        >
+                          <img
+                            src={modifySubIcon}
+                            alt=""
+                            width={18}
+                            height={18}
+                            className="block h-[18px] w-[18px] shrink-0"
+                            aria-hidden
+                          />
+                          Modify
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium text-gray-800 transition-colors hover:bg-gray-50"
+                          onClick={() => {
+                            setOpenActionsMenuId(null);
+                            setSelectedSubscription(subscription);
+                            navigate("/gp-daily/pause-subscription", {
+                              state: { subscription },
+                            });
+                          }}
+                        >
+                          <img
+                            src={pauseSubIcon}
+                            alt=""
+                            width={20}
+                            height={20}
+                            className="block h-5 w-5 shrink-0 object-contain"
+                            aria-hidden
+                          />
+                          Pause
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                          onClick={() => {
+                            setOpenActionsMenuId(null);
+                            setSelectedSubscription(subscription);
+                            navigate("/gp-daily/cancel-subscription", {
+                              state: { subscription },
+                            });
+                          }}
+                        >
+                          <img
+                            src={cancelSubIcon}
+                            alt=""
+                            width={20}
+                            height={20}
+                            className="block h-5 w-5 shrink-0 object-contain"
+                            aria-hidden
+                          />
+                          Cancel
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
-              {isActive && (
-                <span className="px-2 py-0.5 bg-[#DCFCE7] text-[#166534] text-xs font-medium rounded-full">
-                  Active
-                </span>
-              )}
-            </div>
-
-            {/* Next delivery section - only show for active subscriptions */}
-            {isActive && (
-              <div className="flex items-center gap-2 mb-3">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M15.8333 3.33337H4.16667C3.24619 3.33337 2.5 4.07957 2.5 5.00004V16.6667C2.5 17.5872 3.24619 18.3334 4.16667 18.3334H15.8333C16.7538 18.3334 17.5 17.5872 17.5 16.6667V5.00004C17.5 4.07957 16.7538 3.33337 15.8333 3.33337Z"
-                    stroke="#666666"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M13.3333 1.66663V4.99996"
-                    stroke="#666666"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M6.66669 1.66663V4.99996"
-                    stroke="#666666"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M2.5 8.33337H17.5"
-                    stroke="#666666"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <p className="text-[#666666] text-xs">
-                  {getNextDeliveryDisplay(subscription)}
-                </p>
-              </div>
-            )}
-
-            {/* Commented out the hardcoded next delivery for paused subscriptions */}
-            {/* {isPaused && (
-              <div className="flex items-center gap-2 mb-3">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M15.8333 3.33337H4.16667C3.24619 3.33337 2.5 4.07957 2.5 5.00004V16.6667C2.5 17.5872 3.24619 18.3334 4.16667 18.3334H15.8333C16.7538 18.3334 17.5 17.5872 17.5 16.6667V5.00004C17.5 4.07957 16.7538 3.33337 15.8333 3.33337Z"
-                    stroke="#666666"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M13.3333 1.66663V4.99996"
-                    stroke="#666666"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M6.66669 1.66663V4.99996"
-                    stroke="#666666"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M2.5 8.33337H17.5"
-                    stroke="#666666"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <p className="text-[#666666] text-xs">Next: Tomorrow, 7:00 AM</p>
-              </div>
-            )} */}
-
-            <p className="text-[#FF5722] font-medium text-sm mb-3">
-              ₹{formattedAmount}/pack
-            </p>
-
-            <div className="flex gap-2 justify-center items-center">
-              {isActive && (
-                <>
-                  <button
-                    onClick={() => {
-                      setSelectedSubscription(subscription);
-                      // Navigate to modify page instead of showing modal
-                      navigate('/gp-daily/modify-Subscription', { state: { subscription } });
-                    }}
-                    className="flex-1 py-1.5 rounded-full border border-[#006D3B] text-[#006D3B] text-sm font-medium"
-                  >
-                    <div className="flex items-center justify-center gap-1">
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 20 20"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M14.166 2.5H5.83268C4.91221 2.5 4.16602 3.24619 4.16602 4.16667V15.8333C4.16602 16.7538 4.91221 17.5 5.83268 17.5H14.166C15.0865 17.5 15.8327 16.7538 15.8327 15.8333V4.16667C15.8327 3.24619 15.0865 2.5 14.166 2.5Z"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path
-                          d="M7.5 5.83337H12.5"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path
-                          d="M7.5 9.16663H12.5"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path
-                          d="M7.5 12.5H10"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      Modify
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedSubscription(subscription);
-                      navigate('/gp-daily/pause-subscription', { state: { subscription } });
-                    }}
-                    className="flex-1 py-1.5 rounded-full bg-[#FFF3CD] text-[#FF5722] text-sm font-medium"
-                  >
-                    Pause
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedSubscription(subscription);
-                      // Navigate to landing page directly
-                      navigate('/gp-daily/cancel-subscription', { state: { subscription } });
-                    }}
-                    className="flex-1 py-1.5 rounded-full border border-red-500 text-red-500 text-sm font-medium"
-                  >
-                    <div className="flex items-center justify-center gap-1">
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 20 20"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M15 5L5 15"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path
-                          d="M5 5L15 15"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      Cancel
-                    </div>
-                  </button>
-                </>
-              )}
-              {isPaused && (
-                <>
-                  <button
-                    onClick={() => handleResume(subscription.id)}
-                    className="flex-1 py-1.5 rounded-full bg-[#006D3B] text-white text-sm font-medium"
-                  >
-                    Resume
-                  </button>
-
-                  {/* <button
-                    onClick={() => {
-                      setSelectedSubscription(subscription);
-                      setShowDetailsModal(true);
-                    }}
-                    className="flex-1 py-1.5 rounded-full border border-[#1F2937] text-[#1F2937] text-sm font-medium"
-                  >
-                    <div className="flex items-center justify-center gap-1">
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 20 20"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M14.166 2.5H5.83268C4.91221 2.5 4.16602 3.24619 4.16602 4.16667V15.8333C4.16602 16.7538 4.91221 17.5 5.83268 17.5H14.166C15.0865 17.5 15.8327 16.7538 15.8327 15.8333V4.16667C15.8327 3.24619 15.0865 2.5 14.166 2.5Z"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path
-                          d="M7.5 5.83337H12.5"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path
-                          d="M7.5 9.16663H12.5"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path
-                          d="M7.5 12.5H10"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      Modify
-                    </div>
-                  </button> */}
-
-                  <button
-                    onClick={() => {
-                      setSelectedSubscription(subscription);
-                      // Navigate to landing page directly
-                      navigate('/gp-daily/cancel-subscription', { state: { subscription } });
-                    }}
-                    className="flex-1 py-1.5 rounded-full border border-red-500 text-red-500 text-sm font-medium"
-                  >
-                    <div className="flex items-center justify-center gap-1">
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 20 20"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M15 5L5 15"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path
-                          d="M5 5L15 15"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      Cancel
-                    </div>
-                  </button>
-                </>
-              )}
             </div>
           </div>
         </div>
+
+        {/* PACKS accordion — line items */}
+        <div className="mt-6 border-t border-gray-100 pt-4">
+          <button
+            type="button"
+            onClick={() =>
+              setPacksExpandedBySubId((prev) => ({
+                ...prev,
+                [subIdKey]: !(prev[subIdKey] ?? true),
+              }))
+            }
+            className="flex w-full items-center justify-between gap-2 py-1 text-left"
+            aria-expanded={packsExpanded}
+          >
+            <span className="text-sm font-bold tracking-wide text-[#1A1A1A]">
+              PACKS ({lineItems.length})
+            </span>
+            {packsExpanded ? (
+              <IoChevronUp className="shrink-0 text-lg text-gray-500" aria-hidden />
+            ) : (
+              <IoChevronDown className="shrink-0 text-lg text-gray-500" aria-hidden />
+            )}
+          </button>
+          {packsExpanded ? (
+            <div className="space-y-2 pb-1">
+              {lineItems.map((li, idx) => (
+                <div
+                  key={`${subscription.id}-pack-${idx}`}
+                  className="flex gap-3 rounded-xl bg-[#F3F4F6] p-3"
+                >
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-white">
+                    {li.imageUrl ? (
+                      <img
+                        src={li.imageUrl}
+                        alt={li.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gray-200 text-sm font-medium text-gray-400">
+                        {li.name.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-[#1A1A1A]">
+                      {li.name}
+                    </p>
+                    <p className="mt-0.5 text-xs text-[#6B7280]">
+                      Qty: {formatQty(li.quantity)} × ₹{formatRupees(li.unitPrice)}
+                    </p>
+                  </div>
+                  <div className="shrink-0 self-center text-sm font-bold text-[#1A1A1A]">
+                    ₹{formatRupees(li.subtotal)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
+          <span className="text-sm text-[#4B5563]">Total Amount</span>
+          <span className="text-base font-bold text-[#1A1A1A]">
+            ₹{formatRupees(totalDisplay)}
+          </span>
+        </div>
+
+        <div className="mt-4">
+          <p className="mb-2 text-sm font-semibold text-[#1A1A1A]">
+            Subscribed days
+          </p>
+          <div className="flex justify-between gap-1">
+            {WEEK_SHORT.map((label, i) => {
+              const on = deliveryInts.includes(i);
+              return (
+                <div
+                  key={label}
+                  className={`flex h-9 w-9 flex-1 items-center justify-center rounded-full text-[11px] font-semibold sm:h-10 sm:w-10 sm:text-xs ${
+                    on
+                      ? "text-black"
+                      : "border border-gray-300 bg-white text-gray-400"
+                  }`}
+                  style={
+                    on
+                      ? { backgroundColor: theme.colors.primary, color: "#000000" }
+                      : undefined
+                  }
+                >
+                  {label}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <p className="mt-3 text-sm text-[#4B5563]">
+          {getNextDeliveryLine(subscription)}
+        </p>
       </div>
     );
   };
@@ -752,7 +755,7 @@ const ManageMySubscription: React.FC = () => {
 
   if (subscriptions.length === 0) {
     return (
-      <div className="min-h-screen bg-[#f8f6f1]">
+      <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
         <div className="max-w-md mx-auto p-4">
           <div className="bg-white rounded-lg p-6 shadow-sm text-center">
             <svg
@@ -786,18 +789,18 @@ const ManageMySubscription: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f6f1]">
+    <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
       <div className="max-w-[800px] mx-auto">
         {/* Header */}
         <div className="p-4 md:p-6 sticky top-0 bg-[#f8f6f1] z-10">
-          <div className="flex items-center gap-3 mb-6">
+          <div className="mb-5 flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
-              className="hover:bg-gray-100 rounded-full p-2 transition-colors -ml-2"
+              className="rounded-full p-2 text-gray-900 transition-colors hover:bg-gray-100"
             >
               <IoArrowBack className="text-xl md:text-2xl" />
             </button>
-            <h1 className="text-lg md:text-2xl font-bold font-serif text-gray-800">
+            <h1 className="font-ibm-plex-serif min-w-0 truncate whitespace-nowrap text-xl font-bold text-gray-900 md:text-2xl">
               Your Flower Subscriptions
             </h1>
           </div>
@@ -822,14 +825,26 @@ const ManageMySubscription: React.FC = () => {
               </div>
 
               <button
-                onClick={() => setActiveTab('subscriptions')}
+                type="button"
+                onClick={() => {
+                  setActiveTab("subscriptions");
+                  navigate(`${GP_DAILY_BASE}/manage-my-subscription`, {
+                    replace: true,
+                  });
+                }}
                 className={`relative z-10 flex-1 py-3 rounded-xl text-sm font-semibold transition-colors duration-300 ${activeTab === 'subscriptions' ? 'text-gray-900' : 'text-gray-500'
                   }`}
               >
                 Subscriptions
               </button>
               <button
-                onClick={() => setActiveTab('history')}
+                type="button"
+                onClick={() => {
+                  setActiveTab("history");
+                  navigate(`${GP_DAILY_BASE}/manage-my-subscription?tab=history`, {
+                    replace: true,
+                  });
+                }}
                 className={`relative z-10 flex-1 py-3 rounded-xl text-sm font-semibold transition-colors duration-300 ${activeTab === 'history' ? 'text-gray-900' : 'text-gray-500'
                   }`}
               >
@@ -839,84 +854,118 @@ const ManageMySubscription: React.FC = () => {
           </div>
         </div>
 
-        <div className="px-4">
-          {activeTab === 'subscriptions' && (
-            <>
-              {/* Active Subscriptions */}
-              {subscriptions.some((sub) => sub.status === "ACTIVE") && (
-                <div className="mb-6">
-                  {subscriptions
-                    .filter((sub) => sub.status === "ACTIVE")
-                    .map(renderSubscriptionCard)}
-                </div>
-              )}
-
-              {/* Paused Subscriptions */}
-              {subscriptions.some(
-                (sub) => sub.status === "PAUSED" || sub.status === "INACTIVE"
-              ) && (
-                  <div>
-                    <h2 className="text-lg font-bold font-serif mb-3 text-gray-800">
-                      Paused Subscriptions
-                    </h2>
-                    {subscriptions
-                      .filter(
-                        (sub) => sub.status === "PAUSED" || sub.status === "INACTIVE"
-                      )
-                      .map(renderSubscriptionCard)}
-                  </div>
-                )}
-
-              {!subscriptions.some((sub) => sub.status === "ACTIVE" || sub.status === "PAUSED" || sub.status === "INACTIVE") && (
-                <div className="text-center py-10">
-                  <p className="text-gray-500">No active or paused subscriptions found.</p>
-                </div>
-              )}
-            </>
+        <div className="px-4 pb-2">
+          {activeTab === "subscriptions" && (
+            <div className="mb-8">
+              {subscriptions.map(renderSubscriptionCard)}
+            </div>
           )}
 
           {activeTab === 'history' && (
-            <div className="space-y-4">
-              {subscriptions.some((sub) => sub.status === "CANCELLED") ? (
-                subscriptions
-                  .filter((delivery: any) => ["CANCELLED", "ACTIVE", "PAUSED", "INACTIVE", "DELIVERED", "Undelivered"].includes(delivery.status))
-                  .map((delivery: any, index) => (
+            <div className="space-y-4 pb-4">
+              {historyLoading ? (
+                <div className="rounded-2xl bg-white py-10 text-center text-sm text-gray-500 shadow-sm">
+                  Loading orders…
+                </div>
+              ) : historyOrders.length > 0 ? (
+                historyOrders.map((order, index) => {
+                  const orderNumber =
+                    typeof order.order_number === "string"
+                      ? order.order_number
+                      : "";
+                  const statusStr = String(order.status ?? "");
+                  const preview =
+                    typeof order.preview_image === "string"
+                      ? order.preview_image
+                      : "";
+                  const statusLower = statusStr.toLowerCase();
+                  const fallbackIcon =
+                    statusLower.includes("cancel") ||
+                    statusLower.includes("refund")
+                      ? redBox
+                      : greenBox;
+
+                  return (
                     <div
-                      key={index}
-                      className="bg-white rounded-2xl p-4 flex items-center justify-between shadow-sm"
+                      key={
+                        (order.id != null ? String(order.id) : null) ||
+                        orderNumber ||
+                        index
+                      }
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        if (orderNumber) {
+                          navigate(
+                            `${GP_DAILY_BASE}/orders/${encodeURIComponent(orderNumber)}`,
+                            { state: { fromSubscriptionHistory: true } },
+                          );
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (
+                          (e.key === "Enter" || e.key === " ") &&
+                          orderNumber
+                        ) {
+                          e.preventDefault();
+                          navigate(
+                            `${GP_DAILY_BASE}/orders/${encodeURIComponent(orderNumber)}`,
+                            { state: { fromSubscriptionHistory: true } },
+                          );
+                        }
+                      }}
+                      className={`flex items-center gap-2 rounded-2xl bg-white p-3 shadow-sm sm:gap-3 sm:p-3.5 ${
+                        orderNumber
+                          ? "cursor-pointer hover:bg-gray-50/80"
+                          : "cursor-default opacity-90"
+                      }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-6 h-6 flex-shrink-0">
+                      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-2.5">
+                        {preview ? (
                           <img
-                            src={redBox}
-                            alt="Cancelled"
-                            className="w-full h-full object-contain"
+                            src={preview}
+                            alt=""
+                            className="h-9 w-9 shrink-0 rounded-lg object-cover"
                           />
-                        </div>
-                        <div>
-                          <p className="font-medium text-[#1A1A1A] text-sm">
-                            {delivery.productDetails.name}
+                        ) : (
+                          <div className="h-9 w-9 shrink-0">
+                            <img
+                              src={fallbackIcon}
+                              alt=""
+                              className="h-full w-full object-contain"
+                            />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-semibold leading-snug text-[#1A1A1A] sm:text-[13px]">
+                            {subscriptionOrderListTitle(order)}
                           </p>
-                          <p className="text-xs text-[#9CA3AF]">
-                            {format(new Date(delivery.startDate), "MMMM d, yyyy")}
+                          <p className="mt-0.5 truncate text-[10px] leading-snug text-[#9CA3AF] sm:text-xs">
+                            {subscriptionOrderListDate(order)}
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4 md:gap-8">
-                        <span className="px-3 py-1 bg-[#FEE2E2] text-[#EF4444] text-xs font-medium rounded-full">
-                          Cancelled
+                      <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+                        <span
+                          className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold sm:text-[11px] ${orderStatusBadgeClass(statusStr)}`}
+                        >
+                          {formatOrderStatusPill(statusStr)}
                         </span>
-
                         <button
-                          onClick={() => navigate("/customer-support")}
-                          className="text-xs text-[#9CA3AF] underline decoration-1 underline-offset-2 hover:text-gray-900 font-medium"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`${GP_DAILY_BASE}/customer-support`);
+                          }}
+                          className="whitespace-nowrap text-[10px] font-medium text-[#9CA3AF] underline decoration-1 underline-offset-2 hover:text-gray-900 sm:text-xs"
                         >
                           Support
                         </button>
                       </div>
                     </div>
-                  ))
+                  );
+                })
               ) : (
                 <div className="text-center py-10 bg-white rounded-2xl shadow-sm">
                   <p className="text-gray-500">No delivery history found.</p>
@@ -1339,10 +1388,13 @@ const ManageMySubscription: React.FC = () => {
                     {['Sun', 'Mon', 'Tues', 'Wed', 'Thus', 'Fri', 'Sat'].map((day, index) => {
                       const fullDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                       const fullDayName = fullDayNames[index];
-                      const isSelected = editingDays.some(d =>
-                        d.toLowerCase() === fullDayName.toLowerCase() ||
-                        normalizeDayName(d) === fullDayName
-                      );
+                      const isSelected = editingDays.some((d) => {
+                        const s = String(d ?? "");
+                        return (
+                          s.toLowerCase() === fullDayName.toLowerCase() ||
+                          normalizeDayName(s) === fullDayName
+                        );
+                      });
 
                       return (
                         <button

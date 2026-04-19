@@ -187,7 +187,11 @@ const HomePage: React.FC = () => {
                 src={profilehomeIcon}
                 alt="Profile"
                 className="absolute inset-0 m-auto h-9 w-9 cursor-pointer object-contain xs:h-10 xs:w-10 sm:h-12 sm:w-12"
-                onClick={() => navigate("/gp-daily/account")}
+                onClick={() =>
+                  navigate(
+                    `${feature === "gpStore" ? "/gp-store" : "/gp-daily"}/account`,
+                  )
+                }
               />
               <img
                 src={profilelogoIcon}

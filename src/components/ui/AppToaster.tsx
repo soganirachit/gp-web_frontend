@@ -4,6 +4,9 @@ import { IoClose } from 'react-icons/io5';
 /**
  * Global toast: compact snackbar above the tab bar — small type, modest radius, capped width.
  * Each toast includes a dismiss control (react-hot-toast has no built-in close on default bar).
+ *
+ * Uses the stock `Toaster` so visibility / height measurement match the library (custom host
+ * previously skipped height updates and left toasts at opacity 0).
  */
 export function AppToaster() {
   const position = 'bottom-center' as const;

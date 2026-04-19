@@ -305,7 +305,8 @@ const Settings: React.FC = () => {
     {
       icon: ordersIcon,
       title: 'Orders',
-      path: `${basePath}/orders`,
+      /** Subscription delivery history (Daily account menu) */
+      path: `${basePath}/manage-my-subscription?tab=history`,
       isSvg: false
     },
     {

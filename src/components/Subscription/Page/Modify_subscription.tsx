@@ -1,119 +1,139 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
-import { IoArrowBack } from 'react-icons/io5';
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { toast } from "react-hot-toast";
+import { IoArrowBack } from "react-icons/io5";
 
-import { basePackService, BasePack } from '../../../services/basepack.service';
-import { subscriptionService } from '../../../services/subscription.service';
-import { SubscriptionFlowSkeleton } from '../../../components/common/PageSkeletons';
+import { subscriptionService, type Subscription } from "../../../services/subscription.service";
+import { SubscriptionFlowSkeleton } from "../../../components/common/PageSkeletons";
+import { useFeatureTheme } from "../../../context/FeatureThemeContext";
 
+const WEEK_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
-interface Subscription {
-  id: string;
-  type: "DAILY" | "CUSTOM";
-  status: string;
-  startDate: Date;
-  selectedDays: string[];
-  deliveryDays?: string[];
-  deliveryPreference?: string;
-  amount?: number;
-  imagesUrl: string[];
-  productDetails?: {
-    name: string;
-    description: string;
-    imagesUrl: string[];
-  };
-  orderContents?: {
-    name: string;
-    description: string;
-    sellingPricePerPackDaily: number;
-    sellingPricePerPackAlternate: number;
-    contents: {
-      id: string;
-      name: string;
-      quantity: number;
-    }[];
-  };
+function formatDayListShort(shorts: string[]): string {
+  const set = new Set(shorts);
+  return WEEK_SHORT.filter((d) => set.has(d)).join(", ");
+}
+
+function intsToShortLabels(ints: number[]): string[] {
+  return [...new Set(ints.filter((n) => n >= 0 && n <= 6))]
+    .sort((a, b) => a - b)
+    .map((i) => WEEK_SHORT[i]);
 }
 
 const ModifySubscription: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { subscription } = location.state || { subscription: null } as { subscription: Subscription | null };
+  const { theme } = useFeatureTheme();
+  const primary = theme.colors.primary;
 
-  const [quantity, setQuantity] = useState(1); // Default to 1 as quantity isn't explicitly in the interface but logically needed
-  const [deliveryType, setDeliveryType] = useState<'daily' | 'custom'>('daily');
+  const subscription = (location.state as { subscription?: Subscription } | null)?.subscription ?? null;
+
+  const [quantity, setQuantity] = useState(1);
+  const [deliveryType, setDeliveryType] = useState<"daily" | "custom">("daily");
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
-  const [addOns, setAddOns] = useState<{ [key: string]: number }>({});
-  const [availableAddOns, setAvailableAddOns] = useState<BasePack[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const firstLine = subscription?.lineItems?.[0];
+
+  const productName = useMemo(() => {
+    if (!subscription) return "Subscription Pack";
+    return firstLine?.name ?? subscription.productDetails?.name ?? "Subscription Pack";
+  }, [subscription, firstLine?.name]);
+
+  const productImage = useMemo(() => {
+    if (!subscription) return "";
+    return (
+      firstLine?.imageUrl ??
+      subscription.productDetails?.imagesUrl?.[0] ??
+      ""
+    );
+  }, [subscription, firstLine?.imageUrl]);
+
+  const packUnitPrice = useMemo(() => {
+    if (!subscription) return 0;
+    const u = firstLine?.unitPrice ?? subscription.amount;
+    return typeof u === "number" && u > 0 ? Math.round(u) : 0;
+  }, [subscription, firstLine?.unitPrice]);
 
   // Initialize state from subscription data
   useEffect(() => {
-    if (subscription) {
-      // Determine Delivery Type
-      const isCustom = subscription.type === 'CUSTOM' || subscription.deliveryPreference === 'CUSTOM';
-      setDeliveryType(isCustom ? 'custom' : 'daily');
+    if (!subscription) return;
 
-      // Determine Selected Days
-      // Check for stored days in various formats
-      let currentDays: string[] = [];
-      if (subscription.deliveryDays && subscription.deliveryDays.length > 0) {
-        currentDays = subscription.deliveryDays;
-      } else if (subscription.selectedDays && subscription.selectedDays.length > 0) {
-        currentDays = subscription.selectedDays;
-      }
+    const isCustom =
+      subscription.type === "CUSTOM" || subscription.deliveryPreference === "CUSTOM";
 
-      // Normalize days to match our 'Mon', 'Tue' format if needed
-      const dayMap: { [key: string]: string } = {
-        'monday': 'Mon', 'mon': 'Mon',
-        'tuesday': 'Tue', 'tue': 'Tue',
-        'wednesday': 'Wed', 'wed': 'Wed',
-        'thursday': 'Thu', 'thu': 'Thu',
-        'friday': 'Fri', 'fri': 'Fri',
-        'saturday': 'Sat', 'sat': 'Sat',
-        'sunday': 'Sun', 'sun': 'Sun'
+    setDeliveryType(isCustom ? "custom" : "daily");
+
+    let shorts: string[] = [];
+
+    if (subscription.deliveryDayInts && subscription.deliveryDayInts.length > 0) {
+      shorts = intsToShortLabels(subscription.deliveryDayInts);
+    } else {
+      const currentDays =
+        subscription.deliveryDays && subscription.deliveryDays.length > 0
+          ? subscription.deliveryDays
+          : subscription.selectedDays ?? [];
+
+      const dayMap: Record<string, string> = {
+        monday: "Mon",
+        mon: "Mon",
+        tuesday: "Tue",
+        tue: "Tue",
+        wednesday: "Wed",
+        wed: "Wed",
+        thursday: "Thu",
+        thu: "Thu",
+        friday: "Fri",
+        fri: "Fri",
+        saturday: "Sat",
+        sat: "Sat",
+        sunday: "Sun",
+        sun: "Sun",
       };
-      const normalizedDays = currentDays.map(d => dayMap[d.toLowerCase()] || d);
 
-      // If daily, select all days, else select specific days
-      if (!isCustom) {
-        // For daily, visual UI might disable selection, but logically it's all days
-        setSelectedDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
-      } else {
-        setSelectedDays(normalizedDays);
-      }
+      shorts = currentDays.map((d: string | number) => {
+        if (typeof d === "number" && Number.isInteger(d) && d >= 0 && d <= 6) {
+          return WEEK_SHORT[d];
+        }
+        const s = String(d ?? "").trim();
+        const lower = s.toLowerCase();
+        const m = dayMap[lower];
+        if (m) return m;
+        const cap = s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+        if ((WEEK_SHORT as readonly string[]).includes(cap)) return cap;
+        const up = s.slice(0, 3);
+        if ((WEEK_SHORT as readonly string[]).includes(up)) return up;
+        return s;
+      });
+    }
+
+    if (!isCustom) {
+      setSelectedDays([...WEEK_SHORT]);
+    } else {
+      setSelectedDays(shorts.length ? shorts : [...WEEK_SHORT]);
     }
   }, [subscription]);
 
-  // Fetch Add-ons (Products)
   useEffect(() => {
-    const fetchAddOns = async () => {
-      try {
-        setIsLoading(true);
-        const products = await basePackService.getAllBasePacks();
-        setAvailableAddOns(products.slice(0, 3));
-      } catch (error) {
-        console.error("Failed to fetch add-ons", error);
-        toast.error("Failed to load add-ons");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAddOns();
+    setIsLoading(false);
   }, []);
 
+  const subscribedDaysDisplay = useMemo(() => {
+    if (deliveryType === "daily") {
+      return formatDayListShort([...WEEK_SHORT]);
+    }
+    return formatDayListShort(selectedDays);
+  }, [deliveryType, selectedDays]);
+
   const handleDayToggle = (day: string) => {
+    if (deliveryType === "daily") return;
     if (selectedDays.includes(day)) {
-      if (deliveryType === 'custom' && selectedDays.length <= 3) {
+      if (selectedDays.length <= 3) {
         toast.error("You must select at least 3 days");
         return;
       }
-      setSelectedDays(selectedDays.filter(d => d !== day));
+      setSelectedDays(selectedDays.filter((d) => d !== day));
     } else {
       setSelectedDays([...selectedDays, day]);
     }
@@ -126,23 +146,10 @@ const ModifySubscription: React.FC = () => {
     }
   };
 
-  const handleAddOnQuantityChange = (id: string, change: number) => {
-    const currentQty = addOns[id] || 0;
-    const newQty = currentQty + change;
-    if (newQty <= 0) {
-      const newAddOns = { ...addOns };
-      delete newAddOns[id];
-      setAddOns(newAddOns);
-    } else {
-      setAddOns({ ...addOns, [id]: newQty });
-    }
-  };
-
   const handleSaveChanges = async () => {
     if (!subscription) return;
 
-    // Validate min 3 days for custom
-    if (deliveryType === 'custom' && selectedDays.length < 3) {
+    if (deliveryType === "custom" && selectedDays.length < 3) {
       toast.error("Please select at least 3 delivery days");
       return;
     }
@@ -150,31 +157,34 @@ const ModifySubscription: React.FC = () => {
     try {
       setIsUpdating(true);
 
-      // Map short day names to full uppercase names for API
-      const dayMap: { [key: string]: string } = {
-        'Mon': 'MONDAY',
-        'Tue': 'TUESDAY',
-        'Wed': 'WEDNESDAY',
-        'Thu': 'THURSDAY',
-        'Fri': 'FRIDAY',
-        'Sat': 'SATURDAY',
-        'Sun': 'SUNDAY'
+      const dayMap: Record<string, string> = {
+        Mon: "MONDAY",
+        Tue: "TUESDAY",
+        Wed: "WEDNESDAY",
+        Thu: "THURSDAY",
+        Fri: "FRIDAY",
+        Sat: "SATURDAY",
+        Sun: "SUNDAY",
       };
 
-      const apiSelectedDays = selectedDays.map(day => dayMap[day]);
-      const subscriptionType = deliveryType === 'daily' ? 'DAILY' : 'CUSTOM';
+      const apiSelectedDays =
+        deliveryType === "daily"
+          ? [...WEEK_SHORT].map((d) => dayMap[d])
+          : selectedDays.map((day) => dayMap[day]);
+      const subscriptionType = deliveryType === "daily" ? "DAILY" : "CUSTOM";
 
       await subscriptionService.updateSubscription(subscription.id, {
         type: subscriptionType,
         selectedDays: apiSelectedDays,
-        status: subscription.status as any, // Preserve existing status
+        status: subscription.status as "ACTIVE" | "PAUSED" | "CANCELLED" | "INACTIVE",
       });
 
       toast.success("Subscription updated successfully!");
-      navigate('/gp-daily/manage-my-subscription');
-    } catch (error: any) {
+      navigate("/gp-daily/manage-my-subscription");
+    } catch (error: unknown) {
       console.error("Error updating subscription:", error);
-      toast.error(error.message || "Failed to update subscription");
+      const message = error instanceof Error ? error.message : "Failed to update subscription";
+      toast.error(message);
     } finally {
       setIsUpdating(false);
     }
@@ -186,10 +196,14 @@ const ModifySubscription: React.FC = () => {
 
   if (!subscription) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8f6f1]">
+      <div className="flex min-h-screen items-center justify-center bg-[#faf9f5]">
         <div className="text-center">
-          <p className="text-gray-600 mb-4">No subscription data found.</p>
-          <button onClick={() => navigate('/gp-daily/manage-my-subscription')} className="text-blue-600 underline">
+          <p className="mb-4 text-gray-600">No subscription data found.</p>
+          <button
+            type="button"
+            onClick={() => navigate("/gp-daily/manage-my-subscription")}
+            className="text-blue-600 underline"
+          >
             Go Back
           </button>
         </div>
@@ -197,182 +211,197 @@ const ModifySubscription: React.FC = () => {
     );
   }
 
-  const productName = subscription.productDetails?.name || "Subscription Pack";
-  const productImage = subscription.productDetails?.imagesUrl?.[0] || "https://t4.ftcdn.net/jpg/05/65/22/45/360_F_565224520_XvHkj0jS5jI4jZg7jZg7jZg7jZg7jZg7.jpg";
-
   return (
-    <div className="min-h-screen bg-[#f8f6f1] font-sans">
-      <div className="max-w-[800px] mx-auto p-4 md:p-6 pb-nav-bottom">
-
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <button onClick={() => navigate(-1)} className="text-gray-800">
-            <IoArrowBack className="text-2xl" />
-          </button>
-          <h1 className="text-2xl font-semibold text-gray-800 font-serif">Modify Subscription</h1>
-        </div>
-
-        {/* Product Card */}
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-20 h-20 rounded-xl overflow-hidden shadow-sm bg-white">
-            <img
-              src={productImage}
-              alt={productName}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="flex-1">
-            <h2 className="text-xl font-medium text-gray-900 font-serif mb-2">{productName}</h2>
-
-            <div className="flex items-center justify-between">
-              <span className="text-gray-600 font-serif text-lg">Quantity</span>
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => handleQuantityChange(-1)}
-                  className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-2xl text-gray-500 shadow-sm font-bold"
-                >
-                  -
-                </button>
-                <span className="font-semibold text-lg w-4 text-center">{quantity}</span>
-                <button
-                  onClick={() => handleQuantityChange(1)}
-                  className="w-8 h-8 rounded-full bg-[#FAA222] text-gray-900 flex items-center justify-center shadow-sm font-bold text-2xl"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <hr className="border-gray-200 mb-6" />
-
-        {/* Delivery Schedule */}
-        <div className="mb-6">
-          <h3 className="text-lg font-medium text-gray-800 font-serif mb-1">Delivery Schedule</h3>
-          <p className="text-sm text-gray-500 mb-4">Choose your preferred delivery frequency</p>
-
-          <div className="space-y-3">
-            {/* Daily Delivery Option */}
-            <div
-              onClick={() => {
-                setDeliveryType('daily');
-                setSelectedDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
-              }}
-              className={`bg-white rounded-2xl p-4 flex items-center justify-between border-2 transition-colors cursor-pointer ${deliveryType === 'daily' ? 'border-[#FAA222]' : 'border-transparent'
-                }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${deliveryType === 'daily' ? 'border-[#FAA222]' : 'border-gray-300'
-                  }`}>
-                  {deliveryType === 'daily' && <div className="w-2.5 h-2.5 rounded-full bg-[#FAA222]" />}
-                </div>
-                <span className="text-gray-700 font-medium">Daily Delivery</span>
-              </div>
-              <span className="text-gray-400 font-medium">₹{subscription?.orderContents?.sellingPricePerPackDaily || 50}/Pack</span>
-            </div>
-
-            {/* Custom Days Option */}
-            <div
-              onClick={() => setDeliveryType('custom')}
-              className={`bg-white rounded-2xl p-4 flex items-center justify-between border-2 transition-colors cursor-pointer ${deliveryType === 'custom' ? 'border-[#FAA222]' : 'border-transparent'
-                }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${deliveryType === 'custom' ? 'border-[#FAA222]' : 'border-gray-300'
-                  }`}>
-                  {deliveryType === 'custom' && <div className="w-2.5 h-2.5 rounded-full bg-[#FAA222]" />}
-                </div>
-                <span className="text-gray-700 font-medium">Custom Days</span>
-              </div>
-              <span className="text-gray-400 font-medium">₹{subscription?.orderContents?.sellingPricePerPackAlternate || 70}/Pack</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Select Days */}
-        <div className="mb-8">
-          <h3 className="text-lg font-medium text-gray-800 font-serif mb-3">Select Days</h3>
-          <div className="flex rounded-xl p-1 gap-2 w-full overflow-x-auto">
-            {days.map(day => (
-              <button
-                key={day}
-                onClick={() => handleDayToggle(day)}
-                disabled={deliveryType === 'daily'}
-                className={`h-12 flex-1 min-w-[40px] rounded-2xl flex  items-center justify-center font-medium transition-colors text-sm ${deliveryType === 'daily'
-                  ? 'bg-[#FAA222] text-gray-900 cursor-not-allowed'
-                  : selectedDays.includes(day)
-                    ? 'bg-[#FAA222] text-text-gray-900 shadow-sm'
-                    : 'bg-white border-[3px] border-gray-200 text-gray-500 hover:bg-gray-50'
-                  }`}
-              >
-                {day}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Add-Ons */}
-        <div className="mb-8">
-          <h3 className="text-lg font-medium text-gray-800 font-serif mb-1">Add-Ons</h3>
-          <p className="text-sm text-gray-500 mb-4">Enhance your experience</p>
-
-          <div className="space-y-3">
-            {availableAddOns.map(addon => {
-              const qty = addOns[addon.id] || 0;
-              const imageUrl = addon.imagesUrl || '/placeholder.svg';
-              return (
-                <div key={addon.id} className="bg-white rounded-2xl p-3 flex items-center gap-3 border-2 border-gray-200">
-                  <img src={imageUrl} alt={addon.name} className="w-14 h-14 rounded-lg object-cover bg-gray-100" />
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-800">{addon.name}</h4>
-                    <p className="text-gray-500 text-sm">₹{addon.sellingPrice}/pc</p>
-                  </div>
-
-                  {qty === 0 ? (
-                    <button
-                      onClick={() => handleAddOnQuantityChange(addon.id, 1)}
-                      className="bg-[#FAA222] w-20 text-gray-900 text-sm font-medium px-4 py-2 rounded-xl shadow-sm hover:opacity-90"
-                    >
-                      Add
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => handleAddOnQuantityChange(addon.id, -1)}
-                        className="w-8 h-8 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-black"
-                      >
-                        -
-                      </button>
-                      <span className="font-medium w-3 text-center">{qty}</span>
-                      <button
-                        onClick={() => handleAddOnQuantityChange(addon.id, 1)}
-                        className="w-8 h-8 rounded-full bg-[#FAA222] text-black flex items-center justify-center"
-                      >
-                        +
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Footer Buttons */}
-        <div className="flex items-center gap-4 mt-8">
+    <div className="min-h-screen bg-white font-sans text-gray-900">
+      <div className="mx-auto max-w-lg px-5 pb-nav-bottom pt-5 md:px-6 md:pt-6">
+        {/* Header — IBM Plex Serif title + back (matches Orders / reference) */}
+        <header className="mb-7 flex items-center gap-3">
           <button
+            type="button"
             onClick={() => navigate(-1)}
-            className="flex-1 py-4 rounded-2xl border border-gray-200 text-gray-500 font-medium bg-white hover:bg-gray-50"
+            className="shrink-0 rounded-full p-2 text-gray-900 transition-colors hover:bg-gray-100"
+            aria-label="Back"
+          >
+            <IoArrowBack className="text-xl md:text-2xl" />
+          </button>
+          <h1 className="font-ibm-plex-serif min-w-0 truncate text-xl font-bold text-gray-900 md:text-2xl">
+            Modify Subscription
+          </h1>
+        </header>
+
+        {/* Product — image + name only */}
+        <section className="mb-8">
+          <div className="flex items-center gap-3">
+            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-100">
+              {productImage ? (
+                <img src={productImage} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-base font-semibold text-gray-400">
+                  {productName.charAt(0)}
+                </div>
+              )}
+            </div>
+            <h2 className="min-w-0 flex-1 truncate text-base font-bold leading-snug text-black">
+              {productName}
+            </h2>
+          </div>
+
+          {/* Quantity — label left, compact circular stepper right; icons black */}
+          <div className="mt-5 flex items-center justify-between gap-4">
+            <span className="shrink-0 text-base font-semibold text-black">Quantity</span>
+            <div className="flex shrink-0 items-center gap-4">
+              <button
+                type="button"
+                onClick={() => handleQuantityChange(-1)}
+                className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full border-0 bg-gray-100 p-0 transition-colors hover:bg-gray-200 disabled:opacity-50"
+                aria-label="Decrease quantity"
+              >
+                <span className="text-[18px] font-normal leading-none text-black">−</span>
+              </button>
+              <span className="min-w-[1.25rem] text-center text-sm font-bold tabular-nums text-black">
+                {quantity}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleQuantityChange(1)}
+                className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full border-0 p-0 transition-opacity hover:opacity-90"
+                style={{ backgroundColor: primary }}
+                aria-label="Increase quantity"
+              >
+                <span className="text-[18px] font-normal leading-none text-black">+</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Delivery schedule — heading first, then subscribed-days card, then options */}
+        <section>
+          <h3 className="font-ibm-plex-serif text-lg font-bold text-gray-900">
+            Delivery Schedule
+          </h3>
+          <p className="mt-2.5 text-xs font-normal leading-relaxed text-gray-500">
+            Choose your preferred delivery frequency
+          </p>
+
+          <div
+            className="mt-5 rounded-2xl border px-4 py-3.5"
+            style={{
+              backgroundColor: "#FFFBE6",
+              borderColor: "rgba(250, 162, 34, 0.55)",
+            }}
+          >
+            <p className="text-xs font-semibold text-[#6B5B2E]">Subscribed days</p>
+            <p className="mt-1 text-sm font-semibold leading-snug text-black">
+              {subscribedDaysDisplay}
+            </p>
+          </div>
+
+          <div className="mt-5 space-y-4">
+            <button
+              type="button"
+              onClick={() => {
+                setDeliveryType("daily");
+                setSelectedDays([...WEEK_SHORT]);
+              }}
+              className="flex w-full cursor-pointer items-center justify-between rounded-2xl border bg-white px-5 py-4 text-left transition-colors"
+              style={{
+                borderColor: deliveryType === "daily" ? primary : "#e5e7eb",
+                borderWidth: deliveryType === "daily" ? 2 : 1,
+              }}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 bg-white"
+                  style={{ borderColor: primary }}
+                >
+                  {deliveryType === "daily" ? (
+                    <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: primary }} />
+                  ) : null}
+                </div>
+                <span className="truncate font-medium text-gray-900">Daily Delivery</span>
+              </div>
+              <span className="shrink-0 pl-2 text-sm font-medium text-gray-500">
+                ₹{packUnitPrice || "—"}/Pack
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDeliveryType("custom")}
+              className="flex w-full cursor-pointer items-center justify-between rounded-2xl border bg-white p-4 text-left transition-colors"
+              style={{
+                borderColor: deliveryType === "custom" ? primary : "#e5e7eb",
+                borderWidth: deliveryType === "custom" ? 2 : 1,
+              }}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 bg-white"
+                  style={{ borderColor: primary }}
+                >
+                  {deliveryType === "custom" ? (
+                    <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: primary }} />
+                  ) : null}
+                </div>
+                <span className="truncate font-medium text-gray-900">Custom Days</span>
+              </div>
+              <span className="shrink-0 pl-2 text-sm font-medium text-gray-500">
+                ₹{packUnitPrice || "—"}/Pack
+              </span>
+            </button>
+          </div>
+        </section>
+
+        {/* Select days — custom only; orange fill + white label on selected */}
+        {deliveryType === "custom" ? (
+          <section className="mt-9">
+            <h3 className="text-base font-semibold text-black">Select Days</h3>
+            <div className="relative mt-5 px-0.5">
+              <div
+                className="pointer-events-none absolute left-[8%] right-[8%] top-1/2 z-0 h-px -translate-y-1/2 bg-gray-400"
+                aria-hidden
+              />
+              <div className="relative z-10 flex justify-between gap-0.5">
+                {WEEK_SHORT.map((day) => {
+                  const on = selectedDays.includes(day);
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => handleDayToggle(day)}
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-[10px] font-bold transition-colors sm:h-10 sm:w-10 sm:text-[11px] ${
+                        on
+                          ? "text-black shadow-sm"
+                          : "border border-gray-300 bg-white text-black"
+                      }`}
+                      style={on ? { backgroundColor: primary } : undefined}
+                    >
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {/* Footer — ~12px radius */}
+        <div className="mt-11 flex gap-3 pb-8">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="flex-1 rounded-xl border border-gray-200 bg-white py-3.5 text-sm font-semibold text-gray-500 transition-colors hover:bg-gray-50"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleSaveChanges}
             disabled={isUpdating}
-            className={`flex-1 py-4 rounded-2xl bg-[#FAA222] text-black font-semibold shadow-sm hover:bg-[#e5931f] disabled:opacity-50 disabled:cursor-not-allowed`}
+            className="flex-1 rounded-xl py-3.5 text-sm font-bold text-black transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ backgroundColor: primary }}
           >
-            {isUpdating ? 'Saving...' : 'Save Changes'}
+            {isUpdating ? "Saving…" : "Save Changes"}
           </button>
         </div>
       </div>

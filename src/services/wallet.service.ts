@@ -1,6 +1,6 @@
 import { AxiosError } from "axios";
 import api from "./api";
-import { getApiUrl, getPaymentsRazorpayUrl, getWalletUrl } from "../config/api.config";
+import { getPaymentsRazorpayUrl, getWalletUrl } from "../config/api.config";
 import { TransactionType } from "@/interfaces";
 
 function unwrapData<T = unknown>(raw: unknown): T {
@@ -119,9 +119,30 @@ class WalletService {
   }
 
   /**
-   * Step 1: create Razorpay order for wallet top-up (before opening Razorpay UI).
-   * Swagger documents `POST /wallet/add-money/` for step 2 only — there is no
-   * `payments/razorpay/create-wallet-order/` on production (404). Prefer wallet-scoped routes.
+   * Step 1: initiate wallet top-up (create Razorpay order).
+   * POST /wallet/initiate-topup/
+   */
+  async initiateTopup(amount: number): Promise<{
+    razorpay_order_id: string;
+    key_id: string;
+  }> {
+    const walletBase = getWalletUrl();
+    const res = await api.post(`${walletBase}/initiate-topup/`, { amount });
+    const payload = res.data as Record<string, unknown>;
+    if (payload.success === false) {
+      throw new Error(String(payload.message || "Failed to initiate top-up"));
+    }
+    const d = unwrapData<Record<string, unknown>>(payload);
+    const razorpay_order_id = String(d.razorpay_order_id ?? d.order_id ?? "");
+    const key_id = String(d.key_id ?? d.keyId ?? "");
+    if (!razorpay_order_id || !key_id) {
+      throw new Error("Invalid top-up response from server");
+    }
+    return { razorpay_order_id, key_id };
+  }
+
+  /**
+   * Back-compat wrapper used by `RazorpayPayment` component.
    */
   async createRazorpayOrder(
     amount: number,
@@ -131,67 +152,20 @@ class WalletService {
     key_id: string;
     customer: any;
   }> {
-    const body = { amount, purpose };
-    const walletBase = getWalletUrl();
-    const razorpayBase = getPaymentsRazorpayUrl();
-
-    const tryUrls = [
-      `${walletBase}/create-razorpay-order/`,
-      `${walletBase}/create-order/`,
-      `${razorpayBase}/create-wallet-order/`,
-    ];
-
-    let response;
-    let last404: unknown;
-    for (const url of tryUrls) {
-      try {
-        response = await api.post(url, body);
-        break;
-      } catch (e: unknown) {
-        const ax = e as AxiosError;
-        if (ax.response?.status === 404) {
-          last404 = e;
-          continue;
-        }
-        throw e;
-      }
-    }
-    if (!response) {
-      throw last404 instanceof Error
-        ? last404
-        : new Error(
-            "Wallet Razorpay order endpoint not found. Expected one of: /wallet/create-razorpay-order/, /wallet/create-order/"
-          );
-    }
-
-    const raw = response.data as Record<string, unknown>;
-    if (raw.success === false) {
-      throw new Error(String(raw.message || "Failed to create order"));
-    }
-
-    const d = unwrapData<Record<string, unknown>>(raw);
-
-    const razorpayOrderId =
-      (d.razorpay_order_id as string) ||
-      (d.order_id as string) ||
-      (typeof d.order === "object" && d.order != null
-        ? String((d.order as Record<string, unknown>).id ?? "")
-        : "");
-
-    const keyId = String(d.key_id ?? d.keyId ?? "");
-    const amountPaise = Number(
-      d.amount ?? (d.order as Record<string, unknown> | undefined)?.amount ?? amount * 100
-    );
+    const topup = await this.initiateTopup(amount);
+    const razorpayOrderId = topup.razorpay_order_id;
+    const keyId = topup.key_id;
+    const amountPaise = Math.round(amount * 100);
 
     return {
       order: {
         id: razorpayOrderId,
         amount: amountPaise,
-        currency: String(d.currency ?? "INR"),
-        notes: (d.order as Record<string, unknown> | undefined)?.notes ?? d.notes,
+        currency: "INR",
+        notes: undefined,
       },
       key_id: keyId,
-      customer: (d.customer as Record<string, unknown>) ?? {
+      customer: {
         name: "",
         email: "",
         contact: localStorage.getItem("phoneNumber") ?? "",
@@ -200,18 +174,19 @@ class WalletService {
   }
 
   /**
-   * POST /wallet/add-money/ — credit wallet after Razorpay (Swagger + Postman 09 - Wallet).
-   * Body: amount (number, INR), razorpay_order_id, razorpay_payment_id, razorpay_signature.
+   * Step 2: verify payment and credit wallet.
+   * POST /wallet/add-money/
+   * Body: razorpay_order_id, razorpay_payment_id, razorpay_signature.
+   * Do NOT pass amount — backend reads it from step 1.
    */
   async verifyRazorpayPayment(paymentData: {
     razorpay_payment_id: string;
     razorpay_order_id: string;
     razorpay_signature: string;
-    /** INR top-up amount — required by API */
-    amount: number;
+    /** INR top-up amount (optional; ignored by API) */
+    amount?: number;
   }): Promise<any> {
     const payload = {
-      amount: paymentData.amount,
       razorpay_order_id: paymentData.razorpay_order_id,
       razorpay_payment_id: paymentData.razorpay_payment_id,
       razorpay_signature: paymentData.razorpay_signature,

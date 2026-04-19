@@ -30,12 +30,6 @@
     padding-right: env(safe-area-inset-right);
   }
 
-  /* Better touch targets on mobile — minimum 44×44 px per Apple HIG / Google MDC */
-  button, a, [role="button"] {
-    min-height: 44px;
-    min-width: 44px;
-  }
-
   /* Prevent text from overflowing narrow containers on small phones */
   p, span, h1, h2, h3, h4, h5, h6, label {
     word-break: break-word;
@@ -135,7 +129,7 @@
     margin-bottom: max(0px, env(safe-area-inset-bottom));
   }
 
-  /* Override @layer base 44×44 touch targets for dense inline controls (e.g. cart message) */
+  /* Dense inline controls: allow smaller than default hit area when you set explicit size */
   .touch-target-compact {
     min-height: 0 !important;
     min-width: 0 !important;
@@ -159,7 +153,7 @@
   100% { transform: translate(-50%, -50%) scale(1.25); opacity: 0; }
 }
 
-/* react-hot-toast: global 44×44 button rule would make snackbars huge */
+/* react-hot-toast: keep dismiss / actions from inheriting oversized min tap boxes */
 .gp-app-toaster button {
   min-width: 0;
   min-height: 0;

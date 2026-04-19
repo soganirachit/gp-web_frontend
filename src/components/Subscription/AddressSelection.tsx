@@ -10,6 +10,7 @@ import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import ReactDOM from "react-dom/client";
 import { orderService } from "../../services/order.service";
 import { subscriptionService } from "../../services/subscription.service";
+import { subscriptionCartService } from "../../services/subscriptionCart.service";
 import { customerService } from "../../services/getcustomer.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { AddressSelectionSkeleton } from "../common/PageSkeletons";
@@ -385,6 +386,12 @@ const AddressSelection: React.FC = () => {
       if (location.state?.fromCart) {
         // Save selected address and navigate back to cart
         localStorage.setItem('selectedDeliveryAddress', JSON.stringify(selectedAddress));
+
+        // gp-daily cart uses subscription cart APIs to set address
+        if (feature !== 'gpStore' && selectedAddress?.id) {
+          await subscriptionCartService.setDeliveryAddress(Number(selectedAddress.id));
+        }
+
         const cartPath = feature === 'gpStore' ? '/gp-store/basket' : '/gp-daily/basket';
         navigate(cartPath, {
           state: {
@@ -963,7 +970,7 @@ const AddressSelection: React.FC = () => {
                   <img src={WalletIcon} alt="Wallet" className="w-6 h-6" />
                 </button>
                 </Link>
-                <Link to="/account">
+                <Link to="/gp-store/account">
                 <button className="w-8 h-8 flex items-center justify-center text-[#015D3A]">
                   <img src={ProfileIcon} alt="Profile" className="w-6 h-6" />
                 </button>
@@ -1246,19 +1253,19 @@ const AddressSelection: React.FC = () => {
               <div className="mx-auto max-w-[800px] space-y-3">
                 <button
                   onClick={() => navigate(`${basePath}/addresses/add`)}
-                  className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-base font-semibold hover:opacity-90 shadow-sm ${
+                  className={`w-full flex h-[48px] items-center justify-center gap-2 rounded-xl text-base font-semibold hover:opacity-90 shadow-sm ${
                     feature === 'gpStore' ? 'text-white' : 'text-gray-900'
                   }`}
                   style={{ backgroundColor: theme.colors.primary }}
                 >
-                  <span className="text-2xl font-semibold">+</span>
+                  <span className="text-xl font-semibold leading-none">+</span>
                   Add New Address
                 </button>
 
                 <button
                   onClick={handleContinue}
                   disabled={!selectedAddress || loading}
-                  className={`w-full py-3 rounded-xl text-base font-semibold shadow-sm flex items-center justify-center ${
+                  className={`w-full h-[48px] rounded-xl text-base font-semibold shadow-sm flex items-center justify-center ${
                     selectedAddress && !loading
                       ? `hover:opacity-90 ${feature === 'gpStore' ? 'text-white' : 'text-gray-900'}`
                       : 'bg-gray-300 cursor-not-allowed text-gray-500'

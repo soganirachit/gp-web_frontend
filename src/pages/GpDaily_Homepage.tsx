@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaChevronRight } from "react-icons/fa";
 import { MdKeyboardArrowDown } from "react-icons/md";
-import { motion } from "framer-motion";
 import logo from "../assets/All/logo.png";
 import { walletService } from "../services/wallet.service";
 import {
@@ -33,6 +32,10 @@ import locationhomeIcon from "../assets/svg/gp_daily svg/locationhome.svg";
 import profilehomeIcon from "../assets/svg/gp_daily svg/profilehome.svg";
 import profilelogoIcon from "../assets/svg/gp_daily svg/profilelogo.svg";
 import alertIcon from "../assets/svg/gp_daily svg/lowbalance.svg";
+import {
+  formatHomepageNextDeliveryLine,
+  subscriptionProductLabel,
+} from "../utils/subscriptionNextDelivery";
 
 interface DayInfo {
   date: string;
@@ -65,6 +68,8 @@ const Home2: React.FC = () => {
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [selectedSubscription, setSelectedSubscription] =
     useState<Subscription | null>(null);
+  const subscriptionCarouselRef = useRef<HTMLDivElement | null>(null);
+  const [subscriptionCarouselIndex, setSubscriptionCarouselIndex] = useState(0);
   const [products, setProducts] = useState<ProductType[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [userName, setUserName] = useState<string>("");
@@ -123,14 +128,17 @@ const Home2: React.FC = () => {
         );
         setActiveSubscriptions(active);
         setSelectedSubscription(active[0] ?? null);
+        setSubscriptionCarouselIndex(0);
       } else {
         setActiveSubscriptions([]);
         setSelectedSubscription(null);
+        setSubscriptionCarouselIndex(0);
       }
     } catch (error: any) {
       console.error("Error fetching subscriptions:", error);
       setActiveSubscriptions([]);
       setSelectedSubscription(null);
+      setSubscriptionCarouselIndex(0);
     } finally {
       setIsLoadingSubscriptions(false);
     }
@@ -292,6 +300,7 @@ const Home2: React.FC = () => {
       fetchCustomerName();
     } else {
       setIsLoadingBalance(false);
+      setIsLoadingSubscriptions(false);
     }
 
     fetchProducts();
@@ -390,14 +399,46 @@ const Home2: React.FC = () => {
     return imagesUrl;
   };
 
-  // Get next delivery date (static for now)
-  const getNextDeliveryDate = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return `Tomorrow - ${days[tomorrow.getDay()]}, ${tomorrow.getDate()} ${months[tomorrow.getMonth()]}`;
-  };
+  const subscriptionCarouselKey = useMemo(
+    () => activeSubscriptions.map((s) => s.id).join("|"),
+    [activeSubscriptions]
+  );
+
+  useEffect(() => {
+    const el = subscriptionCarouselRef.current;
+    if (!el) return;
+    el.scrollLeft = 0;
+    setSubscriptionCarouselIndex(0);
+    if (activeSubscriptions[0]) {
+      setSelectedSubscription(activeSubscriptions[0]);
+    }
+  }, [subscriptionCarouselKey, activeSubscriptions]);
+
+  const handleSubscriptionCarouselScroll = useCallback(() => {
+    const el = subscriptionCarouselRef.current;
+    if (!el || activeSubscriptions.length === 0) return;
+    const w = el.clientWidth || 1;
+    const idx = Math.min(
+      activeSubscriptions.length - 1,
+      Math.max(0, Math.round(el.scrollLeft / w))
+    );
+    setSubscriptionCarouselIndex(idx);
+    const sub = activeSubscriptions[idx];
+    if (sub) setSelectedSubscription(sub);
+  }, [activeSubscriptions]);
+
+  const scrollSubscriptionCarouselTo = useCallback(
+    (index: number) => {
+      const el = subscriptionCarouselRef.current;
+      if (!el || activeSubscriptions.length === 0) return;
+      const clamped = Math.min(activeSubscriptions.length - 1, Math.max(0, index));
+      el.scrollTo({ left: clamped * el.clientWidth, behavior: "smooth" });
+      setSubscriptionCarouselIndex(clamped);
+      const sub = activeSubscriptions[clamped];
+      if (sub) setSelectedSubscription(sub);
+    },
+    [activeSubscriptions]
+  );
 
   const isPageLoading =
     isLoadingAddress || isLoadingBalance || isLoadingProducts;
@@ -470,7 +511,7 @@ const Home2: React.FC = () => {
                     src={profilehomeIcon}
                     alt="Profile"
                     className="absolute inset-0 m-auto h-9 w-9 xs:h-10 xs:w-10 sm:h-12 sm:w-12 object-contain cursor-pointer"
-                    onClick={() => navigate(`${basePath}/account`)}
+                    onClick={() => navigate("/gp-daily/account")}
                   />
                   <img
                     src={profilelogoIcon}
@@ -528,7 +569,7 @@ const Home2: React.FC = () => {
                 </div>
               )}
 
-              {/* Namaste Section */}
+              {/* Namaste + active subscriptions carousel */}
               <div className="bg-[#FFF5DC] rounded-2xl p-4 border border-gray-200">
                 <div className="flex items-center justify-between mb-4 pl-1">
                   <div className="flex items-center gap-2">
@@ -542,38 +583,102 @@ const Home2: React.FC = () => {
                     />
                   </div>
                   <button
+                    type="button"
                     onClick={() => navigate(`${basePath}/manage-my-subscription`)}
                     className="text-[#FAA222] text-sm font-medium underline"
                   >
                     Manage
                   </button>
                 </div>
-                <div className="space-y-3 pl-1">
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <img
-                      src={scooterIcon}
-                      alt="Scooter"
-                      className="w-5 h-5 flex-shrink-0"
-                    />
-                    <span className="text-base font-medium">{getNextDeliveryDate()}</span>
+
+                {isLoadingSubscriptions ? (
+                  <div className="space-y-3 pl-1 animate-pulse">
+                    <div className="h-5 w-[85%] rounded bg-gray-200/80" />
+                    <div className="h-5 w-[55%] rounded bg-gray-200/80" />
+                    <div className="h-5 w-[70%] rounded bg-gray-200/80" />
                   </div>
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <img
-                      src={clockIcon}
-                      alt="Clock"
-                      className="w-5 h-5 flex-shrink-0"
-                    />
-                    <span className="text-base font-medium">7:00 AM - 9:00 AM</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <img
-                      src={flowerIcon}
-                      alt="Flower"
-                      className="w-5 h-5 flex-shrink-0"
-                    />
-                    <span className="text-base font-medium">Premium Daily Pack</span>
-                  </div>
-                </div>
+                ) : activeSubscriptions.length === 0 ? (
+                  <p className="pl-1 text-sm text-gray-600">
+                    {isLoggedIn
+                      ? "No active subscriptions yet. Explore packs below to get started."
+                      : "Sign in to see your subscriptions here."}
+                  </p>
+                ) : (
+                  <>
+                    <div
+                      ref={subscriptionCarouselRef}
+                      onScroll={handleSubscriptionCarouselScroll}
+                      className="flex snap-x snap-mandatory overflow-x-auto no-scrollbar -mx-1 px-1"
+                    >
+                      {activeSubscriptions.map((sub) => (
+                        <div
+                          key={sub.id}
+                          className="w-full min-w-full shrink-0 snap-center px-1"
+                        >
+                          <div className="space-y-3 pl-1">
+                            <div className="flex items-center justify-between gap-2 text-gray-700">
+                              <div className="flex min-w-0 flex-1 items-center gap-3">
+                                <img
+                                  src={scooterIcon}
+                                  alt=""
+                                  className="h-5 w-5 flex-shrink-0"
+                                  aria-hidden
+                                />
+                                <span className="truncate text-base font-medium">
+                                  {formatHomepageNextDeliveryLine(sub)}
+                                </span>
+                              </div>
+                              <span className="inline-flex shrink-0 items-center rounded-full border border-green-600 px-2 py-0.5 text-[11px] font-semibold text-green-700">
+                                Active
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 text-gray-700">
+                              <img
+                                src={clockIcon}
+                                alt=""
+                                className="h-5 w-5 flex-shrink-0"
+                                aria-hidden
+                              />
+                              <span className="text-base font-medium">7:00 AM - 9:00 AM</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-gray-700">
+                              <img
+                                src={flowerIcon}
+                                alt=""
+                                className="h-5 w-5 flex-shrink-0"
+                                aria-hidden
+                              />
+                              <span className="text-base font-medium">{subscriptionProductLabel(sub)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {activeSubscriptions.length > 1 && (
+                      <div className="mt-3 flex justify-center gap-1">
+                        {activeSubscriptions.map((sub, i) => (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            aria-label={`Subscription ${i + 1}`}
+                            aria-current={i === subscriptionCarouselIndex ? "true" : undefined}
+                            onClick={() => scrollSubscriptionCarouselTo(i)}
+                            className="touch-target-compact inline-flex shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 touch-manipulation"
+                          >
+                            <span
+                              className={`rounded-full transition-[width,height,background-color] ${
+                                i === subscriptionCarouselIndex
+                                  ? "h-[5px] w-[5px] bg-[#FAA222]"
+                                  : "h-[4px] w-[4px] bg-[#D1D5DB]"
+                              }`}
+                              aria-hidden
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
 

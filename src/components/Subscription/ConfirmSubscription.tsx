@@ -1010,6 +1010,19 @@ const ConfirmSubscription: React.FC = () => {
   if (!subscriptionDetails || !selectedAddress) {
     return <SubscriptionFlowSkeleton />;
   }
+
+  const checkoutSub = confirmedSubscriptionData || location?.state?.subscription;
+  const checkoutAddr = (checkoutSub?.delivery_address ?? checkoutSub?.address) || null;
+  const checkoutItems: any[] = Array.isArray(checkoutSub?.items) ? checkoutSub.items : [];
+  const deliveryDaysInts: number[] = Array.isArray(checkoutSub?.delivery_days)
+    ? checkoutSub.delivery_days
+    : [];
+  const deliveryDaysDisplay: string[] = Array.isArray(checkoutSub?.delivery_days_display)
+    ? checkoutSub.delivery_days_display
+    : [];
+  const fee = Number(checkoutSub?.delivery_fee ?? 0) || 0;
+  const itemsTotal = checkoutItems.reduce((sum, it) => sum + (Number(it?.subtotal ?? it?.unit_price ?? 0) || 0), 0);
+  const grandTotal = itemsTotal + fee;
   return (
     <div className="min-h-screen bg-[#f8f6f1] flex justify-center items-center px-4">
       <div className="bg-[#f8f6f1] w-full max-w-[800px] rounded-xl pb-nav-bottom">
@@ -1094,23 +1107,31 @@ const ConfirmSubscription: React.FC = () => {
                 <div className="flex items-start gap-3 mb-3">
                   <FaMapMarkerAlt className="text-gray-600 mt-1 flex-shrink-0 text-lg" />
                   <p className="text-gray-900 text-sm leading-relaxed">
-                    {confirmedSubscriptionData?.address 
-                      ? `${confirmedSubscriptionData.address.houseNo || ''} ${confirmedSubscriptionData.address.streetName || ''}, ${confirmedSubscriptionData.address.area || ''}, ${confirmedSubscriptionData.address.city || ''}, ${confirmedSubscriptionData.address.state || ''} - ${confirmedSubscriptionData.address.pincode || ''}`.replace(/^[\s,]+|[\s,]+$/g, '')
+                    {checkoutAddr
+                      ? `${checkoutAddr.address_line1 || checkoutAddr.houseNo || ''} ${checkoutAddr.address_line2 || checkoutAddr.streetName || ''}, ${checkoutAddr.landmark || checkoutAddr.area || ''}, ${checkoutAddr.city || ''}, ${checkoutAddr.state || ''} - ${checkoutAddr.pincode || ''}`.replace(/^[\s,]+|[\s,]+$/g, '')
                       : selectedAddress
                       ? `${selectedAddress?.street || ''}, ${selectedAddress?.area || ''}, ${selectedAddress?.city || ''}, ${selectedAddress?.state || ''} - ${selectedAddress?.pincode || ''}`.replace(/^[\s,]+|[\s,]+$/g, '')
                       : 'Address not available'}
                   </p>
                 </div>
                 <div className="mt-3 overflow-hidden -mx-4">
-                  <MapView address={selectedAddress || (confirmedSubscriptionData?.address ? {
-                    id: confirmedSubscriptionData.address.id,
-                    street: confirmedSubscriptionData.address.streetName || '',
-                    area: confirmedSubscriptionData.address.area || '',
-                    city: confirmedSubscriptionData.address.city || '',
-                    state: confirmedSubscriptionData.address.state || '',
-                    pincode: confirmedSubscriptionData.address.pincode || '',
-                    coordinates: confirmedSubscriptionData.address.coordinates
-                  } : null)} themeColor={theme.colors.primary} />
+                  <MapView
+                    address={
+                      selectedAddress ||
+                      (checkoutAddr
+                        ? {
+                            id: String(checkoutAddr.id ?? ''),
+                            street: String(checkoutAddr.address_line2 ?? checkoutAddr.streetName ?? ''),
+                            area: String(checkoutAddr.landmark ?? checkoutAddr.area ?? ''),
+                            city: String(checkoutAddr.city ?? ''),
+                            state: String(checkoutAddr.state ?? ''),
+                            pincode: String(checkoutAddr.pincode ?? ''),
+                            coordinates: `${checkoutAddr.latitude ?? ''},${checkoutAddr.longitude ?? ''}`,
+                          }
+                        : null)
+                    }
+                    themeColor={theme.colors.primary}
+                  />
                 </div>
               </div>
 
@@ -1124,7 +1145,7 @@ const ConfirmSubscription: React.FC = () => {
 
               {/* Selected Days */}
               <div className="mb-4">
-                <div className="flex gap-1.5 w-full">
+                <div className="grid grid-cols-7 gap-1.5 w-full">
                   {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
                     // Map display names to API format (3-letter abbreviations)
                     const dayToApiFormat: { [key: string]: string } = {
@@ -1153,9 +1174,11 @@ const ConfirmSubscription: React.FC = () => {
                     
                     // Check if day is in deliveryDays array from API response
                     // Handle both confirmedSubscriptionData and subscription from location.state
-                    const subscriptionData = confirmedSubscriptionData || location?.state?.subscription;
-                    const deliveryDays = subscriptionData?.deliveryDays || [];
-                    const deliveryPreference = subscriptionData?.deliveryPreference;
+                    const subscriptionData = checkoutSub;
+                    const deliveryPreference =
+                      typeof subscriptionData?.deliveryPreference === 'string'
+                        ? subscriptionData.deliveryPreference
+                        : null;
                     
                     // Day is selected if:
                     // 1. deliveryPreference is 'DAILY' (all days selected), OR
@@ -1163,20 +1186,18 @@ const ConfirmSubscription: React.FC = () => {
                     let isSelected = false;
                     if (deliveryPreference === 'DAILY') {
                       isSelected = true;
-                    } else if (Array.isArray(deliveryDays) && deliveryDays.length > 0) {
-                      // Check if the day is in the array (handle both "MON" and "MONDAY" formats)
-                      isSelected = deliveryDays.some((d: string) => {
-                        if (typeof d !== 'string') return false;
-                        const normalized = d.toUpperCase().trim();
-                        // Check against both 3-letter abbreviation and full name
-                        return normalized === dayAbbrev || normalized === dayFull;
-                      });
+                    } else if (deliveryDaysInts.length > 0) {
+                      const mapShortToInt: Record<string, number> = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+                      isSelected = deliveryDaysInts.includes(mapShortToInt[day]);
+                    } else if (deliveryDaysDisplay.length > 0) {
+                      // Fallback: display list
+                      isSelected = deliveryDaysDisplay.some((d) => String(d).toLowerCase().startsWith(day.toLowerCase()));
                     }
                     
                     return (
                       <button
                         key={day}
-                        className={`flex-1 py-2 rounded-2xl text-sm font-semibold transition-colors ${
+                        className={`py-2 rounded-2xl text-sm font-semibold transition-colors ${
                           isSelected
                             ? 'text-black'
                             : 'bg-gray-100 text-gray-700 border-2 border-gray-300'
@@ -1191,17 +1212,25 @@ const ConfirmSubscription: React.FC = () => {
                 </div>
               </div>
 
-              {/* Product Details */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <img src={ordercnfSvg} alt="Box" className="w-6 h-6 opacity-80" />
-                  <span className="text-gray-900 text-sm font-medium">
-                    {confirmedProductData?.name || confirmedSubscriptionData?.product?.name || subscriptionDetails?.packDetails?.name || 'Pack'} x {confirmedSubscriptionData?.quantity || 1}
-                  </span>
+              {/* Items */}
+              <div className="space-y-2 mb-4">
+                {checkoutItems.map((it) => (
+                  <div key={String(it?.id ?? Math.random())} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img src={ordercnfSvg} alt="Box" className="w-6 h-6 opacity-80" />
+                      <span className="text-gray-900 text-sm font-medium truncate">
+                        {String(it?.product?.name ?? 'Pack')} x {Number(it?.quantity ?? 1)}
+                      </span>
+                    </div>
+                    <span className="text-gray-900 text-sm font-medium">
+                      ₹{Number(it?.unit_price ?? 0)}/{String(it?.product?.unit ?? 'Pack')}
+                    </span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <span className="text-gray-600 text-sm">Delivery fee</span>
+                  <span className="text-gray-900 text-sm font-medium">₹{fee}</span>
                 </div>
-                <span className="text-gray-900 text-sm font-medium">
-                  ₹{confirmedProductData?.sellingPrice || confirmedSubscriptionData?.product?.sellingPrice || subscriptionDetails?.sellingPrice || 0}/Pack
-                </span>
               </div>
 
               {/* Total Amount */}
@@ -1211,7 +1240,7 @@ const ConfirmSubscription: React.FC = () => {
                   <span className="text-gray-900 text-sm font-medium">Total Amount</span>
                 </div>
                 <span className="text-gray-900 text-lg font-medium">
-                  ₹{(confirmedProductData?.sellingPrice || confirmedSubscriptionData?.product?.sellingPrice || subscriptionDetails?.sellingPrice || 0) * (confirmedSubscriptionData?.quantity || 1)}
+                  ₹{grandTotal}
                 </span>
               </div>
             </motion.div>

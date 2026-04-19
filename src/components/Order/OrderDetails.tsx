@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { IoArrowBack, IoDownloadOutline } from 'react-icons/io5';
 import { FaCopy } from 'react-icons/fa';
 import { orderService } from '../../services/order.service';
@@ -129,11 +129,25 @@ function isWithinSupportWindowAfterDelivery(
   return Date.now() - deliveredMs < SUPPORT_TICKET_WINDOW_MS;
 }
 
+type OrderDetailsLocationState = { fromSubscriptionHistory?: boolean };
+
 const OrderDetails: React.FC = () => {
   const { orderNumber } = useParams<{ orderNumber: string }>();
   const navigate = useNavigate();
-  const { feature } = useFeatureTheme();
+  const location = useLocation();
+  const { feature, theme } = useFeatureTheme();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+  const isDaily = feature === 'gpDaily';
+  const linkAccentClass =
+    isDaily
+      ? 'text-[#FAA222] decoration-[#FAA222] hover:text-[#DD7600] hover:decoration-[#DD7600] focus-visible:ring-[#FAA222]/30'
+      : 'text-[#19411f] decoration-[#19411f] hover:text-[#145028] hover:decoration-[#145028] focus-visible:ring-[#19411f]/30';
+  const freeDeliveryHighlightClass = isDaily ? 'text-[#FAA222]' : 'text-[#19411F]';
+  const discountHighlightClass = isDaily ? 'text-[#DD7600]' : 'text-green-600';
+  const timelineAccentClass = isDaily ? 'bg-[#FAA222]' : 'bg-[#16A249]';
+  const fromSubscriptionHistory = Boolean(
+    (location.state as OrderDetailsLocationState | null)?.fromSubscriptionHistory,
+  );
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -198,7 +212,9 @@ const OrderDetails: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     const s = status?.toLowerCase() || '';
-    if (s === 'delivered') return 'bg-[#16A249] text-white';
+    if (s === 'delivered') {
+      return isDaily ? 'bg-[#FAA222] text-black' : 'bg-[#16A249] text-white';
+    }
     if (s === 'canceled' || s === 'cancelled') return 'bg-[#EF4444] text-white';
     if (s === 'out_for_delivery') return 'bg-[#3B82F6] text-white';
     return 'bg-gray-500 text-white';
@@ -239,6 +255,20 @@ const OrderDetails: React.FC = () => {
     // You can add a toast notification here
   };
 
+  /** Daily subscription deliveries: back to Manage My Subscription → Delivery History, not My Orders. */
+  const navigateBackToOrderList = (o: OrderDetails | null) => {
+    const type = (o?.order_type || "").toLowerCase();
+    const isSubscription =
+      type === "subscription" ||
+      Boolean(o?.subscription_info) ||
+      fromSubscriptionHistory;
+    if (basePath === "/gp-daily" && isSubscription) {
+      navigate(`${basePath}/manage-my-subscription?tab=history`);
+      return;
+    }
+    navigate(`${basePath}/orders`);
+  };
+
   if (loading) {
     return <OrderDetailSkeleton />;
   }
@@ -250,8 +280,14 @@ const OrderDetails: React.FC = () => {
           <p className="text-gray-600 mb-4">{error || 'Order not found'}</p>
           <button
             type="button"
-            onClick={() => navigate(`${basePath}/orders`)}
-            className="px-4 py-2 bg-[#166534] text-white rounded-lg"
+            onClick={() =>
+              navigate(
+                fromSubscriptionHistory
+                  ? `${basePath}/manage-my-subscription?tab=history`
+                  : `${basePath}/orders`,
+              )
+            }
+            className={`px-4 py-2 rounded-lg ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
           >
             Go Back
           </button>
@@ -343,7 +379,7 @@ const OrderDetails: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => navigate(`${basePath}/orders`)}
+              onClick={() => navigateBackToOrderList(order)}
               className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
             >
               <IoArrowBack size={24} />
@@ -405,13 +441,15 @@ const OrderDetails: React.FC = () => {
               <div className="relative">
                 {/* Horizontal Timeline Line - centered vertically with circles */}
                 {timelinePoints.length > 1 && (
-                  <div className="absolute left-12 right-12 top-4 h-0.5 bg-[#16A249]"></div>
+                  <div className={`absolute left-12 right-12 top-4 h-0.5 ${timelineAccentClass}`}></div>
                 )}
 
                 <div className={`flex ${timelinePoints.length === 1 ? 'justify-center' : 'justify-between'} items-start`}>
                   {timelinePoints.map((point, index) => (
                     <div key={index} className="flex flex-col items-center relative z-10">
-                      <div className="w-8 h-8 bg-[#16A249] rounded-full flex items-center justify-center mb-2">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center mb-2 ${timelineAccentClass}`}
+                      >
                         {point.icon === 'cancel' ? (
                           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M12 4L4 12M4 4L12 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -420,7 +458,13 @@ const OrderDetails: React.FC = () => {
                           <img
                             src={point.icon}
                             alt={point.label}
-                            className={`w-8 h-6 ${point.status === 'out_for_delivery' ? 'brightness-0 invert' : ''}`}
+                            className={`w-8 h-6 ${
+                              isDaily
+                                ? 'brightness-0 invert'
+                                : point.status === 'out_for_delivery'
+                                  ? 'brightness-0 invert'
+                                  : ''
+                            }`}
                           />
                         )}
                       </div>
@@ -441,7 +485,11 @@ const OrderDetails: React.FC = () => {
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Delivery Details</h2>
                 <div className="space-y-3">
                   <div className="flex items-start gap-3">
-                    <img src={detailshomeIcon} alt="Home" className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                    <img
+                      src={detailshomeIcon}
+                      alt="Home"
+                      className="w-5 h-5 mt-0.5 flex-shrink-0"
+                    />
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-900">
                         {order.delivery_address.address_type === 'home' ? 'Home' :
@@ -456,7 +504,11 @@ const OrderDetails: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
-                    <img src={detailsuserIcon} alt="User" className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                    <img
+                      src={detailsuserIcon}
+                      alt="User"
+                      className="w-5 h-5 mt-0.5 flex-shrink-0"
+                    />
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-900">
                         {order.delivery_address.receiver_name}{' '}
@@ -666,7 +718,7 @@ const OrderDetails: React.FC = () => {
               <button
                 onClick={() => navigate(`${basePath}`)}
                 type="button"
-                className="min-w-[200px] rounded-full bg-[#19411f] px-10 py-3 text-base font-semibold text-white transition-colors hover:bg-[#145028]"
+                className={`min-w-[200px] rounded-full px-10 py-3 text-base font-semibold transition-colors ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
               >
                 Shop More
               </button>
@@ -689,7 +741,7 @@ const OrderDetails: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => navigate(`${basePath}/customer-support`)}
-                    className="text-base font-medium text-[#19411F] underline decoration-[#19411F] underline-offset-2"
+                    className={`text-base font-medium underline underline-offset-2 ${linkAccentClass}`}
                   >
                     Raise a Support Ticket
                   </button>

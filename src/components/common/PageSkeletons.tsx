@@ -301,7 +301,7 @@ export function AddressFormSkeleton() {
 
 export function SubscriptionFlowSkeleton() {
   return (
-    <div className="min-h-screen bg-[#f8f6f1] flex justify-center items-start px-4 py-8">
+    <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom flex justify-center items-start px-4 py-8">
       <div className="w-full max-w-[800px] space-y-6">
         <Pulse className="h-10 w-3/4 mx-auto rounded-lg" />
         <Pulse className="h-48 w-full rounded-xl" />

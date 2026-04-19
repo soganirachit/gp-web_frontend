@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import homeIcon from "../../assets/icon/navbar/home.svg";
 import dailyIcon from "../../assets/icon/navbar/daily.svg";
@@ -11,6 +12,7 @@ import storeGreenBanner from "../../assets/svg/gp_store_svg/greenbanner.svg";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
+import { subscriptionCartService } from "../../services/subscriptionCart.service";
 
 const BottomNav: React.FC = () => {
   const location = useLocation();
@@ -20,14 +22,44 @@ const BottomNav: React.FC = () => {
   const { isLoggedIn } = useAuth();
   const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
   const accountRootPath = `${basePath}/account`;
-  const cartItemCount = items.length;
+  const [dailyCartItemCount, setDailyCartItemCount] = useState(0);
+
+  useEffect(() => {
+    if (feature !== "gpDaily") return;
+    if (!isLoggedIn || !localStorage.getItem("access_token")) {
+      setDailyCartItemCount(0);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const cart = await subscriptionCartService.getDailyCart();
+        const rawCount =
+          typeof (cart as any)?.items_count === "number"
+            ? (cart as any).items_count
+            : Array.isArray((cart as any)?.items)
+              ? (cart as any).items.length
+              : 0;
+        if (!cancelled) setDailyCartItemCount(Math.max(0, Number(rawCount) || 0));
+      } catch {
+        if (!cancelled) setDailyCartItemCount(0);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Refresh when route changes (e.g., after add/remove navigations)
+  }, [feature, isLoggedIn, location.pathname]);
+
+  const cartItemCount = useMemo(() => {
+    return feature === "gpDaily" ? dailyCartItemCount : items.length;
+  }, [dailyCartItemCount, feature, items.length]);
 
   /** Treat subpages (FAQ, wallet, …) as part of Account tab; bar tap always opens settings root. */
   const accountSectionPaths = [
     `${basePath}/account`,
     `${basePath}/profile`,
     `${basePath}/faq`,
-    `${basePath}/wallet`,
     `${basePath}/addresses`,
     `${basePath}/refer`,
     `${basePath}/customer-support`,
@@ -221,6 +253,13 @@ const BottomNav: React.FC = () => {
     );
   }
 
+  const basketTabActive = isActive([
+    "/gp-store",
+    "/gp-store/store",
+    "/manage-my-storeProducts",
+    `${basePath}/basket`,
+  ]);
+
   // GP Daily Navigation: Home, Daily (logo only), Wallet, Basket, Account
   return (
     /* Fix_V0.9: E2E anchor for bottom navigation */
@@ -301,12 +340,12 @@ const BottomNav: React.FC = () => {
           <Link
             to={isLoggedIn ? `${basePath}/basket` : "#"}
             onClick={handleBasketClick}
-            className={`flex flex-col items-center justify-center flex-1 relative ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts", `${basePath}/basket`])
+            className={`flex flex-col items-center justify-center flex-1 relative ${basketTabActive
               ? theme.classes.bottomNavActiveText
               : theme.classes.bottomNavInactiveText
               }`}
           >
-            {isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts", `${basePath}/basket`]) && (
+            {basketTabActive && (
               <img
                 src={activeBg}
                 alt=""
@@ -317,18 +356,31 @@ const BottomNav: React.FC = () => {
               <img
                 src={basketIcon}
                 alt="Basket"
-                className={`w-5 h-5 mb-0.5 relative z-10 ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts", `${basePath}/basket`])
-                  ? ""
-                  : "opacity-90"
-                  }`}
+                className={`w-5 h-5 mb-0.5 relative z-10 ${
+                  basketTabActive
+                    ? "brightness-0"
+                    : "opacity-90"
+                }`}
               />
               {cartItemCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-[#2A6B28] text-white text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 z-20">
-                  {cartItemCount > 99 ? '99+' : cartItemCount}
+                <span
+                  className={`absolute -top-0.5 -right-0.5 text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 z-20 ${
+                    basketTabActive
+                      ? "bg-gray-200 text-black ring-1 ring-gray-300/90"
+                      : "bg-[#FAA222] text-black shadow-sm ring-1 ring-[#DD7600]/50"
+                  }`}
+                >
+                  {cartItemCount > 99 ? "99+" : cartItemCount}
                 </span>
               )}
             </div>
-            <span className={`text-[10px] font-medium relative z-10 ${isActive(["/gp-store", "/gp-store/store", "/manage-my-storeProducts", `${basePath}/basket`]) ? "text-gray-700" : ""}`}>Basket</span>
+            <span
+              className={`text-[10px] font-medium relative z-10 ${
+                basketTabActive ? "text-gray-900" : "text-gray-500"
+              }`}
+            >
+              Basket
+            </span>
           </Link>
 
           <Link

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { IoWalletOutline, IoArrowBack, IoTimeOutline, IoRefresh } from "react-icons/io5";
 
@@ -18,7 +18,6 @@ import { TransactionType } from "@/interfaces";
 import { format, parseISO } from "date-fns";
 import { INR } from "@/components/constants";
 import lowbalanceIcon from "../../../assets/svg/gp_daily svg/lowbalance.svg";
-import depositIcon from "../../../assets/svg/gp_daily svg/deposit.svg";
 import enableIcon from "../../../assets/svg/gp_daily svg/enable.svg";
 import Spinner from "../../common/Spinner";
 import { WalletPageSkeleton } from "../../common/PageSkeletons";
@@ -28,6 +27,67 @@ import { addressService, Address } from "../../../services/address.service";
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
 const MIN_AMOUNT = 1;
 const MAX_AMOUNT = 50000;
+
+function normalizeWalletDescription(raw: string): string {
+  return String(raw || "")
+    .toLowerCase()
+    .replace(/[–—]/g, "-")
+    .trim();
+}
+
+/** Debit rows from subscription deliveries (long API copy is shortened in UI). */
+function isSubscriptionDeliveryTransaction(t: TransactionType): boolean {
+  if (t.type !== "DEBIT") return false;
+  const d = normalizeWalletDescription(t.description);
+  return d.includes("subscription") && d.includes("delivery");
+}
+
+/** Credit rows from wallet top-ups (Razorpay / recharge). */
+function isWalletRechargeTransaction(t: TransactionType): boolean {
+  if (t.type !== "CREDIT") return false;
+  const d = normalizeWalletDescription(t.description);
+  if (d.includes("[admin") || d.includes("admin:")) return false;
+  if (d.includes("subscription")) return false;
+  return (
+    d.includes("wallet recharge") ||
+    d.includes("razorpay") ||
+    d.includes("top-up") ||
+    d.includes("top up") ||
+    d.includes("add money") ||
+    d.includes("wallet top")
+  );
+}
+
+function isWalletRechargeLog(item: Record<string, unknown>): boolean {
+  const status = String(item.status ?? "").toLowerCase();
+  const hasRazorpay = Boolean(
+    item.razorpayOrderId ?? item.razorpay_order_id ?? item.razorpay_orderId,
+  );
+  if (!hasRazorpay) return false;
+  return (
+    status === "wallet_recharged" ||
+    status === "captured" ||
+    status === "completed" ||
+    status === "paid" ||
+    status === "created" ||
+    status === "pending"
+  );
+}
+
+function isWalletTransactionRow(item: unknown): item is TransactionType {
+  if (typeof item !== "object" || item === null || !("type" in item)) {
+    return false;
+  }
+  const t = (item as TransactionType).type;
+  return t === "CREDIT" || t === "DEBIT";
+}
+
+function rowCreatedMs(item: unknown): number {
+  const o = item as Record<string, unknown>;
+  const raw = String(o.createdAt ?? o.created_at ?? "");
+  const t = new Date(raw).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
 
 interface CouponType {
   code: string;
@@ -154,6 +214,50 @@ const Wallet = () => {
     toast.success(`Coupon ${coupon.code} applied successfully!`);
   };
 
+  const filteredWalletRows = useMemo(() => {
+    const all = [...transactions, ...(transactionLogs || [])];
+    if (feature !== "gpDaily") {
+      return all;
+    }
+    return all.filter((item) => {
+      if (isWalletTransactionRow(item)) {
+        return (
+          isSubscriptionDeliveryTransaction(item) ||
+          isWalletRechargeTransaction(item)
+        );
+      }
+      return isWalletRechargeLog(item as Record<string, unknown>);
+    });
+  }, [transactions, transactionLogs, feature]);
+
+  /** Most recent successful wallet top-up amount (for balance card footer). */
+  const latestWalletRechargeAmount = useMemo(() => {
+    const hits: { ms: number; amount: number }[] = [];
+    for (const t of transactions) {
+      if (isWalletRechargeTransaction(t)) {
+        hits.push({ ms: rowCreatedMs(t), amount: t.amount });
+      }
+    }
+    for (const log of transactionLogs || []) {
+      if (isWalletTransactionRow(log)) continue;
+      const rec = log as Record<string, unknown>;
+      if (!isWalletRechargeLog(rec)) continue;
+      const st = String(rec.status ?? "").toLowerCase();
+      const settled =
+        st === "wallet_recharged" ||
+        st === "captured" ||
+        st === "completed" ||
+        st === "paid";
+      if (!settled) continue;
+      const amt = Math.abs(Number(rec.amount ?? 0));
+      if (!Number.isFinite(amt) || amt <= 0) continue;
+      hits.push({ ms: rowCreatedMs(log), amount: amt });
+    }
+    if (hits.length === 0) return null;
+    hits.sort((a, b) => b.ms - a.ms);
+    return hits[0].amount;
+  }, [transactions, transactionLogs]);
+
   // Recovery mechanism for pending payments
   const recoverPendingPayments = async () => {
     const pendingPayments = getPendingPayments();
@@ -279,17 +383,10 @@ const Wallet = () => {
         {/* Balance Card */}
         <div className="w-full bg-[#27A155] text-white rounded-[28px] sm:rounded-[32px] px-5 py-4 sm:px-6 sm:py-5 md:px-7 md:py-5 shadow-sm relative overflow-hidden">
 
-          <div className="flex justify-between items-center gap-3 mb-3 min-h-[2.25rem]">
+          <div className="mb-3 min-h-[2.25rem]">
             <span className="text-[11px] font-semibold tracking-wider opacity-90 uppercase leading-none">
               Available Balance
             </span>
-            <button
-              type="button"
-              className="flex items-center justify-center gap-1.5 shrink-0 px-3 py-1.5 bg-transparent rounded-2xl text-[11px] font-semibold border-2 border-white/90 text-white hover:bg-white/10 transition-colors"
-            >
-              <img src={depositIcon} alt="" className="w-4 h-4 sm:w-5 sm:h-5 opacity-95" aria-hidden />
-              <span className="whitespace-nowrap">Deposit History</span>
-            </button>
           </div>
 
           <div className="text-4xl sm:text-5xl md:text-5xl font-semibold mb-4">
@@ -303,7 +400,17 @@ const Wallet = () => {
           <div className="w-full h-[1px] bg-white/40 mb-3"></div>
 
           <div className="text-[12px] font-normal opacity-90">
-            Last deposit ₹1,000
+            {latestWalletRechargeAmount != null ? (
+              <>
+                Last deposit ₹
+                {Number(latestWalletRechargeAmount).toLocaleString("en-IN", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 2,
+                })}
+              </>
+            ) : (
+              "No wallet recharge yet"
+            )}
           </div>
         </div>
 
@@ -550,43 +657,66 @@ const Wallet = () => {
           {/* Show loading state */}
           {isLoadingBalance ? (
             <div className="text-center text-gray-600">Loading transactions...</div>
-          ) : transactions.length === 0 && (!transactionLogs || transactionLogs.length === 0) ? (
+          ) : filteredWalletRows.length === 0 ? (
             <div className="text-center text-gray-600">No transactions yet.</div>
           ) : (
             <div className="space-y-3 md:space-y-4">
-              {/* Map through all transactions */}
-              {[...transactions, ...(transactionLogs || [])]
-                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+              {[...filteredWalletRows]
+                .sort((a, b) => rowCreatedMs(b) - rowCreatedMs(a))
                 .map((item, idx) => {
-                  const isTransaction = 'type' in item;
+                  const isTransaction = isWalletTransactionRow(item);
 
-                  // Determine if it's a credit transaction
                   let isCredit = false;
                   if (isTransaction) {
-                    // For regular transactions, check the type
-                    isCredit = item.type === 'CREDIT';
+                    isCredit = item.type === "CREDIT";
                   } else {
-                    // For transactionLogs, check status only
-                    const status = (item as any).status?.toLowerCase();
+                    const status = (item as { status?: string }).status?.toLowerCase();
                     isCredit =
-                      status === 'wallet_recharged' ||
-                      status === 'captured' ||
-                      status === 'completed' ||
-                      status === 'paid';
+                      status === "wallet_recharged" ||
+                      status === "captured" ||
+                      status === "completed" ||
+                      status === "paid";
                   }
 
-                  const status = !isTransaction ? (item as any).status?.toLowerCase() : null;
-                  const isPending = !isTransaction && (status === 'created' || status === 'pending');
+                  const status = !isTransaction
+                    ? (item as { status?: string }).status?.toLowerCase()
+                    : null;
+                  const isPending =
+                    !isTransaction && (status === "created" || status === "pending");
 
-                  // Get absolute amount value
-                  const amount = Math.abs(isTransaction ? item.amount : (item as any).amount);
+                  const amount = Math.abs(
+                    isTransaction ? item.amount : (item as { amount?: number }).amount ?? 0,
+                  );
+
+                  const createdRaw =
+                    (item as { createdAt?: string; created_at?: string }).createdAt ??
+                    (item as { created_at?: string }).created_at ??
+                    new Date().toISOString();
+
+                  const titleLine =
+                    feature === "gpDaily"
+                      ? isTransaction
+                        ? isSubscriptionDeliveryTransaction(item)
+                          ? "Debit - Subscription delivery"
+                          : "Credit - Wallet recharge"
+                        : "Credit - Wallet recharge"
+                      : isTransaction
+                        ? `${item.type === "CREDIT" ? "Credit" : "Debit"} - ${item.description}`
+                        : "Wallet Recharge";
 
                   return (
                     <div key={`txn-${idx}`} className="bg-white p-4 md:p-5 rounded-2xl border-2 border-gray-200">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3 md:gap-4">
-                          <div className={`p-2 md:p-3 rounded-full ${isPending ? 'bg-yellow-50' : isCredit ? 'bg-green-50' : 'bg-red-50'
-                            }`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 flex-1 items-center gap-3 md:gap-4">
+                          <div
+                            className={`shrink-0 p-2 md:p-3 rounded-full ${
+                              isPending
+                                ? "bg-yellow-50"
+                                : isCredit
+                                  ? "bg-green-50"
+                                  : "bg-red-50"
+                            }`}
+                          >
                             {isPending ? (
                               <IoWarningOutline className="text-yellow-500 md:text-xl" />
                             ) : isCredit ? (
@@ -595,42 +725,47 @@ const Wallet = () => {
                               <IoMdArrowDown className="text-red-500 md:text-xl -rotate-[135deg]" />
                             )}
                           </div>
-                          <div className="min-w-0">
-                            <div className="truncate text-[13px] font-medium text-gray-900">
-                              {isTransaction
-                                ? `${item.type === 'CREDIT' ? 'Credit' : 'Debit'} - ${item.description}`
-                                : 'Wallet Recharge'}
-                            </div>
-                            {/* {isTransaction && item.referenceId && (
-                              <div className="text-xs md:text-sm text-gray-400">
-                                Txn ID: {item.referenceId}
-                              </div>
-                            )} */}
-                            {!isTransaction && (item as any).razorpayOrderId && (
-                              <div className="truncate text-xs text-gray-400 md:text-sm">
-                                Order ID: {(item as any).razorpayOrderId}
-                              </div>
-                            )}
-                            <div className="text-[11px] font-normal text-gray-500">
-                              {format(
-                                new Date(item.createdAt),
-                                "dd MMM yyyy • h:mm a"
+                          <div className="min-w-0 flex-1 overflow-hidden">
+                            <p className="break-words text-[13px] font-medium leading-snug text-gray-900">
+                              {titleLine}
+                            </p>
+                            {feature !== "gpDaily" &&
+                              !isTransaction &&
+                              (item as { razorpayOrderId?: string }).razorpayOrderId && (
+                                <div className="mt-0.5 truncate text-xs text-gray-400 md:text-sm">
+                                  Order ID:{" "}
+                                  {(item as { razorpayOrderId?: string }).razorpayOrderId}
+                                </div>
                               )}
+                            <div className="mt-1 text-[11px] font-normal text-gray-500">
+                              {format(new Date(createdRaw), "dd MMM yyyy • h:mm a")}
                             </div>
                           </div>
                         </div>
-                        <div className="text-right shrink-0 whitespace-nowrap">
-                          <div className={`font-semibold md:text-xl ${isPending ? 'text-yellow-600' :
-                            isCredit ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                            {isPending ? '' : (isCredit ? '+' : '')}{INR} {amount}
+                        <div className="shrink-0 whitespace-nowrap text-right">
+                          <div
+                            className={`font-semibold md:text-xl ${
+                              isPending
+                                ? "text-yellow-600"
+                                : isCredit
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                            }`}
+                          >
+                            {isPending ? "" : (isCredit ? "+" : "")}
+                            {INR} {amount}
                           </div>
                           {!isTransaction && (
-                            <div className={`text-xs md:text-sm ${isPending ? 'text-yellow-600' :
-                              isCredit ? 'text-green-600' :
-                                'text-gray-600'
-                              }`}>
-                              {((item as any).status?.charAt(0).toUpperCase() || '') + ((item as any).status?.slice(1).toLowerCase() || '')}
+                            <div
+                              className={`text-xs md:text-sm ${
+                                isPending
+                                  ? "text-yellow-600"
+                                  : isCredit
+                                    ? "text-green-600"
+                                    : "text-gray-600"
+                              }`}
+                            >
+                              {`${(item as { status?: string }).status?.charAt(0).toUpperCase() ?? ""}${(item as { status?: string }).status?.slice(1).toLowerCase() ?? ""}`}
                             </div>
                           )}
                         </div>

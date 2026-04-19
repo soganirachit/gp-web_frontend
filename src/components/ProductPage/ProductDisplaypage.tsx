@@ -30,8 +30,8 @@ import cautionIcon from "../../assets/svg/gp_daily svg/caution.svg";
 import deliveryTruckIcon from "../../assets/svg/gp_daily svg/delivery_truck.svg";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { storeService } from "../../services/store.service";
-import { useCart } from "../../context/CartContext";
 import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
+import { subscriptionCartService } from "../../services/subscriptionCart.service";
 
 // Add interface for content items
 // interface ContentItem {
@@ -177,7 +177,6 @@ const ProductPage: React.FC = () => {
   const navigate = useNavigate();
   const { feature, theme } = useFeatureTheme();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
-  const { items, addToCart, updateQuantity, removeFromCart } = useCart();
   const productListAvailability =
     feature === 'gpStore' ? PRODUCT_AVAILABILITY_STORE : PRODUCT_AVAILABILITY_DAILY;
 
@@ -192,14 +191,18 @@ const ProductPage: React.FC = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"Description" | "Product Info" | "More">("Description");
+  const [activeTab, setActiveTab] = useState<"Description" | "Details" | "More">("Description");
   const [combineProducts, setCombineProducts] = useState<Product[]>([]);
 
+  const [dailyCart, setDailyCart] = useState<any>(null);
   const activeCartLine = useMemo(() => {
-    if (!product) return null;
-    return items.find((item) => String(item.productId) === String((product as any).id)) ?? null;
-  }, [items, product]);
-  const basketQuantity = activeCartLine?.quantity ?? 0;
+    const productId = (product as any)?.id;
+    if (!productId) return null;
+    const items = (dailyCart as any)?.items as any[] | undefined;
+    if (!Array.isArray(items)) return null;
+    return items.find((it) => String(it.product_id) === String(productId)) ?? null;
+  }, [dailyCart, product]);
+  const basketQuantity = Number((activeCartLine as any)?.quantity ?? 0);
   const [isUpdatingBasket, setIsUpdatingBasket] = useState(false);
   const [stockLimitMessage, setStockLimitMessage] = useState<string | null>(null);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
@@ -391,6 +394,25 @@ const ProductPage: React.FC = () => {
   useEffect(() => {
     fetchProductData();
   }, [slug, navigate]);
+
+  // gp-daily uses subscription cart APIs for basket quantity
+  useEffect(() => {
+    if (feature === "gpStore") return;
+    if (!(product as any)?.id) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const cart = await subscriptionCartService.getDailyCart();
+        if (mounted) setDailyCart(cart as any);
+      } catch (e) {
+        // Ignore (e.g., 401 before login) and keep UI functional.
+        console.error("Failed to load daily cart:", e);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [feature, product]);
 
   const handleBestSellerCardClick = (item: any) => {
     const pathSlug = item.slug ?? item.id;
@@ -636,18 +658,9 @@ const ProductPage: React.FC = () => {
       return;
     }
     try {
-      const { price } = getPriceDisplay();
-      const productImage = getProductImage();
-      await addToCart({
-        productId: product.id as unknown as number,
-        productSlug: (product.slug ?? slug ?? String(product.id)) as string,
-        name: product.name,
-        image: productImage || "/placeholder.svg",
-        price,
-        quantity: 1,
-        variant: null,
-        categorySlug: (product as unknown as { category_slug?: string }).category_slug,
-      });
+      if (feature === "gpStore") return;
+      const cart = await subscriptionCartService.addItem(Number((product as any).id), 1);
+      setDailyCart(cart as any);
       toast.success("Product added to basket!");
     } catch (error: unknown) {
       console.error("Error adding to cart:", error);
@@ -660,10 +673,18 @@ const ProductPage: React.FC = () => {
     setIsUpdatingBasket(true);
     setStockLimitMessage(null);
     try {
+      if (feature === "gpStore") return;
+      const itemId = Number((activeCartLine as any)?.id);
+      const productId = Number((product as any)?.id);
+      if (!productId) return;
+
       if (nextQty < 1) {
-        await removeFromCart(activeCartLine.id);
+        if (itemId) await subscriptionCartService.removeItem(itemId);
+        const cart = await subscriptionCartService.getDailyCart();
+        setDailyCart(cart as any);
       } else {
-        await updateQuantity(activeCartLine.id, nextQty, activeCartLine.customizedMessage);
+        const cart = await subscriptionCartService.addItem(productId, nextQty);
+        setDailyCart(cart as any);
       }
     } catch (error: unknown) {
       const rawMessage = errorMessageFromCatch(error, "");
@@ -977,19 +998,20 @@ const ProductPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Description Section with Tabs */}
+          {/* Tabs + Content — match gp-store layout (daily accent) */}
           <div className="mt-6">
-            <div className="bg-white rounded-xl shadow-sm">
+            <div className="bg-white rounded-xl p-4 shadow-sm mb-8">
               {/* Tabs */}
-              <div className="flex border-b border-gray-200">
-                {(["Description", "Product Info", "More"] as const).map((tab) => (
+              <div className="flex border-b border-gray-200 mb-4">
+                {(["Description", "Details", "More"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`flex-1 py-4 text-sm font-medium transition-colors ${activeTab === tab
-                      ? "text-gray-900 border-b-2 border-gray-900"
-                      : "text-gray-500"
-                      }`}
+                    className={`flex-1 py-3 text-center text-sm font-medium transition-colors ${
+                      activeTab === tab
+                        ? "text-[#FAA222] border-b-2 border-[#FAA222]"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
                   >
                     {tab}
                   </button>
@@ -997,30 +1019,51 @@ const ProductPage: React.FC = () => {
               </div>
 
               {/* Tab Content */}
-              <div className="p-4">
+              <div>
                 {activeTab === "Description" && (
-                  <div className="space-y-3">
-                    <p className="text-sm text-gray-600 leading-relaxed">
-                      {getProductDescription() || "No description available."}
-                    </p>
-                    {getProductContents().map((item, index) => (
-                      <div key={index} className="flex items-start gap-2">
-                        <span className="text-gray-600">•</span>
-                        <span className="text-sm text-gray-600">
-                          {item.name} {item.description && `- ${item.description}`}
-                        </span>
-                      </div>
-                    ))}
+                  <div className="text-sm text-gray-700 leading-relaxed">
+                    {(product as any)?.short_description?.trim?.() ||
+                      getProductDescription() ||
+                      "No short description available."}
                   </div>
                 )}
-                {activeTab === "Product Info" && (
-                  <div className="text-sm text-gray-600">
-                    <p>Product information coming soon.</p>
+                {activeTab === "Details" && (
+                  <div className="space-y-3 text-sm text-gray-700">
+                    {bomDisplayRows.length > 0 ? (
+                      bomDisplayRows.map((row: any) => {
+                        const parsedQty = parseFloat(String(row.quantity).replace(/,/g, ""));
+                        const qtyStr = Number.isFinite(parsedQty)
+                          ? Math.abs(parsedQty % 1) < 1e-6
+                            ? String(Math.round(parsedQty))
+                            : String(parsedQty)
+                          : String(row.quantity);
+                        const unit = String(row.unit ?? "").trim();
+                        const qtyDisplay = unit ? `${qtyStr} ${unit}` : qtyStr;
+                        return (
+                          <div key={row.id} className="border-b border-gray-100 pb-2">
+                            <div>
+                              <span className="font-semibold">{row.name}</span>
+                              <span> · {qtyDisplay}</span>
+                            </div>
+                            {row.isPerishable === true && (
+                              <p className="text-xs text-gray-500 mt-1">Perishable</p>
+                            )}
+                            {row.isPerishable === false && (
+                              <p className="text-xs text-gray-500 mt-1">Non-perishable</p>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p>No ingredient list for this product.</p>
+                    )}
                   </div>
                 )}
                 {activeTab === "More" && (
-                  <div className="text-sm text-gray-600">
-                    <p>Additional information coming soon.</p>
+                  <div className="text-sm text-gray-700 leading-relaxed">
+                    {(product as any)?.description?.trim?.() ||
+                      (basePack as any)?.description?.trim?.() ||
+                      "No additional description."}
                   </div>
                 )}
               </div>

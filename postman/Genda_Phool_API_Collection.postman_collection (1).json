@@ -442,6 +442,60 @@
             },
             "description": "Permanently delete the customer account. PII is anonymised; financial records (orders, payments, invoices) are retained per GST Act 2017 / RBI guidelines. All sessions are blacklisted immediately.\n\nBody: { \"reason\": \"optional reason string\" }"
           }
+        },
+        {
+          "name": "Register Push Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/me/push-token/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "push-token",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fcm_token\": \"<firebase_token>\",\n  \"expo_push_token\": \"\",\n  \"app_version\": \"1.0.0\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Register/refresh FCM push token for current session. Call on app launch and on token refresh."
+          }
+        },
+        {
+          "name": "Clear Push Token (Logout)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users/me/push-token/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "push-token",
+                ""
+              ]
+            },
+            "description": "Clear push token on logout so device stops receiving notifications."
+          }
         }
       ]
     },
@@ -1191,7 +1245,7 @@
                 ""
               ]
             },
-            "description": "Get user's shopping cart with items and totals.\n\nEach item's `unit_price` reflects the product's effective price at time of cart fetch (auto-refreshed on GET). Cart totals: subtotal = Σ(unit_price×qty), net = subtotal - coupon_discount, delivery = 0 if subtotal ≥ free_threshold else store.delivery_fee, tax = (net + delivery) × 5%, total = net + delivery + tax."
+            "description": "Get user's shopping cart with items and totals.\n\nEach item's `unit_price` reflects the product's effective price at time of cart fetch (auto-refreshed on GET).\n\nCart total formula:\n  subtotal     = Σ(unit_price × qty)\n  discount     = coupon_discount (0 for free_delivery coupons)\n  net          = max(subtotal - discount, 0)\n  delivery_fee = distance_km × store.delivery_fee_per_km\n               → 0 if subtotal ≥ store.free_delivery_threshold\n               → 0 if a free_delivery coupon is applied\n               → 0 if no delivery_address is set on cart yet\n  surcharge    = store-specific surcharges (packaging fee, service charge, etc.)\n  taxable      = net + delivery_fee + surcharge\n  tax_amount   = taxable × store tax rate (0% if store has no TaxConfiguration)\n  total        = taxable + tax_amount\n\nCall POST /cart/delivery-address/ with your address_id to get accurate delivery_fee before checkout."
           }
         },
         {
@@ -1334,7 +1388,7 @@
                 ""
               ]
             },
-            "description": "Switch the cart to a different store.\n\nItems available at the new store are kept (price updated). Items not available are removed. Response includes kept_items and removed_items arrays.",
+            "description": "Switch the cart to a different store.\n\nMatching logic: items are matched to the new store by **name + category (case-insensitive)**. If a product with the same name and category exists at the new store and is active/available, the cart line is kept with the new store's price. Variant is also matched by name (case-insensitive); if the variant doesn't exist at the new store, the base product price is used.\n\nItems with no match are removed.\n\nResponse includes:\n- `kept_items` — product names carried over\n- `removed_items` — product names dropped (not found or unavailable at new store)\n- `cart` — updated cart object",
             "body": {
               "mode": "raw",
               "raw": "{\n    \"store_id\": 2\n}"
@@ -1396,12 +1450,83 @@
             },
             "description": "Remove applied coupon from cart."
           }
+        },
+        {
+          "name": "Set Delivery Address (for delivery fee preview)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"address_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/cart/delivery-address/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cart",
+                "delivery-address",
+                ""
+              ]
+            },
+            "description": "Pre-select a delivery address on the cart so the distance-based delivery fee is computed before checkout.\n\nThe address must belong to the authenticated user. Cart totals (delivery_fee) are recalculated immediately and returned.\n\nCall this after adding items but before checkout — the cart will then show the real delivery_fee based on distance from store to the selected address."
+          }
         }
       ]
     },
     {
       "name": "07 - Orders",
       "item": [
+        {
+          "name": "Validate Delivery Location",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://apigp.mygendaphool.com/api/v1/delivery/validate-location/",
+              "protocol": "https",
+              "host": [
+                "apigp",
+                "mygendaphool",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery",
+                "validate-location"
+              ]
+            },
+            "description": "Check whether a lat/lng coordinate is within any store's delivery range.\n\n**Call this before checkout** to show the customer whether delivery is available and the estimated fee/time.\n\nReturns: `serviceable`, `store`, `zone`, `distance_km`, `delivery_fee`, `estimated_delivery_time_minutes`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 26.9124,\n  \"longitude\": 75.7873\n}"
+            }
+          },
+          "response": []
+        },
         {
           "name": "Checkout — Pay from Wallet",
           "request": {
@@ -1471,8 +1596,52 @@
                 ""
               ]
             },
-            "description": "Create order from cart."
-          }
+            "description": "Create a new order from the cart.\n\n**Delivery eligibility:** The delivery address must be within the store's max delivery radius. If outside, returns HTTP 400 with a human-readable message explaining the distance and the allowed range."
+          },
+          "response": [
+            {
+              "name": "400 — Outside Delivery Radius",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"delivery_address_id\": 1,\n    \"payment_method\": \"razorpay\",\n    \"delivery_instructions\": \"Ring doorbell\",\n    \"idempotency_key\": \"{{$guid}}\",\n    \"delivery_slot_id\": 0,\n    \"delivery_date\": \"2026-02-25\",\n    \"delivery_time_slot\": \"\",\n    \"customer_notes\": \"\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/orders/create/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "orders",
+                    "create",
+                    ""
+                  ]
+                },
+                "description": "Create a new order from the cart.\n\n**Delivery eligibility:** The delivery address must be within the store's max delivery radius. If outside, returns HTTP 400 with a human-readable message explaining the distance and the allowed range."
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Sorry, we don't deliver to your location. Your address is 14.2 km away from the store, but our delivery range is 10.0 km.\"\n}"
+            }
+          ]
         },
         {
           "name": "List Orders",
@@ -1635,7 +1804,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"customer_phone\": \"9876543210\",\n    \"store_id\": 1,\n    \"payment_method\": \"pos_cash\",\n    \"discount_amount\": 0,\n    \"customer_notes\": \"\",\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 2\n        },\n        {\n            \"product_id\": 2,\n            \"variant_id\": 5,\n            \"quantity\": 1\n        }\n    ]\n}",
+              "raw": "{\n  \"customer_phone\": \"9876543210\",\n  \"store_id\": 1,\n  \"payment_method\": \"pos_cash\",\n  \"discount_amount\": 0,\n  \"customer_notes\": \"\",\n  \"items\": [\n    {\n      \"product_id\": 1,\n      \"quantity\": 2\n    },\n    {\n      \"product_id\": 2,\n      \"variant_id\": 5,\n      \"quantity\": 1\n    }\n  ],\n  \"customer_name\": \"Rachit Sogani\",\n  \"customer_email\": \"sogani.rachit@gmail.com\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1654,7 +1823,7 @@
                 ""
               ]
             },
-            "description": "Create a POS order. Supports three channels:\n- walk_in: immediate, no delivery address needed\n- phone: requires delivery_address and delivery_date\n- bulk: requires delivery_address and delivery_date; optionally company_name and gstin\n\nSet use_auto_discount=true to have the backend apply the best system discount automatically."
+            "description": "Create a POS order.\n\n**Delivery eligibility (phone / bulk channels only):** When `pos_channel` is `phone` or `bulk`, the delivery address lat/lng is validated against the store's max delivery radius. Walk-in orders bypass this check.\n\n**New optional fields:**\n- `customer_name` — sets first/last name on new customer (or fills in if blank on existing)\n- `customer_email` — sets email on new customer (or fills in if blank on existing)"
           }
         }
       ]
@@ -1998,251 +2167,522 @@
       "name": "10 - Subscriptions",
       "item": [
         {
-          "name": "List Subscription Plans",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/subscriptions/plans/",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "subscriptions",
-                "plans",
-                ""
-              ]
-            },
-            "description": "Get all active subscription plans."
-          }
-        },
-        {
-          "name": "Create Subscription",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"plan_id\": 1,\n    \"delivery_address_id\": 1,\n    \"quantity\": 1,\n    \"start_date\": \"2026-02-15\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/subscriptions/create/",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "subscriptions",
-                "create",
-                ""
-              ]
-            },
-            "description": "Create new subscription."
-          }
-        },
-        {
-          "name": "List My Subscriptions",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/subscriptions/",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "subscriptions",
-                ""
-              ]
-            },
-            "description": "Get user's subscriptions."
-          }
-        },
-        {
-          "name": "Subscription Details",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/subscriptions/{{subscription_id}}/",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "subscriptions",
-                "{{subscription_id}}",
-                ""
-              ]
-            },
-            "description": "Get subscription details."
-          }
-        },
-        {
-          "name": "Update Subscription",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"quantity\": 2,\n    \"delivery_address_id\": 2\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/subscriptions/{{subscription_id}}/update/",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "subscriptions",
-                "{{subscription_id}}",
-                "update",
-                ""
-              ]
-            },
-            "description": "Update subscription details."
-          }
-        },
-        {
-          "name": "Pause Subscription",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/subscriptions/{{subscription_id}}/pause/",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "subscriptions",
-                "{{subscription_id}}",
-                "pause",
-                ""
-              ]
-            },
-            "description": "Pause active subscription."
-          }
-        },
-        {
-          "name": "Resume Subscription",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/subscriptions/{{subscription_id}}/resume/",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "subscriptions",
-                "{{subscription_id}}",
-                "resume",
-                ""
-              ]
-            },
-            "description": "Resume paused subscription."
-          }
-        },
-        {
-          "name": "Cancel Subscription",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/subscriptions/{{subscription_id}}/cancel/",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "subscriptions",
-                "{{subscription_id}}",
-                "cancel",
-                ""
-              ]
-            },
-            "description": "Cancel subscription."
-          }
-        },
-        {
-          "name": "Admin - All Subscriptions",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/subscriptions/admin/all/?status=active",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "subscriptions",
-                "admin",
-                "all",
-                ""
-              ],
-              "query": [
-                {
-                  "key": "status",
-                  "value": "active"
+          "name": "Daily Cart",
+          "item": [
+            {
+              "name": "Get Daily Cart",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/cart/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "cart",
+                    ""
+                  ]
                 },
-                {
-                  "key": "store_id",
-                  "value": "",
-                  "description": "Filter by store ID (admin only)"
-                }
-              ]
+                "description": "Fetch or create your daily cart. Prices are refreshed to live product prices on every call."
+              }
             },
-            "description": "Admin: View all subscriptions."
-          }
+            {
+              "name": "Set Delivery Address",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/cart/set-address/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "cart",
+                    "set-address",
+                    ""
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"delivery_address_id\": 1\n}"
+                },
+                "description": "Set delivery address on daily cart. Resolves the delivery zone and store. Returns 400 if address is outside subscription zones."
+              }
+            },
+            {
+              "name": "Add Item to Daily Cart",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/cart/add/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "cart",
+                    "add",
+                    ""
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"product_id\": 1,\n    \"quantity\": 1\n}"
+                },
+                "description": "Add or update a product in the daily cart. Product must have availability_type = 'daily' or 'both'."
+              }
+            },
+            {
+              "name": "Remove Item from Daily Cart",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/cart/items/1/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "cart",
+                    "items",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Remove a specific item from the daily cart by item ID."
+              }
+            },
+            {
+              "name": "Clear Daily Cart",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/cart/clear/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "cart",
+                    "clear",
+                    ""
+                  ]
+                },
+                "description": "Remove all items and reset address/zone/store on the daily cart."
+              }
+            },
+            {
+              "name": "Checkout Cart → Create Subscription",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/cart/checkout/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "cart",
+                    "checkout",
+                    ""
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"start_date\": \"2026-04-10\",\n    \"payment_method\": \"wallet\"\n}"
+                },
+                "description": "Convert the daily cart into a recurring subscription. Prices are re-fetched at checkout to ensure accuracy. Cart is cleared on success.\n\nPrerequisites: add items via POST /cart/add/ and set address via POST /cart/set-address/ first.\n\npayment_method: 'wallet' (auto-deducted daily) or 'cod'."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Zone & Store Check",
+          "item": [
+            {
+              "name": "Check Subscription Zone",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/check-zone/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "check-zone",
+                    ""
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"address_id\": 1\n}"
+                },
+                "description": "Check if a delivery address is within a subscription delivery zone. Returns eligible=true/false, store, and zone details including delivery_fee.\n\nAlso accepts: {\"lat\": 28.6139, \"lng\": 77.2090}"
+              }
+            },
+            {
+              "name": "Get Store by Zone",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/store-by-zone/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "store-by-zone",
+                    ""
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"address_id\": 1\n}"
+                },
+                "description": "Returns the store assigned to the address based on zone matching."
+              }
+            }
+          ]
+        },
+        {
+          "name": "My Subscriptions",
+          "item": [
+            {
+              "name": "List Subscription Plans",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/plans/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "plans",
+                    ""
+                  ]
+                }
+              }
+            },
+            {
+              "name": "List My Subscriptions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    ""
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Create Subscription (direct, no cart)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/create/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "create",
+                    ""
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"items\": [\n        {\"product_id\": 1, \"quantity\": 2},\n        {\"product_id\": 3, \"quantity\": 1}\n    ],\n    \"delivery_address_id\": 1,\n    \"start_date\": \"2026-04-10\",\n    \"payment_method\": \"wallet\"\n}"
+                },
+                "description": "Create a subscription directly without using the cart (bundle approach). Provide items array with product_id + quantity.\n\nLegacy single-product: use plan_id instead of items.\n\nDelivery address must be within a subscription zone — use POST /check-zone/ to validate first."
+              }
+            },
+            {
+              "name": "Subscription Details",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/1/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "1",
+                    ""
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update Subscription",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/1/update/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "1",
+                    "update",
+                    ""
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"delivery_address_id\": 2,\n    \"items\": [\n        {\"product_id\": 1, \"quantity\": 3}\n    ]\n}"
+                },
+                "description": "Update delivery address and/or items on an active subscription. New address is re-validated against subscription zones."
+              }
+            },
+            {
+              "name": "Pause Subscription",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/1/pause/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "1",
+                    "pause",
+                    ""
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"paused_until_date\": \"2026-04-20\",\n    \"pause_reason\": \"Going on vacation\"\n}"
+                },
+                "description": "Pause a subscription. Set paused_until_date for auto-resume on that date, or leave blank for indefinite pause."
+              }
+            },
+            {
+              "name": "Resume Subscription",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/1/resume/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "1",
+                    "resume",
+                    ""
+                  ]
+                },
+                "description": "Manually resume a paused subscription."
+              }
+            },
+            {
+              "name": "Cancel Subscription",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/1/cancel/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "1",
+                    "cancel",
+                    ""
+                  ]
+                },
+                "description": "Cancel a subscription permanently. Sets end_date to today."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin — Subscriptions",
+          "item": [
+            {
+              "name": "Admin: List All Subscriptions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/subscriptions/admin/all/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "subscriptions",
+                    "admin",
+                    "all",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "active",
+                      "description": "Optional: active, paused, cancelled"
+                    },
+                    {
+                      "key": "user_id",
+                      "value": "",
+                      "description": "Optional: filter by user ID",
+                      "disabled": true
+                    },
+                    {
+                      "key": "store_id",
+                      "value": "",
+                      "description": "Optional: filter by store ID",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Admin/store-manager view of all subscriptions. Supports filters: ?status=active&user_id=1&store_id=26"
+              }
+            }
+          ]
         }
       ]
     },
@@ -3900,7 +4340,7 @@
                 ""
               ]
             },
-            "description": "Get invoice details / download PDF."
+            "description": "Get invoice by numeric ID. Customers can only access their own orders' invoices."
           }
         },
         {
@@ -3957,7 +4397,7 @@
                 ""
               ]
             },
-            "description": "Admin: Generate invoice PDF for an order."
+            "description": "Manually generate a PDF invoice for a delivered or completed (POS) order. PDF is generated synchronously and returned immediately. Body: {\"order\": <order_id>}"
           }
         },
         {
@@ -3992,6 +4432,31 @@
               ]
             },
             "description": "Admin: Resend invoice to customer via WhatsApp or Email."
+          }
+        },
+        {
+          "name": "Get Invoice by Order Number",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/invoices/order/{{order_number}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "invoices",
+                "order",
+                "{{order_number}}",
+                ""
+              ]
+            },
+            "description": "Fetch invoice for a given order number. Works for both customers and admins. Auto-creates and generates PDF for completed (POS) or delivered orders that don't have an invoice yet. If PDF generation previously failed, it retries. Returns invoice with pdf_file URL when ready."
           }
         }
       ]
@@ -4063,7 +4528,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"name\": \"Genda Phool Store Mumbai\",\n    \"code\": \"GP-MUM-001\",\n    \"address\": \"123 Main Road, Mumbai\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\",\n    \"phone\": \"\",\n    \"email\": \"\",\n    \"latitude\": null,\n    \"longitude\": null,\n    \"opening_time\": \"08:00:00\",\n    \"closing_time\": \"21:00:00\",\n    \"is_active\": true,\n    \"delivery_fee\": 40,\n    \"free_delivery_threshold\": 500,\n    \"store_type\": \"both\",\n    \"is_online\": true\n}"
+              "raw": "{\n    \"name\": \"Genda Phool Store Mumbai\",\n    \"code\": \"GP-MUM-001\",\n    \"address\": \"123 Main Road, Mumbai\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\",\n    \"phone\": \"\",\n    \"email\": \"\",\n    \"latitude\": null,\n    \"longitude\": null,\n    \"opening_time\": \"08:00:00\",\n    \"closing_time\": \"21:00:00\",\n    \"is_active\": true,\n    \"delivery_fee_per_km\": 5.00,\n    \"free_delivery_threshold\": 500,\n    \"max_delivery_radius_km\": 10.0,\n    \"min_order_amount\": 0,\n    \"store_type\": \"both\",\n    \"is_online\": true\n}"
             },
             "url": {
               "raw": "{{base_url}}/admin-ops/stores/",
@@ -4214,7 +4679,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"name\": \"Genda Phool Store Mumbai\",\n    \"code\": \"GP-MUM-001\",\n    \"address\": \"123 Main Road, Mumbai\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\",\n    \"phone\": \"\",\n    \"email\": \"\",\n    \"latitude\": null,\n    \"longitude\": null,\n    \"opening_time\": \"08:00:00\",\n    \"closing_time\": \"21:00:00\",\n    \"is_active\": true,\n    \"delivery_fee\": 40,\n    \"free_delivery_threshold\": 500\n}"
+              "raw": "{\n    \"name\": \"Genda Phool Store Mumbai\",\n    \"code\": \"GP-MUM-001\",\n    \"address\": \"123 Main Road, Mumbai\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\",\n    \"phone\": \"\",\n    \"email\": \"\",\n    \"latitude\": null,\n    \"longitude\": null,\n    \"opening_time\": \"08:00:00\",\n    \"closing_time\": \"21:00:00\",\n    \"is_active\": true,\n    \"delivery_fee_per_km\": 5.00,\n    \"free_delivery_threshold\": 500,\n    \"max_delivery_radius_km\": 10.0,\n    \"min_order_amount\": 0\n}"
             },
             "url": {
               "raw": "{{base_url}}/admin-ops/stores/{{store_code}}/",
@@ -4228,7 +4693,7 @@
                 ""
               ]
             },
-            "description": "Admin: Update store details by store code.\n\n⚡ Updating delivery_fee or free_delivery_threshold immediately recalculates all active customer carts for this store."
+            "description": "Admin: Update store details by store code.\n\n⚡ Updating delivery_fee_per_km, free_delivery_threshold, or max_delivery_radius_km immediately affects delivery fee calculations for new cart totals."
           }
         },
         {
@@ -4257,10 +4722,10 @@
                 ""
               ]
             },
-            "description": "Update store delivery fee. Immediately recalculates all active customer carts for this store.\n\nChange GP-JPR to your store code.",
+            "description": "Update store delivery settings. delivery_fee_per_km = cost per km from store to customer (default ₹5). free_delivery_threshold = order subtotal above which delivery is free. max_delivery_radius_km = hard radius limit for orders.\n\nChange GP-JPR to your store code.",
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"delivery_fee\": \"20.00\",\n    \"free_delivery_threshold\": \"500.00\"\n}"
+              "raw": "{\n    \"delivery_fee_per_km\": \"5.00\",\n    \"free_delivery_threshold\": \"500.00\",\n    \"max_delivery_radius_km\": 10.0\n}"
             }
           }
         },
@@ -5598,7 +6063,7 @@
           }
         },
         {
-          "name": "Bulk Import Products (CSV/Excel)",
+          "name": "Bulk Import Products (XLSX)",
           "request": {
             "method": "POST",
             "header": [
@@ -5630,7 +6095,7 @@
                 ""
               ]
             },
-            "description": "Bulk create/update products from a CSV or Excel file.\n\nRequest: multipart/form-data, field: file\nLimits: 5MB max, 500 rows max\n\nRequired columns: name, sku, base_price\nOptional: short_description, description, category (ID or name), availability_type, sale_price, cost_price, is_active, is_featured, track_inventory, low_stock_threshold, is_perishable, shelf_life_days, store_ids (comma-sep), label_ids (comma-sep), sub_products\n\nsub_products format: component_id:qty,component_id:qty  e.g. '101:2,102:5'\n  - 1 component → simple product\n  - 2+ components → composite product\n\nCreate vs Update: matched by SKU. Existing SKU → update; new SKU → create.\n\nResponse:\n  { created: N, updated: N, failed: N, total: N, errors: [{row, sku, message}] }"
+            "description": "Import products from XLSX file.\n\n**Required**: multipart/form-data with `file` field (XLSX).\nOptional: `store_id` param to override store (superadmin only).\n\n**New format** (no SKU column):\n- Upsert by name+store (not SKU)\n- BOM: 8 paired columns bom_1_name/bom_1_qty ... bom_8_name/bom_8_qty\n- Variant BOM: 4 paired vbom_1_name/vbom_1_qty ... vbom_4_name/vbom_4_qty\n- Use Download Template endpoint to get the pre-formatted template with dropdowns"
           }
         },
         {
@@ -5644,7 +6109,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/admin-ops/products/bulk-import/template/",
+              "raw": "{{base_url}}/admin-ops/products/bulk-import/template/?store_id=1",
               "host": [
                 "{{base_url}}"
               ],
@@ -5654,10 +6119,83 @@
                 "bulk-import",
                 "template",
                 ""
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "1",
+                  "description": "Required: store_id to load store-specific inventory for BOM dropdowns"
+                }
               ]
             },
-            "description": "Download a CSV template file with all supported column headers and two example rows (one simple product, one composite)."
+            "description": "Download an Excel (.xlsx) template with two sheets:\n\n**Sheet 1 — Instructions:** Column rules, grouping logic, SKU note, BOM format.\n**Sheet 2 — Products:** Pre-formatted table. Fill rows here and upload via bulk-import.\n\n**SKU column is intentionally blank** — SKUs are auto-generated per store. Do not paste SKUs from other stores.\n\nUpload the filled sheet via: POST /api/v1/admin-ops/products/bulk-import/"
           }
+        },
+        {
+          "name": "Bulk Export Products (XLSX)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin-ops/products/bulk-export/?store_id=1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin-ops",
+                "products",
+                "bulk-export",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "1",
+                  "description": "Filter by store ID (required for super_admin, auto-set for store managers)"
+                },
+                {
+                  "key": "category",
+                  "value": "",
+                  "description": "Filter by category ID",
+                  "disabled": true
+                },
+                {
+                  "key": "availability_type",
+                  "value": "",
+                  "description": "store | daily | both",
+                  "disabled": true
+                },
+                {
+                  "key": "is_active",
+                  "value": "",
+                  "description": "true | false",
+                  "disabled": true
+                },
+                {
+                  "key": "is_featured",
+                  "value": "",
+                  "description": "true | false",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search by name or SKU",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Export products as Excel (.xlsx) with two sheets:\n\n**Sheet 1 — Products:** All products with variants and BOM in re-importable format.\n**Sheet 2 — Inventory:** All active inventory items for the store with IDs for BOM mapping.\n\n**SKU column is blank in the export** — SKUs are store-specific and auto-generated on import. Copying SKUs across stores causes conflicts.\n\n**BOM items:** Use the `id` column from the Inventory sheet to fill `bom_items` column e.g. `9:2,14:1` means 2 units of item 9 + 1 unit of item 14.\n\nTo copy products to another store: change `store_id` column and update `bom_items` IDs to match the target store's inventory (check the target store's Inventory sheet).\n\n**Filters:** `store_id` (required for admin), `category`, `availability_type`, `is_active`, `is_featured`, `search`"
+          },
+          "response": []
         },
         {
           "name": "List Inventory Items (BOM Picker)",
@@ -5683,11 +6221,12 @@
                 {
                   "key": "store_id",
                   "value": "4",
-                  "description": "Filter by store ID to get InventoryItems available for BOM selection"
+                  "description": "REQUIRED for admin/super_admin. Store managers auto-scoped to their store.",
+                  "disabled": false
                 }
               ]
             },
-            "description": "List active InventoryItems for a store. Used as a picker when creating or editing products — select which raw materials (inventory items) go into the BOM of a product or variant. Replaces the old /admin-ops/sub-products/ endpoint."
+            "description": "List active inventory items for BOM picker when creating or editing products.\n\n**`store_id` is required for admin/super_admin** — returns empty if omitted.\nStore managers and staff are automatically scoped to their assigned store, `store_id` is ignored.\n\nInventory is always store-specific — you can only assign inventory items from the **same store** as the product being created. The API enforces this at creation time too.\n\n**Filters:** `store_id` (required for admin), `search` (name or code)"
           }
         },
         {
@@ -8746,6 +9285,40 @@
               "response": []
             }
           ]
+        },
+        {
+          "name": "Send Promo Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin-ops/notifications/send-promo/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin-ops",
+                "notifications",
+                "send-promo",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"offer_title\": \"Summer Sale \\ud83c\\udf38\",\n  \"offer_details\": \"Get 20% off on all bouquets this weekend!\",\n  \"valid_until\": \"30th April 2026\",\n  \"promo_code\": \"SUMMER20\",\n  \"send_whatsapp\": true,\n  \"send_email\": true,\n  \"store_id\": 25,\n  \"send_to_all\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Send promotional WhatsApp + Email blast to customers.\n\n**Audience filters (pick one):**\n- `store_id` — customers who ordered from that store\n- `send_to_all: true` — all customers (roles: admin, super_admin only)\n- neither — uses requester's assigned store\n\n**Note:** `send_to_all` requires role `admin` or `super_admin`."
+          }
         }
       ]
     },

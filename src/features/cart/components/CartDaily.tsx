@@ -1,16 +1,18 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { IoArrowBack, IoCreateOutline, IoTrashOutline } from 'react-icons/io5';
+import { IoArrowBack, IoCreateOutline, IoStorefrontOutline, IoTrashOutline } from 'react-icons/io5';
 import { BsCalendar4 } from 'react-icons/bs';
 import { MdLocationOn } from 'react-icons/md';
 import { FaTag, FaPlus, FaMinus, FaTimes, FaCheck } from 'react-icons/fa';
 import { useCart } from '../../../context/CartContext';
 import { useAuth } from '../../../context/AuthContext';
+import { useFeatureTheme } from '../../../context/FeatureThemeContext';
 import { addressService, Address } from '../../../services/address.service';
-import { storeService } from '../../../services/store.service';
+import { storeService, storeIsWithinDeliveryRadius } from '../../../services/store.service';
+import { subscriptionCartService } from '../../../services/subscriptionCart.service';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import { format, addDays, isToday, isTomorrow, startOfDay } from 'date-fns';
+import { format, addDays, isAfter, isBefore, isToday, isTomorrow, startOfDay } from 'date-fns';
 import toast from 'react-hot-toast';
 import CartRazorpayPayment from '../../../components/Payment/Rezorpay/CartRazorpayPayment';
 import { paymentService } from '../../../services/payment.service';
@@ -27,14 +29,8 @@ import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
 import { errorMessageFromCatch } from '../../../utils/apiErrorMessage';
+import { DELIVERY_DATE_MAX_DAYS_FROM_TODAY } from '../../../constants/deliveryBooking';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
-import cautionIcon from '../../../assets/svg/gp_daily svg/caution.svg';
-
-const BASE_PATH = '/gp-daily';
-const BROWSE_PRODUCTS_PATH = '/gp-daily/Products';
-const ADDRESS_SELECTION_PATH = '/gp-daily/address-selection';
-const ACCENT = '#FAA222';
-const ACCENT_HOVER = '#e8941a';
 
 /**
  * Survives component remounts (e.g. React Strict Mode) so we only show one toast per
@@ -66,8 +62,11 @@ const formatSlotTimeRange = (start: string, end: string): string => {
   return `${startStr}-${endStr}${e.period}`;
 };
 
-const getSlotDisplayLabel = (slot: DeliverySlot): string =>
-  slot.start_time && slot.end_time ? formatSlotTimeRange(slot.start_time, slot.end_time) : slot.slot_name || '';
+const getSlotDisplayLabel = (slot: DeliverySlot): string => {
+  if (!slot.start_time || !slot.end_time) return slot.slot_name || '';
+  const { start, end } = getSlotWindowMinutes(slot);
+  return formatSlotTimeRange(minutesToTimeStr(start), minutesToTimeStr(end));
+};
 
 /** Same heuristics as StoreProductsDisplayPage — cart update API stock errors. */
 const isStockLimitError = (raw: unknown): boolean => {
@@ -86,6 +85,41 @@ const toMinutes = (timeStr: string): number => {
   const [h = '0', m = '0'] = (timeStr || '').split(':');
   return Number(h) * 60 + Number(m);
 };
+
+/** For formatSlotTimeRange after normalizing minutes. */
+const minutesToTimeStr = (mins: number): string => {
+  const h = Math.floor(mins / 60) % 24;
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+};
+
+/**
+ * Same-day slot window in minutes from midnight.
+ * Fixes common backend typo: 1 PM stored as "01:00:00" for Afternoon (e.g. 13:00–16:00).
+ */
+function getSlotWindowMinutes(slot: DeliverySlot): { start: number; end: number } {
+  const rawStart = toMinutes(slot.start_time);
+  const end = toMinutes(slot.end_time);
+  let start = rawStart;
+  if (end <= start) return { start, end };
+
+  const name = (slot.slot_name || '').toLowerCase();
+  const startsVeryEarly = rawStart < 7 * 60;
+  const endsAfternoon = end >= 13 * 60;
+  const afternoonLike =
+    name.includes('afternoon') || name.includes('evening') || name.includes('noon');
+
+  if (startsVeryEarly && endsAfternoon && (afternoonLike || rawStart <= 2 * 60)) {
+    const parts = (slot.start_time || '').split(':');
+    const h = Number(parts[0] ?? 0);
+    const mi = Number(parts[1] ?? 0);
+    if (Number.isFinite(h) && h >= 0 && h <= 6) {
+      const shifted = (h + 12) * 60 + (Number.isFinite(mi) ? mi : 0);
+      if (shifted < end) start = shifted;
+    }
+  }
+  return { start, end };
+}
 
 interface ApplyCouponResponse {
   message?: string;
@@ -121,6 +155,31 @@ function totalsFromCartData(cartData: CartData): CartTotalsState {
     total: parseFloat(cartData.total || '0') || 0,
     deliveryAddressId: id === undefined || id === null ? null : Number(id),
   };
+}
+
+function applyServerCartData(
+  cartData: CartData,
+  setTotals: React.Dispatch<React.SetStateAction<CartTotalsState | null>>,
+  setStoreName: React.Dispatch<React.SetStateAction<string>>,
+  setStoreId: React.Dispatch<React.SetStateAction<number | null>>,
+) {
+  setTotals(totalsFromCartData(cartData));
+  setStoreName((cartData.store_name || '').trim());
+  const sid = cartData.store;
+  if (sid == null) {
+    setStoreId(null);
+  } else {
+    const n = Number(sid as number | string);
+    setStoreId(Number.isFinite(n) ? n : null);
+  }
+}
+
+function parseAddressCoordinates(address: Address | null): { lat: number; lng: number } | null {
+  const raw = address?.coordinates?.trim();
+  if (!raw) return null;
+  const [a, b] = raw.split(',').map((s) => parseFloat(s.trim()));
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return { lat: a, lng: b };
 }
 
 function mergeTotalsFromApplyResponse(
@@ -161,7 +220,8 @@ interface Coupon {
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
 const fetchCoupons = async (): Promise<Coupon[]> => {
-  const storeId = storeService.getStoreIdForProducts() ?? 4;
+  const storeId = storeService.getStoreIdForProducts();
+  if (storeId == null) return [];
   const res = await api.get(`${getApiUrl()}/cart/coupons/?store_id=${storeId}`);
   const json = res.data;
   return Array.isArray(json) ? json : (json.data ?? json.results ?? json.coupons ?? []);
@@ -195,6 +255,7 @@ interface PromoCodeModalProps {
 }
 
 const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApplying, appliedCode }) => {
+  const { theme } = useFeatureTheme();
   const [manualCode, setManualCode] = useState('');
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [isFetchingCoupons, setIsFetchingCoupons] = useState(true);
@@ -305,12 +366,14 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                   }, 300);
                 }}
                 placeholder="e.g. POOJA10"
-                className="min-w-0 flex-1 rounded-xl border-2 border-gray-200 px-3 py-2 text-sm font-medium uppercase tracking-wider outline-none transition-colors focus:border-[#FAA222] sm:px-4 sm:py-2.5"
+                className="min-w-0 flex-1 rounded-xl border-2 border-gray-200 px-3 py-2 text-sm font-medium uppercase tracking-wider outline-none transition-colors sm:px-4 sm:py-2.5"
+                style={{ borderColor: '#e5e7eb' }}
               />
               <button
                 onClick={handleManualApply}
                 disabled={!manualCode.trim() || isApplying}
-                className="flex shrink-0 items-center justify-center rounded-xl bg-[#FAA222] px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-[#e8941a] disabled:cursor-not-allowed disabled:opacity-50 sm:px-5 sm:py-2.5"
+                className="flex shrink-0 items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:px-5 sm:py-2.5"
+                style={{ backgroundColor: theme.colors.primary, color: 'black' }}
               >
                 {isApplying ? '...' : 'Apply'}
               </button>
@@ -319,7 +382,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
               <p
                 role="status"
                 className={`mt-2.5 text-xs font-medium leading-snug sm:text-sm ${
-                  applyHint.kind === 'success' ? 'text-amber-700' : 'text-red-600'
+                  applyHint.kind === 'success' ? 'text-green-700' : 'text-red-600'
                 }`}
               >
                 {applyHint.text}
@@ -349,7 +412,8 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                 <p className="text-sm text-gray-500">{fetchError}</p>
                 <button
                   onClick={loadCoupons}
-                  className="mt-2 text-sm text-[#FAA222] font-medium hover:underline"
+                  className="mt-2 text-sm font-medium hover:underline"
+                  style={{ color: theme.colors.primary }}
                 >
                   Retry
                 </button>
@@ -365,17 +429,21 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                       key={coupon.id}
                       className={`flex items-center justify-between gap-2 rounded-xl border-2 p-3 transition-colors sm:rounded-2xl sm:p-4 ${
                         isApplied
-                          ? 'border-[#FAA222] bg-[#fff3e0]'
+                          ? 'bg-[#f8f6f1]'
                           : 'border-dashed border-gray-300 bg-gray-50'
                       }`}
+                      style={isApplied ? { borderColor: theme.colors.primary } : undefined}
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <FaTag className={`text-base flex-shrink-0 ${isApplied ? 'text-[#FAA222]' : 'text-gray-400'}`} />
+                        <FaTag
+                          className="text-base flex-shrink-0"
+                          style={{ color: isApplied ? theme.colors.primary : '#9ca3af' }}
+                        />
                         <div className="min-w-0">
                           {/* Code + discount badge */}
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-bold text-gray-900 tracking-wider text-sm">{coupon.code}</p>
-                            <span className="text-xs bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full">
+                            <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">
                               {coupon.discount_label}
                             </span>
                           </div>
@@ -395,9 +463,14 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                         disabled={isApplying}
                         className={`ml-3 flex-shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
                           isApplied
-                            ? 'bg-[#FAA222] text-gray-900'
-                            : 'bg-white border border-[#FAA222] text-gray-900 hover:bg-[#FAA222]'
+                            ? 'text-black'
+                            : 'bg-white'
                         }`}
+                        style={
+                          isApplied
+                            ? { backgroundColor: theme.colors.primary }
+                            : { border: `1px solid ${theme.colors.primary}`, color: theme.colors.primary }
+                        }
                       >
                         {isApplied ? (
                           <><FaCheck className="text-xs" /> Applied</>
@@ -425,62 +498,96 @@ const Cart: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoggedIn, phoneNumber: authPhoneNumber } = useAuth();
-  const browseProductsPath = BROWSE_PRODUCTS_PATH;
+  const { theme } = useFeatureTheme();
+  // CartDaily should always follow gp-daily theming + routing.
+  const basePath = '/gp-daily';
+  const browseProductsPath = '/gp-daily/Products';
   const { storePendingPayment, getPendingPayments, removePendingPayment, retryWithBackoff } = useNetworkRecovery();
   const {
-    items,
+    // Keep context around for shared helpers (e.g. clear after checkout),
+    // but Daily cart data is fetched from subscription cart APIs.
     deliveryInfo,
-    removeFromCart,
-    updateQuantity,
     updateDeliveryInfo,
-    getTotalPrice,
-    syncCartToAPI,
     loadCartFromAPI,
     clearCart,
     isSyncing,
   } = useCart();
 
+  const [dailyCart, setDailyCart] = useState<import('../../../services/subscriptionCart.service').DailyCart | null>(null);
+  const [isLoadingDailyCart, setIsLoadingDailyCart] = useState(true);
+
+  const refreshDailyCart = useCallback(async () => {
+    try {
+      setIsLoadingDailyCart(true);
+      const cart = await subscriptionCartService.getDailyCart();
+      setDailyCart(cart);
+    } catch (e: unknown) {
+      toast.error(errorMessageFromCatch(e, 'Failed to fetch daily cart'));
+      setDailyCart(null);
+    } finally {
+      setIsLoadingDailyCart(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn || !localStorage.getItem('access_token')) return;
+    void refreshDailyCart();
+  }, [isLoggedIn, refreshDailyCart]);
+
+  const items = useMemo(() => {
+    const raw = dailyCart?.items ?? [];
+    return raw.map((it) => {
+      const anyIt = it as any;
+      const p = (anyIt?.product ?? null) as any;
+      const unit =
+        Number(anyIt?.unit_price ?? (p?.current_price ?? p?.sale_price ?? p?.base_price ?? 0));
+      const qty = Number.parseFloat(String(anyIt?.quantity ?? 0));
+      return {
+        id: String(it.id),
+        apiCartItemId: it.id,
+        productId: Number(p?.id ?? anyIt?.product_id ?? 0),
+        productSlug: String(p?.slug ?? anyIt?.product_slug ?? ''),
+        name: String(p?.name ?? anyIt?.product_name ?? 'Product'),
+        image: String(p?.primary_image ?? anyIt?.primary_image ?? ''),
+        price: Number.isFinite(unit) ? unit : 0,
+        quantity: Number.isFinite(qty) ? qty : 0,
+        // Fields used by shared Cart UI (gp-store parity) — not provided by daily cart API.
+        variant: null as any,
+        customizedMessage: undefined as any,
+        categorySlug: String(p?.category_slug ?? ''),
+      };
+    });
+  }, [dailyCart]);
+
   const [defaultAddress, setDefaultAddress] = useState<Address | null>(null);
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerRangeMessage, setDatePickerRangeMessage] = useState<string | null>(null);
   const [selectedDateOption, setSelectedDateOption] = useState<'today' | 'tomorrow' | 'dayAfter' | 'pickDate'>('tomorrow');
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const [availableSlots, setAvailableSlots] = useState<DeliverySlot[]>([]);
+  /** Recompute "today" slot eligibility as the clock moves (same calendar day). */
+  const [slotsNowTick, setSlotsNowTick] = useState(0);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
-  // (Bouquet message editing uses inline UI; no overflow menu needed)
-
-  // gp-daily "Select Delivery Days" UI state (subscription-style selector)
   const [deliveryFrequency, setDeliveryFrequency] = useState<'Daily' | 'Mon-Sat' | 'Customize'>('Daily');
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
-  const weekDays = [
-    { day: 'Mon', enabled: true },
-    { day: 'Tue', enabled: true },
-    { day: 'Wed', enabled: true },
-    { day: 'Thu', enabled: true },
-    { day: 'Fri', enabled: true },
-    { day: 'Sat', enabled: true },
-    { day: 'Sun', enabled: true },
-  ];
-
-  const handleDaySelection = (day: string) => {
-    setSelectedDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
-  };
+  // (Bouquet message editing uses inline UI; no overflow menu needed)
 
   // Check authentication and redirect if session expired
   useEffect(() => {
     if (!isLoggedIn || !localStorage.getItem('access_token')) {
-      navigate(`${BASE_PATH}/login`, {
+      navigate(`${basePath}/login`, {
         state: { returnUrl: location.pathname, fromCart: true },
         replace: true
       });
     }
-  }, [isLoggedIn, navigate, location.pathname]);
+  }, [isLoggedIn, navigate, location.pathname, basePath]);
 
   // Listen for tokenRemoved event (session expiration)
   useEffect(() => {
     const handleTokenRemoved = () => {
-      navigate(`${BASE_PATH}/login`, { 
+      navigate(`${basePath}/login`, { 
         state: { returnUrl: location.pathname, fromCart: true },
         replace: true 
       });
@@ -490,10 +597,22 @@ const Cart: React.FC = () => {
     return () => {
       window.removeEventListener('tokenRemoved', handleTokenRemoved);
     };
-  }, [navigate, location.pathname]);
+  }, [navigate, location.pathname, basePath]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setSlotsNowTick((n) => n + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editMessage, setEditMessage] = useState<string>('');
   const datePickerRef = useRef<HTMLDivElement>(null);
+  const lastZoneCheckedAddressIdRef = useRef<number | null>(null);
+  const zoneCheckInFlightAddressIdRef = useRef<number | null>(null);
+  const lastSubscriptionCartAddressSetRef = useRef<number | null>(null);
+  const subscriptionCartAddressSetInFlightRef = useRef(false);
+  const [subscriptionZoneEligible, setSubscriptionZoneEligible] = useState<boolean | null>(null);
+  const [subscriptionDeliveryFee, setSubscriptionDeliveryFee] = useState<number | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [shouldTriggerPayment, setShouldTriggerPayment] = useState(false);
   const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
@@ -509,13 +628,66 @@ const Cart: React.FC = () => {
   const [promoDiscount, setPromoDiscount] = useState<number>(0);
 
   const [cartTotals, setCartTotals] = useState<CartTotalsState | null>(null);
+  /** Fulfilment store label for basket (from GET /cart/ `store_name`). */
+  const [cartStoreName, setCartStoreName] = useState('');
+  /** Numeric store on server cart — used for nearest-store suggestion (app parity). */
+  const [cartStoreId, setCartStoreId] = useState<number | null>(null);
   const [isLoadingCartTotals, setIsLoadingCartTotals] = useState(false);
+  /** Nearest operational store for saved address — user confirms switch (no auto-switch). */
+  const [suggestedStoreForAddress, setSuggestedStoreForAddress] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [isSwitchingSuggestedStore, setIsSwitchingSuggestedStore] = useState(false);
+  /** Same confirmation as Account store switch (Settings page modal). */
+  const [showSuggestedStoreSwitchModal, setShowSuggestedStoreSwitchModal] = useState(false);
+  /** Closest store by distance is offline (ordering unavailable). */
+  const [deliveryStoreOffline, setDeliveryStoreOffline] = useState(false);
+  /** True when selected address is outside service area for current store (validate-coverage API). */
+  const [addressOutsideDelivery, setAddressOutsideDelivery] = useState<boolean | null>(null);
+  const [isCheckingDeliveryCoverage, setIsCheckingDeliveryCoverage] = useState(false);
   /** After first totals fetch, refreshes (e.g. during checkout) must not show the full-page loader */
   const [hasLoadedCartTotalsOnce, setHasLoadedCartTotalsOnce] = useState(false);
   /** After first successful address + totals + sync idle, checkout must not full-screen when sync runs again */
   const [basketHydratedOnce, setBasketHydratedOnce] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   /** Inline stock message per line item (e.g. after insufficient stock). */
+  const weekDays = useMemo(
+    () => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const,
+    [],
+  );
+
+  const activeDeliveryDays = useMemo(() => {
+    if (deliveryFrequency === 'Daily') return [...weekDays];
+    if (deliveryFrequency === 'Mon-Sat') return weekDays.filter((d) => d !== 'Sun');
+    return selectedDays;
+  }, [deliveryFrequency, selectedDays, weekDays]);
+
+  const activeDeliveryDayInts = useMemo(() => {
+    const map: Record<(typeof weekDays)[number], number> = {
+      Mon: 0,
+      Tue: 1,
+      Wed: 2,
+      Thu: 3,
+      Fri: 4,
+      Sat: 5,
+      Sun: 6,
+    };
+    return activeDeliveryDays
+      .map((d) => map[d as (typeof weekDays)[number]])
+      .filter((n) => Number.isInteger(n));
+  }, [activeDeliveryDays, weekDays]);
+
+  const toggleDeliveryDay = (day: (typeof weekDays)[number]) => {
+    if (deliveryFrequency !== 'Customize') return;
+    setSelectedDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  };
+
+  useEffect(() => {
+    // Persist delivery-day preferences locally for gp-daily cart UI.
+    const payload = { deliveryFrequency, selectedDays: activeDeliveryDays };
+    localStorage.setItem('gp_daily_cart_delivery_days', JSON.stringify(payload));
+  }, [deliveryFrequency, selectedDays, activeDeliveryDays]);
   const [lineStockErrorByItemId, setLineStockErrorByItemId] = useState<Record<string, string>>({});
   /** Remount key so the shake animation restarts on every repeat tap at limit. */
   const [stockShakeVersionByItemId, setStockShakeVersionByItemId] = useState<Record<string, number>>({});
@@ -527,26 +699,59 @@ const Cart: React.FC = () => {
     }));
   };
 
+  const deliveryStoreSyncKey = useRef('');
+
+  /**
+   * Account "Select Store" is source of truth when set. If the server cart is still on
+   * another store, move the basket to the selected store — do not call switchStore(sid)
+   * from the cart (that reverted Account choice and showed Sodala vs Malviya mismatch).
+   */
+  const reconcileCartStoreWithAccountSelection = useCallback(
+    async (cartData: CartData): Promise<CartData> => {
+      if (!isLoggedIn) return cartData;
+      if (cartData.store == null) return cartData;
+      const cartStoreNum = Number(cartData.store as number | string);
+      if (!Number.isFinite(cartStoreNum)) return cartData;
+      try {
+        const persisted = storeService.getSelectedStoreId();
+        if (persisted == null) {
+          await storeService.switchStore(cartStoreNum);
+          return cartData;
+        }
+        if (persisted === cartStoreNum) return cartData;
+        await cartService.switchCartStore(persisted);
+        return await cartService.getCartData();
+      } catch {
+        return cartData;
+      }
+    },
+    [isLoggedIn],
+  );
+
   const navigateToProductDetail = (item: (typeof items)[number]) => {
-    const dailySlug = item.productSlug?.trim();
-    if (dailySlug) {
-      navigate(`${BASE_PATH}/product/${encodeURIComponent(dailySlug)}`);
+    const slug = item.productSlug?.trim();
+    if (slug) {
+      navigate(`${basePath}/product/${encodeURIComponent(slug)}`);
       return;
     }
     if (!item.productId) return;
-    navigate(`${BASE_PATH}/product/${encodeURIComponent(String(item.productId))}`);
+    navigate(`${basePath}/product/${encodeURIComponent(String(item.productId))}`);
   };
 
   const isSlotSelectable = (slot: DeliverySlot, date: Date) => {
     // For non-today dates, all API-available slots stay selectable.
     if (!isToday(date)) return true;
-    // For today: only slots strictly ahead of current time are selectable.
-    // This also disables the currently running slot as requested.
+    // For today: bookable until normalized window ends (handles 01:00→13:00 afternoon typo).
     const now = new Date();
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const slotStartMinutes = toMinutes(slot.start_time);
-    return slotStartMinutes > nowMinutes;
+    const { end } = getSlotWindowMinutes(slot);
+    return end > nowMinutes;
   };
+
+  const sortSlotsByStart = (slots: DeliverySlot[]) =>
+    [...slots].sort(
+      (a, b) => getSlotWindowMinutes(a).start - getSlotWindowMinutes(b).start,
+    );
 
   /** Slots the user can actually book for the currently selected delivery date (past slots for "today" are omitted from UI). */
   const slotsToShow = useMemo(() => {
@@ -557,14 +762,38 @@ const Cart: React.FC = () => {
           ? new Date(deliveryInfo.selectedDate)
           : new Date();
     const day = startOfDay(raw);
-    return availableSlots.filter((slot) => isSlotSelectable(slot, day));
-  }, [availableSlots, deliveryInfo?.selectedDate]);
+    return sortSlotsByStart(availableSlots.filter((slot) => isSlotSelectable(slot, day)));
+  }, [availableSlots, deliveryInfo?.selectedDate, slotsNowTick]);
 
   /** True when at least one slot can still be booked for today (after load). */
   const hasSelectableTodaySlots = useMemo(() => {
     const today = startOfDay(new Date());
     return availableSlots.some((slot) => isSlotSelectable(slot, today));
-  }, [availableSlots]);
+  }, [availableSlots, slotsNowTick]);
+
+  const deliveryDateMaxStart = useMemo(
+    () => startOfDay(addDays(new Date(), DELIVERY_DATE_MAX_DAYS_FROM_TODAY)),
+    [slotsNowTick],
+  );
+
+  /** Matches `DatePicker` minDate (today vs tomorrow when today has no bookable slots). */
+  const datePickerMinStart = useMemo(
+    () =>
+      isLoadingSlots || hasSelectableTodaySlots
+        ? startOfDay(new Date())
+        : addDays(startOfDay(new Date()), 1),
+    [isLoadingSlots, hasSelectableTodaySlots, slotsNowTick],
+  );
+
+  const datePickerSelected = useMemo(() => {
+    if (!deliveryInfo?.selectedDate) return null;
+    const d = startOfDay(
+      deliveryInfo.selectedDate instanceof Date
+        ? deliveryInfo.selectedDate
+        : new Date(deliveryInfo.selectedDate),
+    );
+    return isAfter(d, deliveryDateMaxStart) ? deliveryDateMaxStart : d;
+  }, [deliveryInfo?.selectedDate, deliveryDateMaxStart]);
 
   useEffect(() => {
     const state = location.state as { addressUpdated?: boolean } | null;
@@ -577,9 +806,121 @@ const Cart: React.FC = () => {
       return;
     }
     addressUpdatedToastConsumed = true;
-    toast.success('Address updated.', { duration: 2200 });
+    // Avoid double toasts; zone check below will show the relevant message.
     navigate('.', { replace: true, state: {} });
   }, [location.state, navigate]);
+
+  // Subscription zone eligibility check (on cart load + address change)
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const rawId = defaultAddress?.id;
+    if (rawId == null) return;
+    const addressId = Number(rawId);
+    if (!Number.isFinite(addressId)) return;
+
+    // Avoid duplicate requests/toasts (StrictMode can run effects twice).
+    if (zoneCheckInFlightAddressIdRef.current === addressId) return;
+    zoneCheckInFlightAddressIdRef.current = addressId;
+
+    let cancelled = false;
+    const backupDismiss: { id?: number } = {};
+    (async () => {
+      const prev = lastZoneCheckedAddressIdRef.current;
+      const isFirstCheck = prev == null;
+      const isChanged = prev != null && prev !== addressId;
+
+      try {
+        const res = await subscriptionCartService.checkSubscriptionZone(addressId);
+        if (cancelled) return;
+
+        lastZoneCheckedAddressIdRef.current = addressId;
+
+        const eligible = Boolean((res as any)?.eligible);
+        const msg =
+          typeof (res as any)?.message === 'string' ? String((res as any).message).trim() : '';
+        const feeRaw = (res as any)?.delivery_fee;
+        const feeNum = feeRaw == null ? null : Number(feeRaw);
+
+        setSubscriptionZoneEligible(eligible);
+        setSubscriptionDeliveryFee(Number.isFinite(feeNum as number) ? (feeNum as number) : null);
+
+        // If eligible, set address on subscription cart so fees/totals match checkout.
+        if (
+          eligible &&
+          lastSubscriptionCartAddressSetRef.current !== addressId &&
+          subscriptionCartAddressSetInFlightRef.current === false
+        ) {
+          subscriptionCartAddressSetInFlightRef.current = true;
+          try {
+            await subscriptionCartService.setDeliveryAddress(addressId);
+            if (!cancelled) {
+              lastSubscriptionCartAddressSetRef.current = addressId;
+              await refreshDailyCart();
+            }
+          } catch (e: unknown) {
+            if (!cancelled) {
+              toast.error(errorMessageFromCatch(e, 'Could not set delivery address for subscription cart.'), {
+                id: `sub-zone:set-address:${addressId}`,
+              });
+            }
+          } finally {
+            subscriptionCartAddressSetInFlightRef.current = false;
+          }
+        }
+
+        if (isFirstCheck || isChanged) {
+          if (eligible) {
+            const zoneToastId = `sub-zone:${addressId}`;
+            if (!cancelled) {
+              toast.success(msg || 'Great! This address is within our subscription delivery zone.', {
+                duration: 2600,
+                id: zoneToastId,
+              });
+              /** Backup dismiss — avoids stuck toast if height timers reset library auto-dismiss. */
+              backupDismiss.id = window.setTimeout(() => {
+                toast.dismiss(zoneToastId);
+              }, 2800);
+            }
+          } else {
+            toast.error(msg || 'This address is outside our subscription delivery zone.', {
+              duration: 3200,
+              id: `sub-zone:${addressId}`,
+            });
+          }
+        } else if (!eligible) {
+          // Same address re-check (e.g., remount): only surface a problem state.
+          toast.error(msg || 'This address is outside our subscription delivery zone.', {
+            duration: 3200,
+            id: `sub-zone:${addressId}`,
+          });
+        }
+      } catch (e: unknown) {
+        if (cancelled) return;
+        const prevId = lastZoneCheckedAddressIdRef.current;
+        const shouldToast = prevId == null || prevId !== addressId;
+        setSubscriptionZoneEligible(null);
+        setSubscriptionDeliveryFee(null);
+        if (shouldToast) {
+          toast.error(errorMessageFromCatch(e, 'Could not check delivery zone.'), {
+            duration: 3000,
+            id: `sub-zone:${addressId}`,
+          });
+        }
+      } finally {
+        if (zoneCheckInFlightAddressIdRef.current === addressId) {
+          zoneCheckInFlightAddressIdRef.current = null;
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (backupDismiss.id != null) {
+        clearTimeout(backupDismiss.id);
+        backupDismiss.id = undefined;
+      }
+    };
+  }, [isLoggedIn, defaultAddress?.id, refreshDailyCart]);
 
   useEffect(() => {
     if (!showPromoModal) return;
@@ -606,8 +947,9 @@ const Cart: React.FC = () => {
         setCartTotals((prev) => mergeTotalsFromApplyResponse(response, prev, d));
       } else {
         try {
-          const cartData = await cartService.getCartData();
-          setCartTotals(totalsFromCartData(cartData));
+          const raw = await cartService.getCartData();
+          const cartData = await reconcileCartStoreWithAccountSelection(raw);
+          applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
         } catch (_) {}
       }
 
@@ -628,8 +970,9 @@ const Cart: React.FC = () => {
       await removeCouponAPI();
       setAppliedPromoCode(null);
       setPromoDiscount(0);
-      const cartData = await cartService.getCartData();
-      setCartTotals(totalsFromCartData(cartData));
+      const raw = await cartService.getCartData();
+      const cartData = await reconcileCartStoreWithAccountSelection(raw);
+      applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
       toast.success('Promo code removed');
     } catch (error: any) {
       toast.error(error.message || 'Failed to remove promo code');
@@ -682,18 +1025,26 @@ const Cart: React.FC = () => {
     const formattedDate = format(normalizedDate, 'dd MMM yyyy');
     setIsLoadingSlots(true);
     try {
-      const storeId = storeService.getStoreIdForProducts() ?? 4;
+      const storeId = cartStoreId ?? storeService.getStoreIdForProducts();
+      if (storeId == null) {
+        setAvailableSlots([]);
+        setSelectedSlotId(null);
+        setSelectedTimeSlot('');
+        return;
+      }
       const params = new URLSearchParams();
       params.set('store_id', String(storeId));
       const response = await api.get(`/delivery/slots/available/?${params.toString()}`);
       const raw = Array.isArray(response.data) ? response.data : (response.data?.data ?? response.data?.results ?? []);
       // API returns [{ slot: { id, slot_name, start_time, end_time }, is_available }, ...] — flatten and filter
-      const slots: DeliverySlot[] = raw
-        .filter((item: any) => item?.is_available !== false && item?.slot)
-        .map((item: any) => {
-          const s = item.slot;
-          return { id: s.id, slot_name: s.slot_name, start_time: s.start_time, end_time: s.end_time };
-        });
+      const slots: DeliverySlot[] = sortSlotsByStart(
+        raw
+          .filter((item: any) => item?.is_available !== false && item?.slot)
+          .map((item: any) => {
+            const s = item.slot;
+            return { id: s.id, slot_name: s.slot_name, start_time: s.start_time, end_time: s.end_time };
+          }),
+      );
       setAvailableSlots(slots);
       const selectableSlots = slots.filter((slot) => isSlotSelectable(slot, normalizedDate));
       // Auto-select only selectable slots for today; keep existing behavior for other dates.
@@ -751,88 +1102,106 @@ const Cart: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run when slot data proves today is unavailable
   }, [isLoadingSlots, availableSlots, selectedDateOption]);
 
-  // Load cart from API on mount
+  // Daily cart: initial loading is based on subscription cart fetch + address load.
+  // We do NOT call gp-store GET /cart/ here (avoids multiple cart calls).
   useEffect(() => {
-    const loadCart = async () => {
-      if (isLoggedIn) {
-        setIsInitialLoading(true);
-        const fromCart = location.state?.fromCart;
-        const hasTempCart = localStorage.getItem('gp_store_temp_cart');
-        if (fromCart && hasTempCart) {
-          let attempts = 0;
-          const maxAttempts = 20;
-          const checkSync = setInterval(async () => {
-            attempts++;
-            const stillHasTempCart = localStorage.getItem('gp_store_temp_cart');
-            const hasLocalItems = items.length > 0;
-            if ((!stillHasTempCart && !isSyncing) || (hasLocalItems && !isSyncing && attempts > 3)) {
-              clearInterval(checkSync);
-              setTimeout(async () => { 
-                await loadCartFromAPI();
-              }, 500);
-            } else if (attempts >= maxAttempts) {
-              clearInterval(checkSync);
-              await loadCartFromAPI();
-            }
-          }, 200);
-          return () => clearInterval(checkSync);
-        } else {
-          await loadCartFromAPI();
-        }
-      } else {
-        setIsInitialLoading(false);
-      }
-    };
-    loadCart();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoggedIn, location.state]);
-
-  // Set initial loading to false once cart, address, and totals are all loaded
-  useEffect(() => {
-    if (isLoggedIn) {
-      if (!isLoadingAddress && !isLoadingCartTotals && !isSyncing) {
-        // Small delay to ensure all state updates are complete
-        const timer = setTimeout(() => {
-          setIsInitialLoading(false);
-          setBasketHydratedOnce(true);
-        }, 100);
-        return () => clearTimeout(timer);
-      }
-    } else {
+    if (!isLoggedIn) {
       setIsInitialLoading(false);
       setBasketHydratedOnce(true);
+      return;
     }
-  }, [isLoggedIn, isLoadingAddress, isLoadingCartTotals, isSyncing]);
+    if (isLoadingDailyCart || isLoadingAddress) return;
+    setIsInitialLoading(false);
+    setBasketHydratedOnce(true);
+  }, [isLoggedIn, isLoadingDailyCart, isLoadingAddress]);
 
-  // Fetch cart totals
-  // Depend on `items` so the summary auto-refreshes when quantities or items change
+  // Nearest operational store vs cart store — suggest switch (app parity; no auto-switch).
   useEffect(() => {
-    const fetchCartTotals = async () => {
-      if (!isLoggedIn) return;
+    if (!isLoggedIn || !defaultAddress || isLoadingCartTotals) return;
+    const addrId = String(defaultAddress.id ?? '');
+    const key = `${addrId}:${cartStoreId ?? ''}`;
+    if (deliveryStoreSyncKey.current === key) return;
+
+    const coords = parseAddressCoordinates(defaultAddress);
+    if (!coords) {
+      setDeliveryStoreOffline(false);
+      setSuggestedStoreForAddress(null);
+      deliveryStoreSyncKey.current = key;
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
       try {
-        setIsLoadingCartTotals(true);
-        const cartData = await cartService.getCartData();
-        setCartTotals(totalsFromCartData(cartData));
-      } catch (_) {
-        setCartTotals(null);
-      } finally {
-        setIsLoadingCartTotals(false);
-        setHasLoadedCartTotalsOnce(true);
+        const operational = await storeService.getNearestStore(coords.lat, coords.lng);
+        if (cancelled) return;
+        if (operational) {
+          setDeliveryStoreOffline(false);
+          if (cartStoreId != null && operational.id !== cartStoreId) {
+            const storesList = await storeService.getAllStores(coords.lat, coords.lng);
+            const currentRow = storesList.find((s) => s.id === cartStoreId);
+            if (currentRow && storeIsWithinDeliveryRadius(currentRow)) {
+              setSuggestedStoreForAddress(null);
+            } else {
+              setSuggestedStoreForAddress({ id: operational.id, name: operational.name });
+            }
+          } else {
+            setSuggestedStoreForAddress(null);
+          }
+          deliveryStoreSyncKey.current = key;
+          return;
+        }
+
+        setSuggestedStoreForAddress(null);
+        const stores = await storeService.getAllStores(coords.lat, coords.lng);
+        if (cancelled) return;
+        const sorted = [...stores].sort((a, b) => {
+          const da = Number(a.distance_km);
+          const db = Number(b.distance_km);
+          const na = Number.isFinite(da) ? da : Number.POSITIVE_INFINITY;
+          const nb = Number.isFinite(db) ? db : Number.POSITIVE_INFINITY;
+          return na - nb;
+        });
+        const nearestAny = sorted[0];
+        if (!nearestAny) {
+          setDeliveryStoreOffline(false);
+          deliveryStoreSyncKey.current = key;
+          return;
+        }
+        if (nearestAny.is_online === false) {
+          setDeliveryStoreOffline(true);
+          deliveryStoreSyncKey.current = key;
+          return;
+        }
+        setDeliveryStoreOffline(false);
+        deliveryStoreSyncKey.current = key;
+      } catch {
+        if (!cancelled) {
+          setDeliveryStoreOffline(false);
+          setSuggestedStoreForAddress(null);
+        }
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-    fetchCartTotals();
-  }, [isLoggedIn, items]);
+  }, [isLoggedIn, defaultAddress, isLoadingCartTotals, cartStoreId]);
 
   // Sync selected profile address to server cart so delivery_fee matches checkout (distance-based).
   useEffect(() => {
+    // Daily cart should not sync address to gp-store cart.
+    return;
     if (!isLoggedIn || !defaultAddress?.id) return;
-    const id = parseInt(String(defaultAddress.id), 10);
+    const id = parseInt(String(defaultAddress?.id), 10);
     if (!Number.isFinite(id) || id <= 0) return;
     let cancelled = false;
     (async () => {
       try {
-        const cartData = await cartService.setCartDeliveryAddress(id);
-        if (!cancelled) setCartTotals(totalsFromCartData(cartData));
+        const raw = await cartService.setCartDeliveryAddress(id);
+        if (!cancelled) {
+          const cartData = await reconcileCartStoreWithAccountSelection(raw);
+          applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
+        }
       } catch (e) {
         console.warn('cart delivery-address sync failed', e);
       }
@@ -840,7 +1209,55 @@ const Cart: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isLoggedIn, defaultAddress?.id]);
+  }, [isLoggedIn, defaultAddress?.id, reconcileCartStoreWithAccountSelection]);
+
+  // Selected address vs store coverage (same API as address save flow).
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setAddressOutsideDelivery(null);
+      return;
+    }
+    const coords = defaultAddress?.coordinates;
+    if (!coords || !addressService.validateCoordinatesFormat(coords)) {
+      setAddressOutsideDelivery(null);
+      return;
+    }
+    let cancelled = false;
+    setIsCheckingDeliveryCoverage(true);
+    void addressService
+      .validateAddressInDeliveryArea(coords)
+      .then((res) => {
+        if (!cancelled) setAddressOutsideDelivery(!res.isValid);
+      })
+      .catch(() => {
+        if (!cancelled) setAddressOutsideDelivery(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsCheckingDeliveryCoverage(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, defaultAddress?.coordinates, defaultAddress?.id]);
+
+  // If cart payload omits `store_name`, resolve label from cart / selected store id.
+  useEffect(() => {
+    if (!isLoggedIn || cartStoreName.trim()) return;
+    const sid = cartStoreId ?? storeService.getStoreIdForProducts();
+    if (!sid) return;
+    let cancelled = false;
+    void storeService
+      .getAllStores()
+      .then((list) => {
+        if (cancelled) return;
+        const found = list.find((s) => s.id === sid);
+        if (found?.name) setCartStoreName(found.name);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, cartStoreName, cartStoreId, items.length]);
 
   // Prefill Razorpay contact/name/email from profile (state was never set before → empty mobile on Razorpay)
   useEffect(() => {
@@ -910,11 +1327,22 @@ const Cart: React.FC = () => {
       setSelectedDateOption('tomorrow');
       fetchSlotsForDate(tomorrow);
     } else {
-      const dateObj = deliveryInfo.selectedDate instanceof Date
+      let dateObj = deliveryInfo.selectedDate instanceof Date
         ? deliveryInfo.selectedDate
         : deliveryInfo.selectedDate
           ? new Date(deliveryInfo.selectedDate)
           : tomorrow;
+      const maxStart = startOfDay(addDays(new Date(), DELIVERY_DATE_MAX_DAYS_FROM_TODAY));
+      if (isAfter(startOfDay(dateObj), maxStart)) {
+        dateObj = maxStart;
+        updateDeliveryInfo({
+          ...(deliveryInfo ?? {}),
+          deliveryDate: format(dateObj, 'dd MMM yyyy'),
+          timeSlot: '',
+          slotId: undefined,
+          selectedDate: dateObj,
+        });
+      }
       if (isToday(dateObj)) setSelectedDateOption('today');
       else if (isTomorrow(dateObj)) setSelectedDateOption('tomorrow');
       else {
@@ -929,9 +1357,45 @@ const Cart: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Lets users tap greyed days and see why (react-datepicker does not call onChange for disabled days). */
+  const renderDeliveryDayContents = useCallback(
+    (dayOfMonth: number, date?: Date) => {
+      if (!date) return dayOfMonth;
+      const d = startOfDay(date);
+      const tooEarly = isBefore(d, datePickerMinStart);
+      const tooLate = isAfter(d, deliveryDateMaxStart);
+      if (!tooEarly && !tooLate) {
+        return dayOfMonth;
+      }
+      return (
+        <span
+          className="inline-flex size-full min-h-[2.5rem] min-w-[2.5rem] items-center justify-center"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (tooLate) {
+              setDatePickerRangeMessage(
+                `You can only pre-order up to ${DELIVERY_DATE_MAX_DAYS_FROM_TODAY} days in advance.`,
+              );
+            } else {
+              setDatePickerRangeMessage("That date isn’t available for delivery.");
+            }
+          }}
+        >
+          {dayOfMonth}
+        </span>
+      );
+    },
+    [datePickerMinStart, deliveryDateMaxStart],
+  );
+
   const handleDateOptionSelect = (option: 'today' | 'tomorrow' | 'dayAfter' | 'pickDate') => {
     setSelectedDateOption(option);
-    if (option === 'pickDate') { setShowDatePicker(true); return; }
+    if (option === 'pickDate') {
+      setDatePickerRangeMessage(null);
+      setShowDatePicker(true);
+      return;
+    }
     const dateMap = { today: new Date(), tomorrow: addDays(new Date(), 1), dayAfter: addDays(new Date(), 2) };
     const selectedDate = startOfDay(dateMap[option]);
     updateDeliveryInfo({ deliveryDate: format(selectedDate, 'dd MMM yyyy'), timeSlot: '', slotId: undefined, selectedDate });
@@ -940,10 +1404,20 @@ const Cart: React.FC = () => {
 
   const handleDatePickerChange = (date: Date | null) => {
     if (date) {
-      const today = startOfDay(new Date());
       const pickedDate = startOfDay(date);
-      if (pickedDate < today) return;
+      if (isBefore(pickedDate, datePickerMinStart)) {
+        setDatePickerRangeMessage("That date isn’t available for delivery.");
+        return;
+      }
+      if (isAfter(pickedDate, deliveryDateMaxStart)) {
+        setDatePickerRangeMessage(
+          `You can only pre-order up to ${DELIVERY_DATE_MAX_DAYS_FROM_TODAY} days in advance.`,
+        );
+        return;
+      }
+      setDatePickerRangeMessage(null);
       setShowDatePicker(false);
+      const today = startOfDay(new Date());
       const dayAfter = addDays(today, 2);
       if (isToday(pickedDate)) setSelectedDateOption('today');
       else if (isTomorrow(pickedDate)) setSelectedDateOption('tomorrow');
@@ -957,6 +1431,7 @@ const Cart: React.FC = () => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setDatePickerRangeMessage(null);
         setShowDatePicker(false);
       }
     };
@@ -1005,7 +1480,7 @@ const Cart: React.FC = () => {
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
     try {
-      await updateQuantity(itemId, item.quantity, editMessage.trim());
+      // Daily cart doesn't support bouquet message edits yet; keep UI consistent (no-op on server).
       setEditingItemId(null);
       toast.success('Message updated');
     } catch (error: unknown) {
@@ -1028,7 +1503,8 @@ const Cart: React.FC = () => {
     const next = Math.max(1, item.quantity + delta);
     if (next === item.quantity && delta < 0) return;
     try {
-      await updateQuantity(itemId, next, item.customizedMessage || '');
+      await subscriptionCartService.addItem(Number(item.productId), next);
+      await refreshDailyCart();
       setLineStockErrorByItemId((prev) => {
         const n = { ...prev };
         delete n[itemId];
@@ -1054,79 +1530,139 @@ const Cart: React.FC = () => {
 
   const handleDeleteItem = async (itemId: string) => {
     try {
-      await removeFromCart(itemId);
+      // Daily cart removal should use subscriptions/cart/items/{id}/
+      const toRemove = items.find((it) => it.id === itemId);
+      const dailyCartItemId = Number((toRemove as any)?.apiCartItemId ?? itemId);
+      if (Number.isFinite(dailyCartItemId) && dailyCartItemId > 0) {
+        await subscriptionCartService.removeItem(dailyCartItemId);
+      }
+      await refreshDailyCart();
       toast.success('Item removed from cart');
-    } catch (_) {
-      toast.error('Failed to remove item. Please try again.');
+    } catch (e: unknown) {
+      toast.error(errorMessageFromCatch(e, 'Failed to remove item. Please try again.'));
     }
   };
 
   const handleEditAddress = () => {
-    navigate(ADDRESS_SELECTION_PATH, { state: { fromCart: true } });
+    navigate(`${basePath}/address-selection`, { state: { fromCart: true } });
+  };
+
+  const performSwitchToSuggestedStore = async () => {
+    if (!suggestedStoreForAddress) {
+      setShowSuggestedStoreSwitchModal(false);
+      return;
+    }
+    const target = suggestedStoreForAddress;
+    try {
+      setIsSwitchingSuggestedStore(true);
+      await cartService.switchCartStore(target.id);
+      await storeService.switchStore(target.id);
+      deliveryStoreSyncKey.current = '';
+      await loadCartFromAPI();
+      setIsLoadingCartTotals(true);
+      try {
+        const raw = await cartService.getCartData();
+        const cartData = await reconcileCartStoreWithAccountSelection(raw);
+        applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
+      } catch (_) {
+        setCartTotals(null);
+        setCartStoreName('');
+        setCartStoreId(null);
+      } finally {
+        setIsLoadingCartTotals(false);
+      }
+      setSuggestedStoreForAddress(null);
+      setShowSuggestedStoreSwitchModal(false);
+      toast.success(`Store switched to ${target.name}.`);
+    } catch (e: unknown) {
+      toast.error(errorMessageFromCatch(e, 'Could not switch store for this address.'));
+    } finally {
+      setIsSwitchingSuggestedStore(false);
+    }
+  };
+
+  const openSuggestedStoreSwitchModal = () => {
+    if (!suggestedStoreForAddress) return;
+    setShowSuggestedStoreSwitchModal(true);
+  };
+
+  const cancelSuggestedStoreSwitchModal = () => {
+    setShowSuggestedStoreSwitchModal(false);
   };
 
   const handleCheckout = async () => {
     if (items.length === 0) { toast.error('Your cart is empty'); return; }
-    if (!deliveryInfo) { toast.error('Please select delivery date and time'); return; }
+    if (activeDeliveryDayInts.length === 0) { toast.error('Please select delivery days'); return; }
+    if (deliveryFrequency === 'Customize' && activeDeliveryDayInts.length < 3) {
+      toast.error('Please select at least 3 days for a 1-week subscription');
+      return;
+    }
     if (!isLoggedIn) {
-      navigate(`${BASE_PATH}/login`, { state: { returnUrl: `${BASE_PATH}/basket`, fromCart: true } });
+      navigate(`${basePath}/login`, { state: { returnUrl: `${basePath}/basket`, fromCart: true } });
       return;
     }
 
-    try {
-      await syncCartToAPI();
-      await loadCartFromAPI();
-      try {
-        setIsLoadingCartTotals(true);
-        const cartData = await cartService.getCartData();
-        setCartTotals(totalsFromCartData(cartData));
-      } catch (_) {} finally { setIsLoadingCartTotals(false); }
-    } catch (_) {
-      toast.error("We couldn't update your basket. Check your connection and try checkout again.");
-      return;
-    }
+    if (!defaultAddress) { toast.error('Please add a delivery address'); navigate(`${basePath}/addresses`); return; }
 
-    if (!defaultAddress) { toast.error('Please add a delivery address'); navigate(`${BASE_PATH}/addresses`); return; }
-
+    // Daily cart checkout should use subscriptions/cart/checkout/
+    // Prereq: set address on daily cart first.
     try {
       setIsProcessingPayment(true);
-      let deliveryDateFormatted: string | undefined;
-      if (deliveryInfo.selectedDate) {
-        deliveryDateFormatted = format(deliveryInfo.selectedDate, 'yyyy-MM-dd');
-      } else if (deliveryInfo.deliveryDate) {
-        try { deliveryDateFormatted = format(new Date(deliveryInfo.deliveryDate), 'yyyy-MM-dd'); }
-        catch { deliveryDateFormatted = format(addDays(new Date(), 1), 'yyyy-MM-dd'); }
-      }
-      if (!selectedSlotId) {
-        toast.error('Please select a delivery time slot');
-        setIsProcessingPayment(false);
-        return;
-      }
-      const checkoutData = {
-        delivery_address_id: Number(defaultAddress.id),
-        delivery_slot_id: selectedSlotId,
-        delivery_date: deliveryDateFormatted,
-        delivery_instructions: '',
-        customer_notes: '',
+      await subscriptionCartService.setDeliveryAddress(Number(defaultAddress.id));
+      await subscriptionCartService.setDeliveryDays(activeDeliveryDayInts);
+      const checkoutRes = await subscriptionCartService.checkout({
+        start_date: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
+        payment_method: 'wallet',
+        delivery_days: activeDeliveryDayInts,
+      });
+      toast.success('Subscription created successfully!');
+      clearCart();
+      const firstItem = items[0];
+      const subscriptionDetails = {
+        basePackId: String(firstItem?.productId ?? ''),
+        type: deliveryFrequency === 'Customize' ? 'CUSTOM' : 'DAILY',
+        startDate: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
+        amount: Number(total ?? 0),
+        packDetails: {
+          name: String(firstItem?.name ?? 'Pack'),
+          description: '',
+          imageUrl: String(firstItem?.image ?? ''),
+          sellingPrice: Number(firstItem?.price ?? 0),
+          contents: [],
+        },
+        deliveryCount: 7,
+        walletBalance: 0,
+        sellingPrice: Number(firstItem?.price ?? 0),
+        selectedDays: activeDeliveryDays,
       };
-      const checkoutResponse = await paymentService.createCheckoutOrder(checkoutData);
-      const normalizedRazorpayOrderId = checkoutResponse.razorpay_order_id || (checkoutResponse as any).order?.id || checkoutResponse.order_id;
-      const normalizedAmount = checkoutResponse.amount ?? (checkoutResponse as any).order?.amount;
-      const rpKey = checkoutResponse.key_id || import.meta.env.VITE_RAZORPAY_KEY || '';
-      if (!rpKey) throw new Error('Razorpay key not found.');
-      if (!normalizedRazorpayOrderId) throw new Error('Failed to start payment: missing Razorpay order id.');
-      setRazorpayOrderId(normalizedRazorpayOrderId);
-      setRazorpayKey(rpKey);
-      setRazorpayAmount(typeof normalizedAmount === 'number' ? normalizedAmount : Math.round(total * 100));
-      setShouldTriggerPayment(true);
-      setIsProcessingPayment(false);
-      // Pixel: InitiateCheckout — fire when Razorpay checkout is triggered
-      trackInitiateCheckout(
-        items.map(item => ({ id: item.productId, price: item.price, quantity: item.quantity })),
-        total
-      );
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to initiate payment. Please try again.');
+      const selectedAddress = defaultAddress
+        ? {
+            id: String(defaultAddress.id),
+            street: String(defaultAddress.streetName ?? ''),
+            area: String(defaultAddress.area ?? ''),
+            city: String(defaultAddress.city ?? ''),
+            state: String(defaultAddress.state ?? ''),
+            pincode: String(defaultAddress.pincode ?? ''),
+            societyName: String((defaultAddress as any).societyName ?? ''),
+            coordinates: String(defaultAddress.coordinates ?? ''),
+          }
+        : null;
+      navigate(`${basePath}/subscription/confirm`, {
+        state: {
+          isConfirmed: true,
+          isStoreProduct: false,
+          subscription: (checkoutRes as any)?.data ?? checkoutRes,
+          product: firstItem ? { name: firstItem.name, sellingPrice: firstItem.price } : undefined,
+          selectedAddress,
+          subscriptionDetails,
+        },
+        replace: true,
+      });
+      return;
+    } catch (e: unknown) {
+      toast.error(errorMessageFromCatch(e, 'Checkout failed'));
+      return;
+    } finally {
       setIsProcessingPayment(false);
     }
   };
@@ -1141,7 +1677,7 @@ const Cart: React.FC = () => {
     );
     clearCart();
     toast.success('Order placed successfully!');
-    navigate(`${BASE_PATH}/payment-success`, {
+    navigate(`${basePath}/payment-success`, {
       state: { orderId: orderNumber, orderNumber, amount },
     });
   };
@@ -1262,14 +1798,23 @@ const Cart: React.FC = () => {
     setShouldTriggerPayment(false);
   };
 
+  /** Matches subscription checkout default `start_date` (next calendar day). */
+  const basketFirstDeliveryLabel = useMemo(
+    () => format(addDays(startOfDay(new Date()), 1), 'EEE, d MMM yyyy'),
+    [],
+  );
+
   // Order summary
-  const localSubtotal = getTotalPrice();
+  const localSubtotal = items.reduce((sum, it) => sum + Number(it.price || 0) * Number(it.quantity || 0), 0);
   const subtotal = cartTotals?.subtotal ?? localSubtotal;
-  const deliveryFee = cartTotals?.deliveryFee ?? 0;
+  const deliveryFee =
+    cartTotals?.deliveryFee ??
+    (subscriptionDeliveryFee ?? (Number((dailyCart as any)?.delivery_fee) || 0));
   const tax = cartTotals?.taxAmount ?? 0;
   const discount = cartTotals?.discountAmount ?? 0;
   const surcharge = cartTotals?.surchargeAmount ?? 0;
-  const deliveryAddressId = cartTotals?.deliveryAddressId ?? null;
+  const deliveryAddressId =
+    cartTotals?.deliveryAddressId ?? (defaultAddress?.id != null ? Number(defaultAddress.id) : null);
   const total =
     cartTotals?.total ??
     subtotal + deliveryFee + tax + surcharge - discount;
@@ -1279,6 +1824,19 @@ const Cart: React.FC = () => {
     return [address.houseNo, address.streetName, address.area, address.city, address.state, address.pincode].filter(Boolean).join(', ');
   };
 
+  const displayStoreName =
+    cartStoreName.trim() || (isLoadingCartTotals ? '' : 'Selected store');
+  const deliveryBlockedByCoverage = addressOutsideDelivery === true;
+  const deliveryBlockedByStoreMismatch = suggestedStoreForAddress != null;
+
+  const showUnifiedDeliveryAlert =
+    suggestedStoreForAddress != null ||
+    deliveryBlockedByCoverage ||
+    deliveryStoreOffline;
+
+  const suggestedStoreNameButtonClass =
+    'gp-cart-suggested-store-blink inline border-0 bg-transparent p-0 align-baseline font-semibold text-red-900 underline decoration-red-700 underline-offset-2 hover:text-red-950 disabled:cursor-not-allowed disabled:opacity-55';
+
   const razorpayPrefillContact =
     customerInfo.contact ||
     formatPhoneForDisplay(authPhoneNumber || localStorage.getItem('phoneNumber') || '') ||
@@ -1286,7 +1844,7 @@ const Cart: React.FC = () => {
 
   // Auth guard
   if (!isLoggedIn || !localStorage.getItem('access_token')) {
-    return <Navigate to={`${BASE_PATH}/login`} state={{ returnUrl: location.pathname, fromCart: true }} replace />;
+    return <Navigate to={`${basePath}/login`} state={{ returnUrl: location.pathname, fromCart: true }} replace />;
   }
 
   // Full-page loader: initial paint + first totals fetch + first-time sync — not checkout-triggered syncCartToAPI()
@@ -1315,11 +1873,26 @@ const Cart: React.FC = () => {
         .gp-cart-stock-shake {
           animation: gp-cart-stock-shake 0.45s ease-in-out;
         }
+        @keyframes gp-cart-suggested-store-blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.45; }
+        }
+        .gp-cart-suggested-store-blink {
+          animation: gp-cart-suggested-store-blink 1.15s ease-in-out infinite;
+        }
+        .gp-cart-suggested-store-blink:disabled {
+          animation: none;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .gp-cart-suggested-store-blink {
+            animation: none;
+          }
+        }
       `}</style>
       <SEO
         title="My Basket — Genda Phool"
         description="Your Genda Phool basket"
-        canonical="https://customerapp.mygendaphool.com/gp-daily/basket"
+        canonical="https://customerapp.mygendaphool.com/gp-store/basket"
         noIndex={true}
       />
       <div className="mx-auto flex min-h-screen w-full max-w-[min(800px,100vw)] flex-1 flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]">
@@ -1346,7 +1919,8 @@ const Cart: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate(browseProductsPath)}
-              className="mt-2 rounded-full bg-[#FAA222] px-6 py-2.5 text-sm font-semibold text-gray-900 transition-colors hover:bg-[#e8941a]"
+              className="mt-2 rounded-full px-6 py-2.5 text-sm font-semibold transition-colors"
+              style={{ backgroundColor: theme.colors.primary, color: 'black' }}
             >
               Browse Products
             </button>
@@ -1356,78 +1930,83 @@ const Cart: React.FC = () => {
             <>
               {/* Product Items */}
               {items.map((item) => (
-                <div key={item.id} className="relative rounded-[24px] border border-[#e9e5de] bg-white p-4 shadow-sm">
-                  <div className="flex items-start gap-3">
+                <div
+                  key={item.id}
+                  className="relative overflow-hidden rounded-[20px] border border-gray-200 bg-white p-4 shadow-sm"
+                >
+                  <div className="flex items-stretch gap-3">
                     <button
                       type="button"
                       onClick={() => navigateToProductDetail(item)}
-                      className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                      className="shrink-0 self-start rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-black/15 focus-visible:ring-offset-2"
+                      aria-label={`View ${item.name}`}
                     >
                       <img
                         src={item.image}
                         alt=""
                         loading="lazy"
-                        className="pointer-events-none h-[5.25rem] w-[5.25rem] flex-shrink-0 rounded-2xl object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
+                        className="pointer-events-none h-[5.25rem] w-[5.25rem] rounded-2xl object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/placeholder.svg';
+                        }}
                       />
-                      <div className="flex min-w-0 flex-1 flex-col">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <h3 className="text-sm font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere]">
-                              {item.name} x {item.quantity}
-                              {item.variant?.name && (
-                                <span className="font-normal text-gray-600"> ({item.variant.name})</span>
-                              )}
-                            </h3>
-                            {/* gp-daily: delivery date/time not shown per item */}
-                          </div>
+                    </button>
+                    <div className="flex min-h-[5.25rem] min-w-0 flex-1 flex-col">
+                      <div className="flex min-h-0 items-center justify-between gap-2">
+                        <h3 className="min-w-0 flex-1 pr-1 text-sm font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere]">
+                          {item.name}
+                          {item.variant?.name && (
+                            <span className="font-normal text-gray-600"> ({item.variant.name})</span>
+                          )}
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="touch-target-compact flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-red-500 transition-colors hover:bg-gray-200"
+                          aria-label="Remove item"
+                        >
+                          <IoTrashOutline className="h-[15px] w-[15px]" aria-hidden />
+                        </button>
+                      </div>
+                      <div className="mt-auto flex w-full min-h-[1.75rem] items-center justify-between gap-2 pt-1">
+                        <span className="min-w-0 flex-1 text-base font-semibold leading-none text-gray-900">
+                          ₹{Number(item.price).toFixed(2)}/pack
+                        </span>
+                        <div
+                          className="flex shrink-0 items-center gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          role="presentation"
+                        >
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleDeleteItem(item.id);
-                            }}
-                            className="touch-target-compact flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-red-500 transition-colors hover:bg-gray-200"
-                            aria-label="Remove item"
+                            onClick={() => handleQuantityDelta(item.id, -1)}
+                            disabled={item.quantity <= 1}
+                            className="touch-target-compact flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
+                            aria-label="Decrease quantity"
                           >
-                            <IoTrashOutline className="h-[15px] w-[15px]" aria-hidden />
+                            <FaMinus className="text-[8px]" />
+                          </button>
+                          <span className="min-w-[1rem] text-center text-xs font-semibold tabular-nums text-gray-900">
+                            {item.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityDelta(item.id, 1)}
+                            className="touch-target-compact flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-white transition-colors hover:bg-gray-800"
+                            aria-label="Increase quantity"
+                          >
+                            <FaPlus className="text-[8px]" />
                           </button>
                         </div>
-                        <div className="mt-1 flex min-h-[1.75rem] items-center justify-between gap-2">
-                          <span className="text-base font-semibold leading-tight text-gray-900">
-                            ₹{Number(item.price).toFixed(2)} each
-                          </span>
-                          <div
-                            className="flex shrink-0 items-center gap-1"
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => e.stopPropagation()}
-                            role="presentation"
-                          >
-                            <button
-                              type="button"
-                              onClick={() => handleQuantityDelta(item.id, -1)}
-                              disabled={item.quantity <= 1}
-                              className="touch-target-compact flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition-colors hover:bg-gray-200 disabled:opacity-50"
-                              aria-label="Decrease quantity"
-                            >
-                              <FaMinus className="text-[7px]" />
-                            </button>
-                            <span className="min-w-[0.875rem] text-center text-[11px] font-medium tabular-nums text-gray-900">
-                              {item.quantity}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleQuantityDelta(item.id, 1)}
-                              className="touch-target-compact flex h-6 w-6 items-center justify-center rounded-full bg-[#FAA222] text-gray-900 transition-colors hover:bg-[#e8941a]"
-                              aria-label="Increase quantity"
-                            >
-                              <FaPlus className="text-[7px]" />
-                            </button>
-                          </div>
-                        </div>
                       </div>
-                    </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 border-t border-gray-200 pt-3">
+                    <p className="text-sm font-medium text-gray-500">
+                      First Delivery: {basketFirstDeliveryLabel}
+                    </p>
                   </div>
                   {/* Bouquet: custom message */}
                   {isBouquetItem(item) && editingItemId !== item.id && (
@@ -1453,9 +2032,13 @@ const Cart: React.FC = () => {
                           setEditingItemId(item.id);
                           setEditMessage('');
                         }}
-                        className="touch-target-compact mt-2 ml-[5.25rem] mr-1 inline-flex h-auto w-auto items-center gap-2 rounded-full border border-[#FAA222] bg-white px-3 py-1.5 text-[11px] font-semibold leading-snug text-[#FAA222] hover:bg-[#fff7ea] sm:ml-24"
+                        className="touch-target-compact mt-2 ml-[5.25rem] mr-1 inline-flex h-auto w-auto items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold leading-snug hover:bg-[#f1f7f2] sm:ml-24"
+                        style={{ border: `1px solid ${theme.colors.primary}`, color: theme.colors.primary }}
                       >
-                        <span className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-[#FAA222] text-[#FAA222]">
+                        <span
+                          className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
+                          style={{ border: `1px solid ${theme.colors.primary}`, color: theme.colors.primary }}
+                        >
                           <svg width="10" height="10" viewBox="0 0 20 20" fill="none" aria-hidden>
                             <path d="M10 4.5V15.5M4.5 10H15.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                           </svg>
@@ -1471,7 +2054,7 @@ const Cart: React.FC = () => {
                         value={editMessage}
                         onChange={(e) => { if (e.target.value.length <= 500) setEditMessage(e.target.value); }}
                         placeholder="Add a customized message"
-                        className="min-h-[4.75rem] w-full resize-none rounded-lg border border-gray-200 bg-[#fafafa] px-3 py-2.5 text-xs leading-snug text-gray-900 outline-none focus:border-[#FAA222]"
+                        className="min-h-[4.75rem] w-full resize-none rounded-lg border border-gray-200 bg-[#fafafa] px-3 py-2.5 text-xs leading-snug text-gray-900 outline-none"
                         rows={2}
                         maxLength={500}
                       />
@@ -1486,7 +2069,8 @@ const Cart: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleSaveEdit(item.id)}
-                          className="touch-target-compact inline-flex h-auto items-center rounded-lg bg-[#FAA222] px-3.5 py-2 text-xs font-semibold text-gray-900 hover:bg-[#e8941a]"
+                          className="touch-target-compact inline-flex h-auto items-center rounded-lg px-3.5 py-2 text-xs font-semibold"
+                          style={{ backgroundColor: theme.colors.primary, color: 'black' }}
                         >
                           Save
                         </button>
@@ -1506,97 +2090,92 @@ const Cart: React.FC = () => {
                 </div>
               ))}
 
-              {/* Select Delivery Days (daily UI) */}
-              <div className="bg-white rounded-[22px] p-4 shadow-sm relative">
-                <h3 className="text-lg sm:text-xl font-semibold font-serif text-gray-900 mb-3 sm:mb-4 tracking-tight">
-                  Select Delivery Days
-                </h3>
+              {/* Select Delivery Days (gp-daily) */}
+              <div className="bg-white rounded-[25px] p-4 shadow-sm relative">
+                <h3 className="text-base font-semibold text-gray-900 mb-3">Select Delivery Days</h3>
 
-                <div className="flex gap-2 mb-3 sm:mb-4 w-full">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDeliveryFrequency('Daily');
-                      setSelectedDays([]);
-                    }}
-                    className={`flex-1 min-h-[38px] py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
-                      deliveryFrequency === 'Daily'
-                        ? 'bg-[#FAA222] text-gray-900 shadow-sm'
-                        : 'bg-white border border-gray-200 text-gray-900 shadow-sm'
-                    }`}
-                  >
-                    Daily
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDeliveryFrequency('Mon-Sat');
-                      setSelectedDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
-                    }}
-                    className={`flex-1 min-h-[38px] py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
-                      deliveryFrequency === 'Mon-Sat'
-                        ? 'bg-[#FAA222] text-gray-900 shadow-sm'
-                        : 'bg-white border border-gray-200 text-gray-900 shadow-sm'
-                    }`}
-                  >
-                    Mon-Sat
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDeliveryFrequency('Customize');
-                      setSelectedDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
-                    }}
-                    className={`flex-1 min-h-[38px] py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
-                      deliveryFrequency === 'Customize'
-                        ? 'bg-[#FAA222] text-gray-900 shadow-sm'
-                        : 'bg-white border border-gray-200 text-gray-900 shadow-sm'
-                    }`}
-                  >
-                    Customize
-                  </button>
+                <div className="grid grid-cols-2 gap-2 xs:grid-cols-3 mb-4">
+                  {(['Daily', 'Mon-Sat', 'Customize'] as const).map((opt) => {
+                    const isActive = deliveryFrequency === opt;
+                    const isDisabled = false;
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => {
+                          setDeliveryFrequency(opt);
+                          if (opt === 'Customize') {
+                            setSelectedDays((prev) => (prev.length ? prev : [...weekDays]));
+                          } else {
+                            setSelectedDays([]);
+                          }
+                        }}
+                        className={`px-2 py-2 min-h-[40px] xs:min-h-[36px] rounded-xl text-[10px] xs:text-[10px] font-medium transition-colors flex items-center justify-center gap-1 text-center leading-tight ${
+                          isDisabled
+                            ? 'cursor-not-allowed border border-gray-200 bg-gray-50 text-gray-400'
+                            : isActive
+                              ? 'text-black'
+                              : 'bg-white text-gray-700 border border-gray-200'
+                        }`}
+                        style={isActive ? { backgroundColor: theme.colors.primary } : undefined}
+                      >
+                        {opt === 'Mon-Sat' ? 'Mon-Sat' : opt}
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {(deliveryFrequency === 'Customize' || deliveryFrequency === 'Mon-Sat') && (
-                  <div className="mb-3 sm:mb-4">
-                    <div className="flex gap-1.5 justify-between">
-                      {weekDays.map((d) => (
-                        <button
-                          key={d.day}
-                          type="button"
-                          onClick={() => {
-                            if (deliveryFrequency === 'Customize' && d.enabled) handleDaySelection(d.day);
-                          }}
-                          className={`flex-1 min-w-0 max-w-[3.25rem] sm:max-w-none h-8 sm:h-9 rounded-xl flex items-center justify-center text-[10px] sm:text-xs font-semibold transition-all ${
-                            !d.enabled
-                              ? 'bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed'
-                              : selectedDays.includes(d.day)
-                                ? 'bg-[#FAA222] text-gray-900 shadow-sm'
-                                : 'bg-white border border-gray-200 text-gray-900 opacity-70'
-                          }`}
-                          disabled={!d.enabled || deliveryFrequency === 'Mon-Sat'}
-                        >
-                          {d.day}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <div className="grid w-full grid-cols-7 gap-1">
+                  {weekDays.map((day) => {
+                    const isSelected =
+                      deliveryFrequency === 'Daily'
+                        ? true
+                        : deliveryFrequency === 'Mon-Sat'
+                          ? day !== 'Sun'
+                          : activeDeliveryDays.includes(day);
+                    const isDisabled = deliveryFrequency !== 'Customize';
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleDeliveryDay(day)}
+                        disabled={isDisabled}
+                        className={`w-full min-w-0 px-1 py-1.5 min-h-[30px] rounded-lg text-[9px] xs:text-[10px] font-medium transition-colors flex items-center justify-center ${
+                          isSelected
+                            ? 'text-black'
+                            : 'bg-white text-gray-700 border border-gray-200'
+                        }`}
+                        style={isSelected ? { backgroundColor: theme.colors.primary } : undefined}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
 
-                {deliveryFrequency === 'Customize' && selectedDays.length > 0 && selectedDays.length < 3 && (
-                  <div className="mb-3 sm:mb-4 bg-[#FDE8EC] rounded-xl px-3 py-2.5 flex items-start gap-2 border border-[#f5ccd6]/60">
-                    <img
-                      src={cautionIcon}
-                      alt=""
-                      className="mt-0.5 h-4 w-4 sm:h-5 sm:w-5 shrink-0 opacity-90"
-                    />
-                    <p className="text-xs sm:text-sm font-semibold text-gray-900 leading-snug">
+                {deliveryFrequency === 'Customize' && activeDeliveryDays.length > 0 && activeDeliveryDays.length < 3 ? (
+                  <div className="mt-5 rounded-2xl bg-[#fde8ea] px-4 py-4 flex items-center gap-3">
+                    <svg
+                      width="26"
+                      height="26"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      aria-hidden
+                      className="shrink-0"
+                    >
+                      <path
+                        d="M12 3.2c.4 0 .8.2 1 .6l9 15.6c.4.7-.1 1.6-1 1.6H3c-.9 0-1.4-.9-1-1.6l9-15.6c.2-.4.6-.6 1-.6Z"
+                        fill="#B91C1C"
+                      />
+                      <path d="M12 8v6" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M12 17.5h.01" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                    </svg>
+                    <p className="text-sm leading-snug font-semibold text-gray-900">
                       Please select at least 3 days for a 1-week subscription
                     </p>
                   </div>
-                )}
-
-                {/* Subscribe button removed as requested */}
+                ) : null}
               </div>
 
               {/* Delivery Details */}
@@ -1615,37 +2194,102 @@ const Cart: React.FC = () => {
                 {isLoadingAddress ? (
                   <p className="text-sm text-gray-500">Loading address...</p>
                 ) : defaultAddress ? (
-                  <div>
-                    <div className="mb-1 flex items-center gap-2">
-                      <MdLocationOn className="flex-shrink-0 text-lg text-[#FAA222]" />
-                      <span className="truncate text-sm font-medium text-gray-900">{defaultAddress.type}</span>
+                  <div className="space-y-5">
+                    <div>
+                      <div className="mb-1 flex items-center gap-2">
+                        <IoStorefrontOutline
+                          className="h-5 w-5 flex-shrink-0"
+                          style={{ color: theme.colors.primary }}
+                          aria-hidden
+                        />
+                        <span className="truncate text-sm font-medium text-gray-900">From</span>
+                      </div>
+                      <p className="line-clamp-3 pl-7 text-sm leading-snug text-gray-600">
+                        {isLoadingCartTotals && !cartStoreName.trim() ? (
+                          <span className="text-gray-400">Loading store…</span>
+                        ) : (
+                          displayStoreName
+                        )}
+                      </p>
                     </div>
-                    <p className="line-clamp-3 pl-7 text-sm leading-snug text-gray-600">
-                      {formatAddress(defaultAddress)}
-                    </p>
+                    <div>
+                      <div className="mb-1 flex items-center gap-2">
+                        <MdLocationOn className="flex-shrink-0 text-lg" style={{ color: theme.colors.primary }} aria-hidden />
+                        <span className="truncate text-sm font-medium text-gray-900">To</span>
+                      </div>
+                      <p className="line-clamp-2 pl-7 text-sm font-medium leading-snug text-gray-900">
+                        {defaultAddress.type}
+                      </p>
+                      <p className="line-clamp-4 pl-7 text-sm leading-snug text-gray-600">
+                        {formatAddress(defaultAddress)}
+                      </p>
+                      {isCheckingDeliveryCoverage && defaultAddress.coordinates && (
+                        <p className="mt-2 pl-7 text-xs text-gray-400">Checking delivery area…</p>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div>
                     <p className="mb-2 text-sm text-gray-500">No address found</p>
-                    <button type="button" onClick={handleEditAddress} className="text-sm font-medium text-[#FAA222] hover:underline">
+                    <button
+                      type="button"
+                      onClick={handleEditAddress}
+                      className="text-sm font-medium hover:underline"
+                      style={{ color: theme.colors.primary }}
+                    >
                       Add Address
                     </button>
                   </div>
                 )}
               </div>
 
+              {showUnifiedDeliveryAlert ? (
+                <div
+                  className="min-w-0 rounded-[12px] border border-red-600 bg-red-50 px-3 py-2.5 shadow-sm"
+                  role="alert"
+                >
+                  {deliveryStoreOffline ? (
+                    <p className="text-[13px] font-semibold leading-snug text-red-900">
+                      The nearest store for this area is offline — try another address.
+                    </p>
+                  ) : suggestedStoreForAddress ? (
+                    <p className="m-0 text-[13px] font-semibold leading-snug text-red-900">
+                      This store doesn&apos;t deliver to your address—try the nearest store:{' '}
+                      <button
+                        type="button"
+                        disabled={isSwitchingSuggestedStore}
+                        onClick={openSuggestedStoreSwitchModal}
+                        title={`Switch to ${suggestedStoreForAddress.name}`}
+                        className={suggestedStoreNameButtonClass}
+                      >
+                        {suggestedStoreForAddress.name}
+                      </button>
+                    </p>
+                  ) : (
+                    <p className="m-0 text-[13px] font-semibold leading-snug text-red-900">
+                      The current store is not delivering to this address. Update your delivery address or switch store.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+
               {/* ── Promo Code ─────────────────────────────────────────────── */}
-              <div className="bg-white rounded-2xl py-2.5 px-3 shadow-sm border-2 border-[#FAA222]">
+              <div
+                className="bg-white rounded-2xl py-2.5 px-3 shadow-sm border-2"
+                style={{ borderColor: theme.colors.primary }}
+              >
                 {appliedPromoCode ? (
                   <div className="flex items-center justify-between gap-2 min-h-0">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-8 h-8 shrink-0 rounded-full bg-[#fff3e0] flex items-center justify-center">
-                        <FaCheck className="text-[#FAA222] text-xs" />
+                      <div className="w-8 h-8 shrink-0 rounded-full bg-[#f0f7f0] flex items-center justify-center">
+                        <FaCheck className="text-xs" style={{ color: theme.colors.primary }} />
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-gray-900 truncate">"{appliedPromoCode}" applied</p>
                         {promoDiscount > 0 && (
-                          <p className="text-xs text-[#FAA222] font-medium">You save ₹{promoDiscount.toLocaleString('en-IN')}</p>
+                          <p className="text-xs font-medium" style={{ color: theme.colors.primary }}>
+                            You save ₹{promoDiscount.toLocaleString('en-IN')}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -1660,10 +2304,10 @@ const Cart: React.FC = () => {
                     className="w-full flex items-center justify-between gap-2 py-0.5 min-h-0"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <FaTag className="text-[#FAA222] text-sm shrink-0" aria-hidden />
+                      <FaTag className="text-sm shrink-0" style={{ color: theme.colors.primary }} aria-hidden />
                       <span className="text-sm font-semibold text-gray-900">Add Promo Code</span>
                     </div>
-                    <FaPlus className="text-[#FAA222] text-sm shrink-0" aria-hidden />
+                    <FaPlus className="text-sm shrink-0" style={{ color: theme.colors.primary }} aria-hidden />
                   </button>
                 )}
               </div>
@@ -1693,21 +2337,17 @@ const Cart: React.FC = () => {
                     </span>
                     <span>₹{deliveryFee.toLocaleString('en-IN')}</span>
                   </div>
-                  {tax > 0 && (
-                    <div className="flex justify-between text-sm text-gray-700">
-                      <span>GST</span>
-                      <span>₹{tax.toLocaleString('en-IN')}</span>
-                    </div>
-                  )}
-                  {discount > 0 && (
-                    <div className="flex justify-between text-sm text-gray-700">
-                      <span>Discount</span>
-                      <span>-₹{discount.toLocaleString('en-IN')}</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>GST</span>
+                    <span>₹{tax.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>Discount</span>
+                    <span>-₹{discount.toLocaleString('en-IN')}</span>
+                  </div>
                   {/* Show promo line only if backend hasn't merged it into discount already */}
                   {appliedPromoCode && promoDiscount > 0 && discount === 0 && (
-                    <div className="flex justify-between text-sm text-[#FAA222] font-medium">
+                    <div className="flex justify-between text-sm font-medium" style={{ color: theme.colors.primary }}>
                       <span>Promo ({appliedPromoCode})</span>
                       <span>-₹{promoDiscount.toLocaleString('en-IN')}</span>
                     </div>
@@ -1715,7 +2355,9 @@ const Cart: React.FC = () => {
                 </div>
                 <div className="flex justify-between items-center pt-4 border-t border-gray-200">
                   <span className="text-lg font-bold text-gray-900">Total</span>
-                  <span className="text-xl font-bold text-[#FAA222]">₹{total.toLocaleString('en-IN')}</span>
+                  <span className="text-xl font-bold" style={{ color: theme.colors.primary }}>
+                    ₹{total.toLocaleString('en-IN')}
+                  </span>
                 </div>
               </div>
 
@@ -1742,8 +2384,14 @@ const Cart: React.FC = () => {
               {/* Checkout */}
               <button
                 onClick={handleCheckout}
-                disabled={isProcessingPayment}
-                className="w-full bg-[#FAA222] text-gray-900 py-4 rounded-[25px] text-base font-semibold hover:bg-[#e8941a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                disabled={
+                  isProcessingPayment ||
+                  deliveryBlockedByCoverage ||
+                  deliveryBlockedByStoreMismatch ||
+                  deliveryStoreOffline
+                }
+                className="w-full py-4 rounded-[25px] text-base font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                style={{ backgroundColor: theme.colors.primary, color: 'black' }}
               >
                 {isProcessingPayment && (
                   <Spinner size={22} variant="light" className="!inline-flex" />
@@ -1755,6 +2403,40 @@ const Cart: React.FC = () => {
         )}
 
       </div>
+
+      {/* Store switch confirmation — same copy/layout as Settings */}
+      {showSuggestedStoreSwitchModal && (
+        <div className="fixed inset-0 z-[99997] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-3 text-center text-lg font-semibold text-gray-900">Switch Store?</h3>
+            <p className="mb-6 text-center text-sm text-gray-600">
+              Due to the change in store, items in your cart might get affected. Do you want to continue?
+            </p>
+            <div className="space-y-3">
+              <button
+                type="button"
+                disabled={isSwitchingSuggestedStore}
+                onClick={() => void performSwitchToSuggestedStore()}
+                className="w-full rounded-lg py-3 text-base font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                style={{
+                  backgroundColor: theme.colors.primary,
+                  color: 'black',
+                }}
+              >
+                {isSwitchingSuggestedStore ? 'Please wait…' : 'Continue'}
+              </button>
+              <button
+                type="button"
+                disabled={isSwitchingSuggestedStore}
+                onClick={cancelSuggestedStoreSwitchModal}
+                className="w-full rounded-lg py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Promo Code Modal */}
       {showPromoModal && (

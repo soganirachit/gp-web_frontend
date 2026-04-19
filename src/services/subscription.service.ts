@@ -13,6 +13,8 @@ function unwrapList(payload: unknown): unknown[] {
   if (payload && typeof payload === "object") {
     const o = payload as Record<string, unknown>;
     if (Array.isArray(o.data)) return o.data;
+    if (Array.isArray(o.results)) return o.results;
+    if (Array.isArray(o.subscriptions)) return o.subscriptions;
     const inner = o.data as Record<string, unknown> | undefined;
     if (inner && typeof inner === "object") {
       if (Array.isArray(inner.results)) return inner.results;
@@ -22,8 +24,72 @@ function unwrapList(payload: unknown): unknown[] {
   return [];
 }
 
+const WEEKDAY_KEYS = [
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
+  "SUNDAY",
+] as const;
+
+function deliveryDayToInt(day: unknown): number | null {
+  if (typeof day === "number" && Number.isInteger(day) && day >= 0 && day <= 6) {
+    return day;
+  }
+  const key = String(day ?? "")
+    .trim()
+    .toLowerCase();
+  if (key === "mon" || key === "monday") return 0;
+  if (key === "tue" || key === "tues" || key === "tuesday") return 1;
+  if (key === "wed" || key === "wednesday") return 2;
+  if (key === "thu" || key === "thur" || key === "thurs" || key === "thursday") return 3;
+  if (key === "fri" || key === "friday") return 4;
+  if (key === "sat" || key === "saturday") return 5;
+  if (key === "sun" || key === "sunday") return 6;
+  return null;
+}
+
+function normalizeDeliveryDayInts(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
+  const out: number[] = [];
+  for (const d of raw) {
+    const n = deliveryDayToInt(d);
+    if (n != null) out.push(n);
+  }
+  return [...new Set(out)].sort((a, b) => a - b);
+}
+
+function intWeekdaysToSelectedStrings(ints: number[]): string[] {
+  const uniq = [...new Set(ints.filter((n) => n >= 0 && n <= 6))].sort((a, b) => a - b);
+  return uniq.map((i) => WEEKDAY_KEYS[i]).filter(Boolean);
+}
+
 function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
+  const itemsRaw = Array.isArray(raw.items) ? (raw.items as Record<string, unknown>[]) : [];
+  const lineItems: SubscriptionLineItem[] = itemsRaw.map((it) => {
+    const p = (it.product as Record<string, unknown> | undefined) ?? {};
+    const qty = Number.parseFloat(String(it.quantity ?? 1));
+    const unit = Number.parseFloat(
+      String(it.unit_price ?? p.current_price ?? p.sale_price ?? p.base_price ?? 0)
+    );
+    const sub = Number.parseFloat(String(it.subtotal ?? (Number.isFinite(qty) && Number.isFinite(unit) ? qty * unit : 0)));
+    const img = String(p.primary_image ?? "");
+    return {
+      name: String(p.name ?? "Product"),
+      imageUrl: img || undefined,
+      quantity: Number.isFinite(qty) ? qty : 1,
+      unitPrice: Number.isFinite(unit) ? unit : 0,
+      subtotal: Number.isFinite(sub) ? sub : 0,
+    };
+  });
+
+  const firstItem = itemsRaw[0] as Record<string, unknown> | undefined;
+  const itemProduct = (firstItem?.product as Record<string, unknown> | undefined) ?? undefined;
+
   const plan =
+    itemProduct ||
     (raw.plan as Record<string, unknown> | undefined) ||
     (raw.plan_details as Record<string, unknown> | undefined) ||
     (raw.product as Record<string, unknown> | undefined);
@@ -31,18 +97,77 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
   const images =
     (plan?.images_url as string[] | undefined) ||
     (plan?.imagesUrl as string[] | undefined) ||
-    (plan?.image_url ? [String(plan.image_url)] : undefined);
+    (plan?.image_url ? [String(plan.image_url)] : undefined) ||
+    (plan?.primary_image ? [String(plan.primary_image)] : undefined) ||
+    (lineItems[0]?.imageUrl ? [lineItems[0].imageUrl] : undefined);
+
+  const unitPriceCandidate =
+    lineItems[0]?.unitPrice ??
+    (firstItem?.unit_price as unknown) ??
+    (firstItem?.unitPrice as unknown) ??
+    (plan?.current_price as unknown) ??
+    (plan?.sale_price as unknown) ??
+    (plan?.base_price as unknown);
+  const amountParsed = Number(unitPriceCandidate);
+
+  const deliveryDaysRaw =
+    (raw.delivery_days as unknown) ??
+    (raw.selected_days as unknown) ??
+    (raw.deliveryDays as unknown) ??
+    (raw.selectedDays as unknown);
+  const deliveryDayInts = normalizeDeliveryDayInts(deliveryDaysRaw);
+  const displayDaysRaw = raw.delivery_days_display;
+  const deliveryDaysDisplay = Array.isArray(displayDaysRaw)
+    ? (displayDaysRaw as unknown[]).map((d) => String(d)).filter(Boolean)
+    : [];
+  const deliveryDaysMixed = Array.isArray(deliveryDaysRaw) ? (deliveryDaysRaw as unknown[]) : [];
+  const deliveryDaysStrings = deliveryDaysMixed
+    .filter((d): d is string => typeof d === "string")
+    .map((d) => String(d));
+  const selectedDaysFromInts =
+    deliveryDayInts.length > 0 ? intWeekdaysToSelectedStrings(deliveryDayInts) : [];
+
+  const deliveryPreferenceRaw =
+    (raw.delivery_preference as unknown) ?? (raw.deliveryPreference as unknown);
+  const deliveryPreference =
+    typeof deliveryPreferenceRaw === "string"
+      ? deliveryPreferenceRaw.toUpperCase()
+      : deliveryDayInts.length === 7
+        ? "DAILY"
+        : deliveryDayInts.length > 0
+          ? "CUSTOM"
+          : undefined;
+
+  const itemsSubtotal = lineItems.reduce((s, li) => s + li.subtotal, 0);
+  const deliveryFeeParsed = Number.parseFloat(String(raw.delivery_fee ?? 0));
+  const deliveryFee = Number.isFinite(deliveryFeeParsed) ? deliveryFeeParsed : 0;
+  const totalAmount =
+    lineItems.length > 0
+      ? itemsSubtotal + deliveryFee
+      : Number.isFinite(Number(raw.total))
+        ? Number(raw.total)
+        : undefined;
+
+  const nextRaw = raw.next_delivery_date ?? raw.nextDeliveryDate;
+  const nextDeliveryDate =
+    nextRaw != null && String(nextRaw).trim() !== "" ? new Date(String(nextRaw)) : undefined;
 
   return {
     id: String(raw.id ?? ""),
     customerId: String(raw.customer_id ?? raw.customerId ?? ""),
-    type: String(raw.subscription_type ?? raw.type ?? "DAILY").toUpperCase() as
-      | "DAILY"
-      | "CUSTOM",
-    selectedDays: (raw.selected_days ??
-      raw.delivery_days ??
-      raw.selectedDays ??
-      []) as string[],
+    type: String(raw.subscription_type ?? raw.type ?? "DAILY").toUpperCase() as "DAILY" | "CUSTOM",
+    selectedDays:
+      selectedDaysFromInts.length > 0
+        ? selectedDaysFromInts
+        : deliveryDaysStrings,
+    deliveryDays:
+      deliveryDaysDisplay.length > 0
+        ? deliveryDaysDisplay
+        : deliveryDaysStrings.length > 0
+          ? deliveryDaysStrings
+          : undefined,
+    deliveryDayInts: deliveryDayInts.length > 0 ? deliveryDayInts : undefined,
+    deliveryPreference,
     startDate: raw.start_date
       ? new Date(String(raw.start_date))
       : raw.startDate
@@ -57,13 +182,20 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
     basePackId: String(raw.plan_id ?? raw.base_pack_id ?? raw.basePackId ?? ""),
     basePackDetails: raw.base_pack_details as Subscription["basePackDetails"],
     deliveryAddress: raw.delivery_address as Subscription["deliveryAddress"],
-    amount: typeof raw.amount === "number" ? raw.amount : Number(raw.amount ?? raw.price) || undefined,
-    createdAt: raw.created_at
-      ? new Date(String(raw.created_at))
-      : new Date(),
+    amount:
+      Number.isFinite(amountParsed) && amountParsed > 0
+        ? amountParsed
+        : typeof raw.amount === "number"
+          ? raw.amount
+          : Number(raw.amount ?? raw.price) || undefined,
+    totalAmount: totalAmount != null && Number.isFinite(totalAmount) ? totalAmount : undefined,
+    deliveryFee: lineItems.length > 0 ? deliveryFee : undefined,
+    lineItems: lineItems.length > 0 ? lineItems : undefined,
+    nextDeliveryDate: nextDeliveryDate && !Number.isNaN(nextDeliveryDate.getTime()) ? nextDeliveryDate : undefined,
+    createdAt: raw.created_at ? new Date(String(raw.created_at)) : new Date(),
     productDetails: plan
       ? {
-          name: String(plan.name ?? ""),
+          name: String(plan.name ?? lineItems[0]?.name ?? ""),
           description: String(plan.description ?? ""),
           imagesUrl: images ?? [],
           contents: Array.isArray(plan.contents)
@@ -72,6 +204,14 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
         }
       : (raw.product_details as Subscription["productDetails"]),
   };
+}
+
+export interface SubscriptionLineItem {
+  name: string;
+  imageUrl?: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
 }
 
 // Response interfaces
@@ -119,6 +259,15 @@ export interface Subscription {
       quantity: number;
     }>;
   };
+  /** UI helpers used by ManageMySubscription */
+  deliveryPreference?: string;
+  deliveryDays?: string[];
+  /** API `delivery_days` as 0=Mon … 6=Sun */
+  deliveryDayInts?: number[];
+  lineItems?: SubscriptionLineItem[];
+  totalAmount?: number;
+  deliveryFee?: number;
+  nextDeliveryDate?: Date;
 }
 
 export interface SubscriptionInitiateResponse {
@@ -451,9 +600,28 @@ class SubscriptionService {
       status?: "ACTIVE" | "PAUSED" | "CANCELLED" | "INACTIVE";
     }
   ): Promise<Subscription> {
+    const dayToInt = (d: string): number | null => {
+      const key = String(d).trim().toLowerCase();
+      if (key === "mon" || key === "monday") return 0;
+      if (key === "tue" || key === "tues" || key === "tuesday") return 1;
+      if (key === "wed" || key === "wednesday") return 2;
+      if (key === "thu" || key === "thur" || key === "thurs" || key === "thursday") return 3;
+      if (key === "fri" || key === "friday") return 4;
+      if (key === "sat" || key === "saturday") return 5;
+      if (key === "sun" || key === "sunday") return 6;
+      return null;
+    };
+
     const body: Record<string, unknown> = {};
     if (updates.type != null) body.subscription_type = updates.type;
-    if (updates.selectedDays != null) body.delivery_days = updates.selectedDays;
+    if (updates.selectedDays != null) {
+      // Backend expects weekday integers 0–6 (0=Mon, 6=Sun)
+      body.delivery_days = updates.selectedDays
+        .map(dayToInt)
+        .filter(
+          (n): n is number => typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= 6
+        );
+    }
     if (updates.endDate != null) body.end_date = updates.endDate.toISOString().split("T")[0];
     if (updates.status != null) body.status = updates.status;
 

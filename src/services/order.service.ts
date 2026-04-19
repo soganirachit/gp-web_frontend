@@ -112,13 +112,24 @@ class OrderService {
     }
 
     /**
-     * Get orders list with optional status filter
-     * @param status - Optional status filter (pending/confirmed/delivered/cancelled)
+     * Get orders list. Pass a string for legacy `?status=` only, or an object for multiple filters
+     * (e.g. `{ order_type: 'subscription' }` for subscription deliveries).
      */
-    async getOrders(status?: string): Promise<any[]> {
+    async getOrders(
+        statusOrFilters?: string | { status?: string; order_type?: string },
+    ): Promise<any[]> {
         try {
-            const params = status ? { status } : {};
-            const response = await api.get(`${getApiUrl()}/orders/`, { params });
+            const params: Record<string, string> = {};
+            if (typeof statusOrFilters === "string") {
+                if (statusOrFilters) params.status = statusOrFilters;
+            } else if (statusOrFilters && typeof statusOrFilters === "object") {
+                if (statusOrFilters.status) params.status = statusOrFilters.status;
+                if (statusOrFilters.order_type)
+                    params.order_type = statusOrFilters.order_type;
+            }
+            const response = await api.get(`${getApiUrl()}/orders/`, {
+                params: Object.keys(params).length ? params : undefined,
+            });
 
             if (response.status === 200) {
                 // Handle different possible response structures
