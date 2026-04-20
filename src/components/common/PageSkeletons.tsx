@@ -157,10 +157,11 @@ export function OrdersListSkeleton() {
     <div className="min-h-screen bg-[#f8f6f1]">
       <div className="mx-auto w-full max-w-[min(800px,100vw)] pb-nav-bottom">
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 mb-6">
             <Pulse className="h-10 w-10 rounded-full" />
             <Pulse className="h-8 w-40" />
           </div>
+          <Pulse className="h-[46px] w-full rounded-xl" />
         </div>
         <div className="px-4 pt-4 space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (

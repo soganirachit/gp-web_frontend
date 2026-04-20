@@ -63,7 +63,8 @@ const Privacy = lazy(() => import('../pages/Privacy'));
 
 const PageLoader = () => <PageFadeFallback />;
 
-const router = createBrowserRouter([
+const router = createBrowserRouter(
+  [
   {
     path: '/',
     element: <Layout />,
@@ -166,7 +167,14 @@ const router = createBrowserRouter([
       { path: '/privacy', element: <Privacy /> },
     ],
   },
-]);
+  ],
+  {
+    future: {
+      v7_startTransition: true,
+      v7_relativeSplatPath: true,
+    },
+  },
+);
 
 const Router = () => {
   return (

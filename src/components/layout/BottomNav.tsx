@@ -8,6 +8,7 @@ import accountIcon from "../../assets/icon/navbar/account.svg";
 import storeLogo from "../../assets/svg/store_logo.svg";
 import orderStoreIcon from "../../assets/svg/gp_store_svg/orderstore.svg";
 import activeBg from "../../assets/All/Vector (1).png";
+import dailyOrangeBanner from "../../assets/svg/gp_daily svg/orangebanner.svg";
 import storeGreenBanner from "../../assets/svg/gp_store_svg/greenbanner.svg";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useCart } from "../../context/CartContext";
@@ -260,6 +261,15 @@ const BottomNav: React.FC = () => {
     `${basePath}/basket`,
   ]);
 
+  /** GP Daily: same orange “pill” as app (`BottomTabs` + `orangebanner.svg`), labels #222 on active / #6B7280 muted. */
+  const dailyActivePill = (
+    <img
+      src={dailyOrangeBanner}
+      alt=""
+      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[52px] h-[52px] object-contain pointer-events-none"
+    />
+  );
+
   // GP Daily Navigation: Home, Daily (logo only), Wallet, Basket, Account
   return (
     /* Fix_V0.9: E2E anchor for bottom navigation */
@@ -267,107 +277,80 @@ const BottomNav: React.FC = () => {
       className="fixed bottom-0 left-0 right-0 z-50 w-full pointer-events-none"
       data-testid="gp-bottom-nav"
     >
-      <div className="w-full max-w-none bg-white shadow-lg rounded-none pointer-events-auto overflow-visible pb-[env(safe-area-inset-bottom,0px)]">
+      <div className="w-full max-w-[800px] mx-auto bg-white shadow-[0_-2px_16px_rgba(0,0,0,0.08)] rounded-none pointer-events-auto overflow-visible pb-[env(safe-area-inset-bottom,0px)]">
         <div className="flex justify-between items-center px-3 py-2 pt-2">
           <Link
             to="/home"
-            className={`flex flex-col items-center justify-center flex-1 relative ${isActive("/home")
+            className={`flex flex-col items-center justify-center flex-1 relative min-h-[44px] ${isActive("/home")
               ? theme.classes.bottomNavActiveText
               : theme.classes.bottomNavInactiveText
               }`}
           >
-            {isActive("/home") && (
-              <img
-                src={activeBg}
-                alt=""
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
-              />
-            )}
+            {isActive("/home") && dailyActivePill}
             <img
               src={homeIcon}
               alt="Home"
-              className={`w-5 h-5 mb-0.5 relative z-10 ${isActive("/home") ? "" : "opacity-90"
-                }`}
+              className={`w-5 h-5 mb-0.5 relative z-10 ${isActive("/home") ? "" : "opacity-75"}`}
+              style={isActive("/home") ? { filter: "brightness(0) saturate(100%)" } : undefined}
             />
-            <span className={`text-[10px] font-medium relative z-10 ${isActive("/home") ? "text-gray-700" : ""}`}>Home</span>
+            <span className={`text-[10px] font-medium relative z-10 ${isActive("/home") ? "text-[#222222]" : "text-[#6B7280]"}`}>Home</span>
           </Link>
 
           <Link
             to="/gp-daily"
-            className={`flex flex-col items-center justify-center flex-1 relative ${isActive("/gp-daily")
+            className={`flex flex-col items-center justify-center flex-1 relative min-h-[44px] ${isActive("/gp-daily")
               ? theme.classes.bottomNavActiveText
               : theme.classes.bottomNavInactiveText
               }`}
           >
-            {isActive("/gp-daily") && (
-              <img
-                src={activeBg}
-                alt=""
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
-              />
-            )}
+            {isActive("/gp-daily") && dailyActivePill}
             <img
               src={dailyIcon}
               alt="Daily"
-              className={`w-9 h-9 relative z-10 ${isActive("/gp-daily") ? "" : "opacity-90"
-                }`}
+              className={`w-9 h-9 relative z-10 ${isActive("/gp-daily") ? "" : "opacity-75"}`}
+              style={isActive("/gp-daily") ? { filter: "brightness(0) saturate(100%)" } : undefined}
             />
           </Link>
 
           <Link
             to={`${basePath}/wallet`}
-            className={`flex flex-col items-center justify-center flex-1 relative ${isActive(`${basePath}/wallet`)
+            className={`flex flex-col items-center justify-center flex-1 relative min-h-[44px] ${isActive(`${basePath}/wallet`)
               ? theme.classes.bottomNavActiveText
               : theme.classes.bottomNavInactiveText
               }`}
           >
-            {isActive(`${basePath}/wallet`) && (
-              <img
-                src={activeBg}
-                alt=""
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
-              />
-            )}
+            {isActive(`${basePath}/wallet`) && dailyActivePill}
             <img
               src={walletIcon}
               alt="Wallet"
-              className={`w-5 h-5 mb-0.5 relative z-10 ${isActive(`${basePath}/wallet`) ? "" : "opacity-90"
-                }`}
+              className={`w-5 h-5 mb-0.5 relative z-10 ${isActive(`${basePath}/wallet`) ? "" : "opacity-75"}`}
+              style={isActive(`${basePath}/wallet`) ? { filter: "brightness(0) saturate(100%)" } : undefined}
             />
-            <span className={`text-[10px] font-medium relative z-10 ${isActive(`${basePath}/wallet`) ? "text-gray-700" : ""}`}>Wallet</span>
+            <span className={`text-[10px] font-medium relative z-10 ${isActive(`${basePath}/wallet`) ? "text-[#222222]" : "text-[#6B7280]"}`}>Wallet</span>
           </Link>
 
           <Link
             to={isLoggedIn ? `${basePath}/basket` : "#"}
             onClick={handleBasketClick}
-            className={`flex flex-col items-center justify-center flex-1 relative ${basketTabActive
+            className={`flex flex-col items-center justify-center flex-1 relative min-h-[44px] ${basketTabActive
               ? theme.classes.bottomNavActiveText
               : theme.classes.bottomNavInactiveText
               }`}
           >
-            {basketTabActive && (
-              <img
-                src={activeBg}
-                alt=""
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
-              />
-            )}
+            {basketTabActive && dailyActivePill}
             <div className="relative">
               <img
                 src={basketIcon}
                 alt="Basket"
-                className={`w-5 h-5 mb-0.5 relative z-10 ${
-                  basketTabActive
-                    ? "brightness-0"
-                    : "opacity-90"
-                }`}
+                className={`w-5 h-5 mb-0.5 relative z-10 ${basketTabActive ? "" : "opacity-75"}`}
+                style={basketTabActive ? { filter: "brightness(0) saturate(100%)" } : undefined}
               />
               {cartItemCount > 0 && (
                 <span
-                  className={`absolute -top-0.5 -right-0.5 text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 z-20 ${
+                  className={`absolute -top-1 -right-1 text-[10px] font-bold rounded-full min-w-4 h-4 flex items-center justify-center px-1 z-20 leading-none ${
                     basketTabActive
-                      ? "bg-gray-200 text-black ring-1 ring-gray-300/90"
-                      : "bg-[#FAA222] text-black shadow-sm ring-1 ring-[#DD7600]/50"
+                      ? "bg-white border-2 border-[#FFB043] text-[#222222]"
+                      : "bg-[#FFB043] text-[#222222]"
                   }`}
                 >
                   {cartItemCount > 99 ? "99+" : cartItemCount}
@@ -376,7 +359,7 @@ const BottomNav: React.FC = () => {
             </div>
             <span
               className={`text-[10px] font-medium relative z-10 ${
-                basketTabActive ? "text-gray-900" : "text-gray-500"
+                basketTabActive ? "text-[#222222]" : "text-[#6B7280]"
               }`}
             >
               Basket
@@ -386,27 +369,19 @@ const BottomNav: React.FC = () => {
           <Link
             to={accountRootPath}
             onClick={handleAccountNavClick}
-            className={`flex flex-col items-center justify-center flex-1 relative ${isAccountSectionActive()
+            className={`flex flex-col items-center justify-center flex-1 relative min-h-[44px] ${isAccountSectionActive()
               ? theme.classes.bottomNavActiveText
               : theme.classes.bottomNavInactiveText
               }`}
           >
-            {isAccountSectionActive() && (
-              <img
-                src={activeBg}
-                alt=""
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 object-contain pointer-events-none"
-              />
-            )}
+            {isAccountSectionActive() && dailyActivePill}
             <img
               src={accountIcon}
               alt="Account"
-              className={`w-5 h-5 mb-0.5 relative z-10 ${isAccountSectionActive()
-                ? ""
-                : "opacity-90"
-                }`}
+              className={`w-5 h-5 mb-0.5 relative z-10 ${isAccountSectionActive() ? "" : "opacity-75"}`}
+              style={isAccountSectionActive() ? { filter: "brightness(0) saturate(100%)" } : undefined}
             />
-            <span className={`text-[10px] font-medium relative z-10 ${isAccountSectionActive() ? "text-gray-700" : ""}`}>Account</span>
+            <span className={`text-[10px] font-medium relative z-10 ${isAccountSectionActive() ? "text-[#222222]" : "text-[#6B7280]"}`}>Account</span>
           </Link>
         </div>
       </div>

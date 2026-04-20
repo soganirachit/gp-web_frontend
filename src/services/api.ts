@@ -13,6 +13,27 @@ const api = axios.create({
 });
 
 /**
+ * Many services pass `${getApiUrl()}/cart` while `baseURL` is already `getApiUrl()`.
+ * Axios would merge to `/api/v1/api/v1/cart` → 404. Strip the duplicate base path.
+ */
+function stripDuplicateBaseUrlPath(config: InternalAxiosRequestConfig) {
+  const base = String(config.baseURL ?? "").replace(/\/+$/, "");
+  const raw = config.url;
+  if (!base || raw == null || raw === "") return;
+  const url = String(raw);
+  if (/^([a-z][a-z\d+\-.]*:)?\/\//i.test(url)) return;
+
+  if (url === base) {
+    config.url = "/";
+    return;
+  }
+  if (url.startsWith(`${base}/`)) {
+    const rest = url.slice(base.length);
+    config.url = rest.startsWith("/") ? rest : `/${rest}`;
+  }
+}
+
+/**
  * Axios 1.x sets `defaults.adapter` to `['xhr','http','fetch']`, not a function.
  * Without resolving it, GET dedupe never enabled (was always broken in this app).
  */
@@ -118,6 +139,15 @@ api.interceptors.request.use(
     return config;
   },
   (error) => Promise.reject(error)
+);
+
+// Runs first (Axios request interceptors are LIFO) so URLs are correct for dedupe + dispatch.
+api.interceptors.request.use(
+  (config) => {
+    stripDuplicateBaseUrlPath(config);
+    return config;
+  },
+  (error) => Promise.reject(error),
 );
 
 // Response interceptor — on 401, refresh the access token and retry

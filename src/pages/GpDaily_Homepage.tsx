@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { FaChevronRight } from "react-icons/fa";
 import { MdKeyboardArrowDown } from "react-icons/md";
+import { IoPlay } from "react-icons/io5";
 import logo from "../assets/All/logo.png";
 import { walletService } from "../services/wallet.service";
 import {
@@ -11,29 +11,37 @@ import {
 import { orderService } from "@/services/order.service";
 import ErrorBoundary from "../components/ErrorBoundary";
 import useGoogleMaps from "../hooks/useGoogleMaps";
-import { productService, PRODUCT_AVAILABILITY_DAILY } from "../services/product.service";
+import {
+  productService,
+  PRODUCT_AVAILABILITY_GP_DAILY_LIST,
+  mapGpDailyCatalogRowToProduct,
+} from "../services/product.service";
+import {
+  pickActiveSubscriptionDailyUnitRupees,
+  computeGpDailyOrderOnHold,
+} from "../utils/gpDailyWalletHold";
 import { storeService } from "../services/store.service";
 import type { Product as ProductType } from "../services/product.service";
 import { addressService } from "../services/address.service";
+import { validateGpDailyDeliveryAreaFromCoordinates } from "../services/subscriptionZone.service";
 import { customerService } from "../services/getcustomer.service";
 import { toast } from "react-hot-toast";
 import ProductCard from "../components/common/ProductCard";
 import { GpDailyHomeSkeleton } from "../components/common/PageSkeletons";
-import ProfileIcon from "../assets/icon/Profile.png";
 import { SearchBar } from "../components/common/SearchBar";
 import smallgendaIcon from "../assets/svg/smallgenda.svg";
 import scooterIcon from "../assets/svg/gp_daily svg/scooter.svg";
 import clockIcon from "../assets/svg/gp_daily svg/clock.svg";
 import flowerIcon from "../assets/svg/gp_daily svg/flower.svg";
 import bannerPng from "../assets/svg/gp_daily svg/banner.png";
-import topBannerSvg from "../assets/svg/gp_daily svg/top _banner.svg";
+import dailyOfferImage from "../assets/svg/gp_daily svg/offer.png";
 import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
 import locationhomeIcon from "../assets/svg/gp_daily svg/locationhome.svg";
 import profilehomeIcon from "../assets/svg/gp_daily svg/profilehome.svg";
 import profilelogoIcon from "../assets/svg/gp_daily svg/profilelogo.svg";
 import alertIcon from "../assets/svg/gp_daily svg/lowbalance.svg";
 import {
-  formatHomepageNextDeliveryLine,
+  formatNamasteDeliveryLine,
   subscriptionProductLabel,
 } from "../utils/subscriptionNextDelivery";
 
@@ -43,6 +51,9 @@ interface DayInfo {
   status: "past" | "active" | "future";
   deliveryStatus?: "pending" | "delivered" | "next";
 }
+
+/** Matches `NAMASTE_TIME_SLOT_DISPLAY` on mobile GP Daily home. */
+const NAMASTE_TIME_SLOT_DISPLAY = "7 AM – 12 PM";
 
 const Home2: React.FC = () => {
   const navigate = useNavigate();
@@ -70,11 +81,17 @@ const Home2: React.FC = () => {
     useState<Subscription | null>(null);
   const subscriptionCarouselRef = useRef<HTMLDivElement | null>(null);
   const [subscriptionCarouselIndex, setSubscriptionCarouselIndex] = useState(0);
-  const [products, setProducts] = useState<ProductType[]>([]);
+  const [allPackProducts, setAllPackProducts] = useState<ProductType[]>([]);
+  const [pujaPackProducts, setPujaPackProducts] = useState<ProductType[]>([]);
+  const [exoticPackProducts, setExoticPackProducts] = useState<ProductType[]>([]);
+  const [activeSubscriptionExtra, setActiveSubscriptionExtra] = useState<
+    Record<string, unknown> | null
+  >(null);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [userName, setUserName] = useState<string>("");
   const [userFirstName, setUserFirstName] = useState<string>("");
   const [showPauseModal, setShowPauseModal] = useState(false);
+  const [resumingSubId, setResumingSubId] = useState<string | null>(null);
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
   const [deliveryZoneStatus, setDeliveryZoneStatus] = useState<{
     isValid: boolean;
@@ -123,22 +140,52 @@ const Home2: React.FC = () => {
         await subscriptionService.getCustomerSubscriptions();
 
       if (fetchedSubscriptions && fetchedSubscriptions.length > 0) {
-        const active = fetchedSubscriptions.filter(
-          (sub) => sub.status === "ACTIVE"
-        );
-        setActiveSubscriptions(active);
-        setSelectedSubscription(active[0] ?? null);
+        /** Namaste carousel: active + paused only (same as mobile). */
+        const rank = (s: (typeof fetchedSubscriptions)[0]) => {
+          if (s.status === "ACTIVE") return 0;
+          if (s.status === "PAUSED") return 1;
+          return 2;
+        };
+        const namasteList = fetchedSubscriptions
+          .filter((sub) => sub.status === "ACTIVE" || sub.status === "PAUSED")
+          .sort((a, b) => {
+            const d = rank(a) - rank(b);
+            if (d !== 0) return d;
+            return (
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+          });
+        setActiveSubscriptions(namasteList);
+        setSelectedSubscription(namasteList[0] ?? null);
         setSubscriptionCarouselIndex(0);
+        const firstForDetail =
+          namasteList.find((s) => s.status === "ACTIVE") ?? namasteList[0];
+        if (firstForDetail?.id) {
+          try {
+            const detail = await subscriptionService.getSubscriptionById(
+              firstForDetail.id,
+            );
+            setActiveSubscriptionExtra(
+              detail && Object.keys(detail).length > 0 ? detail : null,
+            );
+          } catch {
+            setActiveSubscriptionExtra(null);
+          }
+        } else {
+          setActiveSubscriptionExtra(null);
+        }
       } else {
         setActiveSubscriptions([]);
         setSelectedSubscription(null);
         setSubscriptionCarouselIndex(0);
+        setActiveSubscriptionExtra(null);
       }
     } catch (error: any) {
       console.error("Error fetching subscriptions:", error);
       setActiveSubscriptions([]);
       setSelectedSubscription(null);
       setSubscriptionCarouselIndex(0);
+      setActiveSubscriptionExtra(null);
     } finally {
       setIsLoadingSubscriptions(false);
     }
@@ -147,7 +194,9 @@ const Home2: React.FC = () => {
   const fetchOrdersByCustomerId = async () => {
     try {
       setIsLoadingOrders(true);
-      const orders = await orderService.getOrdersByCustomerId();
+      const orders = await orderService.getOrders({
+        order_type: "subscription",
+      });
       setOrders(orders);
     } catch (error) {
       console.error("Error fetching subscriptions:", error);
@@ -158,6 +207,7 @@ const Home2: React.FC = () => {
   };
 
   const fetchProducts = async () => {
+    const DAILY_ALLOWED = new Set(["daily", "both"]);
     try {
       setIsLoadingProducts(true);
       setProductsFetchError(null);
@@ -173,24 +223,59 @@ const Home2: React.FC = () => {
         }
       }
       const storeId = storeService.getStoreIdForProducts();
+      const sid = storeId || undefined;
 
-      const fetchedProducts = await productService.getAllProducts({
-        availabilityType: PRODUCT_AVAILABILITY_DAILY,
-        storeId: storeId || undefined,
-      });
+      const [rawAll, rawPuja, rawExotic] = await Promise.all([
+        productService.getAllProductsPaged({
+          availabilityType: PRODUCT_AVAILABILITY_GP_DAILY_LIST,
+          storeId: sid,
+        }),
+        productService.getProductsByCategory(
+          "puja-packs",
+          sid,
+          PRODUCT_AVAILABILITY_GP_DAILY_LIST,
+          100,
+        ),
+        productService.getProductsByCategory(
+          "exotic-packs",
+          sid,
+          PRODUCT_AVAILABILITY_GP_DAILY_LIST,
+          100,
+        ),
+      ]);
 
-      const normalizedProducts = fetchedProducts
-        .filter((product) => product.isActive !== false)
-        .map((product) => ({
-          ...product,
-          type: product?.type?.toUpperCase(),
-          category: product?.category?.toUpperCase(),
-        }));
+      const mapRow = (r: Record<string, unknown>) =>
+        mapGpDailyCatalogRowToProduct(r);
 
-      setProducts(normalizedProducts);
+      const allMapped = (rawAll || [])
+        .filter((p: { availability_type?: string }) =>
+          DAILY_ALLOWED.has(
+            String(p?.availability_type ?? "")
+              .toLowerCase()
+              .trim(),
+          ),
+        )
+        .map((p: Record<string, unknown>) => mapRow(p))
+        .filter((p) => p.isActive !== false);
+
+      setAllPackProducts(allMapped.filter((p) => p.isAvailable).slice(0, 10));
+      setPujaPackProducts(
+        (rawPuja || [])
+          .map((p: Record<string, unknown>) => mapRow(p))
+          .filter((p) => p.isAvailable)
+          .slice(0, 6),
+      );
+      setExoticPackProducts(
+        (rawExotic || [])
+          .map((p: Record<string, unknown>) => mapRow(p))
+          .filter((p) => p.isAvailable)
+          .slice(0, 6),
+      );
     } catch (error: unknown) {
       console.error("Error fetching products:", error);
-      setProducts([]);
+      setAllPackProducts([]);
+      setPujaPackProducts([]);
+      setExoticPackProducts([]);
       const msg =
         error && typeof error === "object" && "message" in error
           ? String((error as Error).message)
@@ -219,8 +304,8 @@ const Home2: React.FC = () => {
           coordinates = storedCoordinates;
         }
 
-        const validation = await addressService.validateAddressInDeliveryArea(
-          coordinates
+        const validation = await validateGpDailyDeliveryAreaFromCoordinates(
+          coordinates,
         );
         setDeliveryZoneStatus(validation);
 
@@ -443,21 +528,49 @@ const Home2: React.FC = () => {
   const isPageLoading =
     isLoadingAddress || isLoadingBalance || isLoadingProducts;
 
-  /** Same category filters as gp-store Product browse (PUJA / EXOTIC). */
-  const pujaPacksForHome = useMemo(
+  /** Wallet “order on hold” uses first active subscription’s daily unit (not a paused card). */
+  const primarySubscriptionForWallet = useMemo(
     () =>
-      products.filter(
-        (item) => item.category === "PUJA" && item.isAvailable,
-      ),
-    [products],
+      activeSubscriptions.find((s) => s.status === "ACTIVE") ??
+      activeSubscriptions[0] ??
+      null,
+    [activeSubscriptions],
   );
 
-  const exoticPacksForHome = useMemo(
+  const dailySubscriptionUnitRupees = useMemo(
     () =>
-      products.filter(
-        (item) => item.category === "EXOTIC" && item.isAvailable,
+      pickActiveSubscriptionDailyUnitRupees(
+        primarySubscriptionForWallet,
+        activeSubscriptionExtra,
       ),
-    [products],
+    [primarySubscriptionForWallet, activeSubscriptionExtra],
+  );
+
+  const handleNamasteResume = async (e: React.MouseEvent, subId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      setResumingSubId(subId);
+      await subscriptionService.toggleSubscriptionStatus(subId);
+      toast.success("Subscription resumed");
+      await fetchSubscriptions();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not resume";
+      toast.error(msg);
+    } finally {
+      setResumingSubId(null);
+    }
+  };
+
+  const orderOnHold = useMemo(
+    () =>
+      computeGpDailyOrderOnHold(
+        isLoggedIn,
+        isLoadingBalance,
+        walletBalance,
+        dailySubscriptionUnitRupees,
+      ),
+    [isLoggedIn, isLoadingBalance, walletBalance, dailySubscriptionUnitRupees],
   );
 
   if (isPageLoading) {
@@ -468,101 +581,128 @@ const Home2: React.FC = () => {
     <ErrorBoundary>
       <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
         <div className="mx-auto w-full max-w-[min(800px,100vw)]">
-          {/* Top Header with Gradient Background */}
-          <div className="relative px-3 sm:px-4 pt-0 pb-6 xs:pb-8 sm:pb-12" style={{
-            background: 'linear-gradient(to bottom, rgba(250, 193, 20, 0.8), rgba(250, 193, 20, 0.4))',
-            minHeight: 'clamp(220px, 42vw, 280px)'
-          }}>
-            {/* Banner PNG Background with reduced opacity */}
-            <img
+          <div
+            className="relative px-4 pt-4 pb-0 rounded-b-2xl overflow-hidden"
+            style={{
+              background:
+                "linear-gradient(90deg, rgba(250, 193, 20, 0.4) 0%, rgba(250, 193, 20, 0.2) 100%)",
+              minHeight: "clamp(200px, 38vw, 260px)",
+            }}
+          >
+            {/* <img
               src={bannerPng}
-              alt="Banner"
-              className="absolute inset-0 w-full h-full object-cover opacity-30"
-            />
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover opacity-[0.12] pointer-events-none"
+              aria-hidden
+            /> */}
 
-            {/* Content Overlay */}
-            <div className="relative z-10 pt-3">
-              {/* Location and Profile */}
+            <div className="relative z-10">
               <div className="flex items-center justify-between mb-3">
-                {/* Location Section */}
-                <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
                   <img
                     src={locationhomeIcon}
-                    alt="Location"
-                    className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0"
+                    alt=""
+                    className="w-[18px] h-[18px] flex-shrink-0"
+                    aria-hidden
                   />
                   <div
                     className="flex items-center gap-1 cursor-pointer min-w-0 flex-1"
                     onClick={handleLocationClick}
                   >
                     <div className="flex flex-col min-w-0">
-                      <span className="text-sm sm:text-base font-bold text-gray-800">{addressType}</span>
-                      <span className="text-xs sm:text-sm text-gray-700 truncate font-medium">
-                        {isLoadingAddress ? 'Loading...' : deliveryLocation || 'Tap to set address'}
+                      <span className="text-sm sm:text-base font-bold text-[#111827]">{addressType}</span>
+                      <span className="text-xs sm:text-sm text-[#374151] truncate font-medium">
+                        {isLoadingAddress
+                          ? "Loading..."
+                          : deliveryLocation
+                            ? deliveryLocation.length > 50
+                              ? `${deliveryLocation.slice(0, 50)}...`
+                              : deliveryLocation
+                            : "Tap to set address"}
                       </span>
                     </div>
-                    <MdKeyboardArrowDown className="text-gray-600 flex-shrink-0 text-lg sm:text-xl" />
+                    <MdKeyboardArrowDown className="text-[#4B5563] flex-shrink-0 text-xl" />
                   </div>
                 </div>
 
-                {/* Right Side Icons - Only Profile */}
-                <div className="relative w-14 h-14 xs:w-16 xs:h-16 sm:w-20 sm:h-20 flex-shrink-0 flex items-center justify-center">
+
+                <button
+                  type="button"
+                  className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full flex items-center justify-center"
+                  onClick={() => navigate("/gp-daily/account")}
+                  aria-label={isLoggedIn ? "Wallet" : "Log in"}
+                >
                   <img
                     src={profilehomeIcon}
-                    alt="Profile"
-                    className="absolute inset-0 m-auto h-9 w-9 xs:h-10 xs:w-10 sm:h-12 sm:w-12 object-contain cursor-pointer"
-                    onClick={() => navigate("/gp-daily/account")}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                    aria-hidden
                   />
                   <img
                     src={profilelogoIcon}
-                    alt="Profile Logo"
-                    className="relative z-10 w-5 h-5 object-contain"
+                    alt=""
+                    className="relative z-10 h-[18px] w-[18px] object-contain brightness-0 invert"
+                    aria-hidden
                   />
-                </div>
+                </button>
               </div>
 
               {/* Search Bar — unified styling, product suggestions as you type */}
-              <div className="mt-4 sm:mt-5">
+              <div className="mt-2">
                 <SearchBar
                   mode="product"
                   productBasePath="/gp-daily"
                   searchPagePath="/search"
+                  storeId={storeService.getStoreIdForProducts() ?? undefined}
                 />
               </div>
 
-              {/* Special Festival Offers Text Overlay */}
-              <div className="mt-5 flex flex-col items-start pl-2 pr-2 sm:pl-4">
-                <img
-                  src={topBannerSvg}
-                  alt="Special Festival Offers Available"
-                  className="h-10 xs:h-12 sm:h-14 mb-2 mt-4 max-w-full sm:ml-8 sm:pr-12"
-                />
-                <button type="button" className="flex items-center mt-3 sm:mt-4 ml-0 sm:ml-8 gap-1 text-[#FAA222] text-xs xs:text-sm font-medium underline self-start">
-                  <span>Curated for you</span>
-                  <FaChevronRight className="text-xs" />
+              {/* Special Festival Offers — matches app `GpDailyHomeScreen` offerCard + offer.png (no extra image opacity). */}
+              <div className="relative mt-[14px] min-h-[160px] overflow-hidden bg-transparent">
+                <p className="relative z-10 ml-[10px] mt-[30px] max-w-[14rem] whitespace-pre-line font-serif text-[18px] font-normal leading-7 text-[#222222]">
+                  Special Festival Offers{"\n"}Available
+                </p>
+                <button
+                  type="button"
+                  className="relative z-10 ml-[10px] mt-2 self-start border-b border-[#1f1f1f] pb-[1px]"
+                >
+                  <span className="font-sans text-xs font-normal leading-[22.75px] text-[#222222]">
+                    Curated for you -&gt;
+                  </span>
                 </button>
+                <img
+                  src={dailyOfferImage}
+                  alt=""
+                  width={320}
+                  height={208}
+                  className="pointer-events-none absolute bottom-[-10px] right-[-24px] z-[1] h-[208px] w-[320px] max-w-none object-cover select-none"
+                  aria-hidden
+                />
               </div>
             </div>
           </div>
 
           <div className="px-4 py-4 space-y-4">
               {/* Order in Hold Banner - Only show after balance is loaded */}
-              {!isLoadingBalance && walletBalance < 10000 && (
-                <div className="bg-[#FE5053] rounded-2xl p-4 text-white">
-                  <div className="flex items-start gap-3 mb-3">
+              {!isLoadingBalance && isLoggedIn && orderOnHold.show && (
+                <div className="rounded-[18px] p-4 text-white" style={{ backgroundColor: "rgba(255, 38, 41, 0.8)" }}>
+                  <div className="flex items-start gap-2 mb-2">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <img src={alertIcon} alt="Alert" className="w-7 h-7" />
+                      <img src={alertIcon} alt="" className="w-[18px] h-[18px]" aria-hidden />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-base mb-1">Order in hold</h3>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-[17px] mb-1.5">Order in hold</h3>
                       <p className="text-sm text-white/90">
-                        Your wallet balance is low. Recharge now to continue your daily deliveries.
+                        {orderOnHold.lowBalanceForSubscription
+                          ? `Your wallet balance is below 3-day subscription amount (₹${orderOnHold.threshold3Day}). Recharge now to continue deliveries.`
+                          : "Your wallet balance is low. Recharge now to continue your daily deliveries."}
                       </p>
                     </div>
                   </div>
                   <button
+                    type="button"
                     onClick={() => navigate(`${basePath}/wallet`)}
-                    className="w-full py-2.5 border-2 border-white rounded-xl text-white font-medium text-sm hover:bg-white/10 transition-colors"
+                    className="inline-flex min-w-[130px] items-center justify-center self-start rounded-xl border-2 border-white px-[18px] py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
                   >
                     Recharge Now
                   </button>
@@ -570,25 +710,30 @@ const Home2: React.FC = () => {
               )}
 
               {/* Namaste + active subscriptions carousel */}
-              <div className="bg-[#FFF5DC] rounded-2xl p-4 border border-gray-200">
-                <div className="flex items-center justify-between mb-4 pl-1">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg xs:text-xl sm:text-2xl font-semibold text-gray-900 leading-tight [overflow-wrap:anywhere]">
-                      Namaste, {userFirstName || ""}
+              <div className="rounded-[22px] border border-[#fcf5eb] bg-[#fcf5eb] p-4">
+                <div className="flex items-center justify-between mb-3.5 pl-1">
+                  <div className="flex min-w-0 flex-1 items-center gap-2 pr-2">
+                    <h2 className="min-w-0 flex-1 font-serif text-2xl font-semibold leading-7 text-[#222222] [overflow-wrap:anywhere]">
+                      {isLoggedIn ? `Namaste, ${userFirstName || "User"}` : "Namaste!"}
                     </h2>
-                    <img
-                      src={smallgendaIcon}
-                      alt="Small Genda"
-                      className="w-6 h-6"
-                    />
+                    {isLoggedIn ? (
+                      <img
+                        src={smallgendaIcon}
+                        alt=""
+                        className="h-[34px] w-[34px] shrink-0"
+                        aria-hidden
+                      />
+                    ) : null}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`${basePath}/manage-my-subscription`)}
-                    className="text-[#FAA222] text-sm font-medium underline"
-                  >
-                    Manage
-                  </button>
+                  {isLoggedIn ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`${basePath}/manage-my-subscription`)}
+                      className="shrink-0 text-sm font-medium text-[#E1522D] underline"
+                    >
+                      Manage
+                    </button>
+                  ) : null}
                 </div>
 
                 {isLoadingSubscriptions ? (
@@ -598,9 +743,9 @@ const Home2: React.FC = () => {
                     <div className="h-5 w-[70%] rounded bg-gray-200/80" />
                   </div>
                 ) : activeSubscriptions.length === 0 ? (
-                  <p className="pl-1 text-sm text-gray-600">
+                  <p className="pl-1 text-sm font-medium leading-5 text-[#6B7280]">
                     {isLoggedIn
-                      ? "No active subscriptions yet. Explore packs below to get started."
+                      ? "No subscriptions yet. Explore packs below to subscribe."
                       : "Sign in to see your subscriptions here."}
                   </p>
                 ) : (
@@ -616,46 +761,73 @@ const Home2: React.FC = () => {
                           className="w-full min-w-full shrink-0 snap-center px-1"
                         >
                           <div className="space-y-3 pl-1">
-                            <div className="flex items-center justify-between gap-2 text-gray-700">
-                              <div className="flex min-w-0 flex-1 items-center gap-3">
+                            <div className="flex items-start justify-between gap-2 text-[#222222]">
+                              <div className="flex min-w-0 flex-1 items-start gap-3">
                                 <img
                                   src={scooterIcon}
                                   alt=""
-                                  className="h-5 w-5 flex-shrink-0"
+                                  className="mt-0.5 h-5 w-5 flex-shrink-0"
                                   aria-hidden
                                 />
-                                <span className="truncate text-base font-medium">
-                                  {formatHomepageNextDeliveryLine(sub)}
+                                <span className="min-w-0 flex-1 text-base font-medium leading-snug [overflow-wrap:anywhere]">
+                                  {formatNamasteDeliveryLine(sub)}
                                 </span>
                               </div>
-                              <span className="inline-flex shrink-0 items-center rounded-full border border-green-600 px-2 py-0.5 text-[11px] font-semibold text-green-700">
-                                Active
-                              </span>
+                              {sub.status === "PAUSED" ? (
+                                <span className="inline-flex shrink-0 items-center rounded-md border-2 border-[#664D03] px-2 py-0.5 text-[11px] font-semibold text-[#664D03]">
+                                  Paused
+                                </span>
+                              ) : (
+                                <span className="inline-flex shrink-0 items-center rounded-md border-2 border-[#166534] px-2 py-0.5 text-[11px] font-semibold text-[#166534]">
+                                  Active
+                                </span>
+                              )}
                             </div>
-                            <div className="flex items-center gap-3 text-gray-700">
+                            <div className="flex items-center gap-3 text-[#222222]">
                               <img
                                 src={clockIcon}
                                 alt=""
                                 className="h-5 w-5 flex-shrink-0"
                                 aria-hidden
                               />
-                              <span className="text-base font-medium">7:00 AM - 9:00 AM</span>
+                              <span className="text-base font-medium text-[#222222]">{NAMASTE_TIME_SLOT_DISPLAY}</span>
                             </div>
-                            <div className="flex items-center gap-3 text-gray-700">
-                              <img
-                                src={flowerIcon}
-                                alt=""
-                                className="h-5 w-5 flex-shrink-0"
-                                aria-hidden
-                              />
-                              <span className="text-base font-medium">{subscriptionProductLabel(sub)}</span>
+                            <div className="flex items-center justify-between gap-2 text-[#222222]">
+                              <div className="flex min-w-0 flex-1 items-center gap-3">
+                                <img
+                                  src={flowerIcon}
+                                  alt=""
+                                  className="h-5 w-5 flex-shrink-0"
+                                  aria-hidden
+                                />
+                                <span className="min-w-0 text-base font-medium [overflow-wrap:anywhere]">
+                                  {subscriptionProductLabel(sub)}
+                                </span>
+                              </div>
+                              {sub.status === "PAUSED" ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => void handleNamasteResume(e, sub.id)}
+                                  disabled={resumingSubId === sub.id}
+                                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border-[1.5px] border-[#2563EB] bg-white px-2.5 py-1.5 text-[13px] font-semibold text-[#2563EB] disabled:opacity-60"
+                                >
+                                  {resumingSubId === sub.id ? (
+                                    "…"
+                                  ) : (
+                                    <>
+                                      <IoPlay className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                      Resume
+                                    </>
+                                  )}
+                                </button>
+                              ) : null}
                             </div>
                           </div>
                         </div>
                       ))}
                     </div>
                     {activeSubscriptions.length > 1 && (
-                      <div className="mt-3 flex justify-center gap-1">
+                      <div className="mt-2.5 flex justify-center gap-1.5">
                         {activeSubscriptions.map((sub, i) => (
                           <button
                             key={sub.id}
@@ -668,8 +840,8 @@ const Home2: React.FC = () => {
                             <span
                               className={`rounded-full transition-[width,height,background-color] ${
                                 i === subscriptionCarouselIndex
-                                  ? "h-[5px] w-[5px] bg-[#FAA222]"
-                                  : "h-[4px] w-[4px] bg-[#D1D5DB]"
+                                  ? "h-1.5 w-1.5 bg-[#E1522D]"
+                                  : "h-1.5 w-1.5 bg-[#D1D5DB]"
                               }`}
                               aria-hidden
                             />
@@ -684,103 +856,170 @@ const Home2: React.FC = () => {
 
           {/* Main Content */}
           <div className="px-4 py-4 space-y-6">
-            {/* Puja Packs — products API, category PUJA (same as gp-store browse) */}
+            {productsFetchError ? (
+              <div className="text-red-500 text-center py-4 text-sm">{productsFetchError}</div>
+            ) : null}
+
+            {/* All Packs — same idea as mobile: horizontal strip + Explore full catalog */}
             <div>
               <div className="flex items-center justify-between gap-2 mb-4 min-w-0">
-                <h2 className="text-lg xs:text-xl sm:text-2xl font-semibold text-gray-800 min-w-0 flex-1 pr-2">
-                  Puja Packs
+                <h2 className="min-w-0 flex-1 pr-2 font-serif text-2xl font-semibold text-[#222222]">
+                  All Packs
                 </h2>
                 <button
                   type="button"
-                  onClick={() =>
-                    navigate(`${basePath}/Products?${new URLSearchParams({ category: "puja" }).toString()}`)
-                  }
-                  className="flex shrink-0 items-center gap-1 text-[#19411f] text-sm font-semibold"
+                  onClick={() => navigate(`${basePath}/Products`)}
+                  className="flex shrink-0 items-center gap-1 text-[13px] font-medium text-[#6B7280]"
                 >
-                  <span>Explore More</span>
-                  <FaChevronRight className="text-xs" />
+                  <span>Explore More {">"}</span>
                 </button>
               </div>
-
-              {productsFetchError ? (
-                <div className="text-red-500 text-center py-4 text-sm">{productsFetchError}</div>
+              {!productsFetchError && isLoadingProducts ? (
+                <div className="h-40 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
               ) : (
                 <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
-                  {pujaPacksForHome.slice(0, 6).map((pack, index) => (
-                    <div key={pack.id} className="w-[min(46vw,10.75rem)] xs:w-[11rem] flex-shrink-0 snap-start">
+                  {allPackProducts.map((pack) => (
+                    <div
+                      key={pack.id}
+                      className="w-[min(46vw,10.75rem)] xs:w-[11rem] flex-shrink-0 snap-start"
+                    >
                       <ProductCard
                         imageUrl={getImageUrl(pack.imagesUrl)}
                         packName={pack.name}
-                        description={pack.description || "Mixed flowers daily"}
+                        categoryName={pack.categoryName}
+                        description="Mixed flowers daily"
                         price={`₹${pack.sellingPrice}/Day`}
-                        showDailyButton={true}
-                        showBestsellerTag={index === 0}
+                        showDailyButton
+                        showBestsellerTag={!pack.labels?.length}
+                        labels={pack.labels?.length ? pack.labels : undefined}
                         onClick={() => handleProductClick(pack)}
                       />
                     </div>
                   ))}
                 </div>
               )}
-              {!productsFetchError && pujaPacksForHome.length === 0 && (
-                <p className="text-center text-sm text-gray-500 py-2">No Puja packs available right now.</p>
-              )}
+              {!productsFetchError && !isLoadingProducts && allPackProducts.length === 0 ? (
+                <p className="text-center text-sm text-gray-500 py-2">No packs available right now.</p>
+              ) : null}
             </div>
 
-            {/* Exotic Packs — products API, category EXOTIC */}
+            {/* Puja Packs — GET /products/?category=puja-packs&availability_type=daily,both */}
             <div>
               <div className="flex items-center justify-between gap-2 mb-4 min-w-0">
-                <h2 className="text-lg xs:text-xl sm:text-2xl font-semibold text-gray-800 min-w-0 flex-1 pr-2">
+                <h2 className="min-w-0 flex-1 pr-2 font-serif text-2xl font-semibold text-[#222222]">
+                  Puja Packs
+                </h2>
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `${basePath}/Products?${new URLSearchParams({ category: "puja-packs" }).toString()}`,
+                    )
+                  }
+                  className="flex shrink-0 items-center gap-1 text-[13px] font-medium text-[#6B7280]"
+                >
+                  <span>Explore More {">"}</span>
+                </button>
+              </div>
+
+              {!productsFetchError && isLoadingProducts ? (
+                <div className="h-40 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
+              ) : (
+                <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
+                  {pujaPackProducts.map((pack) => (
+                    <div
+                      key={pack.id}
+                      className="w-[min(46vw,10.75rem)] xs:w-[11rem] flex-shrink-0 snap-start"
+                    >
+                      <ProductCard
+                        imageUrl={getImageUrl(pack.imagesUrl)}
+                        packName={pack.name}
+                        categoryName={pack.categoryName}
+                        description="Mixed flowers daily"
+                        price={`₹${pack.sellingPrice}/Day`}
+                        showDailyButton
+                        showBestsellerTag={!pack.labels?.length}
+                        labels={pack.labels?.length ? pack.labels : undefined}
+                        onClick={() => handleProductClick(pack)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!productsFetchError && !isLoadingProducts && pujaPackProducts.length === 0 ? (
+                <p className="text-center text-sm text-gray-500 py-2">No Puja packs available right now.</p>
+              ) : null}
+            </div>
+
+            {/* Exotic Packs — GET /products/?category=exotic-packs&availability_type=daily,both */}
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-4 min-w-0">
+                <h2 className="min-w-0 flex-1 pr-2 font-serif text-2xl font-semibold text-[#222222]">
                   Exotic Packs
                 </h2>
                 <button
                   type="button"
                   onClick={() =>
-                    navigate(`${basePath}/Products?${new URLSearchParams({ category: "exotic" }).toString()}`)
+                    navigate(
+                      `${basePath}/Products?${new URLSearchParams({ category: "exotic-packs" }).toString()}`,
+                    )
                   }
-                  className="flex shrink-0 items-center gap-1 text-[#19411f] text-sm font-semibold"
+                  className="flex shrink-0 items-center gap-1 text-[13px] font-medium text-[#6B7280]"
                 >
-                  <span>Explore More</span>
-                  <FaChevronRight className="text-xs" />
+                  <span>Explore More {">"}</span>
                 </button>
               </div>
 
-              <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
-                {exoticPacksForHome.slice(0, 6).map((item, index) => (
-                  <div key={item.id} className="w-[min(46vw,10.75rem)] xs:w-[11rem] flex-shrink-0 snap-start">
-                    <ProductCard
-                      imageUrl={getImageUrl(item.imagesUrl)}
-                      packName={item.name}
-                      description={item.description || "Mixed flowers daily"}
-                      price={`₹${item.sellingPrice}/Day`}
-                      showDailyButton={true}
-                      showBestsellerTag={index === 0 || index === 2}
-                      onClick={() => handleProductClick(item)}
-                    />
-                  </div>
-                ))}
-              </div>
-              {exoticPacksForHome.length === 0 && (
-                <p className="text-center text-sm text-gray-500 py-2">No exotic packs available right now.</p>
+              {!productsFetchError && isLoadingProducts ? (
+                <div className="h-40 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
+              ) : (
+                <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
+                  {exoticPackProducts.map((pack) => (
+                    <div
+                      key={pack.id}
+                      className="w-[min(46vw,10.75rem)] xs:w-[11rem] flex-shrink-0 snap-start"
+                    >
+                      <ProductCard
+                        imageUrl={getImageUrl(pack.imagesUrl)}
+                        packName={pack.name}
+                        categoryName={pack.categoryName}
+                        description="Mixed flowers daily"
+                        price={`₹${pack.sellingPrice}/Day`}
+                        showDailyButton
+                        showBestsellerTag={!pack.labels?.length}
+                        labels={pack.labels?.length ? pack.labels : undefined}
+                        onClick={() => handleProductClick(pack)}
+                      />
+                    </div>
+                  ))}
+                </div>
               )}
+              {!productsFetchError && !isLoadingProducts && exoticPackProducts.length === 0 ? (
+                <p className="text-center text-sm text-gray-500 py-2">No exotic packs available right now.</p>
+              ) : null}
             </div>
 
             {/* Full product browse — always visible (route: /gp-daily/Products) */}
-            <div className="flex justify-center pt-4">
+            <div className="flex justify-center pt-1">
               <button
                 type="button"
                 onClick={() => navigate(`${basePath}/Products`)}
-                className="w-full max-w-md bg-[#FAA222] text-gray-700 py-3 rounded-lg font-medium text-sm hover:bg-[#DD7600] transition-colors"
+                className="w-full max-w-none rounded-2xl bg-[#FFB343] px-3.5 py-2.5 text-[15px] font-normal text-[#222222] transition-opacity hover:opacity-95"
               >
                 View All Category
               </button>
             </div>
 
             {/* Quote of the Day Section */}
-            <div>
+            <div className="pt-1">
+              <h2 className="mb-2 self-start font-serif text-lg font-semibold leading-6 text-[#222222]">
+                Quote of the day
+              </h2>
               <img
                 src={bottomBannerSvg}
-                alt="Quote of the Day"
-                className="w-full h-auto"
+                alt=""
+                className="h-auto w-full"
+                aria-hidden
               />
             </div>
           </div>

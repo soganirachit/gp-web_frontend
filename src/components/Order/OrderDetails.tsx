@@ -489,6 +489,14 @@ const OrderDetails: React.FC = () => {
                       src={detailshomeIcon}
                       alt="Home"
                       className="w-5 h-5 mt-0.5 flex-shrink-0"
+                      style={
+                        isDaily
+                          ? {
+                              filter:
+                                "invert(58%) sepia(89%) saturate(457%) hue-rotate(359deg) brightness(102%) contrast(97%)",
+                            }
+                          : undefined
+                      }
                     />
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-900">
@@ -508,6 +516,14 @@ const OrderDetails: React.FC = () => {
                       src={detailsuserIcon}
                       alt="User"
                       className="w-5 h-5 mt-0.5 flex-shrink-0"
+                      style={
+                        isDaily
+                          ? {
+                              filter:
+                                "invert(58%) sepia(89%) saturate(457%) hue-rotate(359deg) brightness(102%) contrast(97%)",
+                            }
+                          : undefined
+                      }
                     />
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-900">

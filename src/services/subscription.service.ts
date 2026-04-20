@@ -547,6 +547,19 @@ class SubscriptionService {
     );
   }
 
+  /** Full subscription row — list may omit plan / daily_amount fields (mobile: GET /subscriptions/:id/). */
+  async getSubscriptionById(
+    subscriptionId: string | number,
+  ): Promise<Record<string, unknown>> {
+    const id = String(subscriptionId).trim();
+    if (!id) return {};
+    const { data } = await api.get(`${base()}/${id}/`);
+    const raw = (data as { data?: unknown })?.data ?? data;
+    return raw && typeof raw === "object"
+      ? (raw as Record<string, unknown>)
+      : {};
+  }
+
   /**
    * Resume: POST /subscriptions/{id}/resume/
    * Pause (scheduled resume): POST /subscriptions/{id}/pause/ with resume_date

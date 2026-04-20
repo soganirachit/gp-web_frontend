@@ -109,6 +109,50 @@ export function formatHomepageNextDeliveryLine(subscription: Subscription): stri
   return part;
 }
 
+/** GP Daily home Namaste row — aligned with mobile `formatNamasteDeliveryLine`. */
+const NAMASTE_MONTH_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sept",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+const NAMASTE_WEEK_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+export function formatNamasteDeliveryLine(subscription: Subscription): string {
+  if (subscription.status === "PAUSED") return "Next delivery paused";
+
+  const raw = subscription.nextDeliveryDate;
+  if (raw != null) {
+    const dt = new Date(raw);
+    if (!Number.isNaN(dt.getTime())) {
+      const today = startOfDay(new Date());
+      const dayOnly = startOfDay(dt);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      const wd = NAMASTE_WEEK_SHORT[dt.getDay()];
+      const dayNum = dt.getDate();
+      const monthStr = NAMASTE_MONTH_SHORT[dt.getMonth()];
+      const tail = `${wd}, ${dayNum} ${monthStr}`;
+      if (dayOnly.getTime() === tomorrow.getTime()) return `Tomorrow - ${tail}`;
+      if (dayOnly.getTime() === today.getTime()) return `Today - ${tail}`;
+      return tail;
+    }
+  }
+
+  const fallback = formatHomepageNextDeliveryLine(subscription);
+  if (fallback === "—") return "No upcoming delivery scheduled";
+  return fallback;
+}
+
 export function subscriptionProductLabel(subscription: Subscription): string {
   const n =
     subscription.productDetails?.name?.trim() ||

@@ -1,6 +1,23 @@
-// Meta Pixel ID — set VITE_META_PIXEL_ID in your .env file
-export const META_PIXEL_ID =
-  import.meta.env.VITE_META_PIXEL_ID || 'REPLACE_WITH_YOUR_PIXEL_ID';
+// Meta Pixel ID — set VITE_META_PIXEL_ID in your .env (numeric ID only)
+
+function resolveMetaPixelId(): string | null {
+  const raw = import.meta.env.VITE_META_PIXEL_ID as string | undefined;
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (
+    !s ||
+    s === 'null' ||
+    s === 'undefined' ||
+    s === 'REPLACE_WITH_YOUR_PIXEL_ID'
+  ) {
+    return null;
+  }
+  // Meta Pixel IDs are numeric strings (typically 15–16 digits)
+  if (!/^\d{8,24}$/.test(s)) return null;
+  return s;
+}
+
+export const META_PIXEL_ID: string | null = resolveMetaPixelId();
 
 declare global {
   interface Window {
@@ -10,7 +27,7 @@ declare global {
 }
 
 export function initMetaPixel(): void {
-  if (typeof window === 'undefined' || window.fbq) return;
+  if (!META_PIXEL_ID || typeof window === 'undefined' || window.fbq) return;
 
   /* eslint-disable */
   (function (f: any, b: Document, e: string, v: string) {
@@ -32,7 +49,7 @@ export function initMetaPixel(): void {
   })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
   /* eslint-enable */
 
-  window.fbq('init', META_PIXEL_ID);
+  window.fbq('init', META_PIXEL_ID as string);
   window.fbq('track', 'PageView');
 }
 

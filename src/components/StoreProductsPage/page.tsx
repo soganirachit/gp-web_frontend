@@ -3,7 +3,7 @@ import { SEO } from "../SEO";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { MdKeyboardArrowDown } from "react-icons/md";
 import { FaChevronRight, FaSearch } from "react-icons/fa";
-import { IoFilterOutline, IoSwapVerticalOutline } from "react-icons/io5";
+import { IoSwapVerticalOutline } from "react-icons/io5";
 import locationhomeIcon from "../../assets/svg/gp_daily svg/locationhome.svg";
 import {
   productService,
@@ -384,7 +384,7 @@ const StoreProductsPages: React.FC = () => {
               ))}
             </div>
 
-            {/* Sort and Filter — same padding/typography as category chips */}
+            {/* Sort (filter button commented out until wired) — same padding/typography as category chips */}
             <div className="mt-2.5 flex items-center gap-2.5">
               <button
                 type="button"
@@ -394,6 +394,8 @@ const StoreProductsPages: React.FC = () => {
                 <IoSwapVerticalOutline className="h-4 w-4 shrink-0" />
                 <span>Sort</span>
               </button>
+              {/* Filter button — not wired */}
+              {/*
               <button
                 type="button"
                 className="touch-target-compact inline-flex items-center gap-1.5 rounded-lg border border-[#D8D3CD] bg-[#f8f6f1] px-3.5 py-2 text-xs leading-snug font-medium text-gray-700 shadow-[0_1px_0_rgba(0,0,0,0.03)] transition-colors hover:bg-[#f1eee7]"
@@ -418,6 +420,7 @@ const StoreProductsPages: React.FC = () => {
                 </svg>
                 <span>Filter</span>
               </button>
+              */}
             </div>
 
             {/* Sort Dropdown */}

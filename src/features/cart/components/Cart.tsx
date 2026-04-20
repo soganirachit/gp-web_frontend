@@ -28,6 +28,11 @@ import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
 import { errorMessageFromCatch } from '../../../utils/apiErrorMessage';
+import {
+  extractCartStockApiMessage,
+  formatCartStockInlineMessage,
+  isCartStockOrAvailabilityInlineError,
+} from '../../../utils/cartStockInlineMessage';
 import { DELIVERY_DATE_MAX_DAYS_FROM_TODAY } from '../../../constants/deliveryBooking';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
 
@@ -65,18 +70,6 @@ const getSlotDisplayLabel = (slot: DeliverySlot): string => {
   if (!slot.start_time || !slot.end_time) return slot.slot_name || '';
   const { start, end } = getSlotWindowMinutes(slot);
   return formatSlotTimeRange(minutesToTimeStr(start), minutesToTimeStr(end));
-};
-
-/** Same heuristics as StoreProductsDisplayPage — cart update API stock errors. */
-const isStockLimitError = (raw: unknown): boolean => {
-  const msg = String(raw ?? '').toLowerCase();
-  return (
-    msg.includes('stock') ||
-    msg.includes('insufficient') ||
-    msg.includes('available quantity') ||
-    msg.includes('only') ||
-    msg.includes('out of stock')
-  );
 };
 
 // Parse "HH:mm:ss" / "HH:mm" into minutes from midnight
@@ -1370,14 +1363,16 @@ const Cart: React.FC = () => {
         return n;
       });
     } catch (error: unknown) {
-      const apiMessage = errorMessageFromCatch(error, "Could not update quantity.");
-      if (isStockLimitError(apiMessage)) {
+      const apiMessage = extractCartStockApiMessage(error);
+      if (isCartStockOrAvailabilityInlineError(apiMessage)) {
         setLineStockErrorByItemId((prev) => ({
           ...prev,
-          [itemId]: 'Exceeded item limit',
+          [itemId]: formatCartStockInlineMessage(apiMessage),
         }));
       } else {
-        toast.error(apiMessage);
+        toast.error(
+          apiMessage.trim() || errorMessageFromCatch(error, 'Could not update quantity.'),
+        );
       }
     }
   };

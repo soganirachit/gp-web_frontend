@@ -11,6 +11,10 @@ import ReactDOM from "react-dom/client";
 import { orderService } from "../../services/order.service";
 import { subscriptionService } from "../../services/subscription.service";
 import { subscriptionCartService } from "../../services/subscriptionCart.service";
+import {
+  validateGpDailyDeliveryAreaForAddressId,
+  validateGpDailyDeliveryAreaFromCoordinates,
+} from "../../services/subscriptionZone.service";
 import { customerService } from "../../services/getcustomer.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { AddressSelectionSkeleton } from "../common/PageSkeletons";
@@ -195,7 +199,10 @@ const AddressSelection: React.FC = () => {
     // Then validate delivery area
     try {
       setIsValidatingAddress(true);
-      const validation = await addressService.validateAddressInDeliveryArea(formData.coordinates);
+      const validation =
+        feature === "gpStore"
+          ? await addressService.validateAddressInDeliveryArea(formData.coordinates)
+          : await validateGpDailyDeliveryAreaFromCoordinates(formData.coordinates);
       setLocationValidation(validation);
 
       if (!validation.isValid) {
@@ -280,7 +287,18 @@ const AddressSelection: React.FC = () => {
         return false;
       }
 
-      const validation = await addressService.validateAddressInDeliveryArea(address.coordinates);
+      const validation =
+        feature === "gpStore"
+          ? await addressService.validateAddressInDeliveryArea(address.coordinates)
+          : await (async () => {
+              const aid = address.id ? parseInt(String(address.id), 10) : NaN;
+              if (Number.isFinite(aid) && aid > 0) {
+                return validateGpDailyDeliveryAreaForAddressId(aid);
+              }
+              return validateGpDailyDeliveryAreaFromCoordinates(
+                address.coordinates!,
+              );
+            })();
       setAddressValidation({
         isValid: validation.isValid,
         message:
@@ -332,23 +350,15 @@ const AddressSelection: React.FC = () => {
           subscriptionData: location.state?.subscriptionData,
         },
       });
+      return;
     }
+
+    await proceedWithValidatedAddress(address);
   };
 
   const createStoreOrder = () => { };
 
-  const handleContinue = async () => {
-    if (!selectedAddress) {
-      toast.error("Please select an address");
-      return;
-    }
-
-    // Validate address is within delivery area
-    const isAddressValid = await validateAddressInDeliveryArea(selectedAddress);
-    if (!isAddressValid) {
-      return;
-    }
-
+  const proceedWithValidatedAddress = async (address: Address) => {
     // try {
     //   // Get the current subscription data
     //   const subscriptionData = localStorage.getItem("currentSubscription");
@@ -385,17 +395,17 @@ const AddressSelection: React.FC = () => {
       // Check if coming from cart page (for both gp-store and gp-daily)
       if (location.state?.fromCart) {
         // Save selected address and navigate back to cart
-        localStorage.setItem('selectedDeliveryAddress', JSON.stringify(selectedAddress));
+        localStorage.setItem('selectedDeliveryAddress', JSON.stringify(address));
 
         // gp-daily cart uses subscription cart APIs to set address
-        if (feature !== 'gpStore' && selectedAddress?.id) {
-          await subscriptionCartService.setDeliveryAddress(Number(selectedAddress.id));
+        if (feature !== 'gpStore' && address?.id) {
+          await subscriptionCartService.setDeliveryAddress(Number(address.id));
         }
 
         const cartPath = feature === 'gpStore' ? '/gp-store/basket' : '/gp-daily/basket';
         navigate(cartPath, {
           state: {
-            selectedAddress: selectedAddress,
+            selectedAddress: address,
             addressUpdated: true,
           },
         });
@@ -431,7 +441,7 @@ const AddressSelection: React.FC = () => {
         // Store product and metaData in localStorage for after Razorpay redirect
         localStorage.setItem("pendingStoreProduct", JSON.stringify(location.state.product));
         localStorage.setItem("pendingStoreMetaData", JSON.stringify(location.state.metaData));
-        localStorage.setItem("selectedDeliveryAddress", JSON.stringify(selectedAddress));
+        localStorage.setItem("selectedDeliveryAddress", JSON.stringify(address));
 
         // Set loading to true to show "Processing..." on button
         setLoading(true);
@@ -442,7 +452,7 @@ const AddressSelection: React.FC = () => {
         // Handle store product payment directly
         // Use currentUserData (local variable) to avoid closure issues
         const handleStoreProductPayment = async (paymentData: any) => {
-          if (!isStoreProduct || !selectedAddress) {
+          if (!isStoreProduct || !address) {
             toast.error("Missing order details or address");
             setLoading(false);
             return;
@@ -485,7 +495,7 @@ const AddressSelection: React.FC = () => {
 
           let productToUse = location.state?.product;
           let metaDataToUse = location.state?.metaData;
-          let addressToUse = selectedAddress;
+          let addressToUse = address;
 
           if (storedProduct && storedMetaData) {
             try {
@@ -713,7 +723,7 @@ const AddressSelection: React.FC = () => {
               );
         const confirmData = {
           basePackId: parsedData.basePackId,
-          deliveryAddressId: selectedAddress.id,
+          deliveryAddressId: address.id,
           type: parsedData.type.toUpperCase() as "DAILY" | "CUSTOM",
           startDate: startDate,
           selectedDays: selectedDays,
@@ -728,7 +738,7 @@ const AddressSelection: React.FC = () => {
         if (confirmResponse.success) {
           const confirmedSubscriptionData = {
             ...confirmResponse.subscription,
-            deliveryAddress: selectedAddress,
+            deliveryAddress: address,
             confirmedAt: new Date().toISOString(),
             packDetails: parsedData.packDetails,
             type: parsedData.type,
@@ -748,7 +758,7 @@ const AddressSelection: React.FC = () => {
             state: {
               isConfirmed: true,
               isStoreProduct: false,
-              selectedAddress: selectedAddress,
+              selectedAddress: address,
               subscription: confirmResponse.subscription,
               product: (confirmResponse as any).product,
               subscriptionDetails: parsedData,
@@ -791,7 +801,7 @@ const AddressSelection: React.FC = () => {
           console.error("Detailed error:", {
             message: errorMessage,
             parsedData,
-            selectedAddress,
+            address,
           });
           toast.error(errorMessage);
         }
@@ -1260,19 +1270,6 @@ const AddressSelection: React.FC = () => {
                 >
                   <span className="text-xl font-semibold leading-none">+</span>
                   Add New Address
-                </button>
-
-                <button
-                  onClick={handleContinue}
-                  disabled={!selectedAddress || loading}
-                  className={`w-full h-[48px] rounded-xl text-base font-semibold shadow-sm flex items-center justify-center ${
-                    selectedAddress && !loading
-                      ? `hover:opacity-90 ${feature === 'gpStore' ? 'text-white' : 'text-gray-900'}`
-                      : 'bg-gray-300 cursor-not-allowed text-gray-500'
-                  }`}
-                  style={selectedAddress && !loading ? { backgroundColor: theme.colors.primary } : {}}
-                >
-                  {loading ? 'Processing...' : (location.state?.fromCart ? 'Continue' : 'Continue & Pay')}
                 </button>
               </div>
             </div>

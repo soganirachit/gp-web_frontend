@@ -25,7 +25,7 @@ export function ProductImageTag({ labels, variant = "store" }: Props) {
 
   const badgeClass =
     variant === "daily"
-      ? "bg-[#FAA222] text-gray-900"
+      ? "bg-[#ffb042] text-[#3C2A00] rounded-tr-md rounded-br-md rounded-tl-none rounded-bl-none"
       : "bg-[#19411F] text-white";
 
   return (

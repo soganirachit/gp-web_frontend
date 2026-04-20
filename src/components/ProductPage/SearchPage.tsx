@@ -7,7 +7,7 @@ import {
   productService,
   Product,
   getEffectivePrice,
-  PRODUCT_AVAILABILITY_DAILY,
+  PRODUCT_AVAILABILITY_GP_DAILY_LIST,
   PRODUCT_AVAILABILITY_STORE,
 } from '../../services/product.service';
 import { trackSearch } from '../../lib/metaPixel';
@@ -21,7 +21,8 @@ const SearchPage: React.FC = () => {
   const navigate = useNavigate();
   const { feature } = useFeatureTheme();
   const listAvailability =
-    feature === 'gpStore' ? PRODUCT_AVAILABILITY_STORE : PRODUCT_AVAILABILITY_DAILY;
+    feature === 'gpStore' ? PRODUCT_AVAILABILITY_STORE : PRODUCT_AVAILABILITY_GP_DAILY_LIST;
+  const productBasePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [basePacks, setBasePacks] = useState<BasePack[]>([]);
@@ -47,7 +48,7 @@ const SearchPage: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [listAvailability]);
 
   useEffect(() => {
     const query = searchQuery.toLowerCase();
@@ -75,9 +76,8 @@ const SearchPage: React.FC = () => {
   };
 
   const handleProductClick = (item: Product | BasePack) => {
-    const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
     const pathSlug = 'slug' in item && item.slug ? item.slug : item.id;
-    navigate(`${basePath}/product/${encodeURIComponent(String(pathSlug))}`, { state: { product: item } });
+    navigate(`${productBasePath}/product/${encodeURIComponent(String(pathSlug))}`, { state: { product: item } });
   };
 
   return (
@@ -95,6 +95,8 @@ const SearchPage: React.FC = () => {
           {/* Search Bar — unified home page styling */}
           <SearchBar
             mode="product"
+            productBasePath={productBasePath}
+            storeId={storeService.getStoreIdForProducts() ?? undefined}
             placeholder="Search subscriptions, products..."
             value={searchQuery}
             onChange={(q) => setSearchQuery(q)}

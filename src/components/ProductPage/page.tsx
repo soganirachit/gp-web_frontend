@@ -12,6 +12,8 @@ import {
   getBasePrice,
   showStrikeBaseOnCard,
   resolveProductImageUrl,
+  PRODUCT_AVAILABILITY_GP_DAILY_LIST,
+  mapGpDailyCatalogRowToProduct,
 } from "../../services/product.service";
 import { storeService } from "../../services/store.service";
 import { getApiUrl } from "../../config/api.config";
@@ -22,7 +24,7 @@ import { SearchBar } from "../common/SearchBar";
 import locationhomeIcon from "../../assets/svg/gp_daily svg/locationhome.svg";
 import scooterIcon from "../../assets/svg/gp_daily svg/scooter.svg";
 
-const DAILY_AVAILABILITY = "daily" as const;
+const DAILY_AVAILABILITY = PRODUCT_AVAILABILITY_GP_DAILY_LIST;
 
 const ProductBrowsePage: React.FC = () => {
   const navigate = useNavigate();
@@ -146,11 +148,13 @@ const ProductBrowsePage: React.FC = () => {
 
         let list: any[] = [];
         const rawAll = async () => {
-          const r = await productService.getAllProducts({
+          const rows = await productService.getAllProductsPaged({
             availabilityType: DAILY_AVAILABILITY,
             storeId: storeId || undefined,
           });
-          return r.filter((p: any) => p.isActive !== false);
+          return rows
+            .filter((p: any) => p.isActive !== false)
+            .map((p: any) => mapGpDailyCatalogRowToProduct(p as Record<string, unknown>));
         };
 
         if (!categorySlug) {
@@ -168,8 +172,11 @@ const ProductBrowsePage: React.FC = () => {
             categorySlug,
             storeId || undefined,
             DAILY_AVAILABILITY,
+            100,
           );
-          list = result || [];
+          list = (result || []).map((p: any) =>
+            mapGpDailyCatalogRowToProduct(p as Record<string, unknown>),
+          );
         }
 
         setProducts(list);
@@ -343,6 +350,8 @@ const ProductBrowsePage: React.FC = () => {
                 <IoSwapVerticalOutline className="h-4 w-4 shrink-0" />
                 <span>Sort</span>
               </button>
+              {/* Filter button — not wired */}
+              {/*
               <button
                 type="button"
                 className="touch-target-compact inline-flex items-center gap-1.5 rounded-lg border border-[#D8D3CD] bg-[#f8f6f1] px-3.5 py-2 text-xs leading-snug font-medium text-gray-700 shadow-[0_1px_0_rgba(0,0,0,0.03)] transition-colors hover:bg-[#f1eee7]"
@@ -427,6 +436,7 @@ const ProductBrowsePage: React.FC = () => {
                 </svg>
                 <span>Filter</span>
               </button>
+              */}
             </div>
 
             {isSortDropdownOpen && (
@@ -468,14 +478,14 @@ const ProductBrowsePage: React.FC = () => {
           </div>
         </div>
 
-        <div className="px-4 py-3">
+        {/* <div className="px-4 py-3">
           <div className="bg-white py-2 rounded-2xl border border-gray-100 shadow-sm mb-4">
             <div className="flex items-center gap-2 text-sm text-gray-700 px-4">
               <img src={scooterIcon} alt="" className="w-5 h-5" />
               <span>Free Delivery — 5–25 min slots in Vadodara</span>
             </div>
           </div>
-        </div>
+        </div> */}
 
         <div className="px-4 py-5">
           {error ? (

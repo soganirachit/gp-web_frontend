@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import { addressService } from "../../services/address.service";
+import { validateGpDailyDeliveryAreaFromCoordinates } from "../../services/subscriptionZone.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import Spinner from "../../components/common/Spinner";
 import {
@@ -259,7 +260,10 @@ const HomePageLocation: React.FC = () => {
       setIsValidatingDeliveryZone(true);
       try {
         const coordinates = `${lat},${lng}`;
-        const validation = await addressService.validateAddressInDeliveryArea(coordinates);
+        const validation =
+          feature === "gpStore"
+            ? await addressService.validateAddressInDeliveryArea(coordinates)
+            : await validateGpDailyDeliveryAreaFromCoordinates(coordinates);
         setIsLocationServiced(validation.isValid);
       } catch (error) {
         console.error("Error validating delivery zone:", error);

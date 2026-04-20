@@ -131,16 +131,30 @@ class OrderService {
                 params: Object.keys(params).length ? params : undefined,
             });
 
+            const subscriptionOnly =
+                String(params.order_type ?? "").toLowerCase() === "subscription";
+            const keepSubscriptionRows = (list: any[]) =>
+                subscriptionOnly
+                    ? list.filter(
+                          (o) =>
+                              String(o?.order_type ?? "").toLowerCase() ===
+                              "subscription",
+                      )
+                    : list;
+
             if (response.status === 200) {
                 // Handle different possible response structures
                 if (response.data.success && response.data.data) {
-                    return Array.isArray(response.data.data) ? response.data.data : [];
+                    const raw = Array.isArray(response.data.data)
+                        ? response.data.data
+                        : [];
+                    return keepSubscriptionRows(raw);
                 }
                 if (Array.isArray(response.data)) {
-                    return response.data;
+                    return keepSubscriptionRows(response.data);
                 }
                 if (response.data.results) {
-                    return response.data.results;
+                    return keepSubscriptionRows(response.data.results);
                 }
                 return [];
             }

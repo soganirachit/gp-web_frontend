@@ -23,14 +23,19 @@ import WalletImage from "../../assets/icon/Wallet.png";
 import ProfileImage from "../../assets/icon/Profile.png";
 import logo from "../../assets/All/logo.png";
 import { ProductDetailSkeleton } from "../common/PageSkeletons";
-import { IoArrowBack } from "react-icons/io5";
-import { FaChevronRight, FaMinus, FaPlus } from "react-icons/fa";
+import { IoArrowBack, IoCartOutline } from "react-icons/io5";
+import { FaChevronRight } from "react-icons/fa";
 import { ProductImageTag } from "../common/ProductImageTag";
 import cautionIcon from "../../assets/svg/gp_daily svg/caution.svg";
 import deliveryTruckIcon from "../../assets/svg/gp_daily svg/delivery_truck.svg";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { storeService } from "../../services/store.service";
 import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
+import {
+  extractCartStockApiMessage,
+  formatCartStockInlineMessage,
+  isCartStockOrAvailabilityInlineError,
+} from "../../utils/cartStockInlineMessage";
 import { subscriptionCartService } from "../../services/subscriptionCart.service";
 
 // Add interface for content items
@@ -200,11 +205,18 @@ const ProductPage: React.FC = () => {
     if (!productId) return null;
     const items = (dailyCart as any)?.items as any[] | undefined;
     if (!Array.isArray(items)) return null;
-    return items.find((it) => String(it.product_id) === String(productId)) ?? null;
+    return (
+      items.find((it) => {
+        const pid = it?.product_id ?? it?.product?.id;
+        return pid != null && String(pid) === String(productId);
+      }) ?? null
+    );
   }, [dailyCart, product]);
   const basketQuantity = Number((activeCartLine as any)?.quantity ?? 0);
+  const [addingToBasket, setAddingToBasket] = useState(false);
   const [isUpdatingBasket, setIsUpdatingBasket] = useState(false);
   const [stockLimitMessage, setStockLimitMessage] = useState<string | null>(null);
+  const [pdpStockShakeNonce, setPdpStockShakeNonce] = useState(0);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
     useState(false);
@@ -657,24 +669,41 @@ const ProductPage: React.FC = () => {
       toast.error("Product information not available");
       return;
     }
+    if (feature === "gpStore") return;
+    if (!localStorage.getItem("phoneNumber")) {
+      toast.error("Please log in to add items to your basket");
+      navigate(`${basePath}/login`, {
+        state: { returnUrl: `${basePath}/product/${encodeURIComponent(slug ?? "")}` },
+      });
+      return;
+    }
+    setAddingToBasket(true);
     try {
-      if (feature === "gpStore") return;
       const cart = await subscriptionCartService.addItem(Number((product as any).id), 1);
       setDailyCart(cart as any);
-      toast.success("Product added to basket!");
+      toast.success("Added to basket");
     } catch (error: unknown) {
       console.error("Error adding to cart:", error);
       toast.error("Failed to add product to basket. Please try again.");
+    } finally {
+      setAddingToBasket(false);
     }
   };
 
   const handleAdjustBasketQuantity = async (nextQty: number) => {
     if (!activeCartLine || isUpdatingBasket) return;
+    if (nextQty > basketQuantity && stockLimitMessage) {
+      setPdpStockShakeNonce((n) => n + 1);
+      return;
+    }
     setIsUpdatingBasket(true);
     setStockLimitMessage(null);
+    setPdpStockShakeNonce(0);
     try {
       if (feature === "gpStore") return;
-      const itemId = Number((activeCartLine as any)?.id);
+      const itemId = Number(
+        (activeCartLine as any)?.id ?? (activeCartLine as any)?.cart_item_id,
+      );
       const productId = Number((product as any)?.id);
       if (!productId) return;
 
@@ -687,18 +716,14 @@ const ProductPage: React.FC = () => {
         setDailyCart(cart as any);
       }
     } catch (error: unknown) {
-      const rawMessage = errorMessageFromCatch(error, "");
-      const msg = String(rawMessage).toLowerCase();
-      const isStockError =
-        msg.includes("stock") ||
-        msg.includes("insufficient") ||
-        msg.includes("available quantity") ||
-        msg.includes("only") ||
-        msg.includes("out of stock");
-      if (isStockError) {
-        setStockLimitMessage("Exceeded item limit");
+      const apiMessage = extractCartStockApiMessage(error);
+      if (isCartStockOrAvailabilityInlineError(apiMessage)) {
+        setStockLimitMessage(formatCartStockInlineMessage(apiMessage));
       } else {
-        toast.error(rawMessage || "Failed to update basket quantity. Please try again.");
+        toast.error(
+          apiMessage.trim() ||
+            errorMessageFromCatch(error, "Failed to update basket quantity. Please try again."),
+        );
       }
     } finally {
       setIsUpdatingBasket(false);
@@ -792,6 +817,19 @@ const ProductPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom overflow-x-clip">
+      <style>{`
+        @keyframes gp-pdp-stock-shake {
+          0%, 100% { transform: translateX(0); }
+          15% { transform: translateX(-7px); }
+          30% { transform: translateX(7px); }
+          45% { transform: translateX(-5px); }
+          60% { transform: translateX(5px); }
+          75% { transform: translateX(-3px); }
+        }
+        .gp-pdp-stock-shake {
+          animation: gp-pdp-stock-shake 0.45s ease-in-out;
+        }
+      `}</style>
       <div className="max-w-[800px] mx-auto relative">
         {/* Header */}
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
@@ -942,37 +980,55 @@ const ProductPage: React.FC = () => {
             </div>
           )}
 
-          {/* Add to Basket / Quantity Controls (gp-store behavior; daily theme) */}
+          {/* Add to Basket → same slot as app: Quantity row + View basket after first add */}
           {basketQuantity > 0 ? (
-            <div className="mb-4 mt-6 py-3">
-              <div className="flex items-center justify-between gap-3">
+            <div className="mb-6 mt-6">
+              <div className="flex items-center justify-between gap-3 py-1">
                 <span className="shrink-0 text-base font-medium text-gray-900">Quantity</span>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-60"
-                    onClick={() => handleAdjustBasketQuantity(basketQuantity - 1)}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-xl font-medium text-[#374151] transition-colors hover:bg-gray-200 disabled:opacity-60"
+                    onClick={() => void handleAdjustBasketQuantity(basketQuantity - 1)}
                     aria-label="Decrease quantity"
                     disabled={isUpdatingBasket}
                   >
-                    <FaMinus className="block text-[9px] leading-none" aria-hidden />
+                    <span className="leading-none" aria-hidden>
+                      −
+                    </span>
                   </button>
-                  <span className="min-w-[1.125rem] px-0.5 text-center text-base font-semibold tabular-nums leading-none text-gray-900">
+                  <span className="min-w-9 shrink-0 text-center text-lg font-semibold tabular-nums text-[#111827]">
                     {basketQuantity}
                   </span>
                   <button
                     type="button"
-                    className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FAA222] text-white transition-colors hover:bg-[#e8941a] disabled:opacity-60"
-                    onClick={() => handleAdjustBasketQuantity(basketQuantity + 1)}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FAA222] text-xl font-medium text-gray-900 transition-colors hover:bg-[#e8941a] disabled:opacity-60"
+                    onClick={() => void handleAdjustBasketQuantity(basketQuantity + 1)}
                     aria-label="Increase quantity"
                     disabled={isUpdatingBasket}
                   >
-                    <FaPlus className="block text-[9px] leading-none" aria-hidden />
+                    <span className="leading-none" aria-hidden>
+                      +
+                    </span>
                   </button>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => navigate(`${basePath}/basket`)}
+                className="mt-3.5 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#FAA222] px-5 py-3.5 text-base font-bold text-gray-900 transition-transform hover:bg-[#e8941a] active:scale-[0.99]"
+              >
+                <IoCartOutline className="text-xl shrink-0" aria-hidden />
+                View basket
+                <FaChevronRight className="text-sm opacity-90" aria-hidden />
+              </button>
               {stockLimitMessage && (
-                <p className="mt-2 text-sm font-medium text-red-600">
+                <p
+                  key={pdpStockShakeNonce}
+                  className={`mt-2 text-sm font-semibold text-red-600 ${
+                    pdpStockShakeNonce > 0 ? "gp-pdp-stock-shake" : ""
+                  }`}
+                >
                   {stockLimitMessage}
                 </p>
               )}
@@ -981,22 +1037,22 @@ const ProductPage: React.FC = () => {
             <button
               type="button"
               onClick={() => void handleAddToBasket()}
-              className="w-full bg-[#FAA222] mt-6 text-gray-900 py-3.5 rounded-[25px] text-base font-semibold mb-6 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center hover:bg-[#e8941a] transition-colors"
-              disabled={!product}
+              className="mb-6 mt-6 flex w-full items-center justify-center rounded-[25px] bg-[#FAA222] py-3.5 text-base font-semibold text-gray-900 transition-colors hover:bg-[#e8941a] disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!product || addingToBasket}
             >
-              Add to Basket
+              {addingToBasket ? "Adding…" : "Add to Basket"}
             </button>
           )}
 
           {/* Delivery Information Banner — light peach card */}
-          <div className="mt-5 sm:mt-6">
+          {/* <div className="mt-5 sm:mt-6">
             <div className="bg-[#FEF3E2] rounded-2xl p-4 sm:p-5 flex items-center gap-3 sm:gap-4 shadow-md border border-amber-100/60">
               <img src={deliveryTruckIcon} alt="" className="w-16 h-16 sm:w-[72px] sm:h-[72px] flex-shrink-0 object-contain" />
               <p className="text-sm sm:text-base font-semibold text-gray-900 leading-snug flex-1">
                 Orders placed before 8 PM will be delivered next day. Sunday deliveries available on request.
               </p>
             </div>
-          </div>
+          </div> */}
 
           {/* Tabs + Content — match gp-store layout (daily accent) */}
           <div className="mt-6">

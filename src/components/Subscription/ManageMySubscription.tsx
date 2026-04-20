@@ -17,6 +17,7 @@ import {
   IoChevronDown,
   IoChevronUp,
   IoCreateOutline,
+  IoCubeOutline,
 } from "react-icons/io5";
 import modifySubIcon from "../../assets/svg/cancelpage/modify.svg";
 import pauseSubIcon from "../../assets/svg/cancelpage/pause.svg";
@@ -24,9 +25,6 @@ import cancelSubIcon from "../../assets/svg/cancelpage/cancel..svg";
 import Spinner from "../../components/common/Spinner";
 import { SubscriptionFlowSkeleton } from "../common/PageSkeletons";
 import { format } from "date-fns";
-import orangeCover from "../../assets/svg/gp_daily svg/orange_cover.svg";
-import redBox from "../../assets/svg/gp_daily svg/redbox.svg";
-import greenBox from "../../assets/svg/gp_daily svg/greenbox.svg";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 
 const WEEK_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
@@ -150,32 +148,37 @@ function subscriptionOrderListTitle(o: Record<string, unknown>): string {
   return "Subscription order";
 }
 
-function subscriptionOrderListDate(o: Record<string, unknown>): string {
+/** Delivery history row — time line aligned with mobile `mapDeliveryHistoryFromOrders`. */
+function subscriptionOrderListTimeLabel(o: Record<string, unknown>): string {
   const raw =
     (o.delivery_date as string) ||
     (o.deliveryDate as string) ||
+    (o.delivered_at as string) ||
     (o.created_at as string) ||
     (o.createdAt as string);
   if (!raw || typeof raw !== "string") return "—";
   try {
-    const d = new Date(raw);
-    if (Number.isNaN(d.getTime())) return "—";
-    return format(d, "MMM d, yyyy");
+    const dt = new Date(raw);
+    if (Number.isNaN(dt.getTime())) return "—";
+    const now = new Date();
+    const isToday = now.toDateString() === dt.toDateString();
+    if (isToday) {
+      return `Today, ${dt.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}`;
+    }
+    return `${dt.toLocaleDateString("en-IN", { weekday: "short", month: "short", day: "numeric" })}, ${dt.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}`;
   } catch {
     return "—";
   }
 }
 
-function orderStatusBadgeClass(status: string): string {
-  const s = (status || "").toLowerCase();
-  if (s.includes("cancel")) return "bg-[#FEE2E2] text-[#EF4444]";
-  if (s.includes("deliver")) return "bg-[#DCFCE7] text-[#166534]";
-  return "bg-gray-100 text-gray-700";
-}
-
-function formatOrderStatusPill(status: string): string {
-  const s = (status || "unknown").toLowerCase().replace(/_/g, " ");
-  return s.replace(/\b\w/g, (c) => c.toUpperCase());
+function historyOrderDelivered(o: Record<string, unknown>): boolean {
+  const st = String(o.status ?? "").toLowerCase();
+  return (
+    st === "delivered" ||
+    st === "completed" ||
+    st === "fulfilled" ||
+    st === "success"
+  );
 }
 
 function isSubscriptionOrderType(o: Record<string, unknown>): boolean {
@@ -232,7 +235,7 @@ const ManageMySubscription: React.FC = () => {
 
   const [validationError, setValidationError] = useState<string>("");
   const [openActionsMenuId, setOpenActionsMenuId] = useState<string | null>(null);
-  /** PACKS accordion per subscription; default expanded when key missing */
+  /** PACKS accordion per subscription; only first card expanded by default (app parity). */
   const [packsExpandedBySubId, setPacksExpandedBySubId] = useState<
     Record<string, boolean>
   >({});
@@ -494,7 +497,10 @@ const ManageMySubscription: React.FC = () => {
       0
     );
     const subIdKey = String(subscription.id);
-    const packsExpanded = packsExpandedBySubId[subIdKey] ?? true;
+    const defaultExpanded =
+      subscriptions.findIndex((x) => x.id === subscription.id) === 0;
+    const packsExpanded =
+      packsExpandedBySubId[subIdKey] ?? defaultExpanded;
 
     const statusBadge = isActive ? (
       <span className="shrink-0 rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-xs font-semibold text-[#166534]">
@@ -655,7 +661,11 @@ const ManageMySubscription: React.FC = () => {
             onClick={() =>
               setPacksExpandedBySubId((prev) => ({
                 ...prev,
-                [subIdKey]: !(prev[subIdKey] ?? true),
+                [subIdKey]: !(
+                  prev[subIdKey] ??
+                  subscriptions.findIndex((x) => x.id === subscription.id) ===
+                    0
+                ),
               }))
             }
             className="flex w-full items-center justify-between gap-2 py-1 text-left"
@@ -724,7 +734,7 @@ const ManageMySubscription: React.FC = () => {
               return (
                 <div
                   key={label}
-                  className={`flex h-9 w-9 flex-1 items-center justify-center rounded-full text-[11px] font-semibold sm:h-10 sm:w-10 sm:text-xs ${
+                  className={`flex h-9 min-w-0 flex-1 items-center justify-center rounded-lg text-[11px] font-semibold sm:h-10 sm:rounded-xl sm:text-xs ${
                     on
                       ? "text-black"
                       : "border border-gray-300 bg-white text-gray-400"
@@ -805,25 +815,9 @@ const ManageMySubscription: React.FC = () => {
             </h1>
           </div>
 
-          {/* Toggle Switch */}
-          <div className="bg-white rounded-2xl p-2 mb-6 border border-gray-200 shadow-sm">
-            <div className="relative flex gap-2">
-              {/* Sliding Orange Background */}
-              <div
-                className={`absolute top-0 bottom-0 transition-all duration-300 ease-in-out ${activeTab === 'subscriptions' ? "left-0" : "left-1/2"
-                  }`}
-                style={{
-                  width: "50%",
-                }}
-              >
-                <img
-                  src={orangeCover}
-                  alt=""
-                  className="w-full h-full object-cover"
-                  style={{ borderRadius: "0.75rem" }}
-                />
-              </div>
-
+          {/* Tabs — same chip pattern as mobile Subscriptions screen */}
+          <div className="mb-6 rounded-[14px] border border-[#F1F5F9] bg-white p-1.5 shadow-sm">
+            <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -832,8 +826,11 @@ const ManageMySubscription: React.FC = () => {
                     replace: true,
                   });
                 }}
-                className={`relative z-10 flex-1 py-3 rounded-xl text-sm font-semibold transition-colors duration-300 ${activeTab === 'subscriptions' ? 'text-gray-900' : 'text-gray-500'
-                  }`}
+                className={`flex-1 rounded-[14px] border py-2.5 text-center text-sm font-semibold transition-colors ${
+                  activeTab === "subscriptions"
+                    ? "border-[#FFB043] bg-[#FFB043] text-[#222222]"
+                    : "border-transparent bg-white text-[#6B7280]"
+                }`}
               >
                 Subscriptions
               </button>
@@ -845,8 +842,11 @@ const ManageMySubscription: React.FC = () => {
                     replace: true,
                   });
                 }}
-                className={`relative z-10 flex-1 py-3 rounded-xl text-sm font-semibold transition-colors duration-300 ${activeTab === 'history' ? 'text-gray-900' : 'text-gray-500'
-                  }`}
+                className={`flex-1 rounded-[14px] border py-2.5 text-center text-sm font-semibold transition-colors ${
+                  activeTab === "history"
+                    ? "border-[#FFB043] bg-[#FFB043] text-[#222222]"
+                    : "border-transparent bg-white text-[#6B7280]"
+                }`}
               >
                 Delivery History
               </button>
@@ -873,17 +873,7 @@ const ManageMySubscription: React.FC = () => {
                     typeof order.order_number === "string"
                       ? order.order_number
                       : "";
-                  const statusStr = String(order.status ?? "");
-                  const preview =
-                    typeof order.preview_image === "string"
-                      ? order.preview_image
-                      : "";
-                  const statusLower = statusStr.toLowerCase();
-                  const fallbackIcon =
-                    statusLower.includes("cancel") ||
-                    statusLower.includes("refund")
-                      ? redBox
-                      : greenBox;
+                  const delivered = historyOrderDelivered(order);
 
                   return (
                     <div
@@ -892,83 +882,73 @@ const ManageMySubscription: React.FC = () => {
                         orderNumber ||
                         index
                       }
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => {
-                        if (orderNumber) {
-                          navigate(
-                            `${GP_DAILY_BASE}/orders/${encodeURIComponent(orderNumber)}`,
-                            { state: { fromSubscriptionHistory: true } },
-                          );
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (
-                          (e.key === "Enter" || e.key === " ") &&
-                          orderNumber
-                        ) {
-                          e.preventDefault();
-                          navigate(
-                            `${GP_DAILY_BASE}/orders/${encodeURIComponent(orderNumber)}`,
-                            { state: { fromSubscriptionHistory: true } },
-                          );
-                        }
-                      }}
-                      className={`flex items-center gap-2 rounded-2xl bg-white p-3 shadow-sm sm:gap-3 sm:p-3.5 ${
-                        orderNumber
-                          ? "cursor-pointer hover:bg-gray-50/80"
-                          : "cursor-default opacity-90"
-                      }`}
+                      className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white p-3 sm:gap-2.5"
                     >
-                      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-2.5">
-                        {preview ? (
-                          <img
-                            src={preview}
-                            alt=""
-                            className="h-9 w-9 shrink-0 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="h-9 w-9 shrink-0">
-                            <img
-                              src={fallbackIcon}
-                              alt=""
-                              className="h-full w-full object-contain"
-                            />
-                          </div>
-                        )}
+                      <button
+                        type="button"
+                        disabled={!orderNumber?.trim()}
+                        onClick={() => {
+                          if (orderNumber) {
+                            navigate(
+                              `${GP_DAILY_BASE}/orders/${encodeURIComponent(orderNumber)}`,
+                              { state: { fromSubscriptionHistory: true } },
+                            );
+                          }
+                        }}
+                        className={`flex min-w-0 flex-1 items-center gap-2.5 text-left sm:gap-2.5 ${
+                          orderNumber?.trim()
+                            ? "cursor-pointer rounded-lg hover:bg-gray-50/80"
+                            : "cursor-default opacity-90"
+                        }`}
+                      >
+                        <IoCubeOutline
+                          className="h-[22px] w-[22px] shrink-0"
+                          style={{ color: delivered ? "#16A34A" : "#DC2626" }}
+                          aria-hidden
+                        />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-semibold leading-snug text-[#1A1A1A] sm:text-[13px]">
+                          <p className="line-clamp-2 text-[15px] font-bold leading-snug text-[#111827]">
                             {subscriptionOrderListTitle(order)}
                           </p>
-                          <p className="mt-0.5 truncate text-[10px] leading-snug text-[#9CA3AF] sm:text-xs">
-                            {subscriptionOrderListDate(order)}
+                          <p className="mt-0.5 text-xs leading-snug text-[#6B7280]">
+                            {subscriptionOrderListTimeLabel(order)}
                           </p>
                         </div>
-                      </div>
-
-                      <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+                      </button>
+                      <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
                         <span
-                          className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold sm:text-[11px] ${orderStatusBadgeClass(statusStr)}`}
+                          className={`whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-bold ${
+                            delivered
+                              ? "bg-[#DCFCE7] text-[#166534]"
+                              : "bg-[#FEE2E2] text-[#991B1B]"
+                          }`}
                         >
-                          {formatOrderStatusPill(statusStr)}
+                          {delivered ? "Delivered" : "Undelivered"}
                         </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`${GP_DAILY_BASE}/customer-support`);
-                          }}
-                          className="whitespace-nowrap text-[10px] font-medium text-[#9CA3AF] underline decoration-1 underline-offset-2 hover:text-gray-900 sm:text-xs"
-                        >
-                          Support
-                        </button>
+                        {delivered ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(`${GP_DAILY_BASE}/customer-support`)
+                            }
+                            className="text-xs font-semibold text-[#2563EB] underline decoration-1 underline-offset-2 hover:text-gray-900"
+                          >
+                            Support
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                   );
                 })
               ) : (
-                <div className="text-center py-10 bg-white rounded-2xl shadow-sm">
-                  <p className="text-gray-500">No delivery history found.</p>
+                <div className="flex flex-col items-center rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
+                  <IoCubeOutline className="h-12 w-12 text-[#D1D5DB]" aria-hidden />
+                  <p className="mt-4 text-base font-semibold text-[#374151]">
+                    No delivery history yet
+                  </p>
+                  <p className="mt-2 max-w-sm text-sm leading-relaxed text-[#6B7280]">
+                    Completed subscription deliveries will show here with status.
+                  </p>
                 </div>
               )}
             </div>

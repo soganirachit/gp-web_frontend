@@ -81,15 +81,24 @@ export function SearchBar({
     }
     try {
       setLoading(true);
-      const { productService } = await import('../../services/product.service');
-      const results = await productService.searchProducts(q.trim(), storeId ?? undefined);
+      const { productService, PRODUCT_AVAILABILITY_GP_DAILY_LIST } = await import(
+        '../../services/product.service'
+      );
+      const availabilityType =
+        productBasePath === '/gp-daily' ? PRODUCT_AVAILABILITY_GP_DAILY_LIST : undefined;
+      const results = await productService.searchProducts(
+        q.trim(),
+        storeId ?? undefined,
+        undefined,
+        availabilityType,
+      );
       setSuggestions((results || []).slice(0, MAX_SUGGESTIONS));
     } catch {
       setSuggestions([]);
     } finally {
       setLoading(false);
     }
-  }, [storeId]);
+  }, [storeId, productBasePath]);
 
   useEffect(() => {
     if (mode === 'product' && query.trim().length >= MIN_CHARS) {
@@ -160,6 +169,12 @@ export function SearchBar({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      /** GP Daily: inline suggestions only — never open standalone `/search` (matches mobile). */
+      if (productBasePath === '/gp-daily') {
+        /** Match mobile: Enter does not open product detail or search page. */
+        e.preventDefault();
+        return;
+      }
       if (suggestions.length > 0 && mode === 'product') {
         handleProductSuggestionClick(suggestions[0] as ProductSuggestion);
       } else if (suggestions.length > 0 && mode === 'order' && onOrderSelect) {

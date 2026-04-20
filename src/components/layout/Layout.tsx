@@ -5,6 +5,7 @@ import { GuestStoreLocationBootstrap } from "../store/GuestStoreLocationBootstra
 import { FeatureThemeProvider } from "../../context/FeatureThemeContext";
 import { FadingOutlet } from "../common/PageFade";
 import { trackPageView } from "../../lib/metaPixel";
+import { AppToaster } from "../ui/AppToaster";
 
 const Layout: React.FC = () => {
   const location = useLocation();
@@ -62,7 +63,9 @@ const Layout: React.FC = () => {
 
   return (
     <FeatureThemeProvider>
-    {/* Fix_V0.9: data-testid for Playwright / QA without changing layout behaviour */}
+    <>
+      <AppToaster />
+      {/* Fix_V0.9: data-testid for Playwright / QA without changing layout behaviour */}
     <div className="min-h-screen bg-[#f8f6f1]" data-testid="gp-root-layout">
       <GuestStoreLocationBootstrap />
       {/* Fixed Header - Hide on auth routes */}
@@ -87,6 +90,7 @@ const Layout: React.FC = () => {
       {/* Single global bottom nav (do not mount BottomNav inside page components — duplicates stack) */}
       {!isAuthRoute && !shouldHideBottomNav && <BottomNav />}
     </div>
+    </>
     </FeatureThemeProvider>
   );
 };

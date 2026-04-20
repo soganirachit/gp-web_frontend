@@ -1,6 +1,7 @@
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
 import { errorMessageFromCatch } from "../utils/apiErrorMessage";
+import { checkSubscriptionZone as postCheckSubscriptionZone } from "./subscriptionZone.service";
 
 export type DailyCartPaymentMethod = "wallet" | "cod";
 
@@ -72,10 +73,8 @@ export const subscriptionCartService = {
    */
   async checkSubscriptionZone(addressId: number): Promise<SubscriptionZoneCheckResponse> {
     try {
-      const res = await api.post(`${getApiUrl()}/subscriptions/check-zone/`, {
-        address_id: addressId,
-      });
-      return unwrap<SubscriptionZoneCheckResponse>(res.data);
+      const res = await postCheckSubscriptionZone({ address_id: addressId });
+      return res as SubscriptionZoneCheckResponse;
     } catch (e: unknown) {
       throw new Error(errorMessageFromCatch(e, "Failed to check delivery zone"));
     }

@@ -29,8 +29,17 @@ import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
 import { errorMessageFromCatch } from '../../../utils/apiErrorMessage';
+import {
+  extractCartStockApiMessage,
+  formatCartStockInlineMessage,
+  isCartStockOrAvailabilityInlineError,
+} from '../../../utils/cartStockInlineMessage';
+import { validateGpDailyDeliveryArea } from '../../../services/subscriptionZone.service';
 import { DELIVERY_DATE_MAX_DAYS_FROM_TODAY } from '../../../constants/deliveryBooking';
+import { computeFirstSubscriptionDeliveryDateFromWeekdayInts } from '../../../utils/subscriptionFirstDeliveryDate';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
+import deliveryTruckIcon from "../../../assets/svg/gp_daily svg/delivery_truck.svg";
+
 
 /**
  * Survives component remounts (e.g. React Strict Mode) so we only show one toast per
@@ -66,18 +75,6 @@ const getSlotDisplayLabel = (slot: DeliverySlot): string => {
   if (!slot.start_time || !slot.end_time) return slot.slot_name || '';
   const { start, end } = getSlotWindowMinutes(slot);
   return formatSlotTimeRange(minutesToTimeStr(start), minutesToTimeStr(end));
-};
-
-/** Same heuristics as StoreProductsDisplayPage — cart update API stock errors. */
-const isStockLimitError = (raw: unknown): boolean => {
-  const msg = String(raw ?? '').toLowerCase();
-  return (
-    msg.includes('stock') ||
-    msg.includes('insufficient') ||
-    msg.includes('available quantity') ||
-    msg.includes('only') ||
-    msg.includes('out of stock')
-  );
 };
 
 // Parse "HH:mm:ss" / "HH:mm" into minutes from midnight
@@ -215,6 +212,8 @@ interface Coupon {
   first_order_only: boolean;
   scope: string;
   discount_label: string;  // e.g. "10% off (up to ₹100)" – use this directly
+  /** GP Daily cart — must match mobile `eligible_for_gp_daily`. */
+  eligible_for_gp_daily?: boolean;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -252,9 +251,17 @@ interface PromoCodeModalProps {
   onApply: (code: string) => Promise<{ successMessage?: string } | void>;
   isApplying: boolean;
   appliedCode: string | null;
+  /** When true, coupons not flagged for Daily cannot be applied (mobile parity). */
+  isDailyMode: boolean;
 }
 
-const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApplying, appliedCode }) => {
+const PromoCodeModal: React.FC<PromoCodeModalProps> = ({
+  onClose,
+  onApply,
+  isApplying,
+  appliedCode,
+  isDailyMode,
+}) => {
   const { theme } = useFeatureTheme();
   const [manualCode, setManualCode] = useState('');
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -287,7 +294,17 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
       setIsFetchingCoupons(true);
       setFetchError(null);
       const data = await fetchCoupons();
-      setCoupons(data);
+      const sorted = isDailyMode
+        ? [...data].sort((a, b) => {
+          const ea = a.eligible_for_gp_daily === true ? 1 : 0;
+          const eb = b.eligible_for_gp_daily === true ? 1 : 0;
+          if (ea !== eb) return eb - ea;
+          return String(a.code).localeCompare(String(b.code), "en", {
+            sensitivity: "base",
+          });
+        })
+        : data;
+      setCoupons(sorted);
     } catch {
       setFetchError('Could not load available coupons.');
     } finally {
@@ -296,7 +313,9 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
   };
 
   // Fetch as soon as the modal mounts
-  useEffect(() => { loadCoupons(); }, []);
+  useEffect(() => {
+    void loadCoupons();
+  }, [isDailyMode]);
 
   const runApply = async (code: string) => {
     setApplyHint(null);
@@ -314,7 +333,21 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
   };
 
   const handleManualApply = () => {
-    if (manualCode.trim()) void runApply(manualCode.trim().toUpperCase());
+    const code = manualCode.trim().toUpperCase();
+    if (!code) return;
+    if (isDailyMode) {
+      const match = coupons.find(
+        (c) => String(c.code).trim().toUpperCase() === code,
+      );
+      if (match && match.eligible_for_gp_daily !== true) {
+        setApplyHint({
+          kind: "error",
+          text: "This promo is not valid on Genda Phool Daily.",
+        });
+        return;
+      }
+    }
+    void runApply(code);
   };
 
   return (
@@ -381,9 +414,8 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
             {applyHint ? (
               <p
                 role="status"
-                className={`mt-2.5 text-xs font-medium leading-snug sm:text-sm ${
-                  applyHint.kind === 'success' ? 'text-green-700' : 'text-red-600'
-                }`}
+                className={`mt-2.5 text-xs font-medium leading-snug sm:text-sm ${applyHint.kind === 'success' ? 'text-green-700' : 'text-red-600'
+                  }`}
               >
                 {applyHint.text}
               </p>
@@ -424,14 +456,17 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
               <div className="space-y-3">
                 {coupons.map((coupon) => {
                   const isApplied = appliedCode === coupon.code;
+                  const ineligibleDaily =
+                    isDailyMode && coupon.eligible_for_gp_daily !== true;
                   return (
                     <div
                       key={coupon.id}
-                      className={`flex items-center justify-between gap-2 rounded-xl border-2 p-3 transition-colors sm:rounded-2xl sm:p-4 ${
-                        isApplied
-                          ? 'bg-[#f8f6f1]'
+                      className={`flex items-center justify-between gap-2 rounded-xl border-2 p-3 transition-colors sm:rounded-2xl sm:p-4 ${isApplied
+                        ? 'bg-[#f8f6f1]'
+                        : ineligibleDaily
+                          ? 'border border-gray-200 bg-gray-100/80 opacity-90'
                           : 'border-dashed border-gray-300 bg-gray-50'
-                      }`}
+                        }`}
                       style={isApplied ? { borderColor: theme.colors.primary } : undefined}
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -455,27 +490,40 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                           <p className="text-xs text-gray-400 mt-0.5">
                             Min. order ₹{coupon.min_order_amount}
                           </p>
+                          {ineligibleDaily ? (
+                            <p className="mt-1 text-xs font-semibold text-red-600">
+                              Not valid on Daily
+                            </p>
+                          ) : null}
                         </div>
                       </div>
 
                       <button
-                        onClick={() => void runApply(coupon.code)}
-                        disabled={isApplying}
-                        className={`ml-3 flex-shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
-                          isApplied
-                            ? 'text-black'
+                        onClick={() => {
+                          if (!isApplied && ineligibleDaily) return;
+                          void runApply(coupon.code);
+                        }}
+                        disabled={isApplying || (!isApplied && ineligibleDaily)}
+                        className={`ml-3 flex-shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${isApplied
+                          ? 'text-black'
+                          : ineligibleDaily
+                            ? 'cursor-not-allowed border border-gray-300 bg-gray-200 text-gray-500'
                             : 'bg-white'
-                        }`}
+                          }`}
                         style={
                           isApplied
                             ? { backgroundColor: theme.colors.primary }
-                            : { border: `1px solid ${theme.colors.primary}`, color: theme.colors.primary }
+                            : !ineligibleDaily
+                              ? { border: `1px solid ${theme.colors.primary}`, color: theme.colors.primary }
+                              : undefined
                         }
                       >
                         {isApplied ? (
                           <><FaCheck className="text-xs" /> Applied</>
                         ) : isApplying ? (
                           'Applying...'
+                        ) : ineligibleDaily ? (
+                          'N/A'
                         ) : (
                           'Apply'
                         )}
@@ -587,9 +635,9 @@ const Cart: React.FC = () => {
   // Listen for tokenRemoved event (session expiration)
   useEffect(() => {
     const handleTokenRemoved = () => {
-      navigate(`${basePath}/login`, { 
+      navigate(`${basePath}/login`, {
         state: { returnUrl: location.pathname, fromCart: true },
-        replace: true 
+        replace: true
       });
     };
 
@@ -643,7 +691,7 @@ const Cart: React.FC = () => {
   const [showSuggestedStoreSwitchModal, setShowSuggestedStoreSwitchModal] = useState(false);
   /** Closest store by distance is offline (ordering unavailable). */
   const [deliveryStoreOffline, setDeliveryStoreOffline] = useState(false);
-  /** True when selected address is outside service area for current store (validate-coverage API). */
+  /** True when selected address is outside GP Daily subscription zone (check-zone / store-by-zone). */
   const [addressOutsideDelivery, setAddressOutsideDelivery] = useState<boolean | null>(null);
   const [isCheckingDeliveryCoverage, setIsCheckingDeliveryCoverage] = useState(false);
   /** After first totals fetch, refreshes (e.g. during checkout) must not show the full-page loader */
@@ -936,6 +984,14 @@ const Cart: React.FC = () => {
     if (!code) return;
     try {
       setIsApplyingPromo(true);
+      const upper = code.trim().toUpperCase();
+      const list = await fetchCoupons();
+      const match = list.find(
+        (c) => String(c.code).trim().toUpperCase() === upper,
+      );
+      if (match && match.eligible_for_gp_daily !== true) {
+        throw new Error("This promo is not valid on Genda Phool Daily.");
+      }
       const response = await applyCouponAPI(code);
 
       const discountAmt = parseFloat(String(response.discount_amount ?? 0));
@@ -950,7 +1006,7 @@ const Cart: React.FC = () => {
           const raw = await cartService.getCartData();
           const cartData = await reconcileCartStoreWithAccountSelection(raw);
           applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
-        } catch (_) {}
+        } catch (_) { }
       }
 
       setAppliedPromoCode(code);
@@ -994,7 +1050,7 @@ const Cart: React.FC = () => {
 
   // Preload Razorpay SDK when basket opens so checkout is not blocked on first load
   useEffect(() => {
-    loadRazorpayScript().catch(() => {});
+    loadRazorpayScript().catch(() => { });
   }, []);
 
   // Open Razorpay only after SDK is ready (avoids "Payment gateway is not ready")
@@ -1211,21 +1267,28 @@ const Cart: React.FC = () => {
     };
   }, [isLoggedIn, defaultAddress?.id, reconcileCartStoreWithAccountSelection]);
 
-  // Selected address vs store coverage (same API as address save flow).
+  // GP Daily: subscription zone only (POST check-zone + GET store-by-zone when needed), not stores/validate-coverage.
   useEffect(() => {
     if (!isLoggedIn) {
       setAddressOutsideDelivery(null);
       return;
     }
+    const addrId = defaultAddress?.id
+      ? parseInt(String(defaultAddress.id), 10)
+      : NaN;
+    const useAddressId = Number.isFinite(addrId) && addrId > 0;
     const coords = defaultAddress?.coordinates;
-    if (!coords || !addressService.validateCoordinatesFormat(coords)) {
+    const coordsOk =
+      !!coords && addressService.validateCoordinatesFormat(coords);
+    if (!useAddressId && !coordsOk) {
       setAddressOutsideDelivery(null);
       return;
     }
     let cancelled = false;
     setIsCheckingDeliveryCoverage(true);
-    void addressService
-      .validateAddressInDeliveryArea(coords)
+    void validateGpDailyDeliveryArea(
+      useAddressId ? { addressId: addrId } : { coordinates: coords! },
+    )
       .then((res) => {
         if (!cancelled) setAddressOutsideDelivery(!res.isValid);
       })
@@ -1253,7 +1316,7 @@ const Cart: React.FC = () => {
         const found = list.find((s) => s.id === sid);
         if (found?.name) setCartStoreName(found.name);
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       cancelled = true;
     };
@@ -1289,9 +1352,9 @@ const Cart: React.FC = () => {
   // Fetch address
   useEffect(() => {
     const fetchAddress = async () => {
-      if (!isLoggedIn) { 
+      if (!isLoggedIn) {
         setIsLoadingAddress(false);
-        return; 
+        return;
       }
       if (location.state?.selectedAddress) {
         setDefaultAddress(location.state.selectedAddress);
@@ -1300,11 +1363,11 @@ const Cart: React.FC = () => {
       }
       const storedAddress = localStorage.getItem('selectedDeliveryAddress');
       if (storedAddress) {
-        try { 
-          setDefaultAddress(JSON.parse(storedAddress)); 
+        try {
+          setDefaultAddress(JSON.parse(storedAddress));
           setIsLoadingAddress(false);
-          return; 
-        } catch (_) {}
+          return;
+        } catch (_) { }
       }
       try {
         setIsLoadingAddress(true);
@@ -1354,7 +1417,7 @@ const Cart: React.FC = () => {
       if (deliveryInfo.slotId) setSelectedSlotId(deliveryInfo.slotId);
       fetchSlotsForDate(dateObj);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /** Lets users tap greyed days and see why (react-datepicker does not call onChange for disabled days). */
@@ -1455,8 +1518,8 @@ const Cart: React.FC = () => {
       deliveryInfo?.selectedDate instanceof Date
         ? deliveryInfo.selectedDate
         : deliveryInfo?.selectedDate
-        ? new Date(deliveryInfo.selectedDate)
-        : new Date();
+          ? new Date(deliveryInfo.selectedDate)
+          : new Date();
     if (!isSlotSelectable(slot, selectedDate)) return;
     setSelectedSlotId(slot.id);
     setSelectedTimeSlot(getSlotDisplayLabel(slot));
@@ -1516,14 +1579,16 @@ const Cart: React.FC = () => {
         return n;
       });
     } catch (error: unknown) {
-      const apiMessage = errorMessageFromCatch(error, "Could not update quantity.");
-      if (isStockLimitError(apiMessage)) {
+      const apiMessage = extractCartStockApiMessage(error);
+      if (isCartStockOrAvailabilityInlineError(apiMessage)) {
         setLineStockErrorByItemId((prev) => ({
           ...prev,
-          [itemId]: 'Exceeded item limit',
+          [itemId]: formatCartStockInlineMessage(apiMessage),
         }));
       } else {
-        toast.error(apiMessage);
+        toast.error(
+          apiMessage.trim() || errorMessageFromCatch(error, 'Could not update quantity.'),
+        );
       }
     }
   };
@@ -1610,8 +1675,12 @@ const Cart: React.FC = () => {
       setIsProcessingPayment(true);
       await subscriptionCartService.setDeliveryAddress(Number(defaultAddress.id));
       await subscriptionCartService.setDeliveryDays(activeDeliveryDayInts);
+      const subscriptionStartDate = format(
+        computeFirstSubscriptionDeliveryDateFromWeekdayInts(activeDeliveryDayInts),
+        'yyyy-MM-dd',
+      );
       const checkoutRes = await subscriptionCartService.checkout({
-        start_date: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
+        start_date: subscriptionStartDate,
         payment_method: 'wallet',
         delivery_days: activeDeliveryDayInts,
       });
@@ -1621,7 +1690,7 @@ const Cart: React.FC = () => {
       const subscriptionDetails = {
         basePackId: String(firstItem?.productId ?? ''),
         type: deliveryFrequency === 'Customize' ? 'CUSTOM' : 'DAILY',
-        startDate: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
+        startDate: subscriptionStartDate,
         amount: Number(total ?? 0),
         packDetails: {
           name: String(firstItem?.name ?? 'Pack'),
@@ -1637,15 +1706,15 @@ const Cart: React.FC = () => {
       };
       const selectedAddress = defaultAddress
         ? {
-            id: String(defaultAddress.id),
-            street: String(defaultAddress.streetName ?? ''),
-            area: String(defaultAddress.area ?? ''),
-            city: String(defaultAddress.city ?? ''),
-            state: String(defaultAddress.state ?? ''),
-            pincode: String(defaultAddress.pincode ?? ''),
-            societyName: String((defaultAddress as any).societyName ?? ''),
-            coordinates: String(defaultAddress.coordinates ?? ''),
-          }
+          id: String(defaultAddress.id),
+          street: String(defaultAddress.streetName ?? ''),
+          area: String(defaultAddress.area ?? ''),
+          city: String(defaultAddress.city ?? ''),
+          state: String(defaultAddress.state ?? ''),
+          pincode: String(defaultAddress.pincode ?? ''),
+          societyName: String((defaultAddress as any).societyName ?? ''),
+          coordinates: String(defaultAddress.coordinates ?? ''),
+        }
         : null;
       navigate(`${basePath}/subscription/confirm`, {
         state: {
@@ -1696,7 +1765,7 @@ const Cart: React.FC = () => {
           finalizeOrder(status.order_number, parseFloat(status.amount) || amountPaise / 100);
           return true;
         }
-      } catch (_) {}
+      } catch (_) { }
       // Wait 2s between polls (skip wait after last attempt)
       if (i < MAX_POLLS - 1) await new Promise(r => setTimeout(r, 2000));
     }
@@ -1777,7 +1846,7 @@ const Cart: React.FC = () => {
             removePendingPayment(payment.id);
             done = true;
           }
-        } catch (_) {}
+        } catch (_) { }
 
         // If verify failed, try status poll
         if (!done) {
@@ -1798,10 +1867,14 @@ const Cart: React.FC = () => {
     setShouldTriggerPayment(false);
   };
 
-  /** Matches subscription checkout default `start_date` (next calendar day). */
+  /** First delivery on or after tomorrow that matches selected `delivery_days`. */
   const basketFirstDeliveryLabel = useMemo(
-    () => format(addDays(startOfDay(new Date()), 1), 'EEE, d MMM yyyy'),
-    [],
+    () =>
+      format(
+        computeFirstSubscriptionDeliveryDateFromWeekdayInts(activeDeliveryDayInts),
+        'EEE, d MMM yyyy',
+      ),
+    [activeDeliveryDayInts],
   );
 
   // Order summary
@@ -1854,7 +1927,7 @@ const Cart: React.FC = () => {
       (isLoadingAddress ||
         (isLoadingCartTotals && !hasLoadedCartTotalsOnce) ||
         (isSyncing && !basketHydratedOnce)));
-  
+
   if (isPageLoading) {
     return <CartPageSkeleton />;
   }
@@ -1912,14 +1985,28 @@ const Cart: React.FC = () => {
         </div>
 
         {items.length === 0 ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-4">
-            <img src={emptyCartSvg} alt="" width={72} height={72} className="mb-3 shrink-0" />
-            <p className="mb-2 text-center text-[18px] font-semibold leading-snug text-gray-900">Your basket is empty</p>
-            <p className="mb-4 max-w-sm text-center text-sm text-gray-500">Add some blooms from the store to see them here.</p>
+          <div className="mx-auto w-full max-w-md space-y-6 px-4 py-8 pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]">
+            <div className="flex flex-col items-center text-center">
+              <img src={emptyCartSvg} alt="" width={72} height={72} className="mb-3 shrink-0" />
+              <p className="mb-2 text-[18px] font-semibold leading-snug text-gray-900">Your basket is empty</p>
+              <p className="max-w-sm text-sm text-gray-500">Add some blooms from the store to see them here.</p>
+            </div>
+            <div className="rounded-2xl border border-amber-300/80 bg-[#FFF4E5] p-4 shadow-sm sm:p-5">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <img
+                  src={deliveryTruckIcon}
+                  alt=""
+                  className="h-14 w-14 shrink-0 object-contain sm:h-[72px] sm:w-[72px]"
+                />
+                <p className="text-left text-sm font-semibold leading-snug text-gray-900 sm:text-base">
+                  Orders placed before 8 PM will be delivered next day. Sunday deliveries available on request.
+                </p>
+              </div>
+            </div>
             <button
               type="button"
               onClick={() => navigate(browseProductsPath)}
-              className="mt-2 rounded-full px-6 py-2.5 text-sm font-semibold transition-colors"
+              className="w-full rounded-full px-6 py-2.5 text-sm font-semibold transition-colors"
               style={{ backgroundColor: theme.colors.primary, color: 'black' }}
             >
               Browse Products
@@ -2080,15 +2167,30 @@ const Cart: React.FC = () => {
                   {lineStockErrorByItemId[item.id] ? (
                     <p
                       key={stockShakeVersionByItemId[item.id] ?? 0}
-                      className={`mt-2  pr-1 text-xs font-medium text-red-600  ${
-                        (stockShakeVersionByItemId[item.id] ?? 0) > 0 ? 'gp-cart-stock-shake' : ''
-                      }`}
+                      className={`mt-2  pr-1 text-xs font-medium text-red-600  ${(stockShakeVersionByItemId[item.id] ?? 0) > 0 ? 'gp-cart-stock-shake' : ''
+                        }`}
                     >
                       {lineStockErrorByItemId[item.id]}
                     </p>
                   ) : null}
                 </div>
               ))}
+
+              {/* Delivery info — above delivery-day controls so it stays visible without scrolling past the tall card */}
+              <div className="mt-1">
+                <div className="rounded-2xl border border-amber-300/80 bg-[#FFF4E5] p-4 shadow-sm sm:p-5">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <img
+                      src={deliveryTruckIcon}
+                      alt=""
+                      className="h-14 w-14 shrink-0 object-contain sm:h-[72px] sm:w-[72px]"
+                    />
+                    <p className="flex-1 text-sm font-semibold leading-snug text-gray-900 sm:text-base">
+                      Orders placed before 8 PM will be delivered next day. Sunday deliveries available on request.
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               {/* Select Delivery Days (gp-daily) */}
               <div className="bg-white rounded-[25px] p-4 shadow-sm relative">
@@ -2111,13 +2213,12 @@ const Cart: React.FC = () => {
                             setSelectedDays([]);
                           }
                         }}
-                        className={`px-2 py-2 min-h-[40px] xs:min-h-[36px] rounded-xl text-[10px] xs:text-[10px] font-medium transition-colors flex items-center justify-center gap-1 text-center leading-tight ${
-                          isDisabled
-                            ? 'cursor-not-allowed border border-gray-200 bg-gray-50 text-gray-400'
-                            : isActive
-                              ? 'text-black'
-                              : 'bg-white text-gray-700 border border-gray-200'
-                        }`}
+                        className={`px-2 py-2 min-h-[40px] xs:min-h-[36px] rounded-xl text-[10px] xs:text-[10px] font-medium transition-colors flex items-center justify-center gap-1 text-center leading-tight ${isDisabled
+                          ? 'cursor-not-allowed border border-gray-200 bg-gray-50 text-gray-400'
+                          : isActive
+                            ? 'text-black'
+                            : 'bg-white text-gray-700 border border-gray-200'
+                          }`}
                         style={isActive ? { backgroundColor: theme.colors.primary } : undefined}
                       >
                         {opt === 'Mon-Sat' ? 'Mon-Sat' : opt}
@@ -2141,11 +2242,10 @@ const Cart: React.FC = () => {
                         type="button"
                         onClick={() => toggleDeliveryDay(day)}
                         disabled={isDisabled}
-                        className={`w-full min-w-0 px-1 py-1.5 min-h-[30px] rounded-lg text-[9px] xs:text-[10px] font-medium transition-colors flex items-center justify-center ${
-                          isSelected
-                            ? 'text-black'
-                            : 'bg-white text-gray-700 border border-gray-200'
-                        }`}
+                        className={`w-full min-w-0 px-1 py-1.5 min-h-[30px] rounded-lg text-[9px] xs:text-[10px] font-medium transition-colors flex items-center justify-center ${isSelected
+                          ? 'text-black'
+                          : 'bg-white text-gray-700 border border-gray-200'
+                          }`}
                         style={isSelected ? { backgroundColor: theme.colors.primary } : undefined}
                       >
                         {day}
@@ -2177,7 +2277,6 @@ const Cart: React.FC = () => {
                   </div>
                 ) : null}
               </div>
-
               {/* Delivery Details */}
               <div className="rounded-[25px] bg-white p-4 shadow-sm">
                 <div className="mb-2 flex items-center justify-between gap-2">
@@ -2445,6 +2544,7 @@ const Cart: React.FC = () => {
           onApply={handleApplyPromoCode}
           isApplying={isApplyingPromo}
           appliedCode={appliedPromoCode}
+          isDailyMode
         />
       )}
 

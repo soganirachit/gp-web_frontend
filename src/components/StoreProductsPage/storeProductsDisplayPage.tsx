@@ -27,6 +27,11 @@ import { useAuth } from "../../context/AuthContext";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
 import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
+import {
+  extractCartStockApiMessage,
+  formatCartStockInlineMessage,
+  isCartStockOrAvailabilityInlineError,
+} from "../../utils/cartStockInlineMessage";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import {
   GUEST_STORE_UPDATED_EVENT,
@@ -137,6 +142,7 @@ const StorePage: React.FC = () => {
   const [customMessage, setCustomMessage] = useState<string>("");
   const [isUpdatingBasket, setIsUpdatingBasket] = useState(false);
   const [stockLimitMessage, setStockLimitMessage] = useState<string | null>(null);
+  const [pdpStockShakeNonce, setPdpStockShakeNonce] = useState(0);
 
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -386,8 +392,13 @@ const StorePage: React.FC = () => {
 
   const handleAdjustBasketQuantity = async (nextQty: number) => {
     if (!activeCartLine || isUpdatingBasket) return;
+    if (nextQty > basketQuantity && stockLimitMessage) {
+      setPdpStockShakeNonce((n) => n + 1);
+      return;
+    }
     setIsUpdatingBasket(true);
     setStockLimitMessage(null);
+    setPdpStockShakeNonce(0);
     try {
       if (nextQty < 1) {
         await removeFromCart(activeCartLine.id);
@@ -396,20 +407,14 @@ const StorePage: React.FC = () => {
       }
     } catch (error: unknown) {
       console.error("Error updating basket quantity:", error);
-      const rawMessage = errorMessageFromCatch(error, "");
-      const msg = String(rawMessage).toLowerCase();
-      const isStockError =
-        msg.includes("stock") ||
-        msg.includes("insufficient") ||
-        msg.includes("available quantity") ||
-        msg.includes("only") ||
-        msg.includes("out of stock");
-      if (isStockError) {
-        setStockLimitMessage(
-          "Exceeded item limit",
-        );
+      const apiMessage = extractCartStockApiMessage(error);
+      if (isCartStockOrAvailabilityInlineError(apiMessage)) {
+        setStockLimitMessage(formatCartStockInlineMessage(apiMessage));
       } else {
-        toast.error(rawMessage || "Failed to update basket quantity. Please try again.");
+        toast.error(
+          apiMessage.trim() ||
+            errorMessageFromCatch(error, "Failed to update basket quantity. Please try again."),
+        );
       }
     } finally {
       setIsUpdatingBasket(false);
@@ -680,6 +685,19 @@ const StorePage: React.FC = () => {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f8f6f1]">
+      <style>{`
+        @keyframes gp-pdp-stock-shake {
+          0%, 100% { transform: translateX(0); }
+          15% { transform: translateX(-7px); }
+          30% { transform: translateX(7px); }
+          45% { transform: translateX(-5px); }
+          60% { transform: translateX(5px); }
+          75% { transform: translateX(-3px); }
+        }
+        .gp-pdp-stock-shake {
+          animation: gp-pdp-stock-shake 0.45s ease-in-out;
+        }
+      `}</style>
       {/* SEO — dynamic per product, works for all current and future products */}
       {product && (
         <SEO
@@ -958,7 +976,12 @@ const StorePage: React.FC = () => {
                 </div>
               </div>
               {stockLimitMessage && (
-                <p className="mt-2 text-sm font-medium text-red-600">
+                <p
+                  key={pdpStockShakeNonce}
+                  className={`mt-2 text-sm font-medium text-red-600 ${
+                    pdpStockShakeNonce > 0 ? "gp-pdp-stock-shake" : ""
+                  }`}
+                >
                   {stockLimitMessage}
                 </p>
               )}

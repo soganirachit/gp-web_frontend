@@ -2,6 +2,9 @@ import axios, { AxiosError, type AxiosResponse } from "axios";
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
 import { addressService } from "./address.service";
+import {
+  resolveGpDailyZoneAtLatLng,
+} from "./subscriptionZone.service";
 
 /** Dispatched on `window` after a guest picks a store from the city picker (home / products refresh). */
 export const GUEST_STORE_UPDATED_EVENT = "gp-guest-temporary-store-updated";
@@ -223,9 +226,29 @@ class StoreService {
   }
 
   /**
-   * Resolve a guest store from device coordinates: validates coverage, then nearest selectable store.
+   * Resolve a guest store from device coordinates.
+   * On `/gp-daily/*`, uses subscription check-zone (+ store-by-zone). Else store validate-coverage + nearest store.
    */
   async resolveGuestStoreFromCoordinates(latitude: number, longitude: number): Promise<number> {
+    const isGpDaily =
+      typeof window !== "undefined" &&
+      window.location.pathname.startsWith("/gp-daily");
+
+    if (isGpDaily) {
+      try {
+        const zone = await resolveGpDailyZoneAtLatLng(latitude, longitude);
+        if (!zone.eligible || zone.storeId == null) {
+          this.clearTemporaryStoreId();
+          this.rejectCityPicker(zone.message);
+        }
+        this.setTemporaryStoreId(zone.storeId);
+        return zone.storeId;
+      } catch {
+        this.clearTemporaryStoreId();
+        this.rejectCityPicker();
+      }
+    }
+
     let coverageOk = false;
     try {
       const cov = await addressService.validateAddressInDeliveryArea(`${latitude},${longitude}`);

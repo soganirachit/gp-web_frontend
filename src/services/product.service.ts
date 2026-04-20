@@ -7,9 +7,72 @@ import { getApiUrl } from "../config/api.config";
 // So we use relative paths like '/products/...'
 const PRODUCTS_BASE = '/products';
 
-/** Query param for GET /products/ — see API: `daily` → daily + both; `store` → store + both (excludes store-only when using `daily`). */
-export const PRODUCT_AVAILABILITY_DAILY = "daily";
 export const PRODUCT_AVAILABILITY_STORE = "store";
+
+/**
+ * GP Daily catalog: `GET /products/?availability_type=daily,both` (include `daily` and `both` rows).
+ * Do not send bare `daily` alone — backend list endpoints expect this combined filter.
+ */
+export const PRODUCT_AVAILABILITY_GP_DAILY_LIST = "daily,both";
+
+/**
+ * Same value as {@link PRODUCT_AVAILABILITY_GP_DAILY_LIST} — legacy name used by some GP Daily screens.
+ */
+export const PRODUCT_AVAILABILITY_DAILY = PRODUCT_AVAILABILITY_GP_DAILY_LIST;
+
+function normalizeProductListNextUrl(nextOrPath: string): string {
+  const root = getApiUrl().replace(/\/$/, "");
+  const s = nextOrPath.trim();
+  if (!s) return root;
+  if (/^https?:\/\//i.test(s)) {
+    try {
+      const u = new URL(s);
+      if (u.protocol === "http:") u.protocol = "https:";
+      return u.href;
+    } catch {
+      return s;
+    }
+  }
+  const path = s.startsWith("/") ? s : `/${s}`;
+  if (path.startsWith("/api/")) {
+    try {
+      const baseForOrigin = root.includes("://") ? root : `https://${root}`;
+      const origin = new URL(baseForOrigin).origin;
+      return `${origin}${path}`;
+    } catch {
+      return `${root}${path}`;
+    }
+  }
+  return `${root}${path}`;
+}
+
+async function fetchAllProductPages(
+  path: string,
+  params: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<any[]> {
+  const allResults: any[] = [];
+  let nextUrl: string | null = null;
+  const firstResponse = await api.get(path, { params, signal });
+  let data = firstResponse.data;
+  const extractResults = (d: any): any[] => {
+    if (d && Array.isArray(d.results)) return d.results;
+    if (d && d.success && Array.isArray(d.data)) return d.data;
+    if (Array.isArray(d)) return d;
+    return [];
+  };
+  allResults.push(...extractResults(data));
+  nextUrl = data?.next ?? null;
+  while (nextUrl) {
+    const res = await api.get(normalizeProductListNextUrl(String(nextUrl)), {
+      signal,
+    });
+    data = res.data;
+    allResults.push(...extractResults(data));
+    nextUrl = data?.next ?? null;
+  }
+  return allResults;
+}
 
 export interface Product {
   id: string;
@@ -45,6 +108,76 @@ export interface Product {
   isActive?: boolean | unknown;
   isStore?: boolean;
   isDaily?: boolean;
+  /** From list API `category_name` (display). */
+  categoryName?: string;
+  availability_type?: string;
+  labels?: Array<{
+    name?: string;
+    slug?: string;
+    color_code?: string;
+    icon?: string;
+  }>;
+}
+
+function legacyCategoryCodeFromCategoryName(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes("exotic")) return "EXOTIC";
+  if (n.includes("puja") || n.includes("pooja")) return "PUJA";
+  return "GENERAL";
+}
+
+/** Map GET /products/ DRF row (`category_name`, `current_price`, …) to {@link Product}. */
+export function mapGpDailyCatalogRowToProduct(
+  row: Record<string, unknown>,
+): Product {
+  const categoryName = String(row.category_name ?? row.category ?? "").trim();
+  const id = String(row.id ?? row.slug ?? "");
+  const slug = row.slug != null ? String(row.slug) : undefined;
+  const primary = row.primary_image;
+  const imagesUrl =
+    typeof primary === "string" && primary
+      ? [primary]
+      : Array.isArray(row.imagesUrl)
+        ? (row.imagesUrl as string[])
+        : undefined;
+  const price = Number(
+    row.current_price ??
+      row.sale_price ??
+      row.base_price ??
+      row.sellingPrice ??
+      0,
+  );
+  const desc = String(
+    row.short_description ?? row.description ?? "",
+  ).trim();
+  const avail = String(row.availability_type ?? "").toLowerCase();
+  const labelsRaw = row.labels;
+  const labels = Array.isArray(labelsRaw)
+    ? (labelsRaw as Product["labels"])
+    : undefined;
+  return {
+    id,
+    slug,
+    name: String(row.name ?? "").trim() || "Product",
+    description: desc || "—",
+    sellingPrice: Number.isFinite(price) ? price : 0,
+    imagesUrl,
+    tags: [],
+    subcategories: [],
+    isAvailable:
+      row.is_available !== false &&
+      row.in_stock !== false &&
+      row.is_available !== 0,
+    category: (
+      categoryName
+        ? legacyCategoryCodeFromCategoryName(categoryName)
+        : String(row.category ?? "GENERAL")
+    ).toUpperCase(),
+    categoryName: categoryName || undefined,
+    availability_type: avail || undefined,
+    labels,
+    isActive: row.is_active !== false,
+  };
 }
 
 export interface Category {
@@ -96,7 +229,7 @@ export interface BestSeller {
 
 export const productService = {
   /**
-   * GET /products/ — optional `availability_type` (e.g. `daily` for daily + both, `store` for store + both).
+   * GET /products/ — optional `availability_type` (e.g. `daily,both` for GP Daily catalog, `store` for store).
    */
   async getAllProducts(opts?: {
     storeId?: number;
@@ -135,6 +268,28 @@ export const productService = {
       }
       throw new Error("An unknown error occurred");
     }
+  },
+
+  /**
+   * GET /products/ and follow `next` until exhausted — use for GP Daily home “All packs”.
+   */
+  async getAllProductsPaged(opts?: {
+    storeId?: number;
+    availabilityType?: string;
+    signal?: AbortSignal;
+    pageChunkSize?: number;
+  }): Promise<any[]> {
+    const params: Record<string, unknown> = {};
+    if (opts?.storeId != null && Number.isFinite(Number(opts.storeId))) {
+      params.store_id = Number(opts.storeId);
+    }
+    if (opts?.availabilityType) params.availability_type = opts.availabilityType;
+    const chunk = opts?.pageChunkSize ?? 100;
+    if (chunk > 0) {
+      params.page_size = chunk;
+      params.limit = chunk;
+    }
+    return fetchAllProductPages(`${PRODUCTS_BASE}/`, params, opts?.signal);
   },
 
   /** Prefer `getProductBySlug` for customer flows — public catalog detail is GET /products/{slug}/ per API (numeric id returns 404). */
@@ -230,26 +385,22 @@ export const productService = {
     }
   },
 
-  async getProductsByCategory(categorySlug: string, storeId?: number, availabilityType?: string): Promise<any[]> {
+  async getProductsByCategory(
+    categorySlug: string,
+    storeId?: number,
+    availabilityType?: string,
+    limit: number = 100,
+    signal?: AbortSignal,
+  ): Promise<any[]> {
     try {
-      const params: Record<string, any> = { category: categorySlug };
+      const params: Record<string, unknown> = { category: categorySlug };
       if (storeId) params.store_id = storeId;
       if (availabilityType) params.availability_type = availabilityType;
-
-      const response = await api.get(`${PRODUCTS_BASE}/`, { params });
-
-      if (response.data && response.data.results && Array.isArray(response.data.results)) {
-        return response.data.results;
+      if (limit > 0) {
+        params.limit = limit;
+        params.page_size = limit;
       }
-      if (response.data && response.data.success && Array.isArray(response.data.data)) {
-        return response.data.data;
-      }
-      if (Array.isArray(response.data)) {
-        return response.data;
-      }
-
-      console.error("Unexpected response format:", response.data);
-      return [];
+      return await fetchAllProductPages(`${PRODUCTS_BASE}/`, params, signal);
     } catch (error: unknown) {
       if (error instanceof AxiosError && (error.code === 'ERR_CANCELED' || error.name === 'AbortError')) {
         throw error;
@@ -408,10 +559,16 @@ export const productService = {
   },
 
   // Search products using GET /products/ with ?search= query (and optional store_id)
-  async searchProducts(search: string, storeId?: number, signal?: AbortSignal): Promise<BestSeller[]> {
+  async searchProducts(
+    search: string,
+    storeId?: number,
+    signal?: AbortSignal,
+    availabilityType?: string,
+  ): Promise<BestSeller[]> {
     try {
       const params: Record<string, any> = { search };
       if (storeId) params.store_id = storeId;
+      if (availabilityType) params.availability_type = availabilityType;
 
       const response = await api.get(`${PRODUCTS_BASE}/`, { params, signal });
       const data = response.data;

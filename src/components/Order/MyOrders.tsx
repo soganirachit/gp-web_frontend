@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { SEO } from '../SEO';
 import { useNavigate } from 'react-router-dom';
-import { FaFilter, FaSearch, FaChevronRight } from 'react-icons/fa';
+import { FaChevronRight } from 'react-icons/fa';
 import { IoArrowBack } from "react-icons/io5";
 import { orderService } from '../../services/order.service';
 import { format } from 'date-fns';
@@ -46,7 +46,9 @@ const MyOrders: React.FC = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const fetchedOrders = await orderService.getOrders();
+      const fetchedOrders = await orderService.getOrders(
+        feature === "gpDaily" ? { order_type: "subscription" } : undefined,
+      );
       if (fetchedOrders && fetchedOrders.length > 0) {
         // Transform API orders to match the component's Order interface
         const transformedOrders: Order[] = fetchedOrders.map((order: any) => {
@@ -76,13 +78,13 @@ const MyOrders: React.FC = () => {
         const sortedOrders = transformedOrders.sort((a: Order, b: Order) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
-        /** GP Store “My Orders” is for store purchases only — subscription deliveries live under Daily. */
+        /** GP Store: hide subscription fulfilments. GP Daily: only subscription rows (list API may still return mixed types). */
         const isSubscriptionRow = (o: Order) =>
           String(o.order_type || '').toLowerCase() === 'subscription';
         const listOrders =
           feature === 'gpStore'
             ? sortedOrders.filter((o) => !isSubscriptionRow(o))
-            : sortedOrders;
+            : sortedOrders.filter((o) => isSubscriptionRow(o));
         setOrders(listOrders);
       } else {
         setOrders([]);
@@ -126,6 +128,19 @@ const MyOrders: React.FC = () => {
   const visibleOrders = filteredOrders.slice(0, visibleCount);
   const hasMoreOrders = visibleCount < filteredOrders.length;
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#f8f6f1]">
+        <SEO
+          title="My Orders — Genda Phool"
+          description="View your Genda Phool order history"
+          canonical="https://customerapp.mygendaphool.com/gp-store/orders"
+          noIndex={true}
+        />
+        <OrdersListSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
@@ -165,6 +180,8 @@ const MyOrders: React.FC = () => {
                 }}
               />
             </div>
+            {/* Filter button — not wired; keep search full width */}
+            {/*
             <button className="w-12 h-[46px] flex items-center justify-center bg-white border border-gray-200 rounded-xl hover:bg-gray-50">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <g clip-path="url(#clip0_315_18148)">
@@ -184,16 +201,14 @@ const MyOrders: React.FC = () => {
                   </clipPath>
                 </defs>
               </svg>
-
             </button>
+            */}
           </div>
         </div>
 
         {/* Content */}
         <div className="flex-1 px-4 pb-nav-bottom relative bg-[#f8f6f1]">
-          {loading ? (
-            <OrdersListSkeleton />
-          ) : filteredOrders.length > 0 ? (
+          {filteredOrders.length > 0 ? (
             <div className="space-y-4">
               {visibleOrders.map((order, index) => {
                 const statusColor = getStatusColor(order.status);
@@ -254,7 +269,6 @@ const MyOrders: React.FC = () => {
             </div>
           )}
         </div>
-
       </div>
     </div>
   );

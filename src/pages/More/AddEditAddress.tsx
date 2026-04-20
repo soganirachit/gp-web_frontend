@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
 import { MdLocationOn, MdMyLocation } from 'react-icons/md';
 import { addressService, Address } from '../../services/address.service';
+import { validateGpDailyDeliveryAreaFromCoordinates } from '../../services/subscriptionZone.service';
 import { toast } from 'react-hot-toast';
 import { GoogleMap, Autocomplete } from '@react-google-maps/api';
 import { useGoogleMaps } from '../../hooks/useGoogleMaps';
@@ -204,7 +205,10 @@ const AddEditAddress: React.FC = () => {
         return false;
       }
 
-      const validation = await addressService.validateAddressInDeliveryArea(coordinates);
+      const validation =
+        feature === 'gpStore'
+          ? await addressService.validateAddressInDeliveryArea(coordinates)
+          : await validateGpDailyDeliveryAreaFromCoordinates(coordinates);
       setLocationValidation({
         isValid: validation.isValid,
         message:
