@@ -35,6 +35,7 @@ import {
   isCartStockOrAvailabilityInlineError,
 } from '../../../utils/cartStockInlineMessage';
 import { validateGpDailyDeliveryArea } from '../../../services/subscriptionZone.service';
+import { GpDailyOutOfZoneBanner } from '../../../components/daily/GpDailyOutOfZoneBanner';
 import { DELIVERY_DATE_MAX_DAYS_FROM_TODAY } from '../../../constants/deliveryBooking';
 import { computeFirstSubscriptionDeliveryDateFromWeekdayInts } from '../../../utils/subscriptionFirstDeliveryDate';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
@@ -929,18 +930,8 @@ const Cart: React.FC = () => {
                 toast.dismiss(zoneToastId);
               }, 2800);
             }
-          } else {
-            toast.error(msg || 'This address is outside our subscription delivery zone.', {
-              duration: 3200,
-              id: `sub-zone:${addressId}`,
-            });
           }
-        } else if (!eligible) {
-          // Same address re-check (e.g., remount): only surface a problem state.
-          toast.error(msg || 'This address is outside our subscription delivery zone.', {
-            duration: 3200,
-            id: `sub-zone:${addressId}`,
-          });
+          // Out-of-zone: no error toast — same as app; basket shows the red inline alert.
         }
       } catch (e: unknown) {
         if (cancelled) return;
@@ -1669,6 +1660,10 @@ const Cart: React.FC = () => {
 
     if (!defaultAddress) { toast.error('Please add a delivery address'); navigate(`${basePath}/addresses`); return; }
 
+    if (addressOutsideDelivery === true) {
+      return;
+    }
+
     // Daily cart checkout should use subscriptions/cart/checkout/
     // Prereq: set address on daily cart first.
     try {
@@ -2343,15 +2338,22 @@ const Cart: React.FC = () => {
               </div>
 
               {showUnifiedDeliveryAlert ? (
-                <div
-                  className="min-w-0 rounded-[12px] border border-red-600 bg-red-50 px-3 py-2.5 shadow-sm"
-                  role="alert"
-                >
-                  {deliveryStoreOffline ? (
+                deliveryStoreOffline ? (
+                  <div
+                    className="min-w-0 rounded-[12px] border border-red-600 bg-red-50 px-3 py-2.5 shadow-sm"
+                    role="alert"
+                  >
                     <p className="text-[13px] font-semibold leading-snug text-red-900">
                       The nearest store for this area is offline — try another address.
                     </p>
-                  ) : suggestedStoreForAddress ? (
+                  </div>
+                ) : deliveryBlockedByCoverage ? (
+                  <GpDailyOutOfZoneBanner />
+                ) : suggestedStoreForAddress ? (
+                  <div
+                    className="min-w-0 rounded-[12px] border border-red-600 bg-red-50 px-3 py-2.5 shadow-sm"
+                    role="alert"
+                  >
                     <p className="m-0 text-[13px] font-semibold leading-snug text-red-900">
                       This store doesn&apos;t deliver to your address—try the nearest store:{' '}
                       <button
@@ -2364,12 +2366,8 @@ const Cart: React.FC = () => {
                         {suggestedStoreForAddress.name}
                       </button>
                     </p>
-                  ) : (
-                    <p className="m-0 text-[13px] font-semibold leading-snug text-red-900">
-                      The current store is not delivering to this address. Update your delivery address or switch store.
-                    </p>
-                  )}
-                </div>
+                  </div>
+                ) : null
               ) : null}
 
               {/* ── Promo Code ─────────────────────────────────────────────── */}

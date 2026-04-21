@@ -203,14 +203,23 @@ const AddressSelection: React.FC = () => {
         feature === "gpStore"
           ? await addressService.validateAddressInDeliveryArea(formData.coordinates)
           : await validateGpDailyDeliveryAreaFromCoordinates(formData.coordinates);
-      setLocationValidation(validation);
+      if (feature !== "gpStore") {
+        // No out-of-zone copy on address screens; basket shows eligibility if needed.
+        setLocationValidation(
+          validation.isValid
+            ? validation
+            : null,
+        );
+      } else {
+        setLocationValidation(validation);
+      }
 
-      if (!validation.isValid) {
-        toast.error(validation.message || 'Address is outside delivery area');
+      if (!validation.isValid && feature === "gpStore") {
+        toast.error(validation.message || "Address is outside delivery area");
         return;
       }
 
-      // If validation passes, proceed with saving
+      // GP Daily: allow saving any pin (cart shows same out-of-zone banner as the app).
       setLoading(true);
 
       // Create address data with only the fields that match the AddressInput interface
@@ -299,17 +308,24 @@ const AddressSelection: React.FC = () => {
                 address.coordinates!,
               );
             })();
-      setAddressValidation({
-        isValid: validation.isValid,
-        message:
-          validation.message ||
-          (validation.isValid ? 'We deliver to this location.' : 'Address is outside delivery area'),
-      });
-
       if (!validation.isValid) {
-        toast.error(validation.message || 'Address is outside delivery area');
+        if (feature !== "gpStore") {
+          setAddressValidation(null);
+          return true;
+        }
+        setAddressValidation({
+          isValid: false,
+          message:
+            validation.message || "Address is outside delivery area",
+        });
+        toast.error(validation.message || "Address is outside delivery area");
         return false;
       }
+      setAddressValidation({
+        isValid: true,
+        message:
+          validation.message || "We deliver to this location.",
+      });
       return true;
     } catch (error) {
       console.error('Error validating address:', error);
@@ -398,8 +414,17 @@ const AddressSelection: React.FC = () => {
         localStorage.setItem('selectedDeliveryAddress', JSON.stringify(address));
 
         // gp-daily cart uses subscription cart APIs to set address
-        if (feature !== 'gpStore' && address?.id) {
-          await subscriptionCartService.setDeliveryAddress(Number(address.id));
+        if (feature !== "gpStore" && address?.id) {
+          try {
+            const z = await subscriptionCartService.checkSubscriptionZone(
+              Number(address.id),
+            );
+            if (Boolean((z as { eligible?: boolean })?.eligible)) {
+              await subscriptionCartService.setDeliveryAddress(Number(address.id));
+            }
+          } catch {
+            /* non-fatal — cart page will re-check zone */
+          }
         }
 
         const cartPath = feature === 'gpStore' ? '/gp-store/basket' : '/gp-daily/basket';
@@ -1045,13 +1070,19 @@ const AddressSelection: React.FC = () => {
 
             {/* Location Validation Status */}
             {locationValidation && (
-              <div className={`p-3 rounded-lg text-sm ${locationValidation.isValid
-                ? 'bg-green-50 text-green-700 border border-green-200'
-                : 'bg-red-50 text-red-700 border border-red-200'
-                }`}>
+              <div
+                className={`p-3 rounded-lg text-sm ${
+                  locationValidation.isValid
+                    ? "bg-green-50 text-green-700 border border-green-200"
+                    : "bg-red-50 text-red-700 border border-red-200"
+                }`}
+              >
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${locationValidation.isValid ? 'bg-green-500' : 'bg-red-500'
-                    }`}></div>
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      locationValidation.isValid ? "bg-green-500" : "bg-red-500"
+                    }`}
+                  />
                   <span>{locationValidation.message}</span>
                 </div>
               </div>
@@ -1246,13 +1277,19 @@ const AddressSelection: React.FC = () => {
 
             {/* Validation Message */}
             {addressValidation && (
-              <div className={`mb-4 p-3 rounded-lg text-sm ${addressValidation.isValid
-                ? 'bg-green-50 text-green-700 border border-green-200'
-                : 'bg-red-50 text-red-700 border border-red-200'
-                }`}>
+              <div
+                className={`mb-4 p-3 rounded-lg text-sm ${
+                  addressValidation.isValid
+                    ? "bg-green-50 text-green-700 border border-green-200"
+                    : "bg-red-50 text-red-700 border border-red-200"
+                }`}
+              >
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${addressValidation.isValid ? 'bg-green-500' : 'bg-red-500'
-                    }`}></div>
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      addressValidation.isValid ? "bg-green-500" : "bg-red-500"
+                    }`}
+                  />
                   <span>{addressValidation.message}</span>
                 </div>
               </div>

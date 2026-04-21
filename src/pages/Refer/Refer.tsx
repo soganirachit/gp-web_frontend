@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { IoArrowBack } from 'react-icons/io5';
 import { FaGift, FaWhatsapp, FaTelegramPlane, FaCopy } from 'react-icons/fa';
 import { MdEmail } from 'react-icons/md';
 import { toast } from 'react-hot-toast';
@@ -18,6 +17,7 @@ import {
   REFER_HERO_TAGLINE,
   REFER_SHARE_SECTION_LABEL,
 } from '../../config/referralShare';
+import { UniformPageHeader } from '../../components/layout/UniformPageHeader';
 
 const PAGE_BG = '#f8f6f1';
 const ACCENT_ORANGE = '#F15A22';
@@ -176,17 +176,14 @@ const Refer: React.FC = () => {
           aria-hidden
         /> */}
 
-        <div className="relative mx-auto flex max-w-lg items-center gap-2 px-4 py-3 sm:px-5">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="rounded-full p-2 text-white transition-colors hover:bg-white/15"
-            aria-label="Go back"
-          >
-            <IoArrowBack className="text-2xl" />
-          </button>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Refer Us</h1>
-        </div>
+        <UniformPageHeader
+          variant="onBrandGradient"
+          title="Refer Us"
+          onBack={() => navigate(-1)}
+          padXClassName="px-4 sm:px-5"
+          padYClassName="py-3"
+          className="relative mx-auto max-w-lg"
+        />
 
         <div className="relative mx-auto flex max-w-lg flex-col items-center px-5 pb-14 pt-2 sm:px-6">
           <motion.div

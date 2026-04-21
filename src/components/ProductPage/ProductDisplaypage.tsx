@@ -461,12 +461,15 @@ const ProductPage: React.FC = () => {
     if (originalPrice <= 0 && price > 0) {
       originalPrice = Math.ceil(price * 1.2);
     }
-    const discountPercentage =
+    const rawDiscountPct =
       p.discount_percentage != null && Number(p.discount_percentage) >= 0
         ? Number(p.discount_percentage)
         : originalPrice > 0 && price < originalPrice
-          ? Math.round(((originalPrice - price) / originalPrice) * 100)
+          ? ((originalPrice - price) / originalPrice) * 100
           : 0;
+    const discountPercentage = Math.round(
+      Math.min(100, Math.max(0, Number.isFinite(rawDiscountPct) ? rawDiscountPct : 0)),
+    );
     const showStrike =
       showStrikeBase(currentProduct) ||
       (originalPrice > 0 && price < originalPrice && discountPercentage > 0);
@@ -552,7 +555,7 @@ const ProductPage: React.FC = () => {
       // const { id } = useParams<{ id: string }>();
 
       if (!localStorage.getItem("phoneNumber")) {
-        toast.error("Please login to continue");
+        toast.error("Please login to continue", { id: "Please login to continue" });
         navigate(`${basePath}/login`, {
           state: {
             returnUrl: `${basePath}/product/${encodeURIComponent(slug ?? "")}`,
@@ -563,7 +566,9 @@ const ProductPage: React.FC = () => {
 
       const currentProduct = product || basePack;
       if (!currentProduct || !slug) {
-        toast.error("Product information not available");
+        toast.error("Product information not available", {
+          id: "Product information not available",
+        });
         setIsCheckingBalance(false);
         return;
       }
@@ -629,7 +634,9 @@ const ProductPage: React.FC = () => {
 
       // Validate CUSTOM subscription has at least one delivery day
       if (selectedType === "CUSTOM" && (!selectedDays || selectedDays.length === 0)) {
-        toast.error("Select at least one delivery day");
+        toast.error("Select at least one delivery day", {
+          id: "Select at least one delivery day",
+        });
         setIsCheckingBalance(false);
         return;
       }
@@ -646,32 +653,40 @@ const ProductPage: React.FC = () => {
           basePackId: resolvedEntityId,
         },
       });
-      toast.success("Proceeding to address selection");
+      toast.success("Proceeding to address selection", {
+        id: "Proceeding to address selection",
+      });
     } catch (error: any) {
       if (
         error.message?.includes("Session expired") ||
         error.message?.includes("Authentication required")
       ) {
-        toast.error(error.message || "Please login to continue");
+        const authMsg = error.message || "Please login to continue";
+        toast.error(authMsg, { id: authMsg });
         navigate(`${basePath}/login`, {
           state: { returnUrl: `${basePath}/product/${encodeURIComponent(slug ?? "")}` },
         });
         return;
       }
 
-      toast.error(error.message || "Failed to proceed with subscription");
+      const subFailMsg = error.message || "Failed to proceed with subscription";
+      toast.error(subFailMsg, { id: subFailMsg });
       setIsCheckingBalance(false);
     }
   };
 
   const handleAddToBasket = async () => {
     if (!product) {
-      toast.error("Product information not available");
+      toast.error("Product information not available", {
+        id: "Product information not available",
+      });
       return;
     }
     if (feature === "gpStore") return;
     if (!localStorage.getItem("phoneNumber")) {
-      toast.error("Please log in to add items to your basket");
+      toast.error("Please log in to add items to your basket", {
+        id: "Please log in to add items to your basket",
+      });
       navigate(`${basePath}/login`, {
         state: { returnUrl: `${basePath}/product/${encodeURIComponent(slug ?? "")}` },
       });
@@ -681,10 +696,12 @@ const ProductPage: React.FC = () => {
     try {
       const cart = await subscriptionCartService.addItem(Number((product as any).id), 1);
       setDailyCart(cart as any);
-      toast.success("Added to basket");
+      toast.success("Added to basket", { id: "Added to basket" });
     } catch (error: unknown) {
       console.error("Error adding to cart:", error);
-      toast.error("Failed to add product to basket. Please try again.");
+      toast.error("Failed to add product to basket. Please try again.", {
+        id: "Failed to add product to basket. Please try again.",
+      });
     } finally {
       setAddingToBasket(false);
     }
@@ -720,10 +737,10 @@ const ProductPage: React.FC = () => {
       if (isCartStockOrAvailabilityInlineError(apiMessage)) {
         setStockLimitMessage(formatCartStockInlineMessage(apiMessage));
       } else {
-        toast.error(
+        const basketErrMsg =
           apiMessage.trim() ||
-            errorMessageFromCatch(error, "Failed to update basket quantity. Please try again."),
-        );
+          errorMessageFromCatch(error, "Failed to update basket quantity. Please try again.");
+        toast.error(basketErrMsg, { id: basketErrMsg });
       }
     } finally {
       setIsUpdatingBasket(false);

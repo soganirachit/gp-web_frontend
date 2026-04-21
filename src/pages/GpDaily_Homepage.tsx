@@ -54,6 +54,8 @@ interface DayInfo {
 
 /** Matches `NAMASTE_TIME_SLOT_DISPLAY` on mobile GP Daily home. */
 const NAMASTE_TIME_SLOT_DISPLAY = "7 AM – 12 PM";
+/** Namaste subscription carousel — auto-advance loop (web). */
+const NAMASTE_CAROUSEL_AUTOPLAY_MS = 5000;
 
 const Home2: React.FC = () => {
   const navigate = useNavigate();
@@ -81,6 +83,9 @@ const Home2: React.FC = () => {
     useState<Subscription | null>(null);
   const subscriptionCarouselRef = useRef<HTMLDivElement | null>(null);
   const [subscriptionCarouselIndex, setSubscriptionCarouselIndex] = useState(0);
+  /** Pause autoplay while pointer is over the carousel (manual read without fighting the timer). */
+  const [namasteCarouselHoverPause, setNamasteCarouselHoverPause] =
+    useState(false);
   const [allPackProducts, setAllPackProducts] = useState<ProductType[]>([]);
   const [pujaPackProducts, setPujaPackProducts] = useState<ProductType[]>([]);
   const [exoticPackProducts, setExoticPackProducts] = useState<ProductType[]>([]);
@@ -525,6 +530,36 @@ const Home2: React.FC = () => {
     [activeSubscriptions]
   );
 
+  useEffect(() => {
+    if (activeSubscriptions.length <= 1 || namasteCarouselHoverPause) {
+      return;
+    }
+    const tick = () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+        return;
+      }
+      setSubscriptionCarouselIndex((prev) => {
+        const len = activeSubscriptions.length;
+        if (len <= 1) return prev;
+        const next = (prev + 1) % len;
+        const el = subscriptionCarouselRef.current;
+        if (el) {
+          const w = el.clientWidth || 1;
+          el.scrollTo({ left: next * w, behavior: "smooth" });
+        }
+        const sub = activeSubscriptions[next];
+        if (sub) setSelectedSubscription(sub);
+        return next;
+      });
+    };
+    const id = window.setInterval(tick, NAMASTE_CAROUSEL_AUTOPLAY_MS);
+    return () => window.clearInterval(id);
+  }, [
+    activeSubscriptions,
+    namasteCarouselHoverPause,
+    subscriptionCarouselKey,
+  ]);
+
   const isPageLoading =
     isLoadingAddress || isLoadingBalance || isLoadingProducts;
 
@@ -751,9 +786,14 @@ const Home2: React.FC = () => {
                 ) : (
                   <>
                     <div
+                      className="-mx-1 px-1"
+                      onMouseEnter={() => setNamasteCarouselHoverPause(true)}
+                      onMouseLeave={() => setNamasteCarouselHoverPause(false)}
+                    >
+                    <div
                       ref={subscriptionCarouselRef}
                       onScroll={handleSubscriptionCarouselScroll}
-                      className="flex snap-x snap-mandatory overflow-x-auto no-scrollbar -mx-1 px-1"
+                      className="flex snap-x snap-mandatory overflow-x-auto no-scrollbar"
                     >
                       {activeSubscriptions.map((sub) => (
                         <div
@@ -849,6 +889,7 @@ const Home2: React.FC = () => {
                         ))}
                       </div>
                     )}
+                    </div>
                   </>
                 )}
               </div>

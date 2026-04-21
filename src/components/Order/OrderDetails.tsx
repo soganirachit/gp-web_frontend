@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { IoArrowBack, IoDownloadOutline } from 'react-icons/io5';
+import { IoDownloadOutline } from 'react-icons/io5';
 import { FaCopy } from 'react-icons/fa';
 import { orderService } from '../../services/order.service';
 import { format } from 'date-fns';
@@ -15,6 +15,7 @@ import detailsuserIcon from '../../assets/svg/gp_store_svg/detailsuser.svg';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
 import { invoiceService, type OrderInvoicePayload } from '../../services/invoice.service';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
+import { UniformPageHeader } from '../layout/UniformPageHeader';
 
 interface OrderItem {
   id: number;
@@ -374,19 +375,12 @@ const OrderDetails: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
       <div className="max-w-[800px] mx-auto min-h-screen flex flex-col">
-        {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigateBackToOrderList(order)}
-              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
-            >
-              <IoArrowBack size={24} />
-            </button>
-            <h1 className="text-2xl font-bold text-gray-900">Order Details</h1>
-          </div>
-        </div>
+        <UniformPageHeader
+          title="Order Details"
+          onBack={() => navigateBackToOrderList(order)}
+          padYClassName="pt-6 pb-4"
+          className="sticky top-0 z-10 border-b border-gray-200"
+        />
 
         {/* Content */}
         <div className="flex-1 px-4 pb-nav-bottom relative bg-[#f8f6f1]">

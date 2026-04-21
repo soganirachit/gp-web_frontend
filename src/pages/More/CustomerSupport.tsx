@@ -1,12 +1,33 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { IoArrowBack } from "react-icons/io5";
 import { FaChevronRight } from "react-icons/fa";
-import { orderService } from "@/services/order.service";
 import { supportService, SupportTicket } from "@/services/support.service";
 import { format } from "date-fns";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { SettingsListSkeleton } from "../../components/common/PageSkeletons";
+import { UniformPageHeader } from "../../components/layout/UniformPageHeader";
+
+function normalizeOrderNumber(n: string | null | undefined): string {
+  return String(n ?? "").trim().toLowerCase();
+}
+
+/** Orders cannot open a duplicate ticket while one of these is still open. */
+function isActiveSupportTicketStatus(status: string | undefined): boolean {
+  const s = String(status ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+  return s === "open" || s === "pending" || s === "in_progress" || s === "new";
+}
+
+function orderNumbersWithActiveTickets(tickets: SupportTicket[]): Set<string> {
+  const set = new Set<string>();
+  for (const t of tickets) {
+    if (!isActiveSupportTicketStatus(t.status)) continue;
+    const on = normalizeOrderNumber(t.order_number ?? undefined);
+    if (on) set.add(on);
+  }
+  return set;
+}
 
 const CustomerSupport: React.FC = () => {
   const navigate = useNavigate();
@@ -93,6 +114,11 @@ const CustomerSupport: React.FC = () => {
     return 'bg-gray-100 text-gray-800';
   };
 
+  const blockedOrderNumbers = useMemo(
+    () => orderNumbersWithActiveTickets(tickets),
+    [tickets],
+  );
+
   if (loading) {
     return <SettingsListSkeleton />;
   }
@@ -100,19 +126,12 @@ const CustomerSupport: React.FC = () => {
   return (
     <div className="bg-[#f8f6f1] min-h-screen">
       <div className="max-w-[800px] mx-auto">
-        {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
-          <div className="flex items-center gap-3 mb-4">
-            <button
-              type="button"
-              onClick={() => navigate(`${basePath}/account`)}
-              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
-            >
-              <IoArrowBack size={24} />
-            </button>
-            <h1 className="text-2xl font-bold font-serif text-gray-900">Customer Support</h1>
-          </div>
-        </div>
+        <UniformPageHeader
+          title="Customer Support"
+          onBack={() => navigate(`${basePath}/account`, { replace: true })}
+          padYClassName="pt-6 pb-4"
+          className="sticky top-0 z-10 mb-4"
+        />
 
         {/* Content */}
         <div className="px-4 pb-nav-bottom">
@@ -164,15 +183,24 @@ const CustomerSupport: React.FC = () => {
                     </button>
                     {orders.map((order) => {
                       const orderDate = formatDate(order.delivered_at);
+                      const blocked = blockedOrderNumbers.has(
+                        normalizeOrderNumber(order.order_number),
+                      );
                       return (
                         <button
                           key={order.id}
                           type="button"
-                          onClick={() => handleOrderSelect(order)}
+                          disabled={blocked}
+                          onClick={() => {
+                            if (blocked) return;
+                            handleOrderSelect(order);
+                          }}
                           className={`w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base transition-colors ${
-                            selectedOrderNumber === order.order_number 
-                              ? 'bg-gray-100 text-gray-900 font-medium' 
-                              : 'text-gray-700 hover:bg-gray-50'
+                            blocked
+                              ? 'opacity-50 cursor-not-allowed text-gray-500'
+                              : selectedOrderNumber === order.order_number
+                                ? 'bg-gray-100 text-gray-900 font-medium'
+                                : 'text-gray-700 hover:bg-gray-50'
                           }`}
                         >
                           <div className="flex flex-col">
@@ -186,6 +214,11 @@ const CustomerSupport: React.FC = () => {
                               <span className="text-xs text-gray-500">₹{parseFloat(order.total_amount).toLocaleString('en-IN')}</span>
                               <span className="text-xs text-gray-500">{orderDate}</span>
                             </div>
+                            {blocked ? (
+                              <span className="text-xs text-amber-700 mt-1.5 font-medium">
+                                Support ticket already open for this order
+                              </span>
+                            ) : null}
                           </div>
                         </button>
                       );

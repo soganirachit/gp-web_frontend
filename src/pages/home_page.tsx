@@ -182,21 +182,18 @@ const HomePage: React.FC = () => {
             </div>
 
             {/* Right Side Icons */}
-            <div className="relative flex h-14 w-14 flex-shrink-0 items-center justify-center xs:h-16 xs:w-16 sm:h-20 sm:w-20">
+            <div className="relative flex h-14 w-14 flex-shrink-0 cursor-default items-center justify-center xs:h-16 xs:w-16 sm:h-20 sm:w-20">
               <img
                 src={profilehomeIcon}
-                alt="Profile"
-                className="absolute inset-0 m-auto h-9 w-9 cursor-pointer object-contain xs:h-10 xs:w-10 sm:h-12 sm:w-12"
-                onClick={() =>
-                  navigate(
-                    `${feature === "gpStore" ? "/gp-store" : "/gp-daily"}/account`,
-                  )
-                }
+                alt=""
+                aria-hidden
+                className="absolute inset-0 m-auto h-9 w-9 object-contain xs:h-10 xs:w-10 sm:h-12 sm:w-12"
               />
               <img
                 src={profilelogoIcon}
-                alt="Profile Logo"
-                className="relative z-10 w-5 h-5 object-contain"
+                alt=""
+                aria-hidden
+                className="relative z-10 h-5 w-5 object-contain"
               />
             </div>
           </div>

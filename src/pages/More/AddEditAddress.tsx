@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { IoArrowBack } from 'react-icons/io5';
 import { MdLocationOn, MdMyLocation } from 'react-icons/md';
 import { addressService, Address } from '../../services/address.service';
 import { validateGpDailyDeliveryAreaFromCoordinates } from '../../services/subscriptionZone.service';
@@ -11,6 +10,54 @@ import { useGoogleMaps } from '../../hooks/useGoogleMaps';
 import { customerService } from '../../services/getcustomer.service';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { MapLoadingPlaceholder } from '../../components/common/PageSkeletons';
+import { UniformPageHeader } from '../../components/layout/UniformPageHeader';
+
+/** When Google Geocoding REST is unavailable or returns nothing, fill fields from OSM (usage policy: identify app). */
+async function reverseGeocodeWithOsm(
+  lat: number,
+  lng: number,
+): Promise<{ formatted: string; line: string; pin: string } | null> {
+  const params = new URLSearchParams({
+    format: 'json',
+    lat: String(lat),
+    lon: String(lng),
+    'accept-language': 'en',
+  });
+  const url = `https://nominatim.openstreetmap.org/reverse?${params.toString()}`;
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'GendaPhoolAddressForm/1.0 (https://customerapp.mygendaphool.com)',
+    },
+  });
+  if (!res.ok) return null;
+  const d = (await res.json()) as {
+    display_name?: string;
+    address?: Record<string, string>;
+  };
+  const addr = d.address || {};
+  const roadLine = [addr.house_number, addr.road].filter(Boolean).join(' ').trim();
+  const parts = [
+    roadLine,
+    addr.suburb || addr.neighbourhood,
+    addr.city || addr.town || addr.village,
+    addr.state,
+  ]
+    .map((s) => String(s || '').trim())
+    .filter(Boolean);
+  const line =
+    parts.join(', ') ||
+    (d.display_name ? d.display_name.split(',').slice(0, 4).join(',').trim() : '');
+  const formatted = (d.display_name || line || '').trim();
+  if (!formatted && !line) return null;
+  const pin = String(addr.postcode || '')
+    .replace(/\D/g, '')
+    .slice(0, 6);
+  return {
+    formatted: formatted || line,
+    line: line || formatted,
+    pin: pin.length === 6 ? pin : '',
+  };
+}
 
 const AddEditAddress: React.FC = () => {
   const navigate = useNavigate();
@@ -54,6 +101,7 @@ const AddEditAddress: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [pincode, setPincode] = useState('');
 
+  const [isLocating, setIsLocating] = useState(false);
   const [showMapLocationHint, setShowMapLocationHint] = useState(false);
   const [locationValidation, setLocationValidation] = useState<{
     isValid: boolean;
@@ -209,18 +257,23 @@ const AddEditAddress: React.FC = () => {
         feature === 'gpStore'
           ? await addressService.validateAddressInDeliveryArea(coordinates)
           : await validateGpDailyDeliveryAreaFromCoordinates(coordinates);
-      setLocationValidation({
-        isValid: validation.isValid,
-        message:
-          validation.message ||
-          (validation.isValid ? 'We deliver to this location.' : 'Address is outside delivery area'),
-      });
-
       if (!validation.isValid) {
+        if (feature !== 'gpStore') {
+          setLocationValidation(null);
+          return true;
+        }
+        setLocationValidation({
+          isValid: false,
+          message: validation.message || 'Address is outside delivery area',
+        });
         toast.error(validation.message || 'Address is outside delivery area');
         return false;
       }
 
+      setLocationValidation({
+        isValid: true,
+        message: validation.message || 'We deliver to this location.',
+      });
       return true;
     } catch (error) {
       console.error('Error validating location:', error);
@@ -290,111 +343,6 @@ const AddEditAddress: React.FC = () => {
     }
   };
 
-  const getCurrentLocation = () => {
-    // Prevent duplicate calls
-    if (isLocationRequestInProgress.current) return;
-    isLocationRequestInProgress.current = true;
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          setSelectedPosition({ lat: latitude, lng: longitude });
-          if (mapRef.current) {
-            mapRef.current.panTo({ lat: latitude, lng: longitude });
-          }
-
-          try {
-            const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-            const response = await fetch(
-              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`
-            );
-            const data = await response.json();
-
-            if (data.results && data.results.length > 0) {
-              // Get formatted address from the first result
-              if (data.results[0].formatted_address) {
-                const fullAddress = data.results[0].formatted_address;
-                setDeliveryAddress(fullAddress);
-
-                // Extract components for completeAddress field
-                const addressComponents: any = {};
-                data.results.forEach((result: any) => {
-                  if (result.address_components) {
-                    result.address_components.forEach((component: any) => {
-                      component.types.forEach((type: string) => {
-                        if (type === 'street_number' && !addressComponents.houseNo) {
-                          addressComponents.houseNo = component.long_name;
-                        }
-                        if (type === 'route' && !addressComponents.streetName) {
-                          addressComponents.streetName = component.long_name;
-                        }
-                        if (type === 'sublocality_level_1' && !addressComponents.area) {
-                          addressComponents.area = component.long_name;
-                        }
-                      });
-                    });
-                  }
-                });
-
-                // Build complete address string
-                const completeAddr = [
-                  addressComponents.houseNo,
-                  addressComponents.streetName,
-                  addressComponents.area
-                ].filter(Boolean).join(', ');
-
-                if (completeAddr) {
-                  setFormData(prev => ({
-                    ...prev,
-                    completeAddress: completeAddr
-                  }));
-                  // Fix: use 'place' variable which is available in this scope?
-                  // Actually 'place' variable is defined in the closure above in autocomplete logic?
-                  // Wait, looking at the code structure...
-                  // This is inside getCurrentLocation which calls Geocoding API.
-                  // It returns 'data' which has results. It is NOT using 'place' object from Google Places API directly here.
-                  // It uses 'data.results[0]'.
-
-                  const result = data.results[0];
-                  const pin = result.address_components?.find((c: any) => c.types.includes('postal_code'))?.long_name;
-                  if (pin) setPincode(pin);
-                }
-              }
-              setShowMapLocationHint(true);
-              window.setTimeout(() => setShowMapLocationHint(false), 4000);
-            }
-          } catch (error) {
-            console.error('Error fetching address:', error);
-            const errorMsg = 'Failed to fetch location details';
-            if (lastToastMessage.current !== errorMsg) {
-              lastToastMessage.current = errorMsg;
-              toast.error(errorMsg);
-            }
-          } finally {
-            isLocationRequestInProgress.current = false;
-          }
-        },
-        (error) => {
-          console.error('Error accessing location:', error);
-          const errorMsg = 'Failed to access location';
-          if (lastToastMessage.current !== errorMsg) {
-            lastToastMessage.current = errorMsg;
-            toast.error(errorMsg);
-          }
-          isLocationRequestInProgress.current = false;
-        }
-      );
-    } else {
-      const errorMsg = 'Geolocation is not supported by your browser';
-      if (lastToastMessage.current !== errorMsg) {
-        lastToastMessage.current = errorMsg;
-        toast.error(errorMsg);
-      }
-      isLocationRequestInProgress.current = false;
-    }
-  };
-
   /** Apply a Geocoder / Places result to search box, pin line, and pincode (same shape as Autocomplete). */
   const applyGeocodedPlaceToForm = (place: google.maps.GeocoderResult) => {
     const formattedAddress = place.formatted_address || '';
@@ -411,28 +359,42 @@ const AddEditAddress: React.FC = () => {
           addressComponents.streetName = component.long_name;
         }
         if (
-          (type === 'sublocality_level_1' || type === 'sublocality') &&
+          (type === 'sublocality_level_1' ||
+            type === 'sublocality' ||
+            type === 'neighborhood') &&
           !addressComponents.area
         ) {
           addressComponents.area = component.long_name;
         }
+        if (type === 'premise' && !addressComponents.premise) {
+          addressComponents.premise = component.long_name;
+        }
+        if ((type === 'locality' || type === 'postal_town') && !addressComponents.city) {
+          addressComponents.city = component.long_name;
+        }
+        if (type === 'administrative_area_level_1' && !addressComponents.state) {
+          addressComponents.state = component.long_name;
+        }
       });
     });
 
+    const areaPart = addressComponents.area || addressComponents.premise || '';
     const completeAddr = [
       addressComponents.houseNo,
       addressComponents.streetName,
-      addressComponents.area,
+      areaPart,
+      addressComponents.city,
+      addressComponents.state,
     ]
+      .map((s) => String(s || '').trim())
       .filter(Boolean)
       .join(', ');
 
-    if (completeAddr) {
-      setFormData((prev) => ({
-        ...prev,
-        completeAddress: completeAddr,
-      }));
-    }
+    const line = completeAddr.length > 0 ? completeAddr : formattedAddress;
+    setFormData((prev) => ({
+      ...prev,
+      completeAddress: line,
+    }));
 
     const pin = place.address_components?.find((c) =>
       c.types.includes('postal_code')
@@ -440,16 +402,110 @@ const AddEditAddress: React.FC = () => {
     if (pin) setPincode(pin);
   };
 
-  const reverseGeocodeMapCenter = async (lat: number, lng: number) => {
-    if (!window.google?.maps) return;
-    try {
-      const geocoder = new google.maps.Geocoder();
-      const { results } = await geocoder.geocode({ location: { lat, lng } });
-      if (results?.[0]) {
-        applyGeocodedPlaceToForm(results[0]);
+  const getCurrentLocation = () => {
+    if (isLocationRequestInProgress.current) return;
+    isLocationRequestInProgress.current = true;
+    setIsLocating(true);
+
+    if (!navigator.geolocation) {
+      const errorMsg = 'Geolocation is not supported by your browser';
+      if (lastToastMessage.current !== errorMsg) {
+        lastToastMessage.current = errorMsg;
+        toast.error(errorMsg);
       }
-    } catch (error) {
-      console.error('Reverse geocode failed:', error);
+      isLocationRequestInProgress.current = false;
+      setIsLocating(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          setSelectedPosition({ lat: latitude, lng: longitude });
+          if (mapRef.current) {
+            mapRef.current.panTo({ lat: latitude, lng: longitude });
+          }
+
+          const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+          let filled = false;
+          if (apiKey) {
+            try {
+              const response = await fetch(
+                `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${encodeURIComponent(apiKey)}`,
+              );
+              const data = await response.json();
+              if (data.status === 'OK' && data.results?.[0]) {
+                applyGeocodedPlaceToForm(data.results[0]);
+                filled = true;
+              }
+            } catch (_) {
+              /* try OSM */
+            }
+          }
+          if (!filled) {
+            try {
+              const osm = await reverseGeocodeWithOsm(latitude, longitude);
+              if (osm) {
+                setDeliveryAddress(osm.formatted);
+                setSearchQuery(osm.formatted);
+                setFormData((prev) => ({ ...prev, completeAddress: osm.line }));
+                if (osm.pin) setPincode(osm.pin);
+              }
+            } catch (_) {
+              /* ignore */
+            }
+          }
+          setShowMapLocationHint(true);
+          window.setTimeout(() => setShowMapLocationHint(false), 4000);
+        } catch (error) {
+          console.error('Error fetching address:', error);
+          const errorMsg = 'Failed to fetch location details';
+          if (lastToastMessage.current !== errorMsg) {
+            lastToastMessage.current = errorMsg;
+            toast.error(errorMsg);
+          }
+        } finally {
+          isLocationRequestInProgress.current = false;
+          setIsLocating(false);
+        }
+      },
+      (error) => {
+        console.error('Error accessing location:', error);
+        const errorMsg = 'Failed to access location';
+        if (lastToastMessage.current !== errorMsg) {
+          lastToastMessage.current = errorMsg;
+          toast.error(errorMsg);
+        }
+        isLocationRequestInProgress.current = false;
+        setIsLocating(false);
+      }
+    );
+  };
+
+  const reverseGeocodeMapCenter = async (lat: number, lng: number) => {
+    if (window.google?.maps) {
+      try {
+        const geocoder = new google.maps.Geocoder();
+        const { results } = await geocoder.geocode({ location: { lat, lng } });
+        if (results?.[0]) {
+          applyGeocodedPlaceToForm(results[0]);
+          return;
+        }
+      } catch (error) {
+        console.error('Reverse geocode failed:', error);
+      }
+    }
+    try {
+      const osm = await reverseGeocodeWithOsm(lat, lng);
+      if (osm) {
+        setDeliveryAddress(osm.formatted);
+        setSearchQuery(osm.formatted);
+        setFormData((prev) => ({ ...prev, completeAddress: osm.line }));
+        if (osm.pin) setPincode(osm.pin);
+      }
+    } catch (_) {
+      /* ignore */
     }
   };
 
@@ -518,19 +574,12 @@ const AddEditAddress: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#f8f6f1] px-4">
       <div className="max-w-[800px] mx-auto">
-        {/* Header */}
-        <div className="py-4 flex items-center">
-          <button
-            type="button"
-            onClick={() => navigate(`${basePath}/addresses`)}
-            className="hover:bg-gray-100 rounded-full p-2 transition-colors mr-3"
-          >
-            <IoArrowBack className="text-xl" />
-          </button>
-          <h1 className="text-xl font-semibold">
-            Enter Address Details
-          </h1>
-        </div>
+        <UniformPageHeader
+          title="Enter Address Details"
+          onBack={() => navigate(`${basePath}/addresses`)}
+          padXClassName="px-0"
+          padYClassName="py-4"
+        />
 
         {/* Map Section */}
         <div className="w-full h-[300px] relative rounded-lg overflow-hidden mb-4 bg-[#F5F5DC]">
@@ -542,60 +591,19 @@ const AddEditAddress: React.FC = () => {
                   setAutocomplete(autocomplete);
                 }}
                 onPlaceChanged={() => {
-                  if (autocomplete) {
-                    const place = autocomplete.getPlace();
-                    if (!place.geometry?.location) {
-                      return;
-                    }
-                    const location = {
-                      lat: place.geometry.location.lat(),
-                      lng: place.geometry.location.lng()
-                    };
-                    setSelectedPosition(location);
-                    if (mapRef.current) {
-                      mapRef.current.panTo(location);
-                      mapRef.current.setZoom(15);
-                    }
-
-                    // Update delivery address and form data
-                    const formattedAddress = place.formatted_address || '';
-                    setDeliveryAddress(formattedAddress);
-                    setSearchQuery(formattedAddress);
-
-                    // Extract address components for completeAddress field
-                    const addressComponents: any = {};
-                    place.address_components?.forEach(component => {
-                      component.types.forEach((type: string) => {
-                        if (type === 'street_number' && !addressComponents.houseNo) {
-                          addressComponents.houseNo = component.long_name;
-                        }
-                        if (type === 'route' && !addressComponents.streetName) {
-                          addressComponents.streetName = component.long_name;
-                        }
-                        if ((type === 'sublocality_level_1' || type === 'sublocality') && !addressComponents.area) {
-                          addressComponents.area = component.long_name;
-                        }
-                      });
-                    });
-
-                    // Build complete address string
-                    const completeAddr = [
-                      addressComponents.houseNo,
-                      addressComponents.streetName,
-                      addressComponents.area
-                    ].filter(Boolean).join(', ');
-
-                    if (completeAddr) {
-                      setFormData(prev => ({
-                        ...prev,
-                        completeAddress: completeAddr
-                      }));
-
-                      // Set pincode from autocomplete
-                      const pin = place.address_components?.find(c => c.types.includes('postal_code'))?.long_name;
-                      if (pin) setPincode(pin);
-                    }
+                  if (!autocomplete) return;
+                  const place = autocomplete.getPlace();
+                  if (!place.geometry?.location) return;
+                  const location = {
+                    lat: place.geometry.location.lat(),
+                    lng: place.geometry.location.lng(),
+                  };
+                  setSelectedPosition(location);
+                  if (mapRef.current) {
+                    mapRef.current.panTo(location);
+                    mapRef.current.setZoom(15);
                   }
+                  applyGeocodedPlaceToForm(place as google.maps.GeocoderResult);
                 }}
                 fields={['address_components', 'geometry', 'formatted_address']}
               >
@@ -690,16 +698,22 @@ const AddEditAddress: React.FC = () => {
           </div>
           {/* Locate Me Button - At the bottom */}
           <button
+            type="button"
             onClick={getCurrentLocation}
-            className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm flex items-center gap-2 shadow-sm hover:bg-gray-50 z-20"
+            disabled={isLocating}
+            aria-busy={isLocating}
+            className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm flex items-center gap-2 shadow-sm hover:bg-gray-50 z-20 disabled:opacity-60 disabled:pointer-events-none"
           >
-            <MdMyLocation className="h-4 w-4" />
-            <span>Locate Me</span>
+            <MdMyLocation className={`h-4 w-4 ${isLocating ? 'animate-pulse' : ''}`} />
+            <span>{isLocating ? 'Locating' : 'Locate Me'}</span>
           </button>
           {/* Paper airplane icon button (top right) */}
           <button
+            type="button"
             onClick={getCurrentLocation}
-            className="absolute top-3 right-3 bg-white rounded-full p-2 shadow-md hover:bg-gray-50 z-10"
+            disabled={isLocating}
+            aria-label={isLocating ? 'Locating' : 'Locate me'}
+            className="absolute top-3 right-3 bg-white rounded-full p-2 shadow-md hover:bg-gray-50 z-10 disabled:opacity-50 disabled:pointer-events-none"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -753,23 +767,23 @@ const AddEditAddress: React.FC = () => {
           >
             <div className="flex items-center gap-2">
               <span
-                className={`inline-block h-2 w-2 rounded-full ${locationValidation.isValid ? 'bg-green-500' : 'bg-red-500'}`}
+                className={`inline-block h-2 w-2 rounded-full ${
+                  locationValidation.isValid ? 'bg-green-500' : 'bg-red-500'
+                }`}
               />
               {locationValidation.message}
             </div>
           </div>
         )}
 
-        {/* Delivering to Section */}
-        {deliveryAddress && (
-          <div className="mb-4">
-            <p className="text-gray-600 text-sm mb-1">Delivering to</p>
-            <p className="text-gray-800 font-medium">{deliveryAddress}</p>
-          </div>
-        )}
-
         {/* Form Fields - Updated Layout */}
         <div className="space-y-4">
+          {deliveryAddress && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+              <p className="text-gray-600 text-sm mb-1">Selected map address</p>
+              <p className="text-gray-800 font-medium">{deliveryAddress}</p>
+            </div>
+          )}
 
           {/* Full Name */}
           <div>

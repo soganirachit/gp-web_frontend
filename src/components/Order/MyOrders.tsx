@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { SEO } from '../SEO';
 import { useNavigate } from 'react-router-dom';
 import { FaChevronRight } from 'react-icons/fa';
-import { IoArrowBack } from "react-icons/io5";
 import { orderService } from '../../services/order.service';
 import { format } from 'date-fns';
 import { OrdersListSkeleton } from '../common/PageSkeletons';
 import { SearchBar } from '../common/SearchBar';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
+import { UniformPageHeader } from '../layout/UniformPageHeader';
+
+const ORDER_LIST_PAGE_SIZE = 6;
 
 interface Order {
   id: string;
@@ -37,11 +39,15 @@ const MyOrders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [visibleCount, setVisibleCount] = useState(4);
+  const [visibleCount, setVisibleCount] = useState(ORDER_LIST_PAGE_SIZE);
 
   useEffect(() => {
     void fetchOrders();
   }, [feature]);
+
+  useEffect(() => {
+    setVisibleCount(ORDER_LIST_PAGE_SIZE);
+  }, [searchQuery]);
 
   const fetchOrders = async () => {
     try {
@@ -93,17 +99,19 @@ const MyOrders: React.FC = () => {
       console.error("Failed to fetch orders", error);
       setOrders([]);
     } finally {
+      setVisibleCount(ORDER_LIST_PAGE_SIZE);
       setLoading(false);
     }
   };
 
   const getStatusColor = (status: string) => {
-    // Correct status mapping based on API
-    // The API returns "SCHEDULED" which is technically "Expected"
     const s = status?.toLowerCase() || '';
-    if (s === 'delivered') return 'text-[#166534]'; // Green
-    if (s === 'canceled' || s === 'cancelled') return 'text-[#EF4444]'; // Red
-    return 'text-[#1F2937]'; // Black/Gray for expected/scheduled
+    if (s === 'delivered') return 'text-[#166534]';
+    if (s === 'canceled' || s === 'cancelled') return 'text-[#EF4444]';
+    if (s === 'out_for_delivery') return 'text-[#1D4ED8]';
+    if (s === 'confirmed' || s === 'pending' || s === 'processing')
+      return 'text-[#92400E]';
+    return 'text-[#1F2937]';
   };
 
   const getStatusText = (order: Order) => {
@@ -117,12 +125,18 @@ const MyOrders: React.FC = () => {
     // since there's no actual delivery_date in the response
     if (s === 'out_for_delivery') return `Out for Delivery`;
     if (s === 'scheduled') return `Scheduled`;
-    // Default: show status or order date
+    if (s === 'confirmed') return `Confirmed`;
     return `Ordered on ${date}`;
   };
 
-  const filteredOrders = orders.filter(order =>
-    true
+  const filteredOrders = orders.filter(
+    (order) =>
+      (order.order_number || '')
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      (order.product?.name || '')
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()),
   );
 
   const visibleOrders = filteredOrders.slice(0, visibleCount);
@@ -151,18 +165,14 @@ const MyOrders: React.FC = () => {
         noIndex={true}
       />
       <div className="max-w-[800px] mx-auto min-h-screen flex flex-col">
-        {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
-          <div className="flex items-center gap-3 mb-6">
-            <button
-              type="button"
-              onClick={() => navigate(`${basePath}/account`)}
-              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
-            >
-              <IoArrowBack size={24} />
-            </button>
-            <h1 className="text-2xl font-bold font-serif text-gray-900">My Orders</h1>
-          </div>
+        <div className="sticky top-0 z-10 bg-[#f8f6f1] px-4 pt-6">
+          <UniformPageHeader
+            title="My Orders"
+            onBack={() => navigate(`${basePath}/account`)}
+            padXClassName="px-0"
+            padYClassName="py-0 pb-4"
+            className="mb-6 bg-transparent"
+          />
 
           {/* Search Bar — unified styling, order suggestions as you type */}
           <div className="flex gap-3">
@@ -257,7 +267,9 @@ const MyOrders: React.FC = () => {
               {hasMoreOrders && (
                 <button
                   className="w-full py-4 text-center text-gray-500 font-medium underline"
-                  onClick={() => setVisibleCount((prev) => prev + 4)}
+                  onClick={() =>
+                    setVisibleCount((prev) => prev + ORDER_LIST_PAGE_SIZE)
+                  }
                 >
                   Load More
                 </button>

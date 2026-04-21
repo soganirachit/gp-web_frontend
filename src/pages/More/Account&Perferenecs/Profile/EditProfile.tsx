@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaCamera } from 'react-icons/fa';
-import { IoArrowBack } from 'react-icons/io5';
 import { customerService } from '@/services/getcustomer.service';
 import { editCustomerService } from '@/services/editcustomer.service';
 import { useFeatureTheme } from '../../../../context/FeatureThemeContext';
 import { formatPhoneForDisplay } from '@/utils/phoneDisplay';
+import { UniformPageHeader } from '../../../../components/layout/UniformPageHeader';
 
 interface UserDetails {
   name: string;
@@ -81,17 +81,11 @@ const Profile: React.FC = () => {
   return (
     <div className="bg-[#f8f6f1] min-h-screen">
       <div className="max-w-[800px] mx-auto">
-        {/* Header */}
-        <div className="px-4 pt-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate(`${basePath}/account`)}
-            className="hover:bg-gray-100 rounded-full p-2 transition-colors"
-          >
-            <IoArrowBack className="text-xl" />
-          </button>
-          <h1 className="text-xl font-medium">Edit Profile</h1>
-        </div>
+        <UniformPageHeader
+          title="Edit Profile"
+          onBack={() => navigate(`${basePath}/account`)}
+          padYClassName="pt-4 pb-4"
+        />
 
         {/* Profile Image */}
         <div className="flex justify-center mt-6">

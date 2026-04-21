@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaPen, FaTrash } from 'react-icons/fa';
-import { IoArrowBack } from 'react-icons/io5';
 import { BsCheckSquareFill } from 'react-icons/bs';
 import { addressService, type Address } from '../../services/address.service';
 import { SettingsListSkeleton } from '../../components/common/PageSkeletons';
@@ -13,6 +12,7 @@ import workIcon from '../../assets/svg/adressbook/office.svg';
 import othersIcon from '../../assets/svg/adressbook/others.svg';
 import defaultIcon from '../../assets/svg/adressbook/default.svg';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
+import { UniformPageHeader } from '../../components/layout/UniformPageHeader';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
 
 const Addresses: React.FC = () => {
@@ -124,17 +124,13 @@ const Addresses: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
       <div className="max-w-[800px] mx-auto px-4">
-        {/* Header */}
-        <div className="p-4 pt-6 -mx-4 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200 mb-2 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate(`${basePath}/account`)}
-            className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
-          >
-            <IoArrowBack size={24} />
-          </button>
-          <h1 className="text-2xl font-bold font-serif text-gray-900">My Addresses</h1>
-        </div>
+        <UniformPageHeader
+          title="My Addresses"
+          onBack={() => navigate(`${basePath}/account`)}
+          padXClassName="px-4"
+          padYClassName="pt-6 pb-4"
+          className="-mx-4 sticky top-0 z-10 border-b border-gray-200 mb-2"
+        />
 
         {/* Main Content */}
         <div>

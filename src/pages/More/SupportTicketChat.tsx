@@ -270,12 +270,14 @@ const SupportTicketChat: React.FC = () => {
             <div className="flex items-start gap-3 mb-3">
               <button
                 onClick={() => navigate(`${basePath}/customer-support`)}
-                className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0 mt-1"
+                className="-ml-2 mr-3 mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#374151] transition-colors hover:bg-gray-100"
+                type="button"
+                aria-label="Go back"
               >
-                <IoArrowBack size={22} className="text-gray-700" />
+                <IoArrowBack size={24} />
               </button>
               <div className="flex-1 min-w-0">
-                <h1 className="text-2xl font-bold text-gray-900 leading-tight mb-1 break-words">
+                <h1 className="font-ibm-plex-serif text-[22px] font-semibold leading-7 tracking-normal text-[#111827] mb-1 break-words">
                   {ticket?.subject 
                     ? ticket.subject.split('—')[0].split('Order')[0].trim() 
                     : 'Support Ticket'}

@@ -21,6 +21,10 @@ const config: Config = {
       '2xl':    '1024px',  // Tablet landscape / desktop
     },
     extend: {
+      fontFamily: {
+        sans: ['IBM Plex Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        serif: ['IBM Plex Serif', 'Georgia', 'serif'],
+      },
       /** Fluid type for section titles — ~17–22px across 360–420px without per-breakpoint classes */
       fontSize: {
         'gp-section': ['clamp(1.0625rem, 2.85vw, 1.375rem)', { lineHeight: '1.28' }],

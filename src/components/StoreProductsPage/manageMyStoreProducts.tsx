@@ -9,11 +9,11 @@ import "react-datepicker/dist/react-datepicker.css";
 import walletImage from "../../assets/icon/Wallet.png";
 import profileImage from "../../assets/icon/Profile.png";
 import Low_Balance from "../../assets/icon/LowBalance.png";
-import { IoArrowBack } from "react-icons/io5";
 import { ManageStoreSkeleton } from "../common/PageSkeletons";
 import { format } from "date-fns";
 import { orderService } from "@/services/order.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import { UniformPageHeader } from "../layout/UniformPageHeader";
 
 interface order {
   id: string;
@@ -68,7 +68,9 @@ const ManageMyStoreProducts: React.FC = () => {
     try {
       setIsLoading(true);
 
-      const fetchedOrders = await orderService.getOrdersByCustomerId();
+      const fetchedOrders = await orderService.getOrders({
+        order_type: "subscription",
+      });
 
       if (fetchedOrders && fetchedOrders.length > 0) {
         // Sort orders by creation date, newest first
@@ -437,34 +439,28 @@ const ManageMyStoreProducts: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
       <div className="max-w-[800px] mx-auto">
-        {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
-            >
-              <IoArrowBack size={24} />
-            </button>
-            <h1 className="text-2xl font-bold font-serif text-gray-900">
-              Manage Store
-            </h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <img
-              src={walletImage}
-              alt="Wallet"
-              className="w-10 h-10 md:w-10 md:h-10"
-              onClick={() => navigate(`${basePath}/wallet`)}
-            />
-            <img
-              src={profileImage}
-              alt="Profile"
-              className="w-6 h-6 md:w-8 md:h-8"
-              onClick={() => navigate(`${basePath}/account`)}
-            />
-          </div>
-        </div>
+        <UniformPageHeader
+          title="Manage Store"
+          onBack={() => navigate(-1)}
+          padYClassName="pt-6 pb-4"
+          className="sticky top-0 z-10 border-b border-gray-200"
+          trailing={
+            <>
+              <img
+                src={walletImage}
+                alt="Wallet"
+                className="w-10 h-10 md:w-10 md:h-10 cursor-pointer"
+                onClick={() => navigate(`${basePath}/wallet`)}
+              />
+              <img
+                src={profileImage}
+                alt="Profile"
+                className="w-6 h-6 md:w-8 md:h-8 cursor-pointer"
+                onClick={() => navigate(`${basePath}/account`)}
+              />
+            </>
+          }
+        />
 
         <div className="p-4">
           {/* Product Button */}

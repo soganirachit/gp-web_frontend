@@ -1,11 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
 import { FaPaperPlane } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { supportService, TicketQuestion, PredefinedAnswers } from '../../services/support.service';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { SettingsListSkeleton } from '../../components/common/PageSkeletons';
+import {
+  UNIFORM_PAGE_HEADER_BACK_BUTTON_CLASS,
+  UNIFORM_PAGE_HEADER_TITLE_CLASS,
+} from '../../components/layout/UniformPageHeader';
 
 interface ChatMessage {
   id: string;
@@ -15,11 +19,28 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+const DAILY_ACCENT = '#FAA222';
+const USER_ANSWER_GREEN = '#166534';
+
 const TicketQuestionForm: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { feature } = useFeatureTheme();
-  const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+  const { feature, basePath: contextBasePath } = useFeatureTheme();
+  const supportBasePath = location.pathname.startsWith('/gp-daily')
+    ? '/gp-daily'
+    : location.pathname.startsWith('/gp-store')
+      ? '/gp-store'
+      : contextBasePath;
+  const isDailySupport =
+    feature === 'gpDaily' || location.pathname.startsWith('/gp-daily');
+  /** Progress + send use Daily orange vs Store green; user answer bubbles stay brand green. */
+  const accentColor = isDailySupport ? DAILY_ACCENT : USER_ANSWER_GREEN;
+
+  const progressActiveClass = useMemo(
+    () => (isDailySupport ? 'bg-[#FAA222]' : 'bg-[#166534]'),
+    [isDailySupport],
+  );
 
   const orderId = searchParams.get('order_id');
   const orderNumber = searchParams.get('order_number');
@@ -191,7 +212,9 @@ const TicketQuestionForm: React.FC = () => {
       
       if (ticket) {
         // Navigate to chat screen
-        navigate(`${basePath}/customer-support/chat?ticket=${ticket.ticket_number}`);
+        navigate(
+          `${supportBasePath}/customer-support/chat?ticket=${ticket.ticket_number}`,
+        );
       } else {
         toast.error('Failed to create ticket. Please try again.');
         setSubmitting(false);
@@ -213,7 +236,7 @@ const TicketQuestionForm: React.FC = () => {
         <div className="text-center">
           <p className="text-gray-600 mb-4">Order information is missing</p>
           <button
-            onClick={() => navigate(`${basePath}/customer-support`)}
+            onClick={() => navigate(`${supportBasePath}/customer-support`)}
             className="px-4 py-2 bg-[#166534] text-white rounded-lg"
           >
             Go Back
@@ -229,7 +252,7 @@ const TicketQuestionForm: React.FC = () => {
         <div className="text-center">
           <p className="text-gray-600 mb-4">No questions available</p>
           <button
-            onClick={() => navigate(`${basePath}/customer-support`)}
+            onClick={() => navigate(`${supportBasePath}/customer-support`)}
             className="px-4 py-2 bg-[#166534] text-white rounded-lg"
           >
             Go Back
@@ -258,13 +281,18 @@ const TicketQuestionForm: React.FC = () => {
           <div className="flex items-center gap-3 mb-2">
             <button
               type="button"
-              onClick={() => navigate(`${basePath}/customer-support`)}
-              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
+              onClick={() => navigate(`${supportBasePath}/customer-support`)}
+              className={[
+                UNIFORM_PAGE_HEADER_BACK_BUTTON_CLASS,
+                isDailySupport ? "text-[#FAA222]" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
             >
               <IoArrowBack size={24} />
             </button>
-            <div className="flex-1">
-              <h1 className="text-xl font-bold text-gray-900">Support Request</h1>
+            <div className="flex-1 min-w-0">
+              <h1 className={UNIFORM_PAGE_HEADER_TITLE_CLASS}>Support Request</h1>
               <p className="text-sm text-gray-600">Order: {orderNumber}</p>
             </div>
           </div>
@@ -274,9 +302,7 @@ const TicketQuestionForm: React.FC = () => {
               <div
                 key={index}
                 className={`flex-1 h-1.5 rounded-full ${
-                  index <= currentQuestionIndex
-                    ? 'bg-[#166534]'
-                    : 'bg-gray-300'
+                  index <= currentQuestionIndex ? progressActiveClass : 'bg-gray-300'
                 }`}
               />
             ))}
@@ -297,11 +323,16 @@ const TicketQuestionForm: React.FC = () => {
                 key={message.id}
                 className={`flex ${message.type === 'question' ? 'justify-start' : 'justify-end'}`}
               >
-                <div className={`max-w-[75%] rounded-2xl p-4 ${
-                  message.type === 'question'
-                    ? 'bg-gray-200 text-gray-900'
-                    : 'bg-[#166534] text-white'
-                }`}>
+                <div
+                  className={`max-w-[75%] rounded-2xl p-4 ${
+                    message.type === 'question' ? 'bg-gray-200 text-gray-900' : 'text-white'
+                  }`}
+                  style={
+                    message.type === 'answer'
+                      ? { backgroundColor: USER_ANSWER_GREEN }
+                      : undefined
+                  }
+                >
                   <p className="text-base whitespace-pre-wrap">{message.content}</p>
                 </div>
               </div>
@@ -333,7 +364,11 @@ const TicketQuestionForm: React.FC = () => {
               onClick={() =>
                 handleAnswerSelect(currentQuestion.id, option.value, option.label)
               }
-              className="w-full text-center p-2 rounded-lg border border-gray-200 bg-white hover:border-[#166534] hover:bg-green-50 transition-colors text-sm"
+              className={`w-full text-center p-2 rounded-lg border border-gray-200 bg-white transition-colors text-sm ${
+                isDailySupport
+                  ? 'hover:border-amber-400 hover:bg-amber-50/80'
+                  : 'hover:border-[#166534] hover:bg-green-50'
+              }`}
             >
               <span className="font-medium text-gray-900">
                 {option.label}
@@ -361,13 +396,17 @@ const TicketQuestionForm: React.FC = () => {
               ? "Or type your answer..."
               : currentQuestion.placeholder || "Type your answer..."
           }
-          className="flex-1 h-12 p-2 border border-gray-300 rounded-xl focus:outline-none focus:border-[#166534] resize-none bg-gray-50 text-sm"
+          className={`flex-1 h-12 p-2 border border-gray-300 rounded-xl focus:outline-none resize-none bg-gray-50 text-sm ${
+            isDailySupport ? 'focus:border-amber-500' : 'focus:border-[#166534]'
+          }`}
           rows={1}
         />
         <button
+          type="button"
           onClick={handleTextAnswerSend}
           disabled={!textInput.trim()}
-          className="p-2.5 bg-[#166534] text-white rounded-xl hover:bg-[#145028] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+          className="p-2.5 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 hover:opacity-90"
+          style={{ backgroundColor: accentColor }}
         >
           <FaPaperPlane size={16} />
         </button>

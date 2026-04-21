@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { SEO } from "../SEO";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
-import { MdKeyboardArrowDown } from "react-icons/md";
-import { FaChevronRight, FaSearch } from "react-icons/fa";
-import { IoSwapVerticalOutline } from "react-icons/io5";
-import locationhomeIcon from "../../assets/svg/gp_daily svg/locationhome.svg";
+import { FaChevronRight } from "react-icons/fa";
+import { IoSwapVerticalOutline, IoArrowBack } from "react-icons/io5";
 import {
   productService,
   Category,
@@ -13,14 +11,12 @@ import {
   showStrikeBaseOnCard,
   PRODUCT_AVAILABILITY_STORE,
 } from "../../services/product.service";
-import { addressService } from "../../services/address.service";
 import { ProductBrowseSkeleton } from "../common/PageSkeletons";
 import { SearchBar } from "../common/SearchBar";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { GUEST_STORE_UPDATED_EVENT, storeService } from "../../services/store.service";
 import { getApiUrl } from "../../config/api.config";
-import { GP_OPEN_GUEST_AREA_MODAL_EVENT } from "../../config/guestAreaModalCopy";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
 
@@ -42,54 +38,12 @@ const StoreProductsPages: React.FC = () => {
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const [categoryName, setCategoryName] = useState<string>("All Products");
   const [selectedCategorySlug, setSelectedCategorySlug] = useState<string | null>(null);
-  const [deliveryLocation, setDeliveryLocation] = useState<string>("");
-  const [addressType, setAddressType] = useState<string>("Home");
-  const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [displayedProducts, setDisplayedProducts] = useState(6); // For Load More functionality
   const [searchQuery, setSearchQuery] = useState('');
 
   // Memoize the category slug from URL
   const categorySlug = useMemo(() => searchParams.get('category'), [searchParams]);
   const stateCategoryName = useMemo(() => location.state?.categoryName, [location.state?.categoryName]);
-
-  // Fetch address — logged-in only. Guests calling /addresses/ get 401; web api.ts then redirects to /login.
-  const fetchLatestAddress = useCallback(async () => {
-    try {
-      setIsLoadingAddress(true);
-      if (!isLoggedIn) {
-        setDeliveryLocation("");
-        setAddressType("Home");
-        return;
-      }
-      const addresses = await addressService.getAllAddresses();
-      const defaultAddress = addresses.find(addr => addr.isDefault);
-      const selectedAddress = defaultAddress || addresses
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
-
-      if (selectedAddress) {
-        const formattedAddress = [
-          selectedAddress.houseNo,
-          selectedAddress.streetName,
-          selectedAddress.area,
-          selectedAddress.city,
-          selectedAddress.state,
-          selectedAddress.pincode
-        ].filter(Boolean).join(', ');
-
-        setDeliveryLocation(formattedAddress);
-        setAddressType(selectedAddress.type || "Home");
-      } else {
-        setDeliveryLocation("");
-        setAddressType("Home");
-      }
-    } catch (error) {
-      console.error("Error fetching address:", error);
-      setDeliveryLocation(localStorage.getItem("userLocation") || "");
-      setAddressType("Home");
-    } finally {
-      setIsLoadingAddress(false);
-    }
-  }, [isLoggedIn]);
 
   // Fetch categories
   useEffect(() => {
@@ -176,8 +130,7 @@ const StoreProductsPages: React.FC = () => {
     };
 
     fetchData();
-    fetchLatestAddress();
-  }, [categorySlug, stateCategoryName, fetchLatestAddress, isLoggedIn, guestStoreEpoch]);
+  }, [categorySlug, stateCategoryName, isLoggedIn, guestStoreEpoch]);
 
   const getItemPrice = (item: any): number => getEffectivePrice(item);
 
@@ -214,18 +167,6 @@ const StoreProductsPages: React.FC = () => {
     } else {
       setSearchParams({});
     }
-  };
-
-  const handleLocationClick = () => {
-    if (!isLoggedIn) {
-      window.dispatchEvent(
-        new CustomEvent(GP_OPEN_GUEST_AREA_MODAL_EVENT, {
-          detail: { dismissible: true, variant: "need_location" },
-        }),
-      );
-      return;
-    }
-    navigate(`${basePath}/addresses`);
   };
 
   const handleLoadMore = () => {
@@ -285,7 +226,7 @@ const StoreProductsPages: React.FC = () => {
   const hasMoreProducts = filteredProducts.length > displayedProducts;
 
   // Combined loading state for full-screen loader
-  const isPageLoading = isLoading || isLoadingCategories || isLoadingAddress;
+  const isPageLoading = isLoading || isLoadingCategories;
 
   // Build SEO meta dynamically from the active category.
   // Must be declared before any early return (Rules of Hooks).
@@ -319,31 +260,23 @@ const StoreProductsPages: React.FC = () => {
         canonical={canonicalUrl}
       />
       <div className="mx-auto min-h-screen w-full min-w-0 max-w-[min(800px,100vw)] overflow-x-hidden bg-[#f8f6f1] pb-nav-bottom">
-        {/* Top Header with Location and Search */}
+        {/* Top bar: back + title (matches app StoreProductsScreen) */}
         <div className="sticky top-0 z-20 bg-[#f8f6f1] border-b border-gray-200">
           <div className="px-4 pt-6 pb-3">
-            {/* Location Section */}
-            <div className="flex items-center gap-1.5 mb-3">
-              <img
-                src={locationhomeIcon}
-                alt="Location"
-                className="w-4 h-4 flex-shrink-0"
-              />
-              <div
-                className="flex items-center gap-1 cursor-pointer min-w-0 flex-1"
-                onClick={handleLocationClick}
+            <div className="mb-3 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="-ml-2 rounded-full p-2 transition-colors hover:bg-black/5"
+                aria-label="Go back"
               >
-                <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-bold text-gray-800">{addressType}</span>
-                  <span className="text-xs text-gray-600 truncate font-medium">
-                    {isLoadingAddress ? 'Loading...' : deliveryLocation || 'Tap to set address'}
-                  </span>
-                </div>
-                <MdKeyboardArrowDown className="text-gray-600 flex-shrink-0 text-lg" />
-              </div>
+                <IoArrowBack size={24} className="text-gray-900" />
+              </button>
+              <h1 className="min-w-0 flex-1 font-serif text-2xl font-bold text-gray-900">
+                Products
+              </h1>
             </div>
 
-            {/* Search Bar — unified home page styling */}
             <SearchBar
               mode="product"
               storeId={storeService.getStoreIdForProducts() ?? undefined}

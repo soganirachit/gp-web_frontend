@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { MdKeyboardArrowDown } from "react-icons/md";
-import { IoSwapVerticalOutline } from "react-icons/io5";
+import { IoSwapVerticalOutline, IoArrowBack } from "react-icons/io5";
 import { FaChevronRight } from "react-icons/fa";
 import { SEO } from "../SEO";
-import { addressService } from "../../services/address.service";
 import {
   productService,
   type Category,
@@ -21,7 +19,6 @@ import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
 import { ProductBrowseSkeleton } from "../common/PageSkeletons";
 import { SearchBar } from "../common/SearchBar";
-import locationhomeIcon from "../../assets/svg/gp_daily svg/locationhome.svg";
 import scooterIcon from "../../assets/svg/gp_daily svg/scooter.svg";
 
 const DAILY_AVAILABILITY = PRODUCT_AVAILABILITY_GP_DAILY_LIST;
@@ -45,49 +42,10 @@ const ProductBrowsePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const [categoryName, setCategoryName] = useState("All Products");
-  const [deliveryLocation, setDeliveryLocation] = useState("");
-  const [addressType, setAddressType] = useState("Home");
-  const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [displayedProducts, setDisplayedProducts] = useState(6);
   const [searchQuery, setSearchQuery] = useState("");
 
   const basePath = "/gp-daily";
-
-  const fetchLatestAddress = useCallback(async () => {
-    try {
-      setIsLoadingAddress(true);
-      const addresses = await addressService.getAllAddresses();
-      const defaultAddress = addresses.find((addr) => addr.isDefault);
-      const selected =
-        defaultAddress ||
-        addresses.sort(
-          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-        )[0];
-
-      if (selected) {
-        const formatted = [
-          selected.houseNo,
-          selected.streetName,
-          selected.area,
-          selected.city,
-          selected.state,
-          selected.pincode,
-        ]
-          .filter(Boolean)
-          .join(", ");
-        setDeliveryLocation(formatted);
-        setAddressType(selected.type || "Home");
-      } else {
-        setDeliveryLocation("");
-        setAddressType("Home");
-      }
-    } catch {
-      setDeliveryLocation(localStorage.getItem("userLocation") || "");
-      setAddressType("Home");
-    } finally {
-      setIsLoadingAddress(false);
-    }
-  }, []);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -191,8 +149,7 @@ const ProductBrowsePage: React.FC = () => {
     };
 
     run();
-    fetchLatestAddress();
-  }, [categorySlug, stateCategoryName, fetchLatestAddress]);
+  }, [categorySlug, stateCategoryName]);
 
   useEffect(() => {
     if (!categorySlug || stateCategoryName) return;
@@ -227,10 +184,6 @@ const ProductBrowsePage: React.FC = () => {
     navigate(`${basePath}/product/${encodeURIComponent(String(pathSlug))}`, { state: { product } });
   };
 
-  const handleLocationClick = () => {
-    navigate(`${basePath}/addresses`);
-  };
-
   const handleCategoryClick = (slug: string | null) => {
     if (slug) {
       setSearchParams({ category: slug });
@@ -254,7 +207,7 @@ const ProductBrowsePage: React.FC = () => {
   const visibleProducts = filteredProducts.slice(0, displayedProducts);
   const hasMoreProducts = filteredProducts.length > displayedProducts;
 
-  const isPageLoading = isLoading || isLoadingCategories || isLoadingAddress;
+  const isPageLoading = isLoading || isLoadingCategories;
 
   const seoDescription = useMemo(() => {
     if (!categorySlug) {
@@ -290,20 +243,18 @@ const ProductBrowsePage: React.FC = () => {
       <div className="mx-auto min-h-screen w-full min-w-0 max-w-[min(800px,100vw)] overflow-x-hidden bg-[#f8f6f1] pb-nav-bottom">
         <div className="sticky top-0 z-20 bg-[#f8f6f1] border-b border-gray-200">
           <div className="px-4 pt-6 pb-3">
-            <div className="flex items-center gap-1.5 mb-3">
-              <img src={locationhomeIcon} alt="" className="w-4 h-4 flex-shrink-0" />
-              <div
-                className="flex items-center gap-1 cursor-pointer min-w-0 flex-1"
-                onClick={handleLocationClick}
+            <div className="mb-3 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="-ml-2 rounded-full p-2 transition-colors hover:bg-black/5"
+                aria-label="Go back"
               >
-                <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-bold text-gray-800">{addressType}</span>
-                  <span className="text-xs text-gray-600 truncate font-medium">
-                    {isLoadingAddress ? "Loading..." : deliveryLocation || "Tap to set address"}
-                  </span>
-                </div>
-                <MdKeyboardArrowDown className="text-gray-600 flex-shrink-0 text-lg" />
-              </div>
+                <IoArrowBack size={24} className="text-gray-900" />
+              </button>
+              <h1 className="min-w-0 flex-1 font-serif text-2xl font-bold text-gray-900">
+                Products
+              </h1>
             </div>
 
             <SearchBar

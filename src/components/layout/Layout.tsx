@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import BottomNav from "./BottomNav";
+import { WebOrderPushBridge } from "./WebOrderPushBridge";
 import { GuestStoreLocationBootstrap } from "../store/GuestStoreLocationBootstrap";
 import { FeatureThemeProvider } from "../../context/FeatureThemeContext";
 import { FadingOutlet } from "../common/PageFade";
@@ -64,6 +65,7 @@ const Layout: React.FC = () => {
   return (
     <FeatureThemeProvider>
     <>
+      <WebOrderPushBridge />
       <AppToaster />
       {/* Fix_V0.9: data-testid for Playwright / QA without changing layout behaviour */}
     <div className="min-h-screen bg-[#f8f6f1]" data-testid="gp-root-layout">

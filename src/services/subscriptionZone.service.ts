@@ -2,6 +2,10 @@ import { AxiosError } from "axios";
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
 
+/** Same copy as mobile `CartScreen` unified delivery alert for GP Daily out-of-zone. */
+export const GP_DAILY_OUT_OF_ZONE_USER_MESSAGE =
+  "Genda Phool Daily is currently not available in this zone. Please choose another address.";
+
 export type SubscriptionZoneInfo = {
   id: number;
   name: string;

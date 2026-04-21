@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { IoArrowBack } from 'react-icons/io5';
 import { SEO } from '../components/SEO';
+import { UniformPageHeader } from '../components/layout/UniformPageHeader';
 
 const Privacy: React.FC = () => {
   const navigate = useNavigate();
@@ -14,18 +14,12 @@ const Privacy: React.FC = () => {
         noIndex
       />
       <div className="max-w-[800px] mx-auto">
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
-              aria-label="Go back"
-            >
-              <IoArrowBack size={24} />
-            </button>
-            <h1 className="text-2xl font-bold font-serif text-gray-900">Privacy Policy</h1>
-          </div>
-        </div>
+        <UniformPageHeader
+          title="Privacy Policy"
+          onBack={() => navigate(-1)}
+          padYClassName="pt-6 pb-4"
+          className="sticky top-0 z-10 border-b border-gray-200"
+        />
 
         <div className="px-4 py-6 space-y-6 text-gray-700">
           <p className="text-sm text-gray-500">Last updated: March 2025</p>

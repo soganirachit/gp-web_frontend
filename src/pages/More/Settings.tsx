@@ -116,13 +116,14 @@ const Settings: React.FC = () => {
     void fetchUser();
   }, [isLoggedIn]);
 
-  /** Re-sync store dropdown when opening Account after cart store change (app parity). */
+  /** GP Store only: re-sync store dropdown when opening Account (GP Daily does not use stores / nearest-store APIs here). */
   useEffect(() => {
+    if (feature !== "gpStore") return;
     if (!isLoggedIn || showAsLoggedOut) return;
     if (location.pathname !== `${basePath}/account`) return;
     void fetchStores();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: refetch on route focus only
-  }, [location.pathname, basePath, isLoggedIn, showAsLoggedOut]);
+  }, [location.pathname, basePath, isLoggedIn, showAsLoggedOut, feature]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -184,6 +185,7 @@ const Settings: React.FC = () => {
   };
 
   const fetchStores = async (opts?: { refreshListOnly?: boolean }) => {
+    if (feature !== "gpStore") return;
     const refreshListOnly = opts?.refreshListOnly === true;
     try {
       if (!refreshListOnly) setIsLoadingStores(true);
@@ -246,12 +248,13 @@ const Settings: React.FC = () => {
     }
   };
 
-  /** Refresh store list (and is_online) when opening the dropdown */
+  /** GP Store only: refresh store list (and is_online) when opening the dropdown */
   useEffect(() => {
+    if (feature !== "gpStore") return;
     if (!isStoreDropdownOpen) return;
-    fetchStores({ refreshListOnly: true });
+    void fetchStores({ refreshListOnly: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only refetch when dropdown opens
-  }, [isStoreDropdownOpen]);
+  }, [isStoreDropdownOpen, feature]);
 
   // GP Store menu items (6 options only)
   const gpStoreMenuItems = [

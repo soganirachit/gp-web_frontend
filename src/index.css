@@ -22,7 +22,7 @@
   }
 
   body {
-    @apply bg-[#f8f6f1];
+    @apply bg-[#f8f6f1] font-sans antialiased;
     /* Minimum supported width (360px budget Android) */
     min-width: 320px;
     /* Respect safe areas for punch-hole / notch / Dynamic Island phones */

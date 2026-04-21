@@ -1,6 +1,59 @@
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
 
+const MAX_ORDER_LIST_PAGES = 40;
+
+/** Never send explicit page index on `GET /orders/` — pagination follows `next` URLs only. */
+function sanitizeOrderListParams(
+    params?: Record<string, string>,
+): Record<string, string> | undefined {
+    if (!params || !Object.keys(params).length) return undefined;
+    const next = { ...params };
+    delete next.page;
+    delete next.page_no;
+    delete next.p;
+    return Object.keys(next).length ? next : undefined;
+}
+
+function extractOrderListPayload(data: unknown): any[] {
+  if (Array.isArray(data)) return data as any[];
+  if (!data || typeof data !== "object") return [];
+  const d = data as Record<string, unknown>;
+  if (Array.isArray(d.data)) return d.data as any[];
+  if (Array.isArray(d.results)) return d.results as any[];
+  return [];
+}
+
+/** Follow DRF `next` until exhausted (matches mobile `order.service`). */
+async function fetchAllOrderPages(
+    params?: Record<string, string>,
+): Promise<any[]> {
+    const all: any[] = [];
+    let url = `${getApiUrl()}/orders/`;
+    let firstParams = sanitizeOrderListParams(params);
+
+    for (let p = 0; p < MAX_ORDER_LIST_PAGES; p++) {
+        const response = await api.get(
+            url,
+            firstParams ? { params: firstParams } : undefined,
+        );
+        firstParams = undefined;
+
+        const data = response.data;
+        const list = extractOrderListPayload(data);
+        all.push(...list);
+
+        const next =
+            typeof (data as any)?.next === "string" &&
+            (data as any).next.trim()
+                ? String((data as any).next).trim()
+                : null;
+        if (!next) break;
+        url = next;
+    }
+    return all;
+}
+
 class OrderService {
     async createOrder(orderPayload: any): Promise<{
         success: boolean;
@@ -127,9 +180,8 @@ class OrderService {
                 if (statusOrFilters.order_type)
                     params.order_type = statusOrFilters.order_type;
             }
-            const response = await api.get(`${getApiUrl()}/orders/`, {
-                params: Object.keys(params).length ? params : undefined,
-            });
+            const query = Object.keys(params).length ? params : undefined;
+            const rawList = await fetchAllOrderPages(query);
 
             const subscriptionOnly =
                 String(params.order_type ?? "").toLowerCase() === "subscription";
@@ -142,23 +194,7 @@ class OrderService {
                       )
                     : list;
 
-            if (response.status === 200) {
-                // Handle different possible response structures
-                if (response.data.success && response.data.data) {
-                    const raw = Array.isArray(response.data.data)
-                        ? response.data.data
-                        : [];
-                    return keepSubscriptionRows(raw);
-                }
-                if (Array.isArray(response.data)) {
-                    return keepSubscriptionRows(response.data);
-                }
-                if (response.data.results) {
-                    return keepSubscriptionRows(response.data.results);
-                }
-                return [];
-            }
-            return [];
+            return keepSubscriptionRows(rawList);
         } catch (error: any) {
             console.error('Error fetching orders:', error);
             return [];

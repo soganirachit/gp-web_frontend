@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useId } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { IoWalletOutline, IoArrowBack, IoTimeOutline, IoRefresh } from "react-icons/io5";
+import { IoWalletOutline, IoTimeOutline, IoRefresh } from "react-icons/io5";
 
 import { motion, AnimatePresence } from "framer-motion";
 import { walletService } from "../../../services/wallet.service";
@@ -31,6 +31,7 @@ import {
   pickActiveSubscriptionDailyUnitRupees,
   computeGpDailyOrderOnHold,
 } from "../../../utils/gpDailyWalletHold";
+import { UniformPageHeader } from "../../layout/UniformPageHeader";
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
 const MIN_AMOUNT = 1;
@@ -382,19 +383,13 @@ const Wallet = () => {
           </div>
         )}
 
-        {/* Header — same inset as body cards */}
-        <div className={`sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200 ${pagePad} pt-6 pb-4`}>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigate(`${basePath}/account`)}
-              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
-            >
-              <IoArrowBack size={24} />
-            </button>
-            <h1 className="text-xl font-semibold font-serif text-gray-900">My Wallet</h1>
-          </div>
-        </div>
+        <UniformPageHeader
+          title="My Wallet"
+          onBack={() => navigate(`${basePath}/account`)}
+          padXClassName={pagePad}
+          padYClassName="py-4"
+          className="sticky top-0 z-10 border-b border-gray-200"
+        />
 
         <div className={`${pagePad} space-y-4 pb-20`}>
         {/* Balance Card */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -18,6 +18,7 @@ import {
   IoChevronUp,
   IoCreateOutline,
   IoCubeOutline,
+  IoPlay,
 } from "react-icons/io5";
 import modifySubIcon from "../../assets/svg/cancelpage/modify.svg";
 import pauseSubIcon from "../../assets/svg/cancelpage/pause.svg";
@@ -181,6 +182,62 @@ function historyOrderDelivered(o: Record<string, unknown>): boolean {
   );
 }
 
+function historyOrderCancelled(o: Record<string, unknown>): boolean {
+  const st = String(o.status ?? "").toLowerCase();
+  return st === "cancelled" || st === "canceled";
+}
+
+const DELIVERY_HISTORY_PAGE_SIZE = 6;
+
+function normalizeApiStatusKey(raw: string): string {
+  return String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_");
+}
+
+function isOutForDeliveryApiStatus(raw: string): boolean {
+  const k = normalizeApiStatusKey(raw);
+  return (
+    k === "out_for_delivery" ||
+    k === "outfordelivery" ||
+    k.startsWith("out_for_delivery") ||
+    k === "shipping" ||
+    k === "shipped" ||
+    k === "in_transit" ||
+    k === "intransit"
+  );
+}
+
+function isConfirmedPipelineApiStatus(raw: string): boolean {
+  const k = normalizeApiStatusKey(raw);
+  if (!k) return false;
+  if (k === "delivered") return false;
+  if (k.includes("cancel")) return false;
+  if (isOutForDeliveryApiStatus(raw)) return false;
+  return (
+    k === "confirmed" ||
+    k === "pending" ||
+    k === "processing" ||
+    k === "scheduled" ||
+    k === "placed" ||
+    k === "accepted"
+  );
+}
+
+/** Match API `status` (snake_case) for delivery history rows — not a binary “undelivered”. */
+function formatHistoryOrderStatusFromApi(o: Record<string, unknown>): string {
+  const raw = String(o.status ?? "").trim();
+  if (!raw) return "Pending";
+  return raw
+    .toLowerCase()
+    .split("_")
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : ""))
+    .filter(Boolean)
+    .join(" ");
+}
+
 function isSubscriptionOrderType(o: Record<string, unknown>): boolean {
   const t = String(o.order_type ?? o.orderType ?? "")
     .trim()
@@ -209,7 +266,16 @@ const ManageMySubscription: React.FC = () => {
   const [historyOrders, setHistoryOrders] = useState<Record<string, unknown>[]>(
     [],
   );
+  const [historyVisibleCount, setHistoryVisibleCount] = useState(
+    DELIVERY_HISTORY_PAGE_SIZE,
+  );
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  const visibleHistoryOrders = useMemo(
+    () => historyOrders.slice(0, historyVisibleCount),
+    [historyOrders, historyVisibleCount],
+  );
+  const hasMoreHistoryRows = historyVisibleCount < historyOrders.length;
 
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
 
@@ -239,6 +305,7 @@ const ManageMySubscription: React.FC = () => {
   const [packsExpandedBySubId, setPacksExpandedBySubId] = useState<
     Record<string, boolean>
   >({});
+  const [resumingSubId, setResumingSubId] = useState<string | null>(null);
 
   // Days of the week
   // const daysOfWeek = ['Mon', 'Tues', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'];
@@ -292,6 +359,7 @@ const ManageMySubscription: React.FC = () => {
         );
         /** API may still return mixed types — keep only subscription orders */
         setHistoryOrders(asRecords.filter((row) => isSubscriptionOrderType(row)));
+        setHistoryVisibleCount(DELIVERY_HISTORY_PAGE_SIZE);
       } catch {
         if (!cancelled) setHistoryOrders([]);
       } finally {
@@ -303,14 +371,19 @@ const ManageMySubscription: React.FC = () => {
     };
   }, [activeTab]);
 
-  /** Card footer — next delivery from subscribed weekdays + today (then API fallback). */
-  const getNextDeliveryLine = (subscription: Subscription) => {
+  /**
+   * Card footer — matches app `getNextDeliveryLabel` / `SubscriptionsScreen`:
+   * cancelled → no row (`null`); paused → "Next Delivery: Paused"; active → date or em dash.
+   */
+  const getNextDeliveryLine = (subscription: Subscription): string | null => {
+    if (subscription.status === "CANCELLED") {
+      return null;
+    }
     if (
       subscription.status === "PAUSED" ||
-      subscription.status === "INACTIVE" ||
-      subscription.status === "CANCELLED"
+      subscription.status === "INACTIVE"
     ) {
-      return "No upcoming delivery";
+      return "Next Delivery: Paused";
     }
     const fromSchedule = computeNextDeliveryFromSubscribedDays(subscription);
     if (fromSchedule) {
@@ -320,7 +393,7 @@ const ManageMySubscription: React.FC = () => {
     if (apiNext && !Number.isNaN(apiNext.getTime())) {
       return `Next Delivery: ${format(apiNext, "EEE, d MMM")}`;
     }
-    return "Next Delivery: —";
+    return "Next delivery: —";
   };
 
   const fetchSubscriptionDetails = async () => {
@@ -356,6 +429,25 @@ const ManageMySubscription: React.FC = () => {
       setSelectedSubscription(null);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResumeSubscription = async (
+    e: React.MouseEvent,
+    subId: string,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      setResumingSubId(subId);
+      await subscriptionService.toggleSubscriptionStatus(subId);
+      toast.success("Subscription resumed");
+      await fetchSubscriptionDetails();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not resume";
+      toast.error(msg);
+    } finally {
+      setResumingSubId(null);
     }
   };
 
@@ -449,6 +541,7 @@ const ManageMySubscription: React.FC = () => {
     const isCancelled = subscription.status === "CANCELLED";
     const isPaused =
       subscription.status === "PAUSED" || subscription.status === "INACTIVE";
+    const nextDeliveryLabel = getNextDeliveryLine(subscription);
 
     const lineItems =
       subscription.lineItems && subscription.lineItems.length > 0
@@ -734,7 +827,7 @@ const ManageMySubscription: React.FC = () => {
               return (
                 <div
                   key={label}
-                  className={`flex h-9 min-w-0 flex-1 items-center justify-center rounded-lg text-[11px] font-semibold sm:h-10 sm:rounded-xl sm:text-xs ${
+                  className={`flex h-9 min-w-0 flex-1 items-center justify-center rounded-xl text-[11px] font-semibold sm:h-10 sm:rounded-xl sm:text-xs ${
                     on
                       ? "text-black"
                       : "border border-gray-300 bg-white text-gray-400"
@@ -752,9 +845,30 @@ const ManageMySubscription: React.FC = () => {
           </div>
         </div>
 
-        <p className="mt-3 text-sm text-[#4B5563]">
-          {getNextDeliveryLine(subscription)}
-        </p>
+        {nextDeliveryLabel != null ? (
+          <div className="mt-4 flex flex-row items-center justify-between gap-2.5">
+            <p className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-[#374151]">
+              {nextDeliveryLabel}
+            </p>
+            {isPaused ? (
+              <button
+                type="button"
+                onClick={(ev) => void handleResumeSubscription(ev, String(subscription.id))}
+                disabled={resumingSubId === String(subscription.id)}
+                className="inline-flex min-w-[5.5rem] shrink-0 items-center justify-center gap-1 rounded-lg border-[1.5px] border-[#2563EB] bg-white px-2.5 py-1.5 text-[13px] font-semibold text-[#2563EB] transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {resumingSubId === String(subscription.id) ? (
+                  <Spinner size={18} variant="default" className="!inline-flex" />
+                ) : (
+                  <>
+                    Resume
+                    <IoPlay className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  </>
+                )}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -868,12 +982,26 @@ const ManageMySubscription: React.FC = () => {
                   Loading orders…
                 </div>
               ) : historyOrders.length > 0 ? (
-                historyOrders.map((order, index) => {
+                <>
+                {visibleHistoryOrders.map((order, index) => {
                   const orderNumber =
                     typeof order.order_number === "string"
                       ? order.order_number
                       : "";
                   const delivered = historyOrderDelivered(order);
+                  const cancelled = historyOrderCancelled(order);
+                  const apiSt = String(order.status ?? "");
+                  const outbound =
+                    !delivered &&
+                    !cancelled &&
+                    isOutForDeliveryApiStatus(apiSt);
+                  const confirmedPipe =
+                    !delivered &&
+                    !cancelled &&
+                    isConfirmedPipelineApiStatus(apiSt);
+                  const statusLabel = delivered
+                    ? "Delivered"
+                    : formatHistoryOrderStatusFromApi(order);
 
                   return (
                     <div
@@ -903,7 +1031,17 @@ const ManageMySubscription: React.FC = () => {
                       >
                         <IoCubeOutline
                           className="h-[22px] w-[22px] shrink-0"
-                          style={{ color: delivered ? "#16A34A" : "#DC2626" }}
+                          style={{
+                            color: delivered
+                              ? "#16A34A"
+                              : cancelled
+                                ? "#DC2626"
+                                : outbound
+                                  ? "#2563EB"
+                                  : confirmedPipe
+                                    ? "#B45309"
+                                    : "#6B7280",
+                          }}
                           aria-hidden
                         />
                         <div className="min-w-0 flex-1">
@@ -920,10 +1058,16 @@ const ManageMySubscription: React.FC = () => {
                           className={`whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-bold ${
                             delivered
                               ? "bg-[#DCFCE7] text-[#166534]"
-                              : "bg-[#FEE2E2] text-[#991B1B]"
+                              : cancelled
+                                ? "bg-[#FEE2E2] text-[#991B1B]"
+                                : outbound
+                                  ? "bg-[#DBEAFE] text-[#1D4ED8]"
+                                  : confirmedPipe
+                                    ? "bg-[#FEF3C7] text-[#92400E]"
+                                    : "bg-[#F3F4F6] text-[#374151]"
                           }`}
                         >
-                          {delivered ? "Delivered" : "Undelivered"}
+                          {statusLabel}
                         </span>
                         {delivered ? (
                           <button
@@ -939,7 +1083,21 @@ const ManageMySubscription: React.FC = () => {
                       </div>
                     </div>
                   );
-                })
+                })}
+                {hasMoreHistoryRows ? (
+                  <button
+                    type="button"
+                    className="w-full py-4 text-center text-sm font-medium text-gray-500 underline"
+                    onClick={() =>
+                      setHistoryVisibleCount(
+                        (c) => c + DELIVERY_HISTORY_PAGE_SIZE,
+                      )
+                    }
+                  >
+                    Load more
+                  </button>
+                ) : null}
+                </>
               ) : (
                 <div className="flex flex-col items-center rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
                   <IoCubeOutline className="h-12 w-12 text-[#D1D5DB]" aria-hidden />

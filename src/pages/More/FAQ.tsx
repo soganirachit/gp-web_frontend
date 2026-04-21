@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IoArrowBack } from 'react-icons/io5';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { faqService, FAQ as FAQItem } from '../../services/faq.service';
 import { normalizeFaqDeliveryWindowCopy } from '../../utils/faqDeliveryCopy';
 import { ContentRowsSkeleton } from '../../components/common/PageSkeletons';
+import { UniformPageHeader } from '../../components/layout/UniformPageHeader';
 
 interface FAQSection {
   title: string;
@@ -69,17 +69,11 @@ const FAQ: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
       <div className="max-w-[800px] mx-auto">
-        {/* Header */}
-        <div className="px-4 pt-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate(`${basePath}/account`)}
-            className="hover:bg-gray-100 rounded-full p-2 transition-colors"
-          >
-            <IoArrowBack className="text-xl" />
-          </button>
-          <h1 className="text-xl font-semibold">FAQs</h1>
-        </div>
+        <UniformPageHeader
+          title="FAQs"
+          onBack={() => navigate(`${basePath}/account`)}
+          padYClassName="pt-4 pb-4"
+        />
 
         {/* FAQ Sections */}
         <div className="px-4 py-6 space-y-8">
