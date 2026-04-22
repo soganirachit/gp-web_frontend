@@ -388,7 +388,7 @@ const Wallet = () => {
           onBack={() => navigate(`${basePath}/account`)}
           padXClassName={pagePad}
           padYClassName="py-4"
-          className="sticky top-0 z-10 border-b border-gray-200"
+          className="sticky top-0 z-10"
         />
 
         <div className={`${pagePad} space-y-4 pb-20`}>
@@ -403,7 +403,7 @@ const Wallet = () => {
               <button
                 type="button"
                 onClick={() => setShowDepositHistoryOnly((p) => !p)}
-                className="inline-flex shrink-0 items-center gap-1 text-[11px]  border-2 border-white/95 rounded-full px-2 py-1 font-semibold text-white/95 underline decoration-white  hover:text-white"
+                className="inline-flex shrink-0 items-center gap-1 text-[11px]  border-2 border-white/95 rounded-full px-2 py-1 font-semibold text-white/95  hover:text-white"
               >
                 <DepositHistoryGlyph />
                 {showDepositHistoryOnly ? "All Transactions" : "Deposit History"}
@@ -486,7 +486,7 @@ const Wallet = () => {
                 key={amount}
                 type="button"
                 onClick={() => handleQuickAmount(amount)}
-                className={`py-2 rounded-2xl border-2 text-sm xs:text-base font-medium ${customAmount === amount.toString()
+                className={`py-1 rounded-xl border-2 text-sm xs:text-base font-medium ${customAmount === amount.toString()
                   ? "border-[#FAA222] text-black bg-[#FAA222]"
                   : "border-gray-200 text-gray-600 bg-white "
                   }`}
@@ -506,7 +506,7 @@ const Wallet = () => {
               type="text"
               value={customAmount}
               onChange={handleAmountChange}
-              className={`w-full p-3 border-2 rounded-2xl text-base ${customAmount && parseInt(customAmount) < MIN_AMOUNT
+              className={`w-full p-3 border-2 rounded-xl text-base ${customAmount && parseInt(customAmount) < MIN_AMOUNT
                 ? "border-red-300 bg-red-50"
                 : "border-gray-400"
                 }`}

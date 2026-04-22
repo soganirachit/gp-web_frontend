@@ -575,7 +575,7 @@ const HomePageLocation: React.FC = () => {
       {/* Header — same pattern as AddEditAddress / Addresses (back + title aligned) */}
       <div className="flex flex-1 flex-col px-4 pb-4">
         <div
-          className={`sticky top-0 z-10 -mx-4 mb-2 border-b border-gray-200 px-4 pb-3 pt-5 ${theme.classes.authPageBackground}`}
+          className={`sticky top-0 z-10 -mx-4 mb-2 px-4 pb-3 pt-5 ${theme.classes.authPageBackground}`}
         >
           <div className="flex items-start gap-2 sm:gap-3">
             <button

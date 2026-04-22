@@ -379,7 +379,7 @@ const OrderDetails: React.FC = () => {
           title="Order Details"
           onBack={() => navigateBackToOrderList(order)}
           padYClassName="pt-6 pb-4"
-          className="sticky top-0 z-10 border-b border-gray-200"
+          className="sticky top-0 z-10"
         />
 
         {/* Content */}

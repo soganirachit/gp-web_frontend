@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IoArrowBack } from 'react-icons/io5';
 import { SearchBar } from '../common/SearchBar';
 import { basePackService, BasePack } from '../../services/basepack.service';
 import {
@@ -16,6 +15,7 @@ import profileImage from '../../assets/icon/Profile.png';
 import logo from '../../assets/All/logo.png';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { storeService } from '../../services/store.service';
+import { UniformPageHeader } from '../layout/UniformPageHeader';
 
 const SearchPage: React.FC = () => {
   const navigate = useNavigate();
@@ -84,13 +84,14 @@ const SearchPage: React.FC = () => {
     <div className="min-h-screen bg-[#f8f6f1] relative overflow-x-clip">
       <div className="mx-auto w-full max-w-[min(800px,100vw)]">
         {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
-          <div className="flex items-center gap-3 mb-6">
-            <button onClick={() => navigate(-1)} className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors">
-              <IoArrowBack size={24} />
-            </button>
-            <h1 className="text-2xl font-bold font-serif text-gray-900">Search</h1>
-          </div>
+        <div className="sticky top-0 z-10 bg-[#f8f6f1] px-4 pb-4 pt-6">
+          <UniformPageHeader
+            title="Search"
+            onBack={() => navigate(-1)}
+            className="mb-6"
+            padXClassName="px-0"
+            padYClassName="py-0"
+          />
 
           {/* Search Bar — unified home page styling */}
           <SearchBar

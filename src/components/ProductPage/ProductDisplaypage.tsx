@@ -23,7 +23,7 @@ import WalletImage from "../../assets/icon/Wallet.png";
 import ProfileImage from "../../assets/icon/Profile.png";
 import logo from "../../assets/All/logo.png";
 import { ProductDetailSkeleton } from "../common/PageSkeletons";
-import { IoArrowBack, IoCartOutline } from "react-icons/io5";
+import { IoCartOutline } from "react-icons/io5";
 import { FaChevronRight } from "react-icons/fa";
 import { ProductImageTag } from "../common/ProductImageTag";
 import cautionIcon from "../../assets/svg/gp_daily svg/caution.svg";
@@ -37,6 +37,7 @@ import {
   isCartStockOrAvailabilityInlineError,
 } from "../../utils/cartStockInlineMessage";
 import { subscriptionCartService } from "../../services/subscriptionCart.service";
+import { UniformPageHeader } from "../layout/UniformPageHeader";
 
 // Add interface for content items
 // interface ContentItem {
@@ -831,6 +832,9 @@ const ProductPage: React.FC = () => {
 
   const currentProduct = product || basePack;
   const categoryName = product?.category === "PUJA" ? "Puja Pack" : product?.category === "EXOTIC" ? "Exotic Pack" : "Puja Pack";
+  const isGpDaily = feature !== "gpStore";
+  const pdp = getPriceDisplay();
+  const showPdpSaveBadge = pdp.showStrike && pdp.discountPercentage > 0;
 
   return (
     <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom overflow-x-clip">
@@ -848,17 +852,13 @@ const ProductPage: React.FC = () => {
         }
       `}</style>
       <div className="max-w-[800px] mx-auto relative">
-        {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
-            >
-              <IoArrowBack size={24} />
-            </button>
-            <h1 className="text-2xl font-bold font-serif text-gray-900">{categoryName}</h1>
-          </div>
+        <div className="sticky top-0 z-10 bg-[#f8f6f1]">
+          <UniformPageHeader
+            title={categoryName}
+            onBack={() => navigate(-1)}
+            padXClassName="px-4"
+            padYClassName="pt-6 pb-3"
+          />
         </div>
 
         {/* Main Content */}
@@ -879,57 +879,100 @@ const ProductPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Product name + orange unit capsule — vertically centered as one row */}
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <h1 className="m-0 min-w-0 flex-1 font-ibm-plex-serif text-2xl font-bold leading-snug text-gray-900">
-              {formatProductTitleCase(getProductName())}
-            </h1>
-            <span
-              className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[#FAA222] px-3 py-[0.4375rem] text-sm font-semibold leading-normal text-gray-900 whitespace-nowrap"
-              aria-label="Unit"
-            >
-              {getProductWeight()}
-            </span>
-          </div>
-
-          {/* Price row — same scale as store (current + struck MRP) */}
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <span className="text-2xl font-bold text-gray-900">
-              ₹{Math.round(getPriceDisplay().price)}/Pack
-            </span>
-            {getPriceDisplay().showStrike && (
-              <span className="text-xl font-medium text-gray-500 line-through">
-                ₹{Math.round(getPriceDisplay().originalPrice)}
-              </span>
-            )}
-          </div>
-
-          {/* Includes — from API `bom_items`; single horizontal row, scroll on overflow, scrollbar hidden */}
-          <div className="mt-4">
-            <h3 className="mb-3 text-base font-semibold text-gray-900">Includes</h3>
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2 no-scrollbar">
-              {bomDisplayRows.length > 0
-                ? bomDisplayRows.map((row) => (
-                    <span
-                      key={String(row.id)}
-                      className="inline-flex shrink-0 items-center whitespace-nowrap rounded-xl border border-[#FAA222] bg-white px-3 py-2 text-sm font-medium text-gray-900"
-                    >
-                      {row.name}
-                    </span>
-                  ))
-                : getIncludesFallbackLabels().map((label, index) => (
-                    <span
-                      key={`${label}-${index}`}
-                      className="inline-flex shrink-0 items-center whitespace-nowrap rounded-xl border border-[#FAA222] bg-white px-3 py-2 text-sm font-medium text-gray-900"
-                    >
-                      {label}
-                    </span>
-                  ))}
-            </div>
-            {bomDisplayRows.length === 0 && getIncludesFallbackLabels().length === 0 && (
-              <p className="text-sm text-gray-500">No ingredient list for this product.</p>
-            )}
-          </div>
+          {isGpDaily ? (
+            <>
+              <div className="mt-4 flex items-start justify-between gap-3">
+                <h1 className="m-0 min-w-0 flex-1 font-sans text-[22px] font-semibold leading-snug text-[#111827] [overflow-wrap:anywhere]">
+                  {formatProductTitleCase(getProductName())}
+                </h1>
+                {showPdpSaveBadge ? (
+                  <span className="shrink-0 rounded-lg bg-[#FAA222] px-3 py-1.5 text-sm font-semibold text-[#111827]">
+                    Save {pdp.discountPercentage}%
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1 text-sm text-gray-600">{getProductWeight()}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2.5">
+                <span className="text-2xl font-bold text-[#111827]">₹{Math.round(pdp.price)}</span>
+                {pdp.showStrike ? (
+                  <span className="text-xl font-semibold text-gray-500 line-through">
+                    ₹{Math.round(pdp.originalPrice)}
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-5">
+                <h2 className="mb-2.5 font-ibm-plex-serif text-2xl font-semibold text-[#222222]">Includes</h2>
+                <div className="flex flex-wrap gap-2">
+                  {bomDisplayRows.length > 0
+                    ? bomDisplayRows.map((row) => (
+                        <span
+                          key={String(row.id)}
+                          className="inline-flex items-center rounded-xl border border-[#FAA222] bg-white px-3 py-1.5 text-xs font-medium text-black"
+                        >
+                          {row.name}
+                        </span>
+                      ))
+                    : getIncludesFallbackLabels().map((label, index) => (
+                        <span
+                          key={`${label}-${index}`}
+                          className="inline-flex items-center rounded-xl border border-[#FAA222] bg-white px-3 py-1.5 text-xs font-medium text-black"
+                        >
+                          {label}
+                        </span>
+                      ))}
+                </div>
+                {bomDisplayRows.length === 0 && getIncludesFallbackLabels().length === 0 && (
+                  <p className="text-sm text-gray-500">No ingredient list for this product.</p>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mt-4 flex items-start justify-between gap-3">
+                <h1 className="m-0 min-w-0 flex-1 font-ibm-plex-serif text-2xl font-bold leading-snug text-gray-900 [overflow-wrap:anywhere]">
+                  {formatProductTitleCase(getProductName())}
+                </h1>
+                {showPdpSaveBadge ? (
+                  <span className="shrink-0 rounded-lg bg-[#19411F] px-3 py-1.5 text-sm font-semibold text-white">
+                    Save {pdp.discountPercentage}%
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <span className="text-2xl font-bold text-gray-900">₹{Math.round(pdp.price)}</span>
+                {pdp.showStrike ? (
+                  <span className="text-xl font-medium text-gray-500 line-through">
+                    ₹{Math.round(pdp.originalPrice)}
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-4">
+                <h3 className="mb-3 text-base font-semibold text-gray-900">Includes</h3>
+                <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2 no-scrollbar">
+                  {bomDisplayRows.length > 0
+                    ? bomDisplayRows.map((row) => (
+                        <span
+                          key={String(row.id)}
+                          className="inline-flex shrink-0 items-center whitespace-nowrap rounded-xl border border-[#FAA222] bg-white px-3 py-2 text-sm font-medium text-gray-900"
+                        >
+                          {row.name}
+                        </span>
+                      ))
+                    : getIncludesFallbackLabels().map((label, index) => (
+                        <span
+                          key={`${label}-${index}`}
+                          className="inline-flex shrink-0 items-center whitespace-nowrap rounded-xl border border-[#FAA222] bg-white px-3 py-2 text-sm font-medium text-gray-900"
+                        >
+                          {label}
+                        </span>
+                      ))}
+                </div>
+                {bomDisplayRows.length === 0 && getIncludesFallbackLabels().length === 0 && (
+                  <p className="text-sm text-gray-500">No ingredient list for this product.</p>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Quantity control removed — handled by Add to Basket control below */}
 
@@ -1086,7 +1129,7 @@ const ProductPage: React.FC = () => {
                         : "text-gray-600 hover:text-gray-900"
                     }`}
                   >
-                    {tab}
+                    {isGpDaily && tab === "Details" ? "Product Info" : tab}
                   </button>
                 ))}
               </div>

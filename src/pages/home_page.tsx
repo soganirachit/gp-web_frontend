@@ -154,7 +154,7 @@ const HomePage: React.FC = () => {
       />
       <div className="mx-auto min-h-screen w-full max-w-[min(800px,100vw)] bg-white pb-safe-bottom">
         {/* Top Navigation Bar */}
-        <div className="bg-white sticky top-0 z-20 isolate px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200">
+        <div className="bg-white sticky top-0 z-20 isolate px-3 sm:px-4 py-2 sm:py-3">
           <div className="flex items-center justify-between">
             {/* Location Section */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">

@@ -129,7 +129,7 @@ const Addresses: React.FC = () => {
           onBack={() => navigate(`${basePath}/account`)}
           padXClassName="px-4"
           padYClassName="pt-6 pb-4"
-          className="-mx-4 sticky top-0 z-10 border-b border-gray-200 mb-2"
+          className="-mx-4 sticky top-0 z-10 mb-2"
         />
 
         {/* Main Content */}

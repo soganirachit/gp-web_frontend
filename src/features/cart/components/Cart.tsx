@@ -1835,7 +1835,7 @@ const Cart: React.FC = () => {
       />
       <div className="mx-auto flex min-h-screen w-full max-w-[min(800px,100vw)] flex-1 flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]">
         {/* Header — matches mobile CartScreen (padding, border, title) */}
-        <div className="sticky top-0 z-10 border-b border-gray-200 bg-[#f8f6f1] px-4 pb-3 pt-6">
+        <div className="sticky top-0 z-10 bg-[#f8f6f1] px-4 pb-3 pt-6">
           <div className="flex items-center gap-2">
             <button
               type="button"

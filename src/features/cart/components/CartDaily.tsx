@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { IoArrowBack, IoCreateOutline, IoStorefrontOutline, IoTrashOutline } from 'react-icons/io5';
+import { IoCreateOutline, IoStorefrontOutline, IoTrashOutline, IoWarning } from 'react-icons/io5';
 import { BsCalendar4 } from 'react-icons/bs';
 import { MdLocationOn } from 'react-icons/md';
 import { FaTag, FaPlus, FaMinus, FaTimes, FaCheck } from 'react-icons/fa';
@@ -36,6 +36,7 @@ import {
 } from '../../../utils/cartStockInlineMessage';
 import { validateGpDailyDeliveryArea } from '../../../services/subscriptionZone.service';
 import { GpDailyOutOfZoneBanner } from '../../../components/daily/GpDailyOutOfZoneBanner';
+import { UniformPageHeader } from '../../../components/layout/UniformPageHeader';
 import { DELIVERY_DATE_MAX_DAYS_FROM_TODAY } from '../../../constants/deliveryBooking';
 import { computeFirstSubscriptionDeliveryDateFromWeekdayInts } from '../../../utils/subscriptionFirstDeliveryDate';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
@@ -1964,19 +1965,13 @@ const Cart: React.FC = () => {
         noIndex={true}
       />
       <div className="mx-auto flex min-h-screen w-full max-w-[min(800px,100vw)] flex-1 flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]">
-        {/* Header — matches mobile CartScreen (padding, border, title) */}
-        <div className="sticky top-0 z-10 border-b border-gray-200 bg-[#f8f6f1] px-4 pb-3 pt-6">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="-ml-2 rounded-full p-2 transition-colors hover:bg-black/5"
-              aria-label="Back"
-            >
-              <IoArrowBack size={24} className="text-gray-900" />
-            </button>
-            <h1 className="text-2xl font-bold text-gray-900">My Basket</h1>
-          </div>
+        <div className="sticky top-0 z-10 bg-[#f8f6f1]">
+          <UniformPageHeader
+            title="My Basket"
+            onBack={() => navigate(-1)}
+            padXClassName="px-4"
+            padYClassName="pt-6 pb-3"
+          />
         </div>
 
         {items.length === 0 ? (
@@ -1985,18 +1980,6 @@ const Cart: React.FC = () => {
               <img src={emptyCartSvg} alt="" width={72} height={72} className="mb-3 shrink-0" />
               <p className="mb-2 text-[18px] font-semibold leading-snug text-gray-900">Your basket is empty</p>
               <p className="max-w-sm text-sm text-gray-500">Add some blooms from the store to see them here.</p>
-            </div>
-            <div className="rounded-2xl border border-amber-300/80 bg-[#FFF4E5] p-4 shadow-sm sm:p-5">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <img
-                  src={deliveryTruckIcon}
-                  alt=""
-                  className="h-14 w-14 shrink-0 object-contain sm:h-[72px] sm:w-[72px]"
-                />
-                <p className="text-left text-sm font-semibold leading-snug text-gray-900 sm:text-base">
-                  Orders placed before 8 PM will be delivered next day. Sunday deliveries available on request.
-                </p>
-              </div>
             </div>
             <button
               type="button"
@@ -2052,7 +2035,7 @@ const Cart: React.FC = () => {
                       </div>
                       <div className="mt-auto flex w-full min-h-[1.75rem] items-center justify-between gap-2 pt-1">
                         <span className="min-w-0 flex-1 text-base font-semibold leading-none text-gray-900">
-                          ₹{Number(item.price).toFixed(2)}/pack
+                          ₹{Number(item.price).toFixed(2)}
                         </span>
                         <div
                           className="flex shrink-0 items-center gap-1.5"
@@ -2171,50 +2154,25 @@ const Cart: React.FC = () => {
                 </div>
               ))}
 
-              {/* Delivery info — above delivery-day controls so it stays visible without scrolling past the tall card */}
-              <div className="mt-1">
-                <div className="rounded-2xl border border-amber-300/80 bg-[#FFF4E5] p-4 shadow-sm sm:p-5">
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <img
-                      src={deliveryTruckIcon}
-                      alt=""
-                      className="h-14 w-14 shrink-0 object-contain sm:h-[72px] sm:w-[72px]"
-                    />
-                    <p className="flex-1 text-sm font-semibold leading-snug text-gray-900 sm:text-base">
-                      Orders placed before 8 PM will be delivered next day. Sunday deliveries available on request.
-                    </p>
-                  </div>
-                </div>
-              </div>
+              {/* Select Delivery Days — matches app `CartScreen` (dailyDeliveryCard + chips + warning) */}
+              <div className="relative mb-3.5 rounded-2xl bg-white p-3 shadow-sm" style={{ marginLeft: 2, marginRight: 2 }}>
+                <h2 className="mb-2.5 font-ibm-plex-serif text-2xl font-semibold text-[#222222]">Select Delivery Days</h2>
 
-              {/* Select Delivery Days (gp-daily) */}
-              <div className="bg-white rounded-[25px] p-4 shadow-sm relative">
-                <h3 className="text-base font-semibold text-gray-900 mb-3">Select Delivery Days</h3>
-
-                <div className="grid grid-cols-2 gap-2 xs:grid-cols-3 mb-4">
+                <div className="mb-2.5 flex flex-row flex-wrap gap-2">
                   {(['Daily', 'Mon-Sat', 'Customize'] as const).map((opt) => {
                     const isActive = deliveryFrequency === opt;
-                    const isDisabled = false;
                     return (
                       <button
                         key={opt}
                         type="button"
-                        disabled={isDisabled}
                         onClick={() => {
                           setDeliveryFrequency(opt);
-                          if (opt === 'Customize') {
-                            setSelectedDays((prev) => (prev.length ? prev : [...weekDays]));
-                          } else {
-                            setSelectedDays([]);
-                          }
+                          setSelectedDays([]);
                         }}
-                        className={`px-2 py-2 min-h-[40px] xs:min-h-[36px] rounded-xl text-[10px] xs:text-[10px] font-medium transition-colors flex items-center justify-center gap-1 text-center leading-tight ${isDisabled
-                          ? 'cursor-not-allowed border border-gray-200 bg-gray-50 text-gray-400'
-                          : isActive
-                            ? 'text-black'
-                            : 'bg-white text-gray-700 border border-gray-200'
-                          }`}
-                        style={isActive ? { backgroundColor: theme.colors.primary } : undefined}
+                        className={`min-h-[40px] min-w-0 flex-1 rounded-xl border-2 border-[#E9E6E2] px-3 py-2 text-center text-xs font-medium text-[#111827] transition-colors ${
+                          isActive ? "border-transparent text-[#111827]" : "bg-white text-gray-500"
+                        }`}
+                        style={isActive ? { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary } : undefined}
                       >
                         {opt === 'Mon-Sat' ? 'Mon-Sat' : opt}
                       </button>
@@ -2222,7 +2180,7 @@ const Cart: React.FC = () => {
                   })}
                 </div>
 
-                <div className="grid w-full grid-cols-7 gap-1">
+                <div className="mb-2.5 flex flex-wrap gap-2">
                   {weekDays.map((day) => {
                     const isSelected =
                       deliveryFrequency === 'Daily'
@@ -2237,11 +2195,12 @@ const Cart: React.FC = () => {
                         type="button"
                         onClick={() => toggleDeliveryDay(day)}
                         disabled={isDisabled}
-                        className={`w-full min-w-0 px-1 py-1.5 min-h-[30px] rounded-lg text-[9px] xs:text-[10px] font-medium transition-colors flex items-center justify-center ${isSelected
-                          ? 'text-black'
-                          : 'bg-white text-gray-700 border border-gray-200'
-                          }`}
-                        style={isSelected ? { backgroundColor: theme.colors.primary } : undefined}
+                        className={`min-w-[2.4rem] flex-1 rounded-lg border-2 px-1.5 py-1.5 text-[11px] font-medium transition-colors ${
+                          isSelected
+                            ? "border-transparent font-bold text-[#111827]"
+                            : "border-[#E9E6E2] bg-white text-gray-500"
+                        } ${isDisabled ? "opacity-90" : ""}`}
+                        style={isSelected ? { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary } : undefined}
                       >
                         {day}
                       </button>
@@ -2249,28 +2208,27 @@ const Cart: React.FC = () => {
                   })}
                 </div>
 
-                {deliveryFrequency === 'Customize' && activeDeliveryDays.length > 0 && activeDeliveryDays.length < 3 ? (
-                  <div className="mt-5 rounded-2xl bg-[#fde8ea] px-4 py-4 flex items-center gap-3">
-                    <svg
-                      width="26"
-                      height="26"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      aria-hidden
-                      className="shrink-0"
-                    >
-                      <path
-                        d="M12 3.2c.4 0 .8.2 1 .6l9 15.6c.4.7-.1 1.6-1 1.6H3c-.9 0-1.4-.9-1-1.6l9-15.6c.2-.4.6-.6 1-.6Z"
-                        fill="#B91C1C"
-                      />
-                      <path d="M12 8v6" stroke="white" strokeWidth="2" strokeLinecap="round" />
-                      <path d="M12 17.5h.01" stroke="white" strokeWidth="3" strokeLinecap="round" />
-                    </svg>
-                    <p className="text-sm leading-snug font-semibold text-gray-900">
-                      Please select at least 3 days for a 1-week subscription
+                {deliveryFrequency === 'Customize' && activeDeliveryDays.length < 3 ? (
+                  <div className="mb-2.5 flex items-center gap-2 rounded-xl bg-[#FCE7F3] px-3 py-2.5">
+                    <IoWarning className="h-4 w-4 shrink-0 text-[#B91C1C]" aria-hidden />
+                    <p className="flex-1 text-left text-xs font-semibold leading-snug text-[#7F1D1D]">
+                      Please select at least 3 days for a 1-week subscription.
                     </p>
                   </div>
                 ) : null}
+              </div>
+
+              <div className="mb-2 mt-1">
+                <div className="flex flex-row items-center gap-3 rounded-2xl border border-amber-200/80 bg-[#FFF4E5] p-4 shadow-sm">
+                  <img
+                    src={deliveryTruckIcon}
+                    alt=""
+                    className="h-14 w-14 shrink-0 object-contain"
+                  />
+                  <p className="flex-1 text-sm font-semibold leading-5 text-[#111827]">
+                    Orders placed before 8 PM will be delivered next day. Sunday deliveries available on request.
+                  </p>
+                </div>
               </div>
               {/* Delivery Details */}
               <div className="rounded-[25px] bg-white p-4 shadow-sm">

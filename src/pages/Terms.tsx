@@ -18,7 +18,7 @@ const Terms: React.FC = () => {
           title="Terms of Service"
           onBack={() => navigate(-1)}
           padYClassName="pt-6 pb-4"
-          className="sticky top-0 z-10 border-b border-gray-200"
+          className="sticky top-0 z-10"
         />
 
         <div className="px-4 py-6 space-y-6 text-gray-700">

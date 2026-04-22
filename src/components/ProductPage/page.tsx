@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { IoSwapVerticalOutline, IoArrowBack } from "react-icons/io5";
+import { IoSwapVerticalOutline } from "react-icons/io5";
 import { FaChevronRight } from "react-icons/fa";
 import { SEO } from "../SEO";
 import {
@@ -20,6 +20,7 @@ import { ProductImageTag } from "../common/ProductImageTag";
 import { ProductBrowseSkeleton } from "../common/PageSkeletons";
 import { SearchBar } from "../common/SearchBar";
 import scooterIcon from "../../assets/svg/gp_daily svg/scooter.svg";
+import { UniformPageHeader } from "../layout/UniformPageHeader";
 
 const DAILY_AVAILABILITY = PRODUCT_AVAILABILITY_GP_DAILY_LIST;
 
@@ -241,21 +242,15 @@ const ProductBrowsePage: React.FC = () => {
         }`}
       />
       <div className="mx-auto min-h-screen w-full min-w-0 max-w-[min(800px,100vw)] overflow-x-hidden bg-[#f8f6f1] pb-nav-bottom">
-        <div className="sticky top-0 z-20 bg-[#f8f6f1] border-b border-gray-200">
+        <div className="sticky top-0 z-20 bg-[#f8f6f1]">
           <div className="px-4 pt-6 pb-3">
-            <div className="mb-3 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="-ml-2 rounded-full p-2 transition-colors hover:bg-black/5"
-                aria-label="Go back"
-              >
-                <IoArrowBack size={24} className="text-gray-900" />
-              </button>
-              <h1 className="min-w-0 flex-1 font-serif text-2xl font-bold text-gray-900">
-                Products
-              </h1>
-            </div>
+            <UniformPageHeader
+              title="Products"
+              onBack={() => navigate(-1)}
+              className="mb-3"
+              padXClassName="px-0"
+              padYClassName="py-0"
+            />
 
             <SearchBar
               mode="product"
@@ -520,7 +515,6 @@ const ProductBrowsePage: React.FC = () => {
                             <p className="text-base font-bold text-gray-900">
                               <span>
                                 ₹{Math.round(eff)}
-                                /Day
                               </span>
                               {showStrikeBaseOnCard(item) && (
                                 <span className="ml-1 text-gray-500 font-medium line-through">

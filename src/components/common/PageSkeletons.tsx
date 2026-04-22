@@ -24,19 +24,40 @@ export function StoreHomeSkeleton() {
             <Pulse className="h-10 w-44 rounded-xl" />
             <Pulse className="h-10 w-10 rounded-full" />
           </div>
-          <Pulse className="h-12 w-full rounded-xl mb-2" />
-          <Pulse className="h-12 w-full rounded-xl" />
+          {/* One search — matches loaded `GpStore_Homepage` */}
+          <Pulse className="h-12 w-full rounded-xl mb-4" />
+          {/* Delivery copy + truck placeholder */}
+          <div className="flex flex-row items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <Pulse className="h-4 w-[92%] rounded-md" />
+              <Pulse className="h-4 w-[62%] rounded-md" />
+            </div>
+            <Pulse className="h-[5.5rem] w-36 shrink-0 rounded-xl sm:h-24 sm:w-40" />
+          </div>
         </div>
-        <div className="px-4 -mt-4 space-y-4">
-          <Pulse className="h-28 w-full rounded-2xl" />
-          <div className="flex gap-2 overflow-hidden">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Pulse key={i} className="h-9 w-24 shrink-0 rounded-full" />
+        <div className="space-y-5 px-4 pt-5 pb-8">
+          {/* Namaste + tagline */}
+          <div className="space-y-2">
+            <Pulse className="h-10 w-48 max-w-[55%] rounded-lg" />
+            <Pulse className="h-3.5 w-full rounded" />
+            <Pulse className="h-3.5 w-[88%] rounded" />
+          </div>
+          {/* Pick your Blooms — 4-col categories */}
+          <Pulse className="h-5 w-40 rounded" />
+          <div className="grid grid-cols-4 gap-x-2 gap-y-4 sm:gap-x-3">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex flex-col items-center gap-2">
+                <Pulse className="aspect-square w-full rounded-2xl" />
+                <Pulse className="h-2.5 w-[72%] rounded" />
+              </div>
             ))}
           </div>
-          <Pulse className="h-5 w-40 rounded" />
+          {/* Promo / wedding mint panel */}
+          <Pulse className="h-40 w-full rounded-2xl sm:h-44" />
+          {/* Product strip — 2-col cards */}
+          <Pulse className="h-5 w-32 rounded" />
           <div className="grid grid-cols-2 gap-3">
-            {Array.from({ length: 6 }).map((_, i) => (
+            {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="space-y-2">
                 <Pulse className="aspect-[4/5] w-full rounded-xl" />
                 <Pulse className="h-4 w-[80%]" />
@@ -88,7 +109,7 @@ export function ProductDetailSkeleton() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f8f6f1]">
       <div className={`relative ${shell} pb-nav-bottom`}>
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3">
             <Pulse className="h-10 w-10 rounded-full shrink-0" />
             <Pulse className="h-8 w-48 max-w-[70%]" />
@@ -116,7 +137,7 @@ export function ProductBrowseSkeleton() {
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
       <div className={`relative min-h-screen ${shell} pb-nav-bottom`}>
-        <div className="bg-[#f8f6f1] sticky top-0 z-20 px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200">
+        <div className="bg-[#f8f6f1] sticky top-0 z-20 px-3 sm:px-4 py-2 sm:py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <Pulse className="h-5 w-5 rounded shrink-0" />
@@ -156,7 +177,7 @@ export function OrdersListSkeleton() {
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
       <div className="mx-auto w-full max-w-[min(800px,100vw)] pb-nav-bottom">
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3 mb-6">
             <Pulse className="h-10 w-10 rounded-full" />
             <Pulse className="h-8 w-40" />
@@ -213,7 +234,7 @@ export function CartPageSkeleton() {
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
       <div className="mx-auto w-full max-w-[min(800px,100vw)] pb-nav-bottom">
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3">
             <Pulse className="h-10 w-10 rounded-full" />
             <Pulse className="h-8 w-36" />
@@ -244,7 +265,7 @@ export function SettingsListSkeleton() {
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
       <div className="mx-auto w-full max-w-[min(800px,100vw)] pb-nav-bottom">
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3">
             <Pulse className="h-10 w-10 rounded-full" />
             <Pulse className="h-8 w-48" />
@@ -264,7 +285,7 @@ export function WalletPageSkeleton() {
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
       <div className="mx-auto w-full max-w-[min(800px,100vw)] pb-nav-bottom">
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3">
             <Pulse className="h-10 w-10 rounded-full" />
             <Pulse className="h-8 w-32" />

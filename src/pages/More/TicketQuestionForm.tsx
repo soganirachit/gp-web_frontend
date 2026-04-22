@@ -277,7 +277,7 @@ const TicketQuestionForm: React.FC = () => {
     <div className="fixed inset-0 bg-[#f8f6f1] flex flex-col overflow-hidden">
       <div className="max-w-[800px] mx-auto w-full h-full flex flex-col relative">
         {/* Header */}
-        <div className="p-4 pt-6 flex-shrink-0 bg-[#f8f6f1] border-b border-gray-200 z-10">
+        <div className="p-4 pt-6 flex-shrink-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3 mb-2">
             <button
               type="button"
@@ -355,7 +355,7 @@ const TicketQuestionForm: React.FC = () => {
 
     {/* Choice Options */}
     {currentQuestion.type === 'choice' && currentQuestion.options && (
-      <div className="px-4 py-3 bg-[#f8f6f1] border-b border-gray-200">
+      <div className="px-4 py-3 bg-[#f8f6f1]">
         <div className="space-y-2">
           {currentQuestion.options.map((option) => (
             <button

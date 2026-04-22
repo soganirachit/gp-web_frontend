@@ -728,7 +728,7 @@ const StorePage: React.FC = () => {
       )}
       <div className="relative mx-auto w-full min-w-0 max-w-[min(800px,100vw)] pb-nav-bottom">
         {/* Header */}
-        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10 border-b border-gray-200">
+        <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
@@ -923,30 +923,30 @@ const StorePage: React.FC = () => {
             </div>
           )}
 
-          {/* Customized Message — only for bouquet categories */}
+          {/* Customized Message (bouquet) — matches app `ProductDetailScreen` messageCard + textArea */}
           {product.category_slug?.toLowerCase().includes('bouquet') && (
-          <div className="mt-6 mb-6">
-            <div className="mb-3">
-              <span className="text-base font-medium text-gray-900">Customized Message (optional)</span>
-            </div>
-            <div className="relative">
-              <textarea
-                value={customMessage}
-                onChange={(e) => {
-                  if (e.target.value.length <= 500) {
-                    setCustomMessage(e.target.value);
-                  }
-                }}
-                placeholder="Add a personalized message for the bouquet..."
-                className="w-full p-3 rounded-lg border-2 border-gray-200 focus:border-[#19411F] focus:outline-none resize-none"
-                rows={4}
-                maxLength={500}
-              />
-              <div className="absolute bottom-3 right-3 text-xs text-gray-500">
-                {customMessage.length}/500
+            <div className="mt-3 w-full self-end">
+              <div className="w-full rounded-xl border border-gray-200 bg-white p-3">
+                <p className="mb-1 text-base font-medium text-gray-900">
+                  Customized Message (optional)
+                </p>
+                <textarea
+                  value={customMessage}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 500) {
+                      setCustomMessage(e.target.value);
+                    }
+                  }}
+                  placeholder="Add a personalized message..."
+                  className="min-h-[48px] w-full resize-y border-0 bg-transparent p-3 text-sm leading-5 text-gray-900 placeholder:text-[#9CA3AF] focus:outline-none focus:ring-0"
+                  maxLength={500}
+                  aria-label="Customized message"
+                />
+                <p className="mt-1 text-right text-xs font-medium text-[#19411F]">
+                  {customMessage.length}/500
+                </p>
               </div>
             </div>
-          </div>
           )}
 
           {/* Add to Basket / Quantity Controls */}

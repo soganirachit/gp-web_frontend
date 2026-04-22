@@ -55,7 +55,8 @@ interface DayInfo {
 /** Matches `NAMASTE_TIME_SLOT_DISPLAY` on mobile GP Daily home. */
 const NAMASTE_TIME_SLOT_DISPLAY = "7 AM – 12 PM";
 /** Namaste subscription carousel — auto-advance loop (web). */
-const NAMASTE_CAROUSEL_AUTOPLAY_MS = 5000;
+/** Matches app `GpDailyHomeScreen` namaste autoplay interval. */
+const NAMASTE_CAROUSEL_AUTOPLAY_MS = 3500;
 
 const Home2: React.FC = () => {
   const navigate = useNavigate();
@@ -83,6 +84,13 @@ const Home2: React.FC = () => {
     useState<Subscription | null>(null);
   const subscriptionCarouselRef = useRef<HTMLDivElement | null>(null);
   const [subscriptionCarouselIndex, setSubscriptionCarouselIndex] = useState(0);
+  /**
+   * Virtual slide index for infinite loop: [clone last | …real… | clone first].
+   * Real sub `i` sits at virtual `i + 1` when `activeSubscriptions.length > 1` (same as app).
+   */
+  const [namasteVirtualIndex, setNamasteVirtualIndex] = useState(0);
+  const namasteJumpingRef = useRef(false);
+  const namasteScrollSettleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Pause autoplay while pointer is over the carousel (manual read without fighting the timer). */
   const [namasteCarouselHoverPause, setNamasteCarouselHoverPause] =
     useState(false);
@@ -494,38 +502,156 @@ const Home2: React.FC = () => {
     [activeSubscriptions]
   );
 
+  const namasteLoopSlides = useMemo((): Subscription[] => {
+    if (activeSubscriptions.length <= 1) return activeSubscriptions;
+    return [
+      activeSubscriptions[activeSubscriptions.length - 1],
+      ...activeSubscriptions,
+      activeSubscriptions[0],
+    ];
+  }, [activeSubscriptions]);
+
+  const getNamasteRealIndexFromVirtual = useCallback(
+    (virtualIdx: number) => {
+      const n = activeSubscriptions.length;
+      if (n <= 1) return 0;
+      if (virtualIdx <= 0) return n - 1;
+      if (virtualIdx >= n + 1) return 0;
+      return Math.max(0, Math.min(virtualIdx - 1, n - 1));
+    },
+    [activeSubscriptions]
+  );
+
+  /** Init scroll to first real slide (virtual index 1) when loop, or 0 when single. */
   useEffect(() => {
     const el = subscriptionCarouselRef.current;
     if (!el) return;
-    el.scrollLeft = 0;
+    const n = activeSubscriptions.length;
+    if (n === 0) return;
+    if (n <= 1) {
+      el.scrollTo({ left: 0, behavior: "auto" });
+      setNamasteVirtualIndex(0);
+      setSubscriptionCarouselIndex(0);
+      if (activeSubscriptions[0]) {
+        setSelectedSubscription(activeSubscriptions[0]);
+      }
+      return;
+    }
     setSubscriptionCarouselIndex(0);
     if (activeSubscriptions[0]) {
       setSelectedSubscription(activeSubscriptions[0]);
     }
+    namasteJumpingRef.current = true;
+    setNamasteVirtualIndex(1);
+    const apply = () => {
+      const w = el.clientWidth || 1;
+      if (w > 0) {
+        el.scrollTo({ left: w, behavior: "auto" });
+      }
+      window.setTimeout(() => {
+        namasteJumpingRef.current = false;
+      }, 0);
+    };
+    requestAnimationFrame(() => requestAnimationFrame(apply));
   }, [subscriptionCarouselKey, activeSubscriptions]);
 
+  const runNamasteBoundaryJump = useCallback(() => {
+    const el = subscriptionCarouselRef.current;
+    if (!el || activeSubscriptions.length <= 1) return;
+    const w = el.clientWidth || 1;
+    const n = activeSubscriptions.length;
+    const lastRealVirtual = n;
+    const firstCloneVirtual = n + 1;
+    const rawIdx = Math.round(el.scrollLeft / w);
+    if (rawIdx === 0) {
+      namasteJumpingRef.current = true;
+      el.scrollTo({ left: lastRealVirtual * w, behavior: "auto" });
+      setNamasteVirtualIndex(lastRealVirtual);
+      setSubscriptionCarouselIndex(n - 1);
+      if (activeSubscriptions[n - 1]) {
+        setSelectedSubscription(activeSubscriptions[n - 1]);
+      }
+      requestAnimationFrame(() => {
+        namasteJumpingRef.current = false;
+      });
+      return;
+    }
+    if (rawIdx === firstCloneVirtual) {
+      namasteJumpingRef.current = true;
+      el.scrollTo({ left: w, behavior: "auto" });
+      setNamasteVirtualIndex(1);
+      setSubscriptionCarouselIndex(0);
+      if (activeSubscriptions[0]) {
+        setSelectedSubscription(activeSubscriptions[0]);
+      }
+      requestAnimationFrame(() => {
+        namasteJumpingRef.current = false;
+      });
+    }
+  }, [activeSubscriptions]);
+
+  /**
+   * After scroll settles, jump off clone slides (same as app `onMomentumScrollEnd`).
+   */
+  useEffect(() => {
+    const el = subscriptionCarouselRef.current;
+    if (!el) return;
+    if (activeSubscriptions.length <= 1) return;
+    const onSettle = () => {
+      if (namasteJumpingRef.current) return;
+      runNamasteBoundaryJump();
+    };
+    const onScroll = () => {
+      if (namasteJumpingRef.current) return;
+      if (namasteScrollSettleRef.current) {
+        clearTimeout(namasteScrollSettleRef.current);
+      }
+      namasteScrollSettleRef.current = setTimeout(onSettle, 120);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      if (namasteScrollSettleRef.current) {
+        clearTimeout(namasteScrollSettleRef.current);
+      }
+      el.removeEventListener("scroll", onScroll);
+    };
+  }, [activeSubscriptions, subscriptionCarouselKey, runNamasteBoundaryJump]);
+
   const handleSubscriptionCarouselScroll = useCallback(() => {
+    if (namasteJumpingRef.current) return;
     const el = subscriptionCarouselRef.current;
     if (!el || activeSubscriptions.length === 0) return;
+    if (activeSubscriptions.length <= 1) {
+      setSubscriptionCarouselIndex(0);
+      if (activeSubscriptions[0]) {
+        setSelectedSubscription(activeSubscriptions[0]);
+      }
+      return;
+    }
     const w = el.clientWidth || 1;
-    const idx = Math.min(
-      activeSubscriptions.length - 1,
-      Math.max(0, Math.round(el.scrollLeft / w))
-    );
-    setSubscriptionCarouselIndex(idx);
-    const sub = activeSubscriptions[idx];
-    if (sub) setSelectedSubscription(sub);
-  }, [activeSubscriptions]);
+    const virtualIdx = Math.round(el.scrollLeft / w);
+    setNamasteVirtualIndex(virtualIdx);
+    const dot = getNamasteRealIndexFromVirtual(virtualIdx);
+    setSubscriptionCarouselIndex(dot);
+    const s = activeSubscriptions[dot];
+    if (s) setSelectedSubscription(s);
+  }, [activeSubscriptions, getNamasteRealIndexFromVirtual]);
 
   const scrollSubscriptionCarouselTo = useCallback(
     (index: number) => {
       const el = subscriptionCarouselRef.current;
       if (!el || activeSubscriptions.length === 0) return;
-      const clamped = Math.min(activeSubscriptions.length - 1, Math.max(0, index));
-      el.scrollTo({ left: clamped * el.clientWidth, behavior: "smooth" });
-      setSubscriptionCarouselIndex(clamped);
-      const sub = activeSubscriptions[clamped];
-      if (sub) setSelectedSubscription(sub);
+      if (activeSubscriptions.length <= 1) {
+        el.scrollTo({ left: 0, behavior: "smooth" });
+        return;
+      }
+      const w = el.clientWidth || 1;
+      const virtual = index + 1;
+      setNamasteVirtualIndex(virtual);
+      el.scrollTo({ left: virtual * w, behavior: "smooth" });
+      setSubscriptionCarouselIndex(index);
+      const s = activeSubscriptions[index];
+      if (s) setSelectedSubscription(s);
     },
     [activeSubscriptions]
   );
@@ -535,20 +661,21 @@ const Home2: React.FC = () => {
       return;
     }
     const tick = () => {
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
-        return;
-      }
-      setSubscriptionCarouselIndex((prev) => {
-        const len = activeSubscriptions.length;
-        if (len <= 1) return prev;
-        const next = (prev + 1) % len;
+      if (document.visibilityState !== "visible") return;
+      setNamasteVirtualIndex((prev) => {
+        const n = activeSubscriptions.length;
+        if (n <= 1) return prev;
+        const next = prev + 1;
         const el = subscriptionCarouselRef.current;
         if (el) {
           const w = el.clientWidth || 1;
           el.scrollTo({ left: next * w, behavior: "smooth" });
         }
-        const sub = activeSubscriptions[next];
-        if (sub) setSelectedSubscription(sub);
+        const dot = getNamasteRealIndexFromVirtual(next);
+        setSubscriptionCarouselIndex(dot);
+        if (activeSubscriptions[dot]) {
+          setSelectedSubscription(activeSubscriptions[dot]!);
+        }
         return next;
       });
     };
@@ -558,6 +685,7 @@ const Home2: React.FC = () => {
     activeSubscriptions,
     namasteCarouselHoverPause,
     subscriptionCarouselKey,
+    getNamasteRealIndexFromVirtual,
   ]);
 
   const isPageLoading =
@@ -745,7 +873,7 @@ const Home2: React.FC = () => {
               )}
 
               {/* Namaste + active subscriptions carousel */}
-              <div className="rounded-[22px] border border-[#fcf5eb] bg-[#fcf5eb] p-4">
+              <div className="rounded-[22px] border border-[#F2E9D7] bg-[#fcf5eb] p-4">
                 <div className="flex items-center justify-between mb-3.5 pl-1">
                   <div className="flex min-w-0 flex-1 items-center gap-2 pr-2">
                     <h2 className="min-w-0 flex-1 font-serif text-2xl font-semibold leading-7 text-[#222222] [overflow-wrap:anywhere]">
@@ -795,9 +923,9 @@ const Home2: React.FC = () => {
                       onScroll={handleSubscriptionCarouselScroll}
                       className="flex snap-x snap-mandatory overflow-x-auto no-scrollbar"
                     >
-                      {activeSubscriptions.map((sub) => (
+                      {namasteLoopSlides.map((sub, loopIdx) => (
                         <div
-                          key={sub.id}
+                          key={`${String(sub.id)}-namaste-loop-${loopIdx}`}
                           className="w-full min-w-full shrink-0 snap-center px-1"
                         >
                           <div className="space-y-3 pl-1">
@@ -929,7 +1057,7 @@ const Home2: React.FC = () => {
                         packName={pack.name}
                         categoryName={pack.categoryName}
                         description="Mixed flowers daily"
-                        price={`₹${pack.sellingPrice}/Day`}
+                        price={`₹${pack.sellingPrice}`}
                         showDailyButton
                         showBestsellerTag={!pack.labels?.length}
                         labels={pack.labels?.length ? pack.labels : undefined}
@@ -977,7 +1105,7 @@ const Home2: React.FC = () => {
                         packName={pack.name}
                         categoryName={pack.categoryName}
                         description="Mixed flowers daily"
-                        price={`₹${pack.sellingPrice}/Day`}
+                        price={`₹${pack.sellingPrice}`}
                         showDailyButton
                         showBestsellerTag={!pack.labels?.length}
                         labels={pack.labels?.length ? pack.labels : undefined}
@@ -1025,7 +1153,7 @@ const Home2: React.FC = () => {
                         packName={pack.name}
                         categoryName={pack.categoryName}
                         description="Mixed flowers daily"
-                        price={`₹${pack.sellingPrice}/Day`}
+                        price={`₹${pack.sellingPrice}`}
                         showDailyButton
                         showBestsellerTag={!pack.labels?.length}
                         labels={pack.labels?.length ? pack.labels : undefined}

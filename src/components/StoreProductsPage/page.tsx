@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { SEO } from "../SEO";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { FaChevronRight } from "react-icons/fa";
-import { IoSwapVerticalOutline, IoArrowBack } from "react-icons/io5";
+import { IoSwapVerticalOutline } from "react-icons/io5";
 import {
   productService,
   Category,
@@ -19,6 +19,7 @@ import { GUEST_STORE_UPDATED_EVENT, storeService } from "../../services/store.se
 import { getApiUrl } from "../../config/api.config";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
+import { UniformPageHeader } from "../layout/UniformPageHeader";
 
 const StoreProductsPages: React.FC = () => {
   const navigate = useNavigate();
@@ -261,21 +262,15 @@ const StoreProductsPages: React.FC = () => {
       />
       <div className="mx-auto min-h-screen w-full min-w-0 max-w-[min(800px,100vw)] overflow-x-hidden bg-[#f8f6f1] pb-nav-bottom">
         {/* Top bar: back + title (matches app StoreProductsScreen) */}
-        <div className="sticky top-0 z-20 bg-[#f8f6f1] border-b border-gray-200">
+        <div className="sticky top-0 z-20 bg-[#f8f6f1]">
           <div className="px-4 pt-6 pb-3">
-            <div className="mb-3 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="-ml-2 rounded-full p-2 transition-colors hover:bg-black/5"
-                aria-label="Go back"
-              >
-                <IoArrowBack size={24} className="text-gray-900" />
-              </button>
-              <h1 className="min-w-0 flex-1 font-serif text-2xl font-bold text-gray-900">
-                Products
-              </h1>
-            </div>
+            <UniformPageHeader
+              title="Products"
+              onBack={() => navigate(-1)}
+              className="mb-3"
+              padXClassName="px-0"
+              padYClassName="py-0"
+            />
 
             <SearchBar
               mode="product"
