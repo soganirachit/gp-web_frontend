@@ -1,7 +1,8 @@
 import axios, { AxiosError, type AxiosResponse } from "axios";
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
-import { addressService } from "./address.service";
+import { addressService, type Address } from "./address.service";
+import { cartService } from "./cart.service";
 import {
   resolveGpDailyZoneAtLatLng,
 } from "./subscriptionZone.service";
@@ -9,9 +10,20 @@ import {
 /** Dispatched on `window` after a guest picks a store from the city picker (home / products refresh). */
 export const GUEST_STORE_UPDATED_EVENT = "gp-guest-temporary-store-updated";
 
+/** Logged-in GP Store: browse/choose-location changed (override or GPS) — home refreshes address + catalog. */
+export const GPS_CATALOG_LOCATION_UPDATED_EVENT = "gp-gps-catalog-location-updated";
+
+const GP_STORE_CATALOG_ADDRESS_OVERRIDE_ID_KEY = "gp_store_catalog_address_override_id";
+
 export function notifyGuestTemporaryStoreUpdated(): void {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(GUEST_STORE_UPDATED_EVENT));
+  }
+}
+
+export function notifyGpsCatalogLocationUpdated(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(GPS_CATALOG_LOCATION_UPDATED_EVENT));
   }
 }
 
@@ -338,6 +350,176 @@ class StoreService {
     } else {
       return this.getTemporaryStoreId();
     }
+  }
+
+  /** Pinned saved address for store catalog (parity with app SecureStore). */
+  getGpStoreCatalogAddressOverrideId(): string | null {
+    if (typeof localStorage === "undefined") return null;
+    const v = localStorage.getItem(GP_STORE_CATALOG_ADDRESS_OVERRIDE_ID_KEY);
+    return v && v.trim() ? v.trim() : null;
+  }
+
+  setGpStoreCatalogAddressOverrideId(id: string | null): void {
+    if (typeof localStorage === "undefined") return;
+    if (id != null && String(id).trim()) {
+      localStorage.setItem(
+        GP_STORE_CATALOG_ADDRESS_OVERRIDE_ID_KEY,
+        String(id).trim(),
+      );
+    } else {
+      localStorage.removeItem(GP_STORE_CATALOG_ADDRESS_OVERRIDE_ID_KEY);
+    }
+  }
+
+  /**
+   * Nearest operational store for coordinates, or next selectable by distance
+   * (when /nearest/ returns out-of-radius offline).
+   */
+  async getSelectableNearestStore(
+    latitude: number,
+    longitude: number,
+  ): Promise<Store | null> {
+    let store = await this.getNearestStore(latitude, longitude);
+    if (store && !storeIsSelectableWeb(store)) {
+      store = null;
+    }
+    if (!store) {
+      store = await this.findFirstSelectableStoreNear(latitude, longitude);
+    }
+    return store;
+  }
+
+  /**
+   * GP Store “Choose location” — guest: temporary store from pin; user: switch cart + assigned store.
+   */
+  async applyBrowseAddressForCatalog(address: Address): Promise<void> {
+    const parts = (address.coordinates || "")
+      .split(",")
+      .map((s) => parseFloat(s.trim()));
+    const lat = parts[0];
+    const lng = parts[1];
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      throw new Error(
+        "This address has no map pin. Edit the address to set location on the map.",
+      );
+    }
+    this.setGpStoreCatalogAddressOverrideId(String(address.id));
+
+    if (!localStorage.getItem("phoneNumber")) {
+      await this.resolveGuestStoreFromCoordinates(lat, lng);
+      notifyGuestTemporaryStoreUpdated();
+      notifyGpsCatalogLocationUpdated();
+      return;
+    }
+
+    const cov = await addressService.validateAddressInDeliveryArea(
+      `${lat},${lng}`,
+    );
+    if (!cov.isValid) {
+      this.setGpStoreCatalogAddressOverrideId(null);
+      throw new Error(
+        "We are not delivering to this address from your current store. Choose another address or switch store from Account.",
+      );
+    }
+
+    const store = await this.getSelectableNearestStore(lat, lng);
+    if (!store) {
+      this.setGpStoreCatalogAddressOverrideId(null);
+      throw new Error("No store is available for this location right now.");
+    }
+    const current = this.getSelectedStoreId();
+    if (current === store.id) {
+      notifyGpsCatalogLocationUpdated();
+      return;
+    }
+    try {
+      await cartService.switchCartStore(store.id);
+    } catch {
+      /* empty cart or network */
+    }
+    await this.switchStore(store.id);
+    notifyGpsCatalogLocationUpdated();
+  }
+
+  /**
+   * Use device GPS for catalog (clears saved-address override). Guest + logged-in.
+   */
+  async applyUseCurrentGpsForCatalog(): Promise<void> {
+    this.setGpStoreCatalogAddressOverrideId(null);
+    if (!navigator.geolocation) {
+      throw new Error("Location is not supported in this browser.");
+    }
+    await new Promise<void>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
+            if (!localStorage.getItem("phoneNumber")) {
+              try {
+                await this.resolveGuestStoreFromCoordinates(
+                  latitude,
+                  longitude,
+                );
+              } catch (e) {
+                reject(
+                  e instanceof Error
+                    ? e
+                    : new Error("Could not resolve store for your location."),
+                );
+                return;
+              }
+              notifyGuestTemporaryStoreUpdated();
+              notifyGpsCatalogLocationUpdated();
+              resolve();
+              return;
+            }
+            const cov = await addressService.validateAddressInDeliveryArea(
+              `${latitude},${longitude}`,
+            );
+            if (!cov.isValid) {
+              throw new Error(
+                "We are not delivering to your current location. Pick a saved address on the map.",
+              );
+            }
+            const store = await this.getSelectableNearestStore(
+              latitude,
+              longitude,
+            );
+            if (!store) {
+              throw new Error("No store is available for this location right now.");
+            }
+            const current = this.getSelectedStoreId();
+            if (current === store.id) {
+              notifyGpsCatalogLocationUpdated();
+              resolve();
+              return;
+            }
+            try {
+              await cartService.switchCartStore(store.id);
+            } catch {
+              /* ignore */
+            }
+            await this.switchStore(store.id);
+            notifyGpsCatalogLocationUpdated();
+            resolve();
+          } catch (e) {
+            reject(
+              e instanceof Error
+                ? e
+                : new Error("Could not update store for your location."),
+            );
+          }
+        },
+        (geoErr) => {
+          let msg = "Failed to get your location.";
+          if (geoErr?.code === geoErr?.PERMISSION_DENIED) {
+            msg = "Location permission denied. Enable location in your browser settings.";
+          }
+          reject(new Error(msg));
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+      );
+    });
   }
 
   /**

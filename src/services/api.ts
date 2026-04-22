@@ -113,6 +113,17 @@ api.interceptors.request.use(
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
     }
+    // FormData: let the browser set multipart boundary (default instance has application/json)
+    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+      const h = config.headers;
+      if (h && typeof (h as { delete?: (k: string) => void }).delete === "function") {
+        (h as { delete: (k: string) => void }).delete("Content-Type");
+        (h as { delete: (k: string) => void }).delete("content-type");
+      } else if (h && typeof h === "object") {
+        delete (h as Record<string, unknown>)["Content-Type"];
+        delete (h as Record<string, unknown>)["content-type"];
+      }
+    }
     return config;
   },
   (error) => Promise.reject(error)

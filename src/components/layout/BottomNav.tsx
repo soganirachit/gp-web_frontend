@@ -7,13 +7,43 @@ import basketIcon from "../../assets/icon/navbar/basket.svg";
 import accountIcon from "../../assets/icon/navbar/account.svg";
 import storeLogo from "../../assets/svg/store_logo.svg";
 import orderStoreIcon from "../../assets/svg/gp_store_svg/orderstore.svg";
-import activeBg from "../../assets/All/Vector (1).png";
 import dailyOrangeBanner from "../../assets/svg/gp_daily svg/orangebanner.svg";
 import storeGreenBanner from "../../assets/svg/gp_store_svg/greenbanner.svg";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import { subscriptionCartService } from "../../services/subscriptionCart.service";
+
+/**
+ * GP Daily tab glyphs: app tints the same SVGs to `#6B7280` / `#222222` (`DAILY_TEXT_ON_PRIMARY`).
+ * `<img src>` cannot honor `currentColor` — use the asset as a CSS mask so the fill matches the app.
+ */
+function DailyNavGlyph({
+  src,
+  active,
+  className = "mb-0.5 h-5 w-5",
+}: {
+  src: string;
+  active: boolean;
+  className?: string;
+}) {
+  return (
+    <span
+      aria-hidden
+      className={`inline-block shrink-0 ${active ? "bg-[#222222]" : "bg-[#6B7280]"} ${className}`}
+      style={{
+        maskImage: `url(${src})`,
+        WebkitMaskImage: `url(${src})`,
+        maskSize: "contain",
+        maskRepeat: "no-repeat",
+        maskPosition: "center",
+        WebkitMaskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+      }}
+    />
+  );
+}
 
 const BottomNav: React.FC = () => {
   const location = useLocation();
@@ -287,28 +317,27 @@ const BottomNav: React.FC = () => {
               }`}
           >
             {isActive("/home") && dailyActivePill}
-            <img
+            <DailyNavGlyph
               src={homeIcon}
-              alt="Home"
-              className={`w-5 h-5 mb-0.5 relative z-10 ${isActive("/home") ? "" : "opacity-75"}`}
-              style={isActive("/home") ? { filter: "brightness(0) saturate(100%)" } : undefined}
+              active={isActive("/home")}
+              className="mb-0.5 h-5 w-5 relative z-10"
             />
             <span className={`text-[10px] font-medium relative z-10 ${isActive("/home") ? "text-[#222222]" : "text-[#6B7280]"}`}>Home</span>
           </Link>
 
           <Link
             to="/gp-daily"
+            aria-label="Daily"
             className={`flex flex-col items-center justify-center flex-1 relative min-h-[44px] ${isActive("/gp-daily")
               ? theme.classes.bottomNavActiveText
               : theme.classes.bottomNavInactiveText
               }`}
           >
             {isActive("/gp-daily") && dailyActivePill}
-            <img
+            <DailyNavGlyph
               src={dailyIcon}
-              alt="Daily"
-              className={`w-9 h-9 relative z-10 ${isActive("/gp-daily") ? "" : "opacity-75"}`}
-              style={isActive("/gp-daily") ? { filter: "brightness(0) saturate(100%)" } : undefined}
+              active={isActive("/gp-daily")}
+              className="h-9 w-9 relative z-10"
             />
           </Link>
 
@@ -320,11 +349,10 @@ const BottomNav: React.FC = () => {
               }`}
           >
             {isActive(`${basePath}/wallet`) && dailyActivePill}
-            <img
+            <DailyNavGlyph
               src={walletIcon}
-              alt="Wallet"
-              className={`w-5 h-5 mb-0.5 relative z-10 ${isActive(`${basePath}/wallet`) ? "" : "opacity-75"}`}
-              style={isActive(`${basePath}/wallet`) ? { filter: "brightness(0) saturate(100%)" } : undefined}
+              active={isActive(`${basePath}/wallet`)}
+              className="mb-0.5 h-5 w-5 relative z-10"
             />
             <span className={`text-[10px] font-medium relative z-10 ${isActive(`${basePath}/wallet`) ? "text-[#222222]" : "text-[#6B7280]"}`}>Wallet</span>
           </Link>
@@ -339,11 +367,10 @@ const BottomNav: React.FC = () => {
           >
             {basketTabActive && dailyActivePill}
             <div className="relative">
-              <img
+              <DailyNavGlyph
                 src={basketIcon}
-                alt="Basket"
-                className={`w-5 h-5 mb-0.5 relative z-10 ${basketTabActive ? "" : "opacity-75"}`}
-                style={basketTabActive ? { filter: "brightness(0) saturate(100%)" } : undefined}
+                active={basketTabActive}
+                className="mb-0.5 h-5 w-5 relative z-10"
               />
               {cartItemCount > 0 && (
                 <span
@@ -375,25 +402,11 @@ const BottomNav: React.FC = () => {
               }`}
           >
             {isAccountSectionActive() && dailyActivePill}
-            {/* Match app `BottomTabs` GP Daily: icon #6B7280 idle / #222222 on pill (`DAILY_TEXT_ON_PRIMARY`); not store SVG #19411F. */}
-            <span
-              className={`mb-0.5 relative z-10 inline-flex h-5 w-5 items-center justify-center ${
-                isAccountSectionActive() ? "text-[#222222]" : "text-[#6B7280]"
-              }`}
-              aria-hidden
-            >
-              <svg
-                className="h-5 w-5 shrink-0"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M12 4C13.0609 4 14.0783 4.42143 14.8284 5.17157C15.5786 5.92172 16 6.93913 16 8C16 9.06087 15.5786 10.0783 14.8284 10.8284C14.0783 11.5786 13.0609 12 12 12C10.9391 12 9.92172 11.5786 9.17157 10.8284C8.42143 10.0783 8 9.06087 8 8C8 6.93913 8.42143 5.92172 9.17157 5.17157C9.92172 4.42143 10.9391 4 12 4ZM12 14C16.42 14 20 15.79 20 18V20H4V18C4 15.79 7.58 14 12 14Z"
-                  fill="currentColor"
-                />
-              </svg>
-            </span>
+            <DailyNavGlyph
+              src={accountIcon}
+              active={isAccountSectionActive()}
+              className="mb-0.5 h-5 w-5 relative z-10"
+            />
             <span className={`text-[10px] font-medium relative z-10 ${isAccountSectionActive() ? "text-[#222222]" : "text-[#6B7280]"}`}>
               Account
             </span>

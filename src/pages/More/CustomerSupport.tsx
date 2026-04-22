@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaChevronRight } from "react-icons/fa";
-import { supportService, SupportTicket } from "@/services/support.service";
+import {
+  supportService,
+  SupportTicket,
+  formatSupportStatusLabel,
+  normalizeSupportStatus,
+} from "@/services/support.service";
 import { format } from "date-fns";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { SettingsListSkeleton } from "../../components/common/PageSkeletons";
@@ -62,7 +67,7 @@ const CustomerSupport: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Fetch eligible orders (delivered in last 12 hours)
+      // Fetch eligible orders (delivered in last 4 hours)
       const eligibleOrders = await supportService.getEligibleOrders();
       console.log('Fetched eligible orders:', eligibleOrders);
       setOrders(eligibleOrders);
@@ -89,7 +94,7 @@ const CustomerSupport: React.FC = () => {
 
   const getSelectedOrderText = () => {
     if (!selectedOrderNumber) {
-      return orders.length === 0 ? 'No orders available (delivered in last 12 hours)' : 'Select an order delivered in last 12 hours';
+      return orders.length === 0 ? 'No orders available (delivered in last 4 hours)' : 'Select an order delivered in last 4 hours';
     }
     return selectedOrderNumber;
   };
@@ -107,11 +112,11 @@ const CustomerSupport: React.FC = () => {
   };
 
   const getStatusColor = (status: string) => {
-    const s = status?.toLowerCase() || '';
-    if (s === 'open' || s === 'pending') return 'bg-yellow-100 text-yellow-800';
-    if (s === 'resolved' || s === 'closed') return 'bg-green-100 text-green-800';
-    if (s === 'in_progress') return 'bg-blue-100 text-blue-800';
-    return 'bg-gray-100 text-gray-800';
+    const s = normalizeSupportStatus(status);
+    if (s === "open" || s === "pending" || s === "new") return "bg-yellow-100 text-yellow-800";
+    if (s === "resolved" || s === "closed") return "bg-green-100 text-green-800";
+    if (s === "in_progress") return "bg-blue-100 text-blue-800";
+    return "bg-gray-100 text-gray-800";
   };
 
   const blockedOrderNumbers = useMemo(
@@ -138,7 +143,7 @@ const CustomerSupport: React.FC = () => {
           {/* Orders Dropdown - Delivered in last 6 hours */}
           <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
             <label className="text-sm font-semibold text-gray-700 mb-3 block">
-              Select Order (Delivered in last 12 hours)
+              Select Order (Delivered in last 4 hours)
             </label>
             <div ref={dropdownRef} className="relative w-full">
               {/* Custom Dropdown Button */}
@@ -277,8 +282,10 @@ const CustomerSupport: React.FC = () => {
                           Created: {formatDate(ticket.created_at)}
                         </p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(ticket.status)}`}>
-                        {ticket.status}
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(ticket.status)}`}
+                      >
+                        {formatSupportStatusLabel(ticket.status)}
                       </span>
                     </div>
                   </div>

@@ -9,14 +9,12 @@ import { useAuth } from "../../../context/AuthContext";
 import { useFeatureTheme } from "../../../context/FeatureThemeContext";
 import { useCart, CartItem, CartDeliveryInfo } from "../../../context/CartContext";
 import RazorpayPayment from "../../Payment/Rezorpay/RezorpayPayment";
-import { IoWarningOutline } from "react-icons/io5";
+import { IoAlertCircle, IoWarningOutline } from "react-icons/io5";
 import { useNetworkRecovery } from "../../../hooks/useNetworkRecovery";
 import { IoMdArrowDown, IoMdArrowUp } from "react-icons/io";
 import walletImage from "../../../assets/icon/Wallet.png";
 import profileImage from "../../../assets/icon/Profile.png";
 import { TransactionType } from "@/interfaces";
-import { format, parseISO } from "date-fns";
-import { INR } from "@/components/constants";
 import lowbalanceIcon from "../../../assets/svg/gp_daily svg/lowbalance.svg";
 import enableIcon from "../../../assets/svg/gp_daily svg/enable.svg";
 import Spinner from "../../common/Spinner";
@@ -63,6 +61,19 @@ function DepositHistoryGlyph({ className }: { className?: string }) {
   );
 }
 
+/** Match mobile `WalletScreen` `formatTxnTime`. */
+function formatTxnTimeAppStyle(value?: string) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function isWalletTransactionRow(item: unknown): item is TransactionType {
   if (typeof item !== "object" || item === null || !("type" in item)) {
     return false;
@@ -104,7 +115,7 @@ const Wallet = () => {
   const { isLoggedIn } = useAuth();
   const { feature } = useFeatureTheme();
   const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
-  const [customAmount, setCustomAmount] = useState<string>("500");
+  const [customAmount, setCustomAmount] = useState<string>("1000");
   const [balance, setBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<TransactionType[]>([]);
   const [transactionLogs, setTransactionLogs] = useState<any[]>([]);
@@ -251,6 +262,12 @@ const Wallet = () => {
     setCustomAmount(amount.toString());
   };
 
+  const isQuickAmountActive = (amount: number) => {
+    const parsed = parseInt(customAmount, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return false;
+    return parsed === amount;
+  };
+
   const handleCouponSelect = (coupon: CouponType) => {
     setSelectedCoupon(coupon);
     setShowCoupons(false);
@@ -259,10 +276,10 @@ const Wallet = () => {
 
   const filteredWalletRows = useMemo(() => {
     const all = [...transactions, ...(transactionLogs || [])];
+    if (showDepositHistoryOnly) {
+      return transactions.filter((t) => t.type === "CREDIT");
+    }
     if (feature === "gpDaily") {
-      if (showDepositHistoryOnly) {
-        return transactions.filter((t) => t.type === "CREDIT");
-      }
       return transactions;
     }
     return all;
@@ -363,8 +380,8 @@ const Wallet = () => {
     return <WalletPageSkeleton />;
   }
 
-  /** One horizontal gutter for all cards (Pixel / iPhone / narrow Android). */
-  const pagePad = "px-4 sm:px-5 md:px-6";
+  /** Match mobile `WalletScreen` `headerBlock` (paddingHorizontal: 12). */
+  const pagePad = "px-3 sm:px-3";
 
   return (
     <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom overflow-x-clip">
@@ -391,27 +408,30 @@ const Wallet = () => {
           className="sticky top-0 z-10"
         />
 
-        <div className={`${pagePad} space-y-4 pb-20`}>
-        {/* Balance Card */}
-        <div className="w-full bg-[#27A155] text-white rounded-[28px] sm:rounded-[32px] px-5 py-4 sm:px-6 sm:py-5 md:px-7 md:py-5 shadow-sm relative overflow-hidden">
-
-          <div className="mb-3 flex min-h-[2.25rem] items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold tracking-wider opacity-90 uppercase leading-none">
+        <div className={`${pagePad} space-y-0 pb-20`}>
+        {/* Balance card — match mobile `WalletScreen` gradient, radius, type scale */}
+        <div
+          className="w-full text-white rounded-[30px] p-[22px] shadow-sm relative overflow-hidden"
+          style={{
+            background:
+              "linear-gradient(280.14deg, rgba(2, 133, 50, 0.85) 5.56%, rgba(22, 163, 74, 0.85) 129.06%)",
+          }}
+        >
+          <div className="mb-0 flex min-h-0 items-center justify-between gap-2">
+            <span className="text-[10px] font-serif font-bold tracking-wide text-white uppercase leading-none">
               Available Balance
             </span>
-            {feature === "gpDaily" ? (
-              <button
-                type="button"
-                onClick={() => setShowDepositHistoryOnly((p) => !p)}
-                className="inline-flex shrink-0 items-center gap-1 text-[11px]  border-2 border-white/95 rounded-full px-2 py-1 font-semibold text-white/95  hover:text-white"
-              >
-                <DepositHistoryGlyph />
-                {showDepositHistoryOnly ? "All Transactions" : "Deposit History"}
-              </button>
-            ) : null}
+            <button
+              type="button"
+              onClick={() => setShowDepositHistoryOnly((p) => !p)}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-[20px] border border-white px-2.5 py-1.5 text-[10px] font-sans font-semibold text-white"
+            >
+              <DepositHistoryGlyph />
+              {showDepositHistoryOnly ? "All Transactions" : "Deposit History"}
+            </button>
           </div>
 
-          <div className="text-4xl sm:text-5xl md:text-5xl font-semibold mb-4">
+          <div className="mt-2 text-[42px] font-serif font-bold leading-[1.1] text-white">
             {isLoadingBalance ? (
               <Spinner size={48} variant="light" className="flex-shrink-0" />
             ) : (
@@ -419,9 +439,7 @@ const Wallet = () => {
             )}
           </div>
 
-          <div className="w-full h-[1px] bg-white/40 mb-3"></div>
-
-          <div className="text-[12px] font-normal opacity-90">
+          <div className="mt-2 border-t border-white/30 pt-1.5 text-[12px] font-serif font-normal text-white/[0.92]">
             {latestWalletRechargeAmount != null ? (
               <>
                 Last deposit ₹
@@ -441,17 +459,17 @@ const Wallet = () => {
           feature === "gpDaily" &&
           isLoggedIn &&
           gpDailyOrderHold.show && (
-            <div className="w-full bg-[#FE5053] rounded-2xl px-4 py-4 text-white">
-              <div className="flex items-start gap-3">
+            <div className="mt-2.5 w-full rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white">
+              <div className="flex items-start gap-2">
                 <img
                   src={lowbalanceIcon}
                   alt=""
-                  className="w-7 h-7 shrink-0 mt-0.5"
+                  className="h-7 w-7 shrink-0 mt-0.5"
                   aria-hidden
                 />
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-base mb-1">Order in hold</h3>
-                  <p className="text-sm text-white/90 leading-snug">
+                <div className="min-w-0 flex-1">
+                  <h3 className="mb-1 font-serif text-base font-bold text-white">Order in hold</h3>
+                  <p className="font-sans text-sm leading-snug text-white/90">
                     {gpDailyOrderHold.lowBalanceForSubscription
                       ? `Your wallet balance is below 3-day subscription amount (₹${gpDailyOrderHold.threshold3Day}). Recharge now to continue deliveries.`
                       : "Your wallet balance is low. Recharge now to continue your daily deliveries."}
@@ -461,56 +479,71 @@ const Wallet = () => {
             </div>
           )}
 
-        {!isLoadingBalance && feature === "gpStore" && balance < 100 && (
-          <div className="w-full bg-[#FE5053] rounded-2xl px-4 py-3 text-white flex items-center">
-            <div className="flex items-center gap-3 w-full min-h-[3rem]">
-              <img src={lowbalanceIcon} alt="" className="w-7 h-7 shrink-0" aria-hidden />
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm leading-tight">Low Balance</h3>
-                <p className="text-[11px] font-normal text-white/95 mt-0.5 leading-snug">
-                  Your wallet balance is low. Recharge Now!
+        {!isLoadingBalance &&
+          feature === "gpDaily" &&
+          isLoggedIn &&
+          !gpDailyOrderHold.show &&
+          balance < 500 && (
+            <div className="mt-2.5 w-full flex flex-row items-start gap-2 rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white">
+              <IoAlertCircle className="h-[18px] w-[18px] shrink-0 text-white" style={{ marginTop: 1 }} aria-hidden />
+              <div className="min-w-0 flex-1">
+                <h3 className="font-serif text-[13px] font-bold leading-[18px] text-white">Low Balance</h3>
+                <p className="mt-1 font-serif text-xs leading-4 text-white">
+                  Your wallet balance is low. Recharge now
                 </p>
               </div>
+            </div>
+          )}
+
+        {!isLoadingBalance && feature === "gpStore" && balance < 500 && (
+          <div className="mt-2.5 w-full flex flex-row items-start gap-2 rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white">
+            <IoAlertCircle className="h-[18px] w-[18px] shrink-0 text-white" style={{ marginTop: 1 }} aria-hidden />
+            <div className="min-w-0 flex-1">
+              <h3 className="font-serif text-[13px] font-bold leading-[18px] text-white">Low Balance</h3>
+              <p className="mt-1 font-serif text-xs leading-4 text-white">
+                Your wallet balance is low. Recharge now
+              </p>
             </div>
           </div>
         )}
 
-        {/* Add Money Section */}
-        <div className="w-full">
-          <h2 className="text-xl font-serif font-semibold text-gray-900">Add Money To Wallet</h2>
+        {/* Add Money — match mobile `WalletScreen` chips, labels, field, CTA */}
+        <div className="mt-3 w-full">
+          <h2 className="mb-2 text-[22px] font-serif font-bold text-[#222222]">
+            Add Money to Wallet
+          </h2>
 
-          {/* Quick Amount Buttons */}
-          <div className="mt-3 grid grid-cols-2 gap-2 xs:grid-cols-4 xs:gap-3 md:gap-4 mb-5">
+          <div className="mb-2 flex flex-wrap gap-2">
             {QUICK_AMOUNTS.map((amount) => (
               <button
                 key={amount}
                 type="button"
                 onClick={() => handleQuickAmount(amount)}
-                className={`py-1 rounded-xl border-2 text-sm xs:text-base font-medium ${customAmount === amount.toString()
-                  ? "border-[#FAA222] text-black bg-[#FAA222]"
-                  : "border-gray-200 text-gray-600 bg-white "
-                  }`}
+                className={`min-w-0 rounded-[10px] border px-3.5 py-2 text-xs font-sans font-semibold transition-colors ${
+                  isQuickAmountActive(amount)
+                    ? "border-[#FFB043] bg-[#FFB043] text-[#222222]"
+                    : "border-[#e5e7eb] bg-white text-[#808080]"
+                }`}
               >
                 ₹{amount}
               </button>
             ))}
           </div>
 
-
-
-          <div className="mb-4">
-            <label className="block text-gray-900 font-medium mb-2">
+          <div className="mb-2.5">
+            <label className="mb-1.5 mt-2.5 block text-sm font-serif font-normal text-[#222222]">
               Enter Amount
             </label>
             <input
               type="text"
               value={customAmount}
               onChange={handleAmountChange}
-              className={`w-full p-3 border-2 rounded-xl text-base ${customAmount && parseInt(customAmount) < MIN_AMOUNT
-                ? "border-red-300 bg-red-50"
-                : "border-gray-400"
-                }`}
-              placeholder="Enter Amount"
+              className={`h-[46px] w-full rounded-[10px] border bg-white px-3 font-sans text-base text-[#111827] placeholder:text-[#9CA3AF] ${
+                customAmount && parseInt(customAmount) < MIN_AMOUNT
+                  ? "border-red-300 bg-red-50"
+                  : "border-[#d1d5db]"
+              }`}
+              placeholder="1000"
             />
             {customAmount && parseInt(customAmount) < MIN_AMOUNT && (
               <p className="text-red-500 text-sm mt-1">
@@ -610,7 +643,7 @@ const Wallet = () => {
                 error.message || "Payment failed. Please try again."
               );
             }}
-            className="block w-full py-2.5 bg-[#FAA222] text-black rounded-2xl text-sm font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="mt-2.5 block w-full rounded-[12px] bg-[#FFB043] py-3 text-center text-sm font-sans font-semibold text-[#222222] transition-opacity disabled:cursor-not-allowed disabled:opacity-70"
             buttonText={
               isProcessingPayment ? "Processing..." : `Proceed to Pay ₹${customAmount}`
             }
@@ -695,8 +728,8 @@ const Wallet = () => {
         </div> */}
 
         {/* Combined Transactions & Payment History */}
-        <div className="w-full pt-4">
-          <h2 className="mb-4 font-serif text-xl font-semibold text-gray-900">
+        <div className="w-full pt-0">
+          <h2 className="mb-2 mt-3 text-[22px] font-serif font-bold text-[#222222]">
             Recent Transactions
           </h2>
 
@@ -716,17 +749,18 @@ const Wallet = () => {
                 <>
                   <p className="font-semibold text-gray-800">No transactions</p>
                   <p className="mt-1 text-xs text-gray-500">
-                    Wallet transactions will appear here after your first top-up or activity.
+                    Wallet transactions will appear here after your first top-up or cashback.
                   </p>
                 </>
               )}
             </div>
           ) : (
-            <div className="space-y-3 md:space-y-4">
+            <div className="space-y-2">
               {[...filteredWalletRows]
                 .sort((a, b) => rowCreatedMs(b) - rowCreatedMs(a))
                 .map((item, idx) => {
                   const isTransaction = isWalletTransactionRow(item);
+                  const isDailyWallet = feature === "gpDaily";
 
                   let isCredit = false;
                   if (isTransaction) {
@@ -761,70 +795,92 @@ const Wallet = () => {
                     : "Wallet Recharge";
 
                   return (
-                    <div key={`txn-${idx}`} className="bg-white p-4 md:p-5 rounded-2xl border-2 border-gray-200">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 flex-1 items-center gap-3 md:gap-4">
-                          <div
-                            className={`shrink-0 p-2 md:p-3 rounded-full ${
-                              isPending
-                                ? "bg-yellow-50"
-                                : isCredit
-                                  ? "bg-green-50"
-                                  : "bg-red-50"
-                            }`}
-                          >
-                            {isPending ? (
-                              <IoWarningOutline className="text-yellow-500 md:text-xl" />
-                            ) : isCredit ? (
-                              <IoMdArrowUp className="text-green-500 md:text-xl -rotate-[135deg]" />
-                            ) : (
-                              <IoMdArrowDown className="text-red-500 md:text-xl -rotate-[135deg]" />
+                    <div
+                      key={`txn-${idx}`}
+                      className={`mb-2 flex w-full items-center gap-2 rounded-[12px] border border-[#f3f4f6] bg-white last:mb-0 ${
+                        isDailyWallet
+                          ? "min-h-[76px] px-3 py-4"
+                          : "px-2.5 py-2.5"
+                      }`}
+                    >
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <div
+                          className={`flex shrink-0 items-center justify-center rounded-full ${
+                            isDailyWallet ? "h-8 w-8" : "h-6 w-6"
+                          } ${
+                            isPending
+                              ? "bg-yellow-50"
+                              : isCredit
+                                ? "bg-[#ecfdf3]"
+                                : "bg-[#fef2f2]"
+                          }`}
+                        >
+                          {isPending ? (
+                            <IoWarningOutline
+                              className={`text-yellow-500 ${
+                                isDailyWallet ? "h-3.5 w-3.5" : "h-3 w-3"
+                              }`}
+                            />
+                          ) : isCredit ? (
+                            <IoMdArrowUp
+                              className={`-rotate-[135deg] text-[#16a34a] ${
+                                isDailyWallet ? "h-3.5 w-3.5" : "h-3 w-3"
+                              }`}
+                            />
+                          ) : (
+                            <IoMdArrowDown
+                              className={`-rotate-[135deg] text-[#ef4444] ${
+                                isDailyWallet ? "h-3.5 w-3.5" : "h-3 w-3"
+                              }`}
+                            />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                          <p className="line-clamp-2 break-words text-sm font-sans font-normal leading-5 text-[#222222]">
+                            {titleLine}
+                          </p>
+                          {feature !== "gpDaily" &&
+                            !isTransaction &&
+                            (item as { razorpayOrderId?: string }).razorpayOrderId && (
+                              <div className="mt-0.5 truncate text-xs text-gray-400">
+                                Order ID:{" "}
+                                {(item as { razorpayOrderId?: string }).razorpayOrderId}
+                              </div>
                             )}
-                          </div>
-                          <div className="min-w-0 flex-1 overflow-hidden">
-                            <p className="break-words text-[13px] font-medium leading-snug text-gray-900">
-                              {titleLine}
-                            </p>
-                            {feature !== "gpDaily" &&
-                              !isTransaction &&
-                              (item as { razorpayOrderId?: string }).razorpayOrderId && (
-                                <div className="mt-0.5 truncate text-xs text-gray-400 md:text-sm">
-                                  Order ID:{" "}
-                                  {(item as { razorpayOrderId?: string }).razorpayOrderId}
-                                </div>
-                              )}
-                            <div className="mt-1 text-[11px] font-normal text-gray-500">
-                              {format(new Date(createdRaw), "dd MMM yyyy • h:mm a")}
-                            </div>
+                          <div className="mt-0.5 text-xs font-sans font-normal text-[#808080]">
+                            {formatTxnTimeAppStyle(createdRaw)}
                           </div>
                         </div>
-                        <div className="shrink-0 whitespace-nowrap text-right">
+                      </div>
+                      <div className="shrink-0 whitespace-nowrap text-right">
+                        <div
+                          className={`text-base font-sans font-medium ${
+                            isPending
+                              ? "text-yellow-600"
+                              : isCredit
+                                ? "text-[rgb(0,113,42)]"
+                                : "text-[rgb(205,21,24)]"
+                          }`}
+                        >
+                          {!isPending
+                            ? `${isCredit ? "+" : "-"}₹${amount.toLocaleString("en-IN", {
+                                maximumFractionDigits: 2,
+                              })}`
+                            : null}
+                        </div>
+                        {!isTransaction && (
                           <div
-                            className={`font-semibold md:text-xl ${
+                            className={`text-xs ${
                               isPending
                                 ? "text-yellow-600"
                                 : isCredit
-                                  ? "text-green-600"
-                                  : "text-red-600"
+                                  ? "text-[rgb(0,113,42)]"
+                                  : "text-gray-600"
                             }`}
                           >
-                            {isPending ? "" : isCredit ? "+" : "-"}
-                            {INR} {amount}
+                            {`${(item as { status?: string }).status?.charAt(0).toUpperCase() ?? ""}${(item as { status?: string }).status?.slice(1).toLowerCase() ?? ""}`}
                           </div>
-                          {!isTransaction && (
-                            <div
-                              className={`text-xs md:text-sm ${
-                                isPending
-                                  ? "text-yellow-600"
-                                  : isCredit
-                                    ? "text-green-600"
-                                    : "text-gray-600"
-                              }`}
-                            >
-                              {`${(item as { status?: string }).status?.charAt(0).toUpperCase() ?? ""}${(item as { status?: string }).status?.slice(1).toLowerCase() ?? ""}`}
-                            </div>
-                          )}
-                        </div>
+                        )}
                       </div>
                     </div>
                   );

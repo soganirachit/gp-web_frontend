@@ -24,13 +24,19 @@ function extractOrderListPayload(data: unknown): any[] {
   return [];
 }
 
-/** Follow DRF `next` until exhausted (matches mobile `order.service`). */
+/**
+ * Follow DRF `next` until exhausted (matches mobile `order.service`), except for
+ * `order_type=subscription` — backend must not be called with `?page=2` etc.; only
+ * the first `GET /orders/?order_type=subscription` (no page param) is used.
+ */
 async function fetchAllOrderPages(
     params?: Record<string, string>,
 ): Promise<any[]> {
     const all: any[] = [];
     let url = `${getApiUrl()}/orders/`;
     let firstParams = sanitizeOrderListParams(params);
+    const subscriptionOnlyRequest =
+        String(firstParams?.order_type ?? "").toLowerCase() === "subscription";
 
     for (let p = 0; p < MAX_ORDER_LIST_PAGES; p++) {
         const response = await api.get(
@@ -42,6 +48,10 @@ async function fetchAllOrderPages(
         const data = response.data;
         const list = extractOrderListPayload(data);
         all.push(...list);
+
+        if (subscriptionOnlyRequest) {
+            break;
+        }
 
         const next =
             typeof (data as any)?.next === "string" &&

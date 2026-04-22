@@ -28,6 +28,7 @@ const Allset = lazy(() => import('../components/Customer/forms/login/Allset'));
 const MorePage = lazy(() => import('../pages/More/Settings'));
 const Profile = lazy(() => import('../pages/More/Account&Perferenecs/Profile/EditProfile'));
 const Addresses = lazy(() => import('../pages/More/Addresses'));
+const ChooseLocation = lazy(() => import('../pages/More/ChooseLocation'));
 const AddEditAddress = lazy(() => import('../pages/More/AddEditAddress'));
 
 const Location = lazy(() => import('../features/location/Home_page_location'));
@@ -131,6 +132,7 @@ const router = createBrowserRouter(
       { path: '/gp-store/account', element: <ProtectedRoute><MorePage /></ProtectedRoute> },
       { path: '/gp-store/profile', element: <ProtectedRoute><Profile /></ProtectedRoute> },
       { path: '/gp-store/addresses', element: <ProtectedRoute><Addresses /></ProtectedRoute> },
+      { path: '/gp-store/choose-location', element: <ProtectedRoute><ChooseLocation /></ProtectedRoute> },
       { path: '/gp-store/addresses/add', element: <ProtectedRoute><AddEditAddress /></ProtectedRoute> },
       { path: '/gp-store/addresses/edit', element: <ProtectedRoute><AddEditAddress /></ProtectedRoute> },
       { path: '/gp-store/address-selection', element: <ProtectedRoute><AddressSelection /></ProtectedRoute> },

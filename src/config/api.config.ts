@@ -92,7 +92,15 @@ export const getPaymentsRazorpayUrl = () => {
 
 };
 
-
+/** Site origin (e.g. `https://apigp.mygendaphool.com`) for resolving relative media paths. */
+export const getApiOrigin = (): string => {
+  const normalized = String(getApiUrl()).replace(/\/$/, "");
+  try {
+    return new URL(normalized).origin;
+  } catch {
+    return normalized.replace(/\/api\/v1\/?$/i, "");
+  }
+};
 
 export default config;
 
