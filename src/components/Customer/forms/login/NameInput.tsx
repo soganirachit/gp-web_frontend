@@ -159,12 +159,16 @@ const NameInput: React.FC = () => {
 
           <div className="space-y-6">
             <div>
-              <label className="block text-gray-700 mb-2 font-semibold">First Name</label>
+              <label className="block text-gray-700 mb-2 font-semibold">
+                First Name<span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="Enter your first name"
+                required
+                aria-required="true"
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg transition-colors"
                 style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
                 onFocus={(e) => e.target.style.borderColor = theme.colors.primary}

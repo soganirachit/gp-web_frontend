@@ -1,3 +1,4 @@
+import { isAxiosError } from "axios";
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
 import { errorMessageFromCatch } from "../utils/apiErrorMessage";
@@ -11,6 +12,8 @@ export interface DailyCartItem {
   product_name?: string;
   product_slug?: string;
   primary_image?: string | null;
+  variant_id?: number | null;
+  variant_name?: string | null;
   quantity: number;
   unit_price?: string | number;
   total_price?: string | number;
@@ -23,6 +26,8 @@ export interface DailyCart {
   store_id?: number | null;
   store_name?: string;
   zone_id?: number | null;
+  /** Confirmed subscription-zone delivery fee (from GET/POST cart). */
+  delivery_fee?: string | number;
   items: DailyCartItem[];
   items_count?: number;
   subtotal?: string | number;
@@ -45,6 +50,51 @@ function unwrap<T>(raw: unknown): T {
   return raw as T;
 }
 
+/** Set-address returned when store/zone changes and server needs explicit confirmation. */
+export type SubscriptionCartStoreChangeConfirmation = {
+  store_changed: true;
+  requires_confirmation: true;
+  new_store: { id: number; name: string };
+  new_zone?: { id: number; name: string; delivery_fee?: string | number } | null;
+  message?: string;
+};
+
+export function isSubscriptionCartStoreChangeConfirmation(
+  data: unknown,
+): data is SubscriptionCartStoreChangeConfirmation {
+  if (!data || typeof data !== "object") return false;
+  const o = data as Record<string, unknown>;
+  return o.store_changed === true && o.requires_confirmation === true;
+}
+
+/** When set-address succeeds with cart payload (not a confirmation-only response). */
+export function extractDailyCartFromSetAddressResponse(data: unknown): DailyCart | null {
+  if (!data || typeof data !== "object") return null;
+  if (isSubscriptionCartStoreChangeConfirmation(data)) return null;
+  try {
+    return unwrap<DailyCart>(data);
+  } catch {
+    return null;
+  }
+}
+
+/** GET /subscriptions/cart/ returned 400 — address outside zones or stale; caller should prompt re-selection. */
+export class SubscriptionCartZoneStaleError extends Error {
+  readonly code = "SUBSCRIPTION_CART_ZONE_STALE" as const;
+  constructor(
+    message = "Your delivery address is no longer in our zones, please select a new one",
+  ) {
+    super(message);
+    this.name = "SubscriptionCartZoneStaleError";
+  }
+}
+
+export function isSubscriptionCartZoneStaleError(
+  e: unknown,
+): e is SubscriptionCartZoneStaleError {
+  return e instanceof SubscriptionCartZoneStaleError;
+}
+
 export const subscriptionCartService = {
   _weekdayToInt(day: string): number | null {
     const d = String(day).trim().toLowerCase();
@@ -63,6 +113,9 @@ export const subscriptionCartService = {
       const res = await api.get(`${getApiUrl()}/subscriptions/cart/`);
       return unwrap<DailyCart>(res.data);
     } catch (e: unknown) {
+      if (isAxiosError(e) && e.response?.status === 400) {
+        throw new SubscriptionCartZoneStaleError();
+      }
       throw new Error(errorMessageFromCatch(e, "Failed to fetch daily cart"));
     }
   },
@@ -96,23 +149,35 @@ export const subscriptionCartService = {
     }
   },
 
-  async setDeliveryAddress(deliveryAddressId: number): Promise<DailyCart> {
+  /**
+   * POST /subscriptions/cart/set-address/
+   * Returns full JSON — either a {@link SubscriptionCartStoreChangeConfirmation} or cart payload (possibly wrapped in `data`).
+   */
+  async setDeliveryAddress(
+    deliveryAddressId: number,
+    confirmStoreChange = false,
+  ): Promise<unknown> {
     try {
       const res = await api.post(`${getApiUrl()}/subscriptions/cart/set-address/`, {
         delivery_address_id: deliveryAddressId,
+        confirm_store_change: confirmStoreChange,
       });
-      return unwrap<DailyCart>(res.data);
+      return res.data;
     } catch (e: unknown) {
       throw new Error(errorMessageFromCatch(e, "Failed to set delivery address"));
     }
   },
 
-  async addItem(productId: number, quantity: number): Promise<DailyCart> {
+  async addItem(productId: number, quantity: number, variantId?: number): Promise<DailyCart> {
     try {
-      const res = await api.post(`${getApiUrl()}/subscriptions/cart/add/`, {
+      const payload: Record<string, unknown> = {
         product_id: productId,
         quantity,
-      });
+      };
+      if (variantId != null && Number.isFinite(variantId)) {
+        payload.variant_id = variantId;
+      }
+      const res = await api.post(`${getApiUrl()}/subscriptions/cart/add/`, payload);
       return unwrap<DailyCart>(res.data);
     } catch (e: unknown) {
       throw new Error(errorMessageFromCatch(e, "Failed to update daily cart"));

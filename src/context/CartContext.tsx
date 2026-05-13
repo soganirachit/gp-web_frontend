@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import toast from 'react-hot-toast';
 import { cartService } from '../services/cart.service';
 import { storeService } from '../services/store.service';
+import { errorMessageFromCatch } from '../utils/apiErrorMessage';
 
 export interface CartItem {
   id: string; // Unique cart item ID (UI level)
@@ -157,25 +159,23 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     );
 
     if (existingItemIndex >= 0) {
-      // Update quantity if item already exists
+      const snapshot = items;
       const existingItem = items[existingItemIndex];
       const newQuantity = existingItem.quantity + item.quantity;
       
-      // Update UI cart first
       const updatedItems = [...items];
       updatedItems[existingItemIndex].quantity = newQuantity;
       setItems(updatedItems);
       
-      // Sync to API if logged in
       if (token && existingItem.apiCartItemId) {
         try {
           await cartService.updateCartItem(existingItem.apiCartItemId, newQuantity);
         } catch (error) {
           console.error('Error updating cart item in API:', error);
-          // Continue with UI update even if API fails
+          setItems(snapshot);
+          toast.error(errorMessageFromCatch(error, 'Could not update basket'));
         }
       } else if (token && existingItem.productId) {
-        // Item exists but doesn't have API ID yet - add to API
         try {
           let storeId: number | null = null;
           try {
@@ -186,6 +186,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
           if (!storeId) {
             console.error('Store ID not available - item updated in local cart only');
             console.log('Token exists:', !!token, 'ProductId:', existingItem.productId);
+            setItems(snapshot);
+            toast.error('Choose a store to update your basket');
             return;
           }
           console.log('Adding to cart with storeId:', storeId, 'productId:', existingItem.productId);
@@ -196,12 +198,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             item.customizedMessage,
             existingItem.variant?.id
           );
-          // Reload cart from API to get all items with correct cart_item_id
-          // Add a small delay to ensure API has processed the add
           await new Promise(resolve => setTimeout(resolve, 300));
           await loadCartFromAPI();
         } catch (error) {
           console.error('Error adding cart item to API:', error);
+          setItems(snapshot);
+          toast.error(errorMessageFromCatch(error, 'Could not update basket'));
         }
       }
     } else {
@@ -231,13 +233,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
           if (!storeId) {
             console.error('Store ID not available - cannot add to API cart');
             console.log('Token exists:', !!token, 'SelectedStoreId:', storeService.getSelectedStoreId(), 'TemporaryStoreId:', storeService.getTemporaryStoreId());
-            // Remove from pending adds since we're not calling API
             pendingAddsRef.current.delete(newItem.id);
-            // Still show success since item is in local cart, but log warning
-            console.warn('Item added to local cart only - store ID required for API sync');
-            // Show user-friendly error
-            // Note: toast is not available in context, so we'll use console.warn
-            // The calling component should handle the toast notification
+            setItems((prev) => prev.filter((i) => i.id !== newItem.id));
+            toast.error('Choose a store to add items to your basket');
             return;
           }
           console.log('Calling addToCart API with storeId:', storeId, 'productId:', newItem.productId, 'quantity:', newItem.quantity);
@@ -272,7 +270,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         } catch (error) {
           console.error('Error adding cart item to API:', error);
           pendingAddsRef.current.delete(newItem.id);
-          // Continue with UI update even if API fails
+          setItems((prev) => prev.filter((i) => i.id !== newItem.id));
+          toast.error(errorMessageFromCatch(error, 'Could not add to basket'));
         }
       }
     }

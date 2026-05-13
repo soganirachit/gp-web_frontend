@@ -323,6 +323,22 @@ class StoreService {
   }
 
   /**
+   * After POST /subscriptions/check-zone/ returns eligible + store: persist that store for
+   * GP Daily catalog calls ({@link resolveGpDailyCatalogStoreId}) until the subscription cart
+   * supplies its own `store_id`.
+   */
+  syncDailyZoneCheckStore(res: {
+    eligible: boolean;
+    store?: { id?: number } | null;
+  }): void {
+    if (!res.eligible) return;
+    const sid = Number(res.store?.id);
+    if (!Number.isFinite(sid) || sid <= 0) return;
+    this.setTemporaryStoreId(sid);
+    notifyGuestTemporaryStoreUpdated();
+  }
+
+  /**
    * Clear temporary store ID (e.g., when user logs in)
    */
   clearTemporaryStoreId(): void {

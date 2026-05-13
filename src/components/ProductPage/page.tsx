@@ -21,6 +21,7 @@ import { ProductBrowseSkeleton } from "../common/PageSkeletons";
 import { SearchBar } from "../common/SearchBar";
 import scooterIcon from "../../assets/svg/gp_daily svg/scooter.svg";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
+import { resolveGpDailyCatalogStoreId } from "../../utils/gpDailyCatalogStore";
 
 const DAILY_AVAILABILITY = PRODUCT_AVAILABILITY_GP_DAILY_LIST;
 
@@ -52,13 +53,13 @@ const ProductBrowsePage: React.FC = () => {
     const fetchCategories = async () => {
       try {
         setIsLoadingCategories(true);
-        const storeId = storeService.getStoreIdForProducts();
+        const catalogSid = await resolveGpDailyCatalogStoreId();
         let fetched = await productService.getCategories(
-          storeId || undefined,
+          catalogSid || undefined,
           DAILY_AVAILABILITY,
         );
         if (!fetched.length) {
-          fetched = await productService.getCategories(storeId || undefined, "store");
+          fetched = await productService.getCategories(catalogSid || undefined, "store");
         }
         const active = fetched
           .filter((c) => c.is_active)
@@ -91,7 +92,8 @@ const ProductBrowsePage: React.FC = () => {
           }
         }
 
-        const storeId = storeService.getStoreIdForProducts();
+        const catalogSid = await resolveGpDailyCatalogStoreId();
+        const storeId = catalogSid ?? undefined;
 
         if (stateCategoryName) {
           setCategoryName(stateCategoryName);

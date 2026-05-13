@@ -14,6 +14,7 @@ import { format } from "date-fns";
 import { orderService } from "@/services/order.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
+import { pickPrimaryImageUrl, type ProductImageLike } from "../../utils/pickPrimaryImageUrl";
 
 interface order {
   id: string;
@@ -28,6 +29,7 @@ interface order {
     sellingPrice: number;
     productId: string;
     imagesUrl: string[];
+    primary_image_variants?: ProductImageLike["primary_image_variants"];
     category: string;
     isDaily: boolean;
     isStore: boolean;
@@ -194,6 +196,10 @@ const ManageMyStoreProducts: React.FC = () => {
     const isScheduled = order.status === "SCHEDULED";
     const isCancelled = order.status === "CANCELLED";
 
+    const thumbUrl =
+      pickPrimaryImageUrl(order.product as ProductImageLike, "thumb") ||
+      order.product.imagesUrl?.[0];
+
     return (
       <div
         key={order.id}
@@ -201,9 +207,9 @@ const ManageMyStoreProducts: React.FC = () => {
       >
         <div className="flex items-start gap-3">
           <div className="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-            {order.product.imagesUrl && order.product.imagesUrl.length > 0 ? (
+            {thumbUrl ? (
               <img
-                src={order.product.imagesUrl[0]}
+                src={thumbUrl}
                 alt={order.product.name}
                 className="w-full h-full object-cover"
               />

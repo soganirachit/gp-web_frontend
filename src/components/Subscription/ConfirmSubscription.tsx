@@ -9,9 +9,8 @@ import savingsCnfSvg from "../../assets/svg/gp_daily svg/savings_cnf.svg";
 import allsetLogo from "../../assets/All/allset_logo.png";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
-import { GoogleMap } from "@react-google-maps/api";
+import { GoogleMap, Marker } from "@react-google-maps/api";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
-import { MdLocationOn } from "react-icons/md";
 import { subscriptionService } from "../../services/subscription.service";
 import { customerService } from "@/services/getcustomer.service";
 import { orderService } from "@/services/order.service";
@@ -321,7 +320,7 @@ const SuccessCheckmark = () => (
   </motion.div>
 );
 
-const MapView: React.FC<MapViewProps> = ({ address, themeColor = "#F15A22" }) => {
+const MapView: React.FC<MapViewProps> = ({ address, themeColor: _themeColor = "#F15A22" }) => {
   const { isLoaded, loadError } = useGoogleMaps();
 
   if (!isLoaded) {
@@ -342,11 +341,15 @@ const MapView: React.FC<MapViewProps> = ({ address, themeColor = "#F15A22" }) =>
 
   // Get coordinates from the address.coordinates field
   let center = { lat: 20.5937, lng: 78.9629 }; // Default to India's center
+  let hasValidCoords = false;
 
   if (address?.coordinates) {
-    const [lat, lng] = address.coordinates.split(",").map(Number);
-    if (!isNaN(lat) && !isNaN(lng)) {
+    const parts = address.coordinates.split(",").map((s) => Number(String(s).trim()));
+    const lat = parts[0];
+    const lng = parts[1];
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
       center = { lat, lng };
+      hasValidCoords = true;
     }
   }
 
@@ -358,7 +361,7 @@ const MapView: React.FC<MapViewProps> = ({ address, themeColor = "#F15A22" }) =>
           height: "100%",
         }}
         center={center}
-        zoom={16}
+        zoom={hasValidCoords ? 18 : 16}
         options={{
           zoomControl: false,
           streetViewControl: false,
@@ -372,9 +375,7 @@ const MapView: React.FC<MapViewProps> = ({ address, themeColor = "#F15A22" }) =>
           clickableIcons: false,
         }}
       >
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
-          <MdLocationOn className="text-4xl drop-shadow-lg" style={{ color: themeColor }} />
-        </div>
+        {hasValidCoords ? <Marker position={center} /> : null}
       </GoogleMap>
       {/* Overlay to prevent any map interactions */}
       <div className="absolute inset-0 bg-transparent" />

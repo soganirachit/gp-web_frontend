@@ -311,9 +311,18 @@ export const productService = {
     }
   },
 
-  async getProductBySlug(slug: string): Promise<any> {
+  async getProductBySlug(
+    slug: string,
+    opts?: { storeId?: number },
+  ): Promise<any> {
     try {
-      const response = await api.get(`${PRODUCTS_BASE}/${encodeURIComponent(slug)}/`);
+      const params =
+        opts?.storeId != null && Number.isFinite(Number(opts.storeId))
+          ? { store_id: Number(opts.storeId) }
+          : undefined;
+      const response = await api.get(`${PRODUCTS_BASE}/${encodeURIComponent(slug)}/`, {
+        params,
+      });
       const d = response.data;
       if (d && typeof d === "object" && !Array.isArray(d)) {
         if ("success" in d && d.success && d.data != null) return d.data;
@@ -649,6 +658,116 @@ export function resolveProductImageUrl(item: Record<string, unknown> | null | un
   }
 
   return "/placeholder.svg";
+}
+
+/**
+ * Thumbnail for PDP size-variant chips — uses variant image fields when present, else product hero.
+ */
+export function resolveVariantChipImageUrl(
+  variant: Record<string, unknown> | null | undefined,
+  product: Record<string, unknown> | null | undefined,
+): string {
+  if (variant == null) return resolveProductImageUrl(product ?? {});
+  const direct =
+    (typeof variant.primary_image === "string" && variant.primary_image.trim()
+      ? variant.primary_image
+      : null) ||
+    (typeof variant.image === "string" && variant.image.trim() ? variant.image : null) ||
+    (typeof variant.thumbnail === "string" && variant.thumbnail.trim()
+      ? variant.thumbnail
+      : null) ||
+    (typeof variant.thumbnail_url === "string" && variant.thumbnail_url.trim()
+      ? variant.thumbnail_url
+      : null);
+  if (direct) {
+    return resolveProductImageUrl({ primary_image: direct } as Record<string, unknown>);
+  }
+  return resolveProductImageUrl(product ?? {});
+}
+
+/** One slide in the catalog PDP image carousel (main + thumbnails). */
+export type CatalogPdpGallerySlide = { src: string; alt: string };
+
+/**
+ * Build PDP gallery slides: selected variant `image` when set (only that variant — never
+ * other variants’ images), then product `primary_image`, then `images[]`. Deduplicates by resolved URL.
+ */
+export function buildCatalogPdpGalleryImages(
+  product: Record<string, unknown> | null | undefined,
+  selectedVariant: Record<string, unknown> | null | undefined,
+): CatalogPdpGallerySlide[] {
+  if (product == null) {
+    return [{ src: "/placeholder.svg", alt: "Product" }];
+  }
+  const productName = String(product.name ?? "Product");
+  const slides: CatalogPdpGallerySlide[] = [];
+  const seen = new Set<string>();
+
+  const pushRaw = (url: unknown, alt: string) => {
+    const raw = url != null ? String(url).trim() : "";
+    if (!raw) return;
+    const src = resolveProductImageUrl({ primary_image: raw } as Record<string, unknown>);
+    if (!src || src === "/placeholder.svg" || seen.has(src)) return;
+    seen.add(src);
+    slides.push({ src, alt });
+  };
+
+  const variantsRaw = product.variants;
+  const sizeVariants = Array.isArray(variantsRaw)
+    ? (variantsRaw as unknown[]).filter((v: any) => {
+        if (v?.is_active === false) return false;
+        const t = String(v?.variant_type ?? "size").toLowerCase();
+        return t === "size";
+      })
+    : [];
+  const sortedVariants = [...sizeVariants].sort(
+    (a: any, b: any) => (Number(a?.display_order) || 0) - (Number(b?.display_order) || 0),
+  );
+  const selId = selectedVariant?.id != null ? selectedVariant.id : null;
+  const selectedRow =
+    selId != null
+      ? sortedVariants.find((v: any) => String(v?.id) === String(selId))
+      : null;
+
+  let primaryPushed = false;
+  const selIm =
+    selectedRow && (selectedRow as any).image != null
+      ? String((selectedRow as any).image ?? "").trim()
+      : "";
+  if (selIm) {
+    pushRaw(selIm, `${productName} – ${String((selectedRow as any).name || "Variant")}`);
+  } else {
+    pushRaw(product.primary_image, productName);
+    primaryPushed = true;
+  }
+
+  if (!primaryPushed) {
+    pushRaw(product.primary_image, productName);
+  }
+
+  const imgs = product.images;
+  if (Array.isArray(imgs)) {
+    const sortedImgs = [...imgs].sort(
+      (a: any, b: any) => (Number(a?.display_order) || 0) - (Number(b?.display_order) || 0),
+    );
+    for (const img of sortedImgs) {
+      pushRaw((img as any)?.image, String((img as any)?.alt_text || productName));
+    }
+  }
+
+  if (slides.length === 0) {
+    slides.push({ src: "/placeholder.svg", alt: productName });
+  }
+  return slides;
+}
+
+/** PDP rupee string — avoids rounding fractional prices (e.g. 0.8 → ₹1). */
+export function formatRupeePdpAmount(n: number): string {
+  if (!Number.isFinite(n)) return "0";
+  const r = Math.round(n * 100) / 100;
+  if (Math.abs(r - Math.round(r)) < 1e-9) return String(Math.round(r));
+  const s = r.toFixed(2);
+  return s.replace(/0+$/, "").replace(/\.$/, "");
 }
 
 /**

@@ -32,14 +32,43 @@ function parseLatLng(coords: string): { lat: number; lng: number } | null {
   return { lat, lng };
 }
 
+/**
+ * Unwrap common API envelopes: `{ eligible, store, zone }`, `{ data: { ... } }`,
+ * `{ success, message, data: { eligible, store, zone } }`, etc.
+ */
+function peelCheckZonePayload(raw: unknown): Record<string, unknown> {
+  let cur: unknown = raw;
+  for (let i = 0; i < 5; i++) {
+    if (cur == null || typeof cur !== "object") return {};
+    const rec = cur as Record<string, unknown>;
+    const hasZoneShape =
+      typeof rec.eligible === "boolean" ||
+      rec.store != null ||
+      rec.zone != null;
+    if (hasZoneShape) return rec;
+    const d = rec.data;
+    if (d != null && typeof d === "object") {
+      cur = d;
+      continue;
+    }
+    return rec;
+  }
+  return {};
+}
+
 function normalizeCheckZonePayload(raw: unknown): CheckSubscriptionZoneResponse {
   const o = raw as Record<string, unknown> | null | undefined;
-  const inner = (o?.data as Record<string, unknown> | undefined) ?? o ?? {};
+  const inner = peelCheckZonePayload(raw);
+  const outerMsg =
+    o && typeof o.message === "string" ? String(o.message).trim() : "";
   return {
     eligible: Boolean(inner.eligible),
     store: inner.store as SubscriptionStoreInfo | undefined,
     zone: inner.zone as SubscriptionZoneInfo | undefined,
-    message: inner.message != null ? String(inner.message) : undefined,
+    message:
+      inner.message != null && String(inner.message).trim()
+        ? String(inner.message)
+        : outerMsg || undefined,
   };
 }
 
@@ -73,7 +102,11 @@ export async function checkSubscriptionZone(
     `${getApiUrl()}/subscriptions/check-zone/`,
     body,
   );
-  return normalizeCheckZonePayload(response.data);
+  const normalized = normalizeCheckZonePayload(response.data);
+  const enriched = await enrichStoreFromZoneIfNeeded(normalized);
+  const { storeService } = await import("./store.service");
+  storeService.syncDailyZoneCheckStore(enriched);
+  return enriched;
 }
 
 /**

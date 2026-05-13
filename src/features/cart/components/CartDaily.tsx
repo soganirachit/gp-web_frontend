@@ -9,7 +9,11 @@ import { useAuth } from '../../../context/AuthContext';
 import { useFeatureTheme } from '../../../context/FeatureThemeContext';
 import { addressService, Address } from '../../../services/address.service';
 import { storeService, storeIsWithinDeliveryRadius } from '../../../services/store.service';
-import { subscriptionCartService } from '../../../services/subscriptionCart.service';
+import {
+  subscriptionCartService,
+  isSubscriptionCartStoreChangeConfirmation,
+  isSubscriptionCartZoneStaleError,
+} from '../../../services/subscriptionCart.service';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow, startOfDay } from 'date-fns';
@@ -28,7 +32,7 @@ import { SEO } from '../../../components/SEO';
 import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
-import { errorMessageFromCatch } from '../../../utils/apiErrorMessage';
+import { errorMessageFromCatch, isCartLineUnavailableMessage } from '../../../utils/apiErrorMessage';
 import {
   extractCartStockApiMessage,
   formatCartStockInlineMessage,
@@ -38,6 +42,7 @@ import { validateGpDailyDeliveryArea } from '../../../services/subscriptionZone.
 import { GpDailyOutOfZoneBanner } from '../../../components/daily/GpDailyOutOfZoneBanner';
 import { UniformPageHeader } from '../../../components/layout/UniformPageHeader';
 import { DELIVERY_DATE_MAX_DAYS_FROM_TODAY } from '../../../constants/deliveryBooking';
+import { pickPrimaryImageUrl } from '../../../utils/pickPrimaryImageUrl';
 import { computeFirstSubscriptionDeliveryDateFromWeekdayInts } from '../../../utils/subscriptionFirstDeliveryDate';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
 import deliveryTruckIcon from "../../../assets/svg/gp_daily svg/delivery_truck.svg";
@@ -565,19 +570,95 @@ const Cart: React.FC = () => {
 
   const [dailyCart, setDailyCart] = useState<import('../../../services/subscriptionCart.service').DailyCart | null>(null);
   const [isLoadingDailyCart, setIsLoadingDailyCart] = useState(true);
+  /** Line failed API (cart item / product not found) — OOS overlay until removed. */
+  const [lineCartStaleByItemId, setLineCartStaleByItemId] = useState<Record<string, boolean>>({});
+  const [subscriptionStoreChangePrompt, setSubscriptionStoreChangePrompt] = useState<{
+    addressId: number;
+    message: string;
+  } | null>(null);
+  const pendingSubscriptionAddressResolveRef = useRef<((ok: boolean) => void) | null>(null);
+  const prevDailyCartStoreIdRef = useRef<number | null | undefined>(undefined);
 
   const refreshDailyCart = useCallback(async () => {
     try {
       setIsLoadingDailyCart(true);
       const cart = await subscriptionCartService.getDailyCart();
       setDailyCart(cart);
+      setLineCartStaleByItemId({});
     } catch (e: unknown) {
+      if (isSubscriptionCartZoneStaleError(e)) {
+        toast.error(e.message, { id: 'sub-cart-zone-stale', duration: 4000 });
+        setDailyCart(null);
+        navigate(`${basePath}/address-selection`, {
+          state: { fromCart: true },
+        });
+        return;
+      }
       toast.error(errorMessageFromCatch(e, 'Failed to fetch daily cart'));
       setDailyCart(null);
     } finally {
       setIsLoadingDailyCart(false);
     }
+  }, [navigate, basePath]);
+
+  const applySubscriptionCartDeliveryAddress = useCallback(
+    async (addressId: number): Promise<boolean> => {
+      try {
+        const raw = await subscriptionCartService.setDeliveryAddress(addressId, false);
+        if (isSubscriptionCartStoreChangeConfirmation(raw)) {
+          const msg =
+            typeof raw.message === 'string' && raw.message.trim()
+              ? raw.message.trim()
+              : `Your delivery address maps to ${raw.new_store?.name ?? 'a different store'}. Continuing will clear items in your daily basket that are not available there.`;
+          return await new Promise<boolean>((resolve) => {
+            pendingSubscriptionAddressResolveRef.current = resolve;
+            setSubscriptionStoreChangePrompt({ addressId, message: msg });
+          });
+        }
+        await refreshDailyCart();
+        return true;
+      } catch (e: unknown) {
+        toast.error(
+          errorMessageFromCatch(e, 'Could not set delivery address for subscription cart.'),
+          { id: `sub-cart-set-address:${addressId}` },
+        );
+        return false;
+      }
+    },
+    [refreshDailyCart],
+  );
+
+  const cancelSubscriptionStoreChange = useCallback(() => {
+    pendingSubscriptionAddressResolveRef.current?.(false);
+    pendingSubscriptionAddressResolveRef.current = null;
+    setSubscriptionStoreChangePrompt(null);
   }, []);
+
+  const confirmSubscriptionStoreChange = useCallback(async () => {
+    const p = subscriptionStoreChangePrompt;
+    if (!p) return;
+    try {
+      const raw = await subscriptionCartService.setDeliveryAddress(p.addressId, true);
+      if (isSubscriptionCartStoreChangeConfirmation(raw)) {
+        toast.error('Could not confirm address change. Try again.', {
+          id: 'sub-cart-store-change-retry',
+        });
+        pendingSubscriptionAddressResolveRef.current?.(false);
+        pendingSubscriptionAddressResolveRef.current = null;
+        setSubscriptionStoreChangePrompt(null);
+        return;
+      }
+      await refreshDailyCart();
+      pendingSubscriptionAddressResolveRef.current?.(true);
+      pendingSubscriptionAddressResolveRef.current = null;
+      setSubscriptionStoreChangePrompt(null);
+    } catch (e: unknown) {
+      toast.error(errorMessageFromCatch(e, 'Could not confirm address change.'));
+      pendingSubscriptionAddressResolveRef.current?.(false);
+      pendingSubscriptionAddressResolveRef.current = null;
+      setSubscriptionStoreChangePrompt(null);
+    }
+  }, [subscriptionStoreChangePrompt, refreshDailyCart]);
 
   useEffect(() => {
     if (!isLoggedIn || !localStorage.getItem('access_token')) return;
@@ -592,22 +673,42 @@ const Cart: React.FC = () => {
       const unit =
         Number(anyIt?.unit_price ?? (p?.current_price ?? p?.sale_price ?? p?.base_price ?? 0));
       const qty = Number.parseFloat(String(anyIt?.quantity ?? 0));
+      const vidRaw = anyIt?.variant_id ?? p?.variant_id;
+      const vid =
+        vidRaw != null && Number.isFinite(Number(vidRaw)) ? Number(vidRaw) : undefined;
+      const vNameRaw = anyIt?.variant_name ?? p?.variant_name;
+      const vName =
+        vNameRaw != null && String(vNameRaw).trim() ? String(vNameRaw).trim() : '';
       return {
         id: String(it.id),
         apiCartItemId: it.id,
         productId: Number(p?.id ?? anyIt?.product_id ?? 0),
         productSlug: String(p?.slug ?? anyIt?.product_slug ?? ''),
         name: String(p?.name ?? anyIt?.product_name ?? 'Product'),
-        image: String(p?.primary_image ?? anyIt?.primary_image ?? ''),
+        image: pickPrimaryImageUrl(p ?? anyIt, 'thumb'),
         price: Number.isFinite(unit) ? unit : 0,
         quantity: Number.isFinite(qty) ? qty : 0,
-        // Fields used by shared Cart UI (gp-store parity) — not provided by daily cart API.
-        variant: null as any,
+        variant:
+          vName && vid != null
+            ? { id: vid, name: vName, final_price: Number.isFinite(unit) ? unit : 0 }
+            : vName
+              ? { id: vid ?? 0, name: vName, final_price: Number.isFinite(unit) ? unit : 0 }
+              : null,
         customizedMessage: undefined as any,
         categorySlug: String(p?.category_slug ?? ''),
       };
     });
   }, [dailyCart]);
+
+  /** Backend may clear lines when store changes — refresh if cart store id changes. */
+  useEffect(() => {
+    const sid = dailyCart?.store_id ?? null;
+    const prev = prevDailyCartStoreIdRef.current;
+    if (prev !== undefined && prev !== sid && sid != null && prev != null) {
+      void refreshDailyCart();
+    }
+    prevDailyCartStoreIdRef.current = sid;
+  }, [dailyCart?.store_id, refreshDailyCart]);
 
   const [defaultAddress, setDefaultAddress] = useState<Address | null>(null);
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
@@ -712,6 +813,11 @@ const Cart: React.FC = () => {
     if (deliveryFrequency === 'Mon-Sat') return weekDays.filter((d) => d !== 'Sun');
     return selectedDays;
   }, [deliveryFrequency, selectedDays, weekDays]);
+
+  const hasStaleDailyLine = useMemo(
+    () => items.some((it) => lineCartStaleByItemId[it.id]),
+    [items, lineCartStaleByItemId],
+  );
 
   const activeDeliveryDayInts = useMemo(() => {
     const map: Record<(typeof weekDays)[number], number> = {
@@ -902,16 +1008,9 @@ const Cart: React.FC = () => {
         ) {
           subscriptionCartAddressSetInFlightRef.current = true;
           try {
-            await subscriptionCartService.setDeliveryAddress(addressId);
-            if (!cancelled) {
+            const applied = await applySubscriptionCartDeliveryAddress(addressId);
+            if (!cancelled && applied) {
               lastSubscriptionCartAddressSetRef.current = addressId;
-              await refreshDailyCart();
-            }
-          } catch (e: unknown) {
-            if (!cancelled) {
-              toast.error(errorMessageFromCatch(e, 'Could not set delivery address for subscription cart.'), {
-                id: `sub-zone:set-address:${addressId}`,
-              });
             }
           } finally {
             subscriptionCartAddressSetInFlightRef.current = false;
@@ -960,7 +1059,7 @@ const Cart: React.FC = () => {
         backupDismiss.id = undefined;
       }
     };
-  }, [isLoggedIn, defaultAddress?.id, refreshDailyCart]);
+  }, [isLoggedIn, defaultAddress?.id, refreshDailyCart, applySubscriptionCartDeliveryAddress]);
 
   useEffect(() => {
     if (!showPromoModal) return;
@@ -1356,9 +1455,17 @@ const Cart: React.FC = () => {
       const storedAddress = localStorage.getItem('selectedDeliveryAddress');
       if (storedAddress) {
         try {
-          setDefaultAddress(JSON.parse(storedAddress));
-          setIsLoadingAddress(false);
-          return;
+          const parsed = JSON.parse(storedAddress);
+          const currentUserId = localStorage.getItem('userId');
+          const addrUserId = parsed?.userId?.toString();
+          if (currentUserId && addrUserId && addrUserId !== currentUserId) {
+            // Stale address from a different user session — discard it
+            localStorage.removeItem('selectedDeliveryAddress');
+          } else {
+            setDefaultAddress(parsed);
+            setIsLoadingAddress(false);
+            return;
+          }
         } catch (_) { }
       }
       try {
@@ -1551,6 +1658,7 @@ const Cart: React.FC = () => {
   const handleQuantityDelta = async (itemId: string, delta: number) => {
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
+    if (lineCartStaleByItemId[itemId]) return;
     if (delta > 0 && lineStockErrorByItemId[itemId]) {
       triggerStockMessageShake(itemId);
       return;
@@ -1558,8 +1666,17 @@ const Cart: React.FC = () => {
     const next = Math.max(1, item.quantity + delta);
     if (next === item.quantity && delta < 0) return;
     try {
-      await subscriptionCartService.addItem(Number(item.productId), next);
+      await subscriptionCartService.addItem(
+        Number(item.productId),
+        next,
+        item.variant?.id && item.variant.id > 0 ? item.variant.id : undefined,
+      );
       await refreshDailyCart();
+      setLineCartStaleByItemId((prev) => {
+        const n = { ...prev };
+        delete n[itemId];
+        return n;
+      });
       setLineStockErrorByItemId((prev) => {
         const n = { ...prev };
         delete n[itemId];
@@ -1572,6 +1689,10 @@ const Cart: React.FC = () => {
       });
     } catch (error: unknown) {
       const apiMessage = extractCartStockApiMessage(error);
+      if (isCartLineUnavailableMessage(apiMessage)) {
+        setLineCartStaleByItemId((prev) => ({ ...prev, [itemId]: true }));
+        return;
+      }
       if (isCartStockOrAvailabilityInlineError(apiMessage)) {
         setLineStockErrorByItemId((prev) => ({
           ...prev,
@@ -1649,6 +1770,10 @@ const Cart: React.FC = () => {
 
   const handleCheckout = async () => {
     if (items.length === 0) { toast.error('Your cart is empty'); return; }
+    if (hasStaleDailyLine) {
+      toast.error('Remove unavailable items from your basket before checkout.');
+      return;
+    }
     if (activeDeliveryDayInts.length === 0) { toast.error('Please select delivery days'); return; }
     if (deliveryFrequency === 'Customize' && activeDeliveryDayInts.length < 3) {
       toast.error('Please select at least 3 days for a 1-week subscription');
@@ -1669,7 +1794,11 @@ const Cart: React.FC = () => {
     // Prereq: set address on daily cart first.
     try {
       setIsProcessingPayment(true);
-      await subscriptionCartService.setDeliveryAddress(Number(defaultAddress.id));
+      const addrOk = await applySubscriptionCartDeliveryAddress(Number(defaultAddress.id));
+      if (!addrOk) {
+        setIsProcessingPayment(false);
+        return;
+      }
       await subscriptionCartService.setDeliveryDays(activeDeliveryDayInts);
       const subscriptionStartDate = format(
         computeFirstSubscriptionDeliveryDateFromWeekdayInts(activeDeliveryDayInts),
@@ -1725,7 +1854,13 @@ const Cart: React.FC = () => {
       });
       return;
     } catch (e: unknown) {
-      toast.error(errorMessageFromCatch(e, 'Checkout failed'));
+      const msg = errorMessageFromCatch(e, 'Checkout failed');
+      if (isCartLineUnavailableMessage(msg)) {
+        toast.error('Remove unavailable items from your basket before checkout.');
+        void refreshDailyCart();
+      } else {
+        toast.error(msg);
+      }
       return;
     } finally {
       setIsProcessingPayment(false);
@@ -1994,12 +2129,34 @@ const Cart: React.FC = () => {
           <div className="space-y-4 px-4 py-4">
             <>
               {/* Product Items */}
-              {items.map((item) => (
+              {items.map((item) => {
+                const lineStale = lineCartStaleByItemId[item.id];
+                return (
                 <div
                   key={item.id}
                   className="relative overflow-hidden rounded-[20px] border border-gray-200 bg-white p-4 shadow-sm"
                 >
-                  <div className="flex items-stretch gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteItem(item.id)}
+                    className="absolute right-4 top-4 z-30 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-red-500 transition-colors hover:bg-gray-200"
+                    aria-label="Remove item"
+                  >
+                    <IoTrashOutline className="h-[15px] w-[15px]" aria-hidden />
+                  </button>
+
+                  {lineStale ? (
+                    <div
+                      className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[1px]"
+                      aria-hidden
+                    >
+                      <p className="text-center text-base font-semibold text-red-600">Out of stock</p>
+                    </div>
+                  ) : null}
+
+                  <div
+                    className={`flex items-stretch gap-3 ${lineStale ? 'pointer-events-none select-none opacity-40' : ''}`}
+                  >
                     <button
                       type="button"
                       onClick={() => navigateToProductDetail(item)}
@@ -2017,28 +2174,20 @@ const Cart: React.FC = () => {
                       />
                     </button>
                     <div className="flex min-h-[5.25rem] min-w-0 flex-1 flex-col">
-                      <div className="flex min-h-0 items-center justify-between gap-2">
+                      <div className="flex min-h-0 items-start gap-2 pr-10">
                         <h3 className="min-w-0 flex-1 pr-1 text-sm font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere]">
                           {item.name}
                           {item.variant?.name && (
                             <span className="font-normal text-gray-600"> ({item.variant.name})</span>
                           )}
                         </h3>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="touch-target-compact flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-red-500 transition-colors hover:bg-gray-200"
-                          aria-label="Remove item"
-                        >
-                          <IoTrashOutline className="h-[15px] w-[15px]" aria-hidden />
-                        </button>
                       </div>
-                      <div className="mt-auto flex w-full min-h-[1.75rem] items-center justify-between gap-2 pt-1">
-                        <span className="min-w-0 flex-1 text-base font-semibold leading-none text-gray-900">
+                      <div className="mt-auto flex w-full min-h-[1.75rem] items-center gap-2 pt-1">
+                        <span className="min-w-0 flex-1 truncate text-base font-semibold leading-none text-gray-900">
                           ₹{Number(item.price).toFixed(2)}
                         </span>
                         <div
-                          className="flex shrink-0 items-center gap-1.5"
+                          className="ml-auto flex shrink-0 items-center gap-1.5"
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => e.stopPropagation()}
                           role="presentation"
@@ -2068,50 +2217,52 @@ const Cart: React.FC = () => {
                     </div>
                   </div>
 
+                  {!lineCartStaleByItemId[item.id] ? (
+                    <>
+                  {/* Bouquet: add message — above first-delivery separator (aligned with cart text column) */}
+                  {isBouquetItem(item) && editingItemId !== item.id && !item.customizedMessage ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingItemId(item.id);
+                        setEditMessage('');
+                      }}
+                      className="touch-target-compact mt-2 ml-[5.25rem] mr-1 inline-flex h-auto w-auto items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold leading-snug hover:bg-[#f1f7f2] sm:ml-24"
+                      style={{ border: `1px solid ${theme.colors.primary}`, color: theme.colors.primary }}
+                    >
+                      <span
+                        className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
+                        style={{ border: `1px solid ${theme.colors.primary}`, color: theme.colors.primary }}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 20 20" fill="none" aria-hidden>
+                          <path d="M10 4.5V15.5M4.5 10H15.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                      </span>
+                      Add custom message
+                    </button>
+                  ) : null}
+
                   <div className="mt-3 border-t border-gray-200 pt-3">
                     <p className="text-sm font-medium text-gray-500">
                       First Delivery: {basketFirstDeliveryLabel}
                     </p>
                   </div>
-                  {/* Bouquet: custom message */}
-                  {isBouquetItem(item) && editingItemId !== item.id && (
-                    item.customizedMessage ? (
-                      <div className="mt-2 flex items-center justify-between gap-3 pl-[5.25rem] pr-1 sm:pl-24">
-                        <p className="min-w-0 flex-1 truncate text-xs leading-snug text-gray-500">
-                          <span className="font-medium text-gray-500">Customized Message:</span>{' '}
-                          {item.customizedMessage}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => handleEditItem(item.id)}
-                          className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-                          aria-label="Edit custom message"
-                        >
-                          <IoCreateOutline className="text-lg" />
-                        </button>
-                      </div>
-                    ) : (
+                  {isBouquetItem(item) && editingItemId !== item.id && item.customizedMessage ? (
+                    <div className="mt-2 flex items-center justify-between gap-3 pl-[5.25rem] pr-1 sm:pl-24">
+                      <p className="min-w-0 flex-1 truncate text-xs leading-snug text-gray-500">
+                        <span className="font-medium text-gray-500">Customized Message:</span>{' '}
+                        {item.customizedMessage}
+                      </p>
                       <button
                         type="button"
-                        onClick={() => {
-                          setEditingItemId(item.id);
-                          setEditMessage('');
-                        }}
-                        className="touch-target-compact mt-2 ml-[5.25rem] mr-1 inline-flex h-auto w-auto items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold leading-snug hover:bg-[#f1f7f2] sm:ml-24"
-                        style={{ border: `1px solid ${theme.colors.primary}`, color: theme.colors.primary }}
+                        onClick={() => handleEditItem(item.id)}
+                        className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100"
+                        aria-label="Edit custom message"
                       >
-                        <span
-                          className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
-                          style={{ border: `1px solid ${theme.colors.primary}`, color: theme.colors.primary }}
-                        >
-                          <svg width="10" height="10" viewBox="0 0 20 20" fill="none" aria-hidden>
-                            <path d="M10 4.5V15.5M4.5 10H15.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                          </svg>
-                        </span>
-                        Add custom message
+                        <IoCreateOutline className="text-lg" />
                       </button>
-                    )
-                  )}
+                    </div>
+                  ) : null}
 
                   {editingItemId === item.id && isBouquetItem(item) && (
                     <div className="mt-2 pl-[5.25rem] pr-1 sm:pl-24 sm:pr-3">
@@ -2151,8 +2302,11 @@ const Cart: React.FC = () => {
                       {lineStockErrorByItemId[item.id]}
                     </p>
                   ) : null}
+                    </>
+                  ) : null}
                 </div>
-              ))}
+              );
+              })}
 
               {/* Select Delivery Days — matches app `CartScreen` (dailyDeliveryCard + chips + warning) */}
               <div className="relative mb-3.5 rounded-2xl bg-white p-3 shadow-sm" style={{ marginLeft: 2, marginRight: 2 }}>
@@ -2384,11 +2538,18 @@ const Cart: React.FC = () => {
                   <div className="flex justify-between text-sm text-gray-700">
                     <span className="inline-flex flex-col gap-0.5">
                       <span>Delivery fee</span>
-                      {deliveryFee === 0 && deliveryAddressId === null && (
+                      {(dailyCart?.zone_id != null ||
+                        subscriptionDeliveryFee != null ||
+                        (dailyCart?.delivery_fee != null &&
+                          String(dailyCart.delivery_fee).trim() !== '')) ? (
+                        <span className="text-[11px] font-normal text-gray-500">
+                          Your zone rate from the subscription cart.
+                        </span>
+                      ) : deliveryFee === 0 && deliveryAddressId === null ? (
                         <span className="text-[11px] font-normal text-gray-400">
                           Confirmed when your delivery address is set on this cart.
                         </span>
-                      )}
+                      ) : null}
                     </span>
                     <span>₹{deliveryFee.toLocaleString('en-IN')}</span>
                   </div>
@@ -2441,6 +2602,7 @@ const Cart: React.FC = () => {
                 onClick={handleCheckout}
                 disabled={
                   isProcessingPayment ||
+                  hasStaleDailyLine ||
                   deliveryBlockedByCoverage ||
                   deliveryBlockedByStoreMismatch ||
                   deliveryStoreOffline
@@ -2492,6 +2654,41 @@ const Cart: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Subscription cart: store change clears incompatible lines — confirm with user */}
+      {subscriptionStoreChangePrompt ? (
+        <div
+          className="fixed inset-0 z-[220] flex items-center justify-center bg-black/45 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="gp-sub-cart-store-change-title"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h2 id="gp-sub-cart-store-change-title" className="text-lg font-semibold text-gray-900">
+              Address changed
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-gray-600 whitespace-pre-wrap">
+              {subscriptionStoreChangePrompt.message}
+            </p>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
+              <button
+                type="button"
+                onClick={() => void confirmSubscriptionStoreChange()}
+                className="rounded-xl bg-gray-900 py-3 text-center text-base font-semibold text-white hover:bg-gray-800"
+              >
+                Continue
+              </button>
+              <button
+                type="button"
+                onClick={cancelSubscriptionStoreChange}
+                className="rounded-xl border border-gray-200 py-3 text-center text-base font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Promo Code Modal */}
       {showPromoModal && (

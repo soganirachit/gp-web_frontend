@@ -15,12 +15,18 @@ import { GuestServiceAreaModal } from "./GuestServiceAreaModal";
 const GP_STORE_SHOPPING_PATHS =
   /^\/gp-store\/?$|^\/gp-store\/products|^\/gp-store\/product\/|^\/gp-store\/explore-more/;
 
-function isGpStoreGuestShoppingPath(pathname: string): boolean {
-  return GP_STORE_SHOPPING_PATHS.test(pathname);
+const GP_DAILY_GUEST_SHOPPING_PATHS =
+  /^\/gp-daily\/?$|^\/gp-daily\/Products|^\/gp-daily\/product\/|^\/gp-daily\/explore-more/i;
+
+function isGuestShoppingPath(pathname: string): boolean {
+  return (
+    GP_STORE_SHOPPING_PATHS.test(pathname) ||
+    GP_DAILY_GUEST_SHOPPING_PATHS.test(pathname)
+  );
 }
 
 /**
- * Logged-out users: on entering GP Store shopping routes, request browser location and
+ * Logged-out users: on entering GP Store / GP Daily shopping routes, request browser location and
  * assign nearest store when in coverage; otherwise open the city picker (mandatory until a city is chosen).
  */
 export const GuestStoreLocationBootstrap: React.FC = () => {
@@ -38,13 +44,13 @@ export const GuestStoreLocationBootstrap: React.FC = () => {
   }, [isLoggedIn]);
 
   useEffect(() => {
-    if (!isGpStoreGuestShoppingPath(pathname)) {
+    if (!isGuestShoppingPath(pathname)) {
       setOpen(false);
     }
   }, [pathname]);
 
   useEffect(() => {
-    if (!isGpStoreGuestShoppingPath(pathname) || isLoggedIn) return;
+    if (!isGuestShoppingPath(pathname) || isLoggedIn) return;
     if (storeService.getTemporaryStoreId()) return;
     if (inFlightRef.current) return;
 

@@ -38,69 +38,159 @@ const MyOrders: React.FC = () => {
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [visibleCount, setVisibleCount] = useState(ORDER_LIST_PAGE_SIZE);
+  const [nextPageUrl, setNextPageUrl] = useState<string | null>(null);
+  /** Max filtered rows to show; steps by 6 per “Load more” (6 → 12 → 18 …). */
+  const [displayLimit, setDisplayLimit] = useState(ORDER_LIST_PAGE_SIZE);
+
+  const subscriptionListOnly = feature === "gpDaily";
 
   useEffect(() => {
     void fetchOrders();
   }, [feature]);
 
   useEffect(() => {
-    setVisibleCount(ORDER_LIST_PAGE_SIZE);
+    setDisplayLimit(ORDER_LIST_PAGE_SIZE);
   }, [searchQuery]);
+
+  const mapRawToOrders = (fetchedOrders: any[]): Order[] =>
+    fetchedOrders.map((order: any) => ({
+      id: order.id?.toString() || order.order_number || Math.random().toString(),
+      order_number: order.order_number || `Order #${order.id}`,
+      order_type: String(order.order_type ?? order.orderType ?? "").trim() || undefined,
+      status: order.status || "pending",
+      createdAt: order.created_at || order.createdAt || new Date().toISOString(),
+      deliveryDate: order.delivery_date || order.deliveryDate,
+      deliveryTime: order.delivery_time_slot || order.deliveryTime,
+      total_amount: order.total_amount || order.total || "0",
+      preview_image: order.preview_image || null,
+      product: {
+        name: order.order_number || "Order",
+        image: order.preview_image ? [order.preview_image] : [],
+        imagesUrl: order.preview_image ? [order.preview_image] : [],
+        price: parseFloat(order.total_amount || order.total || "0"),
+        sellingPrice: parseFloat(order.total_amount || order.total || "0"),
+      },
+      quantity: order.items_count || 1,
+    }));
+
+  const filterOrdersForFeature = (sorted: Order[]): Order[] => {
+    const isSubscriptionRow = (o: Order) =>
+      String(o.order_type || "").toLowerCase() === "subscription";
+    return subscriptionListOnly
+      ? sorted.filter((o) => isSubscriptionRow(o))
+      : sorted.filter((o) => !isSubscriptionRow(o));
+  };
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const fetchedOrders = await orderService.getOrders(
-        feature === "gpDaily" ? { order_type: "subscription" } : undefined,
+      setNextPageUrl(null);
+      const { orders: raw, nextUrl } = await orderService.getOrdersFirstPage(
+        subscriptionListOnly ? { order_type: "subscription" } : undefined,
       );
-      if (fetchedOrders && fetchedOrders.length > 0) {
-        // Transform API orders to match the component's Order interface
-        const transformedOrders: Order[] = fetchedOrders.map((order: any) => {
-          // Use the new API response structure with order_number, total_amount, and preview_image
-          return {
-            id: order.id?.toString() || order.order_number || Math.random().toString(),
-            order_number: order.order_number || `Order #${order.id}`,
-            order_type: String(order.order_type ?? order.orderType ?? '').trim() || undefined,
-            status: order.status || 'pending',
-            createdAt: order.created_at || order.createdAt || new Date().toISOString(),
-            deliveryDate: order.delivery_date || order.deliveryDate,
-            deliveryTime: order.delivery_time_slot || order.deliveryTime,
-            total_amount: order.total_amount || order.total || '0',
-            preview_image: order.preview_image || null,
-            product: {
-              name: order.order_number || 'Order',
-              image: order.preview_image ? [order.preview_image] : [],
-              imagesUrl: order.preview_image ? [order.preview_image] : [],
-              price: parseFloat(order.total_amount || order.total || '0'),
-              sellingPrice: parseFloat(order.total_amount || order.total || '0'),
-            },
-            quantity: order.items_count || 1,
-          };
-        });
-
-        // Sort by newest first
-        const sortedOrders = transformedOrders.sort((a: Order, b: Order) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      const transformedOrders = mapRawToOrders(raw || []);
+      const sortedOrders = transformedOrders.sort(
+        (a: Order, b: Order) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+      let merged = filterOrdersForFeature(sortedOrders);
+      let url = nextUrl;
+      let prefetchGuard = 0;
+      while (
+        merged.length < ORDER_LIST_PAGE_SIZE &&
+        url &&
+        prefetchGuard < 25
+      ) {
+        prefetchGuard += 1;
+        const { orders: raw2, nextUrl: n } = await orderService.getOrdersNextPage(
+          url,
+          subscriptionListOnly,
         );
-        /** GP Store: hide subscription fulfilments. GP Daily: only subscription rows (list API may still return mixed types). */
-        const isSubscriptionRow = (o: Order) =>
-          String(o.order_type || '').toLowerCase() === 'subscription';
-        const listOrders =
-          feature === 'gpStore'
-            ? sortedOrders.filter((o) => !isSubscriptionRow(o))
-            : sortedOrders.filter((o) => isSubscriptionRow(o));
-        setOrders(listOrders);
-      } else {
-        setOrders([]);
+        url = n;
+        const batch = filterOrdersForFeature(
+          mapRawToOrders(raw2 || []).sort(
+            (a: Order, b: Order) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          ),
+        );
+        merged = [...merged, ...batch].sort(
+          (a: Order, b: Order) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
       }
+      setOrders(merged);
+      setNextPageUrl(url);
     } catch (error) {
       console.error("Failed to fetch orders", error);
       setOrders([]);
+      setNextPageUrl(null);
     } finally {
-      setVisibleCount(ORDER_LIST_PAGE_SIZE);
+      setDisplayLimit(ORDER_LIST_PAGE_SIZE);
       setLoading(false);
+    }
+  };
+
+  const filterBySearch = (list: Order[], q: string): Order[] => {
+    const ql = q.toLowerCase();
+    return list.filter(
+      (order) =>
+        (order.order_number || "").toLowerCase().includes(ql) ||
+        (order.product?.name || "").toLowerCase().includes(ql),
+    );
+  };
+
+  const handleLoadMore = async () => {
+    if (loadingMore) return;
+
+    const filteredNow = filterBySearch(orders, searchQuery);
+    const shown = Math.min(displayLimit, filteredNow.length);
+    const nextTarget = shown + ORDER_LIST_PAGE_SIZE;
+
+    if (nextTarget <= filteredNow.length) {
+      setDisplayLimit(nextTarget);
+      return;
+    }
+
+    if (!nextPageUrl) return;
+
+    setLoadingMore(true);
+    try {
+      let merged = orders;
+      let url: string | null = nextPageUrl;
+      let fetchGuard = 0;
+      while (url && fetchGuard < 25) {
+        fetchGuard += 1;
+        const len = filterBySearch(merged, searchQuery).length;
+        if (len >= nextTarget) break;
+
+        const { orders: raw, nextUrl } = await orderService.getOrdersNextPage(
+          url,
+          subscriptionListOnly,
+        );
+        url = nextUrl;
+        const batch = filterOrdersForFeature(
+          mapRawToOrders(raw || []).sort(
+            (a: Order, b: Order) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          ),
+        );
+        merged = [...merged, ...batch].sort(
+          (a: Order, b: Order) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+        setOrders(merged);
+        setNextPageUrl(nextUrl);
+        if (!nextUrl) break;
+      }
+
+      const finalLen = filterBySearch(merged, searchQuery).length;
+      setDisplayLimit(Math.min(nextTarget, finalLen));
+    } catch (error) {
+      console.error("Failed to load more orders", error);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -139,8 +229,9 @@ const MyOrders: React.FC = () => {
         .includes(searchQuery.toLowerCase()),
   );
 
-  const visibleOrders = filteredOrders.slice(0, visibleCount);
-  const hasMoreOrders = visibleCount < filteredOrders.length;
+  const visibleOrders = filteredOrders.slice(0, displayLimit);
+  const canRevealMoreLocally = displayLimit < filteredOrders.length;
+  const showLoadMore = canRevealMoreLocally || Boolean(nextPageUrl);
 
   if (loading) {
     return (
@@ -264,14 +355,14 @@ const MyOrders: React.FC = () => {
                 );
               })}
 
-              {hasMoreOrders && (
+              {showLoadMore && (
                 <button
-                  className="w-full py-4 text-center text-gray-500 font-medium underline"
-                  onClick={() =>
-                    setVisibleCount((prev) => prev + ORDER_LIST_PAGE_SIZE)
-                  }
+                  type="button"
+                  className="w-full py-4 text-center text-gray-500 font-medium underline disabled:opacity-50"
+                  disabled={loadingMore}
+                  onClick={() => void handleLoadMore()}
                 >
-                  Load More
+                  {loadingMore ? "Loading…" : "Load More"}
                 </button>
               )}
             </div>

@@ -10,7 +10,7 @@ import WalletImage from "../../assets/icon/Wallet.png";
 import ProfileImage from "../../assets/icon/Profile.png";
 import logo from "../../assets/All/logo.png";
 import { ProductDetailSkeleton } from "../common/PageSkeletons";
-import { IoArrowBack } from "react-icons/io5";
+import { IoArrowBack, IoCartOutline } from "react-icons/io5";
 import { FaChevronRight, FaMinus, FaPlus } from "react-icons/fa";
 import {
   productService,
@@ -18,6 +18,8 @@ import {
   getBasePrice,
   showStrikeBaseOnCard,
   PRODUCT_AVAILABILITY_STORE,
+  formatRupeePdpAmount,
+  buildCatalogPdpGalleryImages,
 } from "../../services/product.service";
 import DatePicker from "react-datepicker";
 import clockIcon from "../../assets/svg/gp_store_svg/clock.svg";
@@ -154,6 +156,10 @@ const StorePage: React.FC = () => {
   useEffect(() => {
     selectedImageIndexRef.current = selectedImageIndex;
   }, [selectedImageIndex]);
+
+  useEffect(() => {
+    setSelectedImageIndex(0);
+  }, [selectedVariant?.id]);
 
   const activeCartLine = useMemo(() => {
     if (!product) return null;
@@ -295,12 +301,23 @@ const StorePage: React.FC = () => {
 
   const getPriceDisplay = () => {
     if (!product) return { price: 0, originalPrice: 0, savings: 0, discountPercentage: 0, showStrike: false };
-    // Use current_price / effective_price from API — never compute price on frontend
-    const price = selectedVariant
-      ? (selectedVariant.final_price ?? (parseFloat(product.effective_price) || product.current_price))
-      : (parseFloat(product.effective_price) || product.current_price);
-    const originalPrice = parseFloat(product.base_price) || 0;
-    // Prefer API discount_percentage when available (covers offers + sale); always whole % for display.
+    let price: number;
+    let originalPrice: number;
+    if (selectedVariant) {
+      const sv = selectedVariant as Record<string, unknown>;
+      const rawSale = sv.final_price ?? sv.price ?? sv.sale_price ?? sv.current_price;
+      price = Number(rawSale);
+      if (!Number.isFinite(price)) {
+        price = parseFloat(String(product.effective_price)) || Number(product.current_price) || 0;
+      }
+      const rawOrig = sv.base_price ?? sv.list_price ?? sv.mrp ?? sv.original_price;
+      const vo = rawOrig != null ? parseFloat(String(rawOrig)) : NaN;
+      originalPrice =
+        Number.isFinite(vo) && vo > 0 ? vo : parseFloat(String(product.base_price)) || 0;
+    } else {
+      price = parseFloat(String(product.effective_price)) || Number(product.current_price) || 0;
+      originalPrice = parseFloat(String(product.base_price)) || 0;
+    }
     const rawDiscountPct =
       product.discount_percentage != null && product.discount_percentage >= 0
         ? Number(product.discount_percentage)
@@ -310,8 +327,14 @@ const StorePage: React.FC = () => {
     const discountPercentage = Math.round(
       Math.min(100, Math.max(0, Number.isFinite(rawDiscountPct) ? rawDiscountPct : 0)),
     );
-    const showStrike = discountPercentage > 0;
-    const savings = originalPrice - price;
+    if (discountPercentage > 0 && price > 0 && originalPrice <= price) {
+      const inferred = price / (1 - discountPercentage / 100);
+      if (Number.isFinite(inferred) && inferred > price) {
+        originalPrice = Math.ceil(inferred);
+      }
+    }
+    const showStrike = originalPrice > price && price >= 0;
+    const savings = Math.max(0, originalPrice - price);
     return { price, originalPrice, savings, discountPercentage, showStrike };
   };
   
@@ -349,53 +372,52 @@ const StorePage: React.FC = () => {
     return "/placeholder.svg";
   };
   const createStoreOrder = async () => {
-    try {
-      if (!product) {
-        toast.error("Product information not available", {
-          id: "Product information not available",
-        });
-        return;
-      }
-      
-      if (!isLoggedIn) return;
-
-      const { price } = getPriceDisplay();
-      
-      // Get product image
-      const productImage = getProductImage();
-      
-      // Add to cart (works for both logged-in and logged-out users)
-      // variant.id is used for variant_id in cart add API
-      try {
-        await addToCart({
-          productId: product.id,
-          productSlug: product.slug,
-          name: product.name,
-          image: productImage,
-          price: price,
-          quantity: 1,
-          variant: selectedVariant ? {
-            id: selectedVariant.id,
-            name: selectedVariant.name,
-            final_price: selectedVariant.final_price,
-          } : null,
-          categorySlug: product.category_slug,
-          customizedMessage: product.category_slug?.toLowerCase().includes('bouquet') ? (customMessage || undefined) : undefined,
-        });
-        
-        toast.success("Product added to basket!", { id: "Product added to basket!" });
-        trackAddToCart({ id: product.id, name: product.name, price, quantity: 1 });
-      } catch (error) {
-        console.error("Error adding to cart:", error);
-        toast.error("Failed to add product to basket. Please try again.", {
-          id: "Failed to add product to basket. Please try again.",
-        });
-      }
-    } catch (error) {
-      console.error("Error adding to cart:", error);
-      toast.error("Failed to add product to basket. Please try again.", {
-        id: "Failed to add product to basket. Please try again.",
+    if (!product) {
+      toast.error("Product information not available", {
+        id: "Product information not available",
       });
+      return;
+    }
+
+    if (!isLoggedIn) return;
+
+    const { price } = getPriceDisplay();
+    const productImage = getProductImage();
+
+    try {
+      await addToCart({
+        productId: product.id,
+        productSlug: product.slug,
+        name: product.name,
+        image: productImage,
+        price: price,
+        quantity: 1,
+        variant: selectedVariant
+          ? {
+              id: selectedVariant.id,
+              name: selectedVariant.name,
+              final_price: selectedVariant.final_price,
+            }
+          : null,
+        categorySlug: product.category_slug,
+        customizedMessage: product.category_slug?.toLowerCase().includes("bouquet")
+          ? customMessage || undefined
+          : undefined,
+      });
+
+      toast.success("Product added to basket!", { id: "Product added to basket!" });
+      trackAddToCart({ id: product.id, name: product.name, price, quantity: 1 });
+    } catch (error: unknown) {
+      console.error("Error adding to cart:", error);
+      const apiMessage = extractCartStockApiMessage(error);
+      if (isCartStockOrAvailabilityInlineError(apiMessage)) {
+        setStockLimitMessage(formatCartStockInlineMessage(apiMessage));
+      } else {
+        const msg =
+          apiMessage.trim() ||
+          errorMessageFromCatch(error, "Failed to add product to basket. Please try again.");
+        toast.error(msg, { id: msg.length > 100 ? msg.slice(0, 100) : msg });
+      }
     }
   };
 
@@ -447,7 +469,14 @@ const StorePage: React.FC = () => {
       }
       setIsCheckingBalance(true);
       const minDays = 7;
-      const pricePerPack = parseFloat(product.effective_price) || product.current_price;
+      const sv = selectedVariant as { final_price?: string | number } | null;
+      let pricePerPack: number;
+      if (sv && sv.final_price != null && String(sv.final_price).trim() !== "") {
+        const n = Number(sv.final_price);
+        pricePerPack = Number.isFinite(n) ? n : parseFloat(String(product.effective_price)) || Number(product.current_price) || 0;
+      } else {
+        pricePerPack = parseFloat(String(product.effective_price)) || Number(product.current_price) || 0;
+      }
       const checkoutQuantity = basketQuantity > 0 ? basketQuantity : 1;
       const totalPrice = pricePerPack * minDays * checkoutQuantity;
       const { balance } = (await walletService.getWalletBalance()) || {};
@@ -514,26 +543,11 @@ const StorePage: React.FC = () => {
   // API often sets primary_image and also lists extra files only under images[] — using only one source hides photos.
   const orderedImages = useMemo(() => {
     if (!product) return [];
-    const list: { src: string; alt: string }[] = [];
-    const seen = new Set<string>();
-    const push = (src: string | null | undefined, alt: string) => {
-      const u = src != null ? String(src).trim() : '';
-      if (!u || seen.has(u)) return;
-      seen.add(u);
-      list.push({ src: u, alt });
-    };
-    push(product.primary_image, product.name);
-    if (product.images?.length) {
-      const sorted = [...product.images].sort(
-        (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0),
-      );
-      sorted.forEach((img) => push(img.image, img.alt_text || product.name));
-    }
-    if (list.length === 0) {
-      list.push({ src: '/placeholder.svg', alt: product.name });
-    }
-    return list;
-  }, [product]);
+    return buildCatalogPdpGalleryImages(
+      product as unknown as Record<string, unknown>,
+      selectedVariant as Record<string, unknown> | null,
+    );
+  }, [product, selectedVariant]);
 
   const goToGalleryImage = (idx: number) => {
     if (idx === selectedImageIndex) return;
@@ -849,10 +863,10 @@ const StorePage: React.FC = () => {
 
           {/* Offer price first, then struck MRP when discounted */}
           <div className="mt-4 flex items-center gap-3 flex-wrap">
-            <span className="text-2xl font-bold text-gray-900">₹{getPriceDisplay().price}</span>
+            <span className="text-2xl font-bold text-gray-900">₹{formatRupeePdpAmount(getPriceDisplay().price)}</span>
             {getPriceDisplay().showStrike && (
               <span className="text-xl font-medium text-gray-500 line-through">
-                ₹{getPriceDisplay().originalPrice.toFixed(0)}
+                ₹{formatRupeePdpAmount(getPriceDisplay().originalPrice)}
               </span>
             )}
           </div>
@@ -891,33 +905,49 @@ const StorePage: React.FC = () => {
               </div>
               <div className="overflow-x-auto pb-2 -mx-1 no-scrollbar">
                 <div className="flex gap-3 min-w-max">
-                {getActiveVariants().map((variant: any) => (
+                {getActiveVariants().map((variant: any) => {
+                  const chipSale = Number(
+                    variant.final_price ??
+                      variant.price ??
+                      variant.sale_price ??
+                      variant.current_price,
+                  );
+                  const vt = String(variant.variant_type || "size").toLowerCase();
+                  const subLabel =
+                    vt === "size"
+                      ? "Size"
+                      : formatProductTitleCase(String(variant.variant_type || "Size"));
+                  const selected = selectedVariant?.id === variant.id;
+                  return (
                   <button
                     key={variant.id}
+                    type="button"
                     onClick={() => {
                       setStockLimitMessage(null);
                       setSelectedVariant(variant);
                     }}
-                    className={`flex min-h-0 flex-col items-center justify-center gap-1 px-3 py-2 text-center rounded-xl border-2 transition-all flex-shrink-0 ${
-                      selectedVariant?.id === variant.id
-                        ? 'bg-[#E6F4EA] border-[#19411F]'
-                        : 'bg-white border-gray-200'
+                    className={`flex min-h-[5.5rem] min-w-[108px] flex-shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 px-3 py-3 text-center transition-all ${
+                      selected
+                        ? "border-[#19411F] bg-[#E6F4EA]"
+                        : "border-gray-200 bg-white"
                     }`}
-                    style={{ minWidth: '108px' }}
                   >
-                    <span className={`text-sm font-semibold leading-tight ${
-                      selectedVariant?.id === variant.id ? 'text-[#19411F]' : 'text-gray-900'
-                    }`}>
-                      {formatProductTitleCase(String(variant.name ?? ''))}
+                    <span
+                      className={`text-sm font-semibold leading-tight ${
+                        selected ? "text-[#19411F]" : "text-gray-900"
+                      }`}
+                    >
+                      {formatProductTitleCase(String(variant.name ?? ""))}
+                    </span>
+                    <span className="text-xs font-medium leading-none text-gray-500">
+                      {subLabel}
                     </span>
                     <span className="text-base font-bold leading-tight text-gray-900">
-                      ₹{variant.final_price}
+                      ₹{formatRupeePdpAmount(Number.isFinite(chipSale) ? chipSale : 0)}
                     </span>
-                    {/* <span className="text-xs leading-tight text-gray-600">
-                      {formatProductTitleCase(getVariantDescription(variant))}
-                    </span> */}
                   </button>
-                ))}
+                  );
+                })}
                 </div>
               </div>
             </div>
@@ -990,6 +1020,15 @@ const StorePage: React.FC = () => {
                   </button>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => navigate(`${basePath}/basket`)}
+                className="mt-3.5 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#19411F] px-5 py-3.5 text-base font-bold text-white transition-colors hover:bg-[#1e5a1c] active:scale-[0.99]"
+              >
+                <IoCartOutline className="text-xl shrink-0" aria-hidden />
+                View basket
+                <FaChevronRight className="text-sm opacity-90" aria-hidden />
+              </button>
               {stockLimitMessage && (
                 <p
                   key={pdpStockShakeNonce}

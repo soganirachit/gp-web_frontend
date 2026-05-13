@@ -1,3 +1,5 @@
+import { errorMessageFromParsedBody } from "../utils/apiErrorMessage";
+
 class HeaderService {
     getHeaders() {
         const token = localStorage.getItem('access_token');
@@ -25,7 +27,11 @@ class HeaderService {
         }
 
         if (error.response?.status === 404) {
-            throw new Error('Address not found.');
+            const fromBody = errorMessageFromParsedBody(error.response?.data, "");
+            if (fromBody.trim()) {
+                throw new Error(fromBody);
+            }
+            throw new Error("Not found.");
         }
 
         throw new Error(error.response?.data?.message || error.message || 'An error occurred while processing your request.');

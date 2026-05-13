@@ -24,6 +24,31 @@ function extractOrderListPayload(data: unknown): any[] {
   return [];
 }
 
+function extractNextOrderListUrl(data: unknown): string | null {
+    const next =
+        typeof (data as { next?: unknown })?.next === "string" &&
+        String((data as { next: string }).next).trim()
+            ? String((data as { next: string }).next).trim()
+            : null;
+    return next || null;
+}
+
+function parseOrderListPage(data: unknown): { items: any[]; nextUrl: string | null } {
+    return {
+        items: extractOrderListPayload(data),
+        nextUrl: extractNextOrderListUrl(data),
+    };
+}
+
+function keepSubscriptionOrderRows(list: any[], subscriptionOnly: boolean): any[] {
+    return subscriptionOnly
+        ? list.filter(
+              (o) =>
+                  String(o?.order_type ?? "").toLowerCase() === "subscription",
+          )
+        : list;
+}
+
 /** Follow DRF `next` until exhausted (matches mobile `order.service`). */
 async function fetchAllOrderPages(
     params?: Record<string, string>,
@@ -39,19 +64,27 @@ async function fetchAllOrderPages(
         );
         firstParams = undefined;
 
-        const data = response.data;
-        const list = extractOrderListPayload(data);
-        all.push(...list);
+        const { items, nextUrl } = parseOrderListPage(response.data);
+        all.push(...items);
 
-        const next =
-            typeof (data as any)?.next === "string" &&
-            (data as any).next.trim()
-                ? String((data as any).next).trim()
-                : null;
-        if (!next) break;
-        url = next;
+        if (!nextUrl) break;
+        url = nextUrl;
     }
     return all;
+}
+
+function buildOrderListQueryParams(
+    statusOrFilters?: string | { status?: string; order_type?: string },
+): Record<string, string> {
+    const params: Record<string, string> = {};
+    if (typeof statusOrFilters === "string") {
+        if (statusOrFilters) params.status = statusOrFilters;
+    } else if (statusOrFilters && typeof statusOrFilters === "object") {
+        if (statusOrFilters.status) params.status = statusOrFilters.status;
+        if (statusOrFilters.order_type)
+            params.order_type = statusOrFilters.order_type;
+    }
+    return params;
 }
 
 class OrderService {
@@ -172,35 +205,63 @@ class OrderService {
         statusOrFilters?: string | { status?: string; order_type?: string },
     ): Promise<any[]> {
         try {
-            const params: Record<string, string> = {};
-            if (typeof statusOrFilters === "string") {
-                if (statusOrFilters) params.status = statusOrFilters;
-            } else if (statusOrFilters && typeof statusOrFilters === "object") {
-                if (statusOrFilters.status) params.status = statusOrFilters.status;
-                if (statusOrFilters.order_type)
-                    params.order_type = statusOrFilters.order_type;
-            }
+            const params = buildOrderListQueryParams(statusOrFilters);
             const query = Object.keys(params).length ? params : undefined;
             const rawList = await fetchAllOrderPages(query);
-
             const subscriptionOnly =
                 String(params.order_type ?? "").toLowerCase() === "subscription";
-            const keepSubscriptionRows = (list: any[]) =>
-                subscriptionOnly
-                    ? list.filter(
-                          (o) =>
-                              String(o?.order_type ?? "").toLowerCase() ===
-                              "subscription",
-                      )
-                    : list;
-
-            return keepSubscriptionRows(rawList);
+            return keepSubscriptionOrderRows(rawList, subscriptionOnly);
         } catch (error: any) {
             console.error('Error fetching orders:', error);
             return [];
         }
     }
 
+    /**
+     * First page of `GET /orders/` only. Use {@link getOrdersNextPage} with the returned
+     * `nextUrl` when the user taps “Load more” (avoids requesting every page up front).
+     */
+    async getOrdersFirstPage(
+        statusOrFilters?: string | { status?: string; order_type?: string },
+    ): Promise<{ orders: any[]; nextUrl: string | null }> {
+        try {
+            const params = buildOrderListQueryParams(statusOrFilters);
+            const sanitized = sanitizeOrderListParams(
+                Object.keys(params).length ? params : undefined,
+            );
+            const response = await api.get(
+                `${getApiUrl()}/orders/`,
+                sanitized ? { params: sanitized } : undefined,
+            );
+            const { items, nextUrl } = parseOrderListPage(response.data);
+            const subscriptionOnly =
+                String(params.order_type ?? "").toLowerCase() === "subscription";
+            return {
+                orders: keepSubscriptionOrderRows(items, subscriptionOnly),
+                nextUrl,
+            };
+        } catch (error: any) {
+            console.error("Error fetching orders (first page):", error);
+            return { orders: [], nextUrl: null };
+        }
+    }
+
+    async getOrdersNextPage(
+        nextUrl: string,
+        subscriptionOnly: boolean,
+    ): Promise<{ orders: any[]; nextUrl: string | null }> {
+        try {
+            const response = await api.get(nextUrl);
+            const { items, nextUrl: next } = parseOrderListPage(response.data);
+            return {
+                orders: keepSubscriptionOrderRows(items, subscriptionOnly),
+                nextUrl: next,
+            };
+        } catch (error: any) {
+            console.error("Error fetching orders (next page):", error);
+            return { orders: [], nextUrl: null };
+        }
+    }
 
     async cancelOrder(orderId: string) {
         try {

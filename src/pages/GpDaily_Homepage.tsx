@@ -21,6 +21,7 @@ import {
   computeGpDailyOrderOnHold,
 } from "../utils/gpDailyWalletHold";
 import { storeService } from "../services/store.service";
+import { resolveGpDailyCatalogStoreId } from "../utils/gpDailyCatalogStore";
 import type { Product as ProductType } from "../services/product.service";
 import { addressService } from "../services/address.service";
 import { validateGpDailyDeliveryAreaFromCoordinates } from "../services/subscriptionZone.service";
@@ -235,8 +236,8 @@ const Home2: React.FC = () => {
           }
         }
       }
-      const storeId = storeService.getStoreIdForProducts();
-      const sid = storeId || undefined;
+      const catalogSid = await resolveGpDailyCatalogStoreId();
+      const sid = catalogSid || undefined;
 
       const [rawAll, rawPuja, rawExotic] = await Promise.all([
         productService.getAllProductsPaged({
@@ -485,7 +486,13 @@ const Home2: React.FC = () => {
   };
 
   const handleLocationClick = () => {
-    navigate(`${basePath}/addresses`);
+    if (!isLoggedIn) {
+      navigate(`${basePath}/login`, {
+        state: { returnUrl: `${basePath}/address-selection` },
+      });
+      return;
+    }
+    navigate(`${basePath}/address-selection`, { state: { fromHome: true } });
   };
 
   // Helper function to get image URL (handles both string and array)
@@ -865,7 +872,7 @@ const Home2: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => navigate(`${basePath}/wallet`)}
-                    className="inline-flex min-w-[130px] items-center justify-center self-start rounded-xl border-2 border-white px-[18px] py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+                    className="ml-10 inline-flex min-w-[130px] items-center justify-center self-start rounded-xl border-2 border-white px-[18px] py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
                   >
                     Recharge Now
                   </button>

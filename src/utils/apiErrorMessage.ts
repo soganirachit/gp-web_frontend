@@ -77,6 +77,24 @@ export function errorMessageFromParsedBody(body: unknown, fallback: string): str
 }
 
 /** Axios errors, `throw response.data`, or `Error` from API helpers. */
+/** True when the server indicates a cart line is missing (avoid mis-mapping 404 to “address”). */
+export function isCartItemNotFoundMessage(message: string): boolean {
+  const m = String(message ?? "").toLowerCase();
+  if (!m.trim()) return false;
+  return m.includes("cart item") && m.includes("not found");
+}
+
+/**
+ * Cart line should show out-of-stock overlay and block checkout until removed.
+ * Covers e.g. `{ success: false, message: "Product not found" }` on quantity/cart APIs.
+ */
+export function isCartLineUnavailableMessage(message: string): boolean {
+  if (isCartItemNotFoundMessage(message)) return true;
+  const m = String(message ?? "").toLowerCase().trim();
+  if (!m) return false;
+  return m.includes("product") && m.includes("not found");
+}
+
 export function errorMessageFromCatch(err: unknown, fallback: string): string {
   const ax = err as { response?: { data?: unknown }; message?: string };
   const data = ax?.response?.data;

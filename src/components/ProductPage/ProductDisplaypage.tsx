@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import "react-datepicker/dist/react-datepicker.css";
 import { basePackService } from "../../services/basepack.service";
@@ -13,7 +13,8 @@ import {
   getEffectivePrice,
   getBasePrice,
   resolveProductImageUrl,
-  showStrikeBase,
+  buildCatalogPdpGalleryImages,
+  formatRupeePdpAmount,
   showStrikeBaseOnCard,
 } from "../../services/product.service";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
@@ -36,7 +37,11 @@ import {
   formatCartStockInlineMessage,
   isCartStockOrAvailabilityInlineError,
 } from "../../utils/cartStockInlineMessage";
-import { subscriptionCartService } from "../../services/subscriptionCart.service";
+import {
+  subscriptionCartService,
+  isSubscriptionCartZoneStaleError,
+} from "../../services/subscriptionCart.service";
+import { resolveGpDailyCatalogStoreId } from "../../utils/gpDailyCatalogStore";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
 
 // Add interface for content items
@@ -98,6 +103,18 @@ interface GarlandProduct extends Product {
 }
 
 // Add ExistingSubscriptionModal component
+const catalogPdpGallerySlideVariants = {
+  enter: (dir: number) => ({
+    x: dir >= 0 ? "100%" : "-100%",
+    opacity: 0,
+  }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir: number) => ({
+    x: dir >= 0 ? "-100%" : "100%",
+    opacity: 0,
+  }),
+};
+
 const ExistingSubscriptionModal: React.FC<ExistingSubscriptionModalProps> = ({
   isOpen,
   onClose,
@@ -201,23 +218,55 @@ const ProductPage: React.FC = () => {
   const [combineProducts, setCombineProducts] = useState<Product[]>([]);
 
   const [dailyCart, setDailyCart] = useState<any>(null);
+  /** GP Daily — size variants from catalog (same source as gp-store PDP). */
+  const [selectedVariant, setSelectedVariant] = useState<Record<string, unknown> | null>(null);
   const activeCartLine = useMemo(() => {
     const productId = (product as any)?.id;
     if (!productId) return null;
     const items = (dailyCart as any)?.items as any[] | undefined;
     if (!Array.isArray(items)) return null;
+    const lines = items.filter((it) => {
+      const pid = it?.product_id ?? it?.product?.id;
+      return pid != null && String(pid) === String(productId);
+    });
+    if (lines.length === 0) return null;
+
+    if (feature === "gpStore") {
+      return lines[0] ?? null;
+    }
+
+    // GP Daily: each variant is its own basket line — only the selected variant shows qty / View basket.
+    const variants = (product as any)?.variants;
+    const activeVariants = Array.isArray(variants)
+      ? variants.filter((v: any) => v.is_active && v.variant_type === "size")
+      : [];
+    const selVid =
+      selectedVariant && (selectedVariant as any).id != null
+        ? Number((selectedVariant as any).id)
+        : null;
+    if (activeVariants.length === 0 || selVid == null || !Number.isFinite(selVid)) {
+      const noVar = lines.find((it) => {
+        const vid = it?.variant_id ?? it?.variant?.id;
+        return vid == null || vid === "" || Number(vid) === 0;
+      });
+      return noVar ?? lines[0] ?? null;
+    }
     return (
-      items.find((it) => {
-        const pid = it?.product_id ?? it?.product?.id;
-        return pid != null && String(pid) === String(productId);
+      lines.find((it) => {
+        const vid = Number(it?.variant_id ?? it?.variant?.id);
+        return Number.isFinite(vid) && vid === selVid;
       }) ?? null
     );
-  }, [dailyCart, product]);
+  }, [dailyCart, product, selectedVariant, feature]);
   const basketQuantity = Number((activeCartLine as any)?.quantity ?? 0);
   const [addingToBasket, setAddingToBasket] = useState(false);
   const [isUpdatingBasket, setIsUpdatingBasket] = useState(false);
   const [stockLimitMessage, setStockLimitMessage] = useState<string | null>(null);
   const [pdpStockShakeNonce, setPdpStockShakeNonce] = useState(0);
+  const [pdpImageIndex, setPdpImageIndex] = useState(0);
+  const [pdpGalleryDir, setPdpGalleryDir] = useState(1);
+  const pdpGallerySwipeStartX = useRef<number | null>(null);
+  const pdpImageIndexRef = useRef(0);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
     useState(false);
@@ -262,9 +311,13 @@ const ProductPage: React.FC = () => {
   const loadBestSellers = async (
     excludeSlug: string,
     excludeProductId?: string | number | null,
+    catalogStoreId?: number | null,
   ) => {
     try {
-      const storeId = storeService.getStoreIdForProducts();
+      const storeId =
+        catalogStoreId != null && Number.isFinite(Number(catalogStoreId))
+          ? Number(catalogStoreId)
+          : storeService.getStoreIdForProducts();
       const list = await productService.getProductsByLabel(
         "best-seller",
         storeId ?? undefined,
@@ -291,6 +344,40 @@ const ProductPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    pdpImageIndexRef.current = pdpImageIndex;
+  }, [pdpImageIndex]);
+
+  useEffect(() => {
+    setPdpImageIndex(0);
+  }, [selectedVariant?.id]);
+
+  useEffect(() => {
+    if (feature === "gpStore" || !product) {
+      setSelectedVariant(null);
+      return;
+    }
+    const variants = (product as any)?.variants;
+    if (!Array.isArray(variants)) {
+      setSelectedVariant(null);
+      return;
+    }
+    const activeVariants = variants
+      .filter((v: any) => v.is_active && v.variant_type === "size")
+      .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0));
+    if (activeVariants.length === 0) {
+      setSelectedVariant(null);
+      return;
+    }
+    setSelectedVariant((prev) => {
+      const pid = (prev as any)?.id;
+      if (pid != null && activeVariants.some((v: any) => v.id === pid)) {
+        return prev;
+      }
+      return activeVariants[0];
+    });
+  }, [feature, product]);
+
   // Fetch product or base pack data
   const fetchProductData = async () => {
     try {
@@ -311,11 +398,21 @@ const ProductPage: React.FC = () => {
         return;
       }
 
+      const catalogSidForDaily =
+        feature !== "gpStore"
+          ? await resolveGpDailyCatalogStoreId().catch(() => undefined)
+          : undefined;
+      const catalogStoreId =
+        feature !== "gpStore" ? catalogSidForDaily ?? undefined : undefined;
+
       // Customer API: GET /products/{slug}/ (Postman — not numeric id)
       try {
-        const productData = await productService.getProductBySlug(slug);
+        const productData = await productService.getProductBySlug(
+          slug,
+          catalogStoreId != null ? { storeId: catalogStoreId } : undefined,
+        );
         setProduct(productData);
-        await loadBestSellers(slug, productData?.id ?? null);
+        await loadBestSellers(slug, productData?.id ?? null, catalogSidForDaily ?? null);
       } catch (productError) {
         // Legacy base packs only: GET /basepacks/{id}/ — do not call with a product slug (404).
         const legacyNumericId = /^\d+$/.test(String(slug));
@@ -336,14 +433,17 @@ const ProductPage: React.FC = () => {
             surcharge: 0,
           };
           setBasePack(extendedData);
-          await loadBestSellers(slug, data?.id ?? null);
+          await loadBestSellers(slug, data?.id ?? null, catalogSidForDaily ?? null);
         } catch (basePackError) {
           setError("Failed to fetch product details");
         }
       }
 
       // Fetch combine products (other flower packs)
-      const sid = storeService.getStoreIdForProducts();
+      const sid =
+        feature !== "gpStore"
+          ? catalogStoreId ?? storeService.getStoreIdForProducts()
+          : storeService.getStoreIdForProducts();
       const allProducts = await productService.getAllProducts({
         availabilityType: productListAvailability,
         storeId: sid || undefined,
@@ -384,7 +484,10 @@ const ProductPage: React.FC = () => {
   useEffect(() => {
     const fetchOtherPacks = async () => {
       try {
-        const sid = storeService.getStoreIdForProducts();
+        const sid =
+          feature !== "gpStore"
+            ? await resolveGpDailyCatalogStoreId().catch(() => undefined)
+            : storeService.getStoreIdForProducts();
         const allProducts = await productService.getAllProducts({
           availabilityType: productListAvailability,
           storeId: sid || undefined,
@@ -401,7 +504,7 @@ const ProductPage: React.FC = () => {
     if (slug) {
       fetchOtherPacks();
     }
-  }, [slug]);
+  }, [slug, feature, productListAvailability]);
 
   // Fetch product data on mount
   useEffect(() => {
@@ -418,6 +521,13 @@ const ProductPage: React.FC = () => {
         const cart = await subscriptionCartService.getDailyCart();
         if (mounted) setDailyCart(cart as any);
       } catch (e) {
+        if (isSubscriptionCartZoneStaleError(e)) {
+          toast.error(e.message, { id: "sub-cart-zone-stale" });
+          if (mounted) {
+            navigate(`${basePath}/address-selection`, { state: { fromCart: true } });
+          }
+          return;
+        }
         // Ignore (e.g., 401 before login) and keep UI functional.
         console.error("Failed to load daily cart:", e);
       }
@@ -425,7 +535,7 @@ const ProductPage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [feature, product]);
+  }, [feature, product, basePath, navigate]);
 
   const handleBestSellerCardClick = (item: any) => {
     const pathSlug = item.slug ?? item.id;
@@ -443,6 +553,76 @@ const ProductPage: React.FC = () => {
   //   });
   // };
 
+  const getActiveVariants = () => {
+    if (!product || feature === "gpStore") return [];
+    const variants = (product as any)?.variants;
+    if (!Array.isArray(variants)) return [];
+    return variants
+      .filter((v: any) => v.is_active && v.variant_type === "size")
+      .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0));
+  };
+
+  const catalogGallerySlides = useMemo(() => {
+    if (!product) return [];
+    return buildCatalogPdpGalleryImages(
+      product as unknown as Record<string, unknown>,
+      selectedVariant as Record<string, unknown> | null,
+    );
+  }, [product, selectedVariant]);
+
+  const PDP_SWIPE_THRESHOLD_PX = 36;
+
+  const resolvePdpGalleryTransitionDir = (prev: number, next: number, n: number): number => {
+    if (n <= 1 || prev === next) return 1;
+    if (prev === n - 1 && next === 0) return 1;
+    if (prev === 0 && next === n - 1) return -1;
+    return next > prev ? 1 : -1;
+  };
+
+  const goToPdpGalleryImage = (idx: number) => {
+    if (idx === pdpImageIndex) return;
+    const n = catalogGallerySlides.length;
+    let dir = idx > pdpImageIndex ? 1 : -1;
+    if (n > 1) {
+      if (pdpImageIndex === n - 1 && idx === 0) dir = 1;
+      if (pdpImageIndex === 0 && idx === n - 1) dir = -1;
+    }
+    setPdpGalleryDir(dir);
+    setPdpImageIndex(idx);
+  };
+
+  const handlePdpGalleryPointerDown = (e: React.PointerEvent) => {
+    if (catalogGallerySlides.length <= 1) return;
+    pdpGallerySwipeStartX.current = e.clientX;
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handlePdpGalleryPointerUp = (e: React.PointerEvent) => {
+    if (pdpGallerySwipeStartX.current == null || catalogGallerySlides.length <= 1) return;
+    const dx = e.clientX - pdpGallerySwipeStartX.current;
+    pdpGallerySwipeStartX.current = null;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    if (Math.abs(dx) < PDP_SWIPE_THRESHOLD_PX) return;
+    const n = catalogGallerySlides.length;
+    const prev = pdpImageIndexRef.current;
+    const next = dx < 0 ? (prev + 1) % n : (prev - 1 + n) % n;
+    if (next === prev) return;
+    setPdpGalleryDir(resolvePdpGalleryTransitionDir(prev, next, n));
+    setPdpImageIndex(next);
+  };
+
+  const handlePdpGalleryPointerCancel = () => {
+    pdpGallerySwipeStartX.current = null;
+  };
+
   // Price row — same fields as gp-store product detail (discount %, strike)
   const getPriceDisplay = () => {
     const currentProduct = product || basePack;
@@ -456,9 +636,50 @@ const ProductPage: React.FC = () => {
       };
     }
 
-    const p = currentProduct as unknown as Record<string, unknown>;
-    const price = getEffectivePrice(currentProduct);
-    let originalPrice = getBasePrice(currentProduct);
+    let pricedEntity: unknown = currentProduct;
+    if (feature !== "gpStore" && product && selectedVariant) {
+      const sv = selectedVariant as Record<string, unknown>;
+      const rawSale =
+        sv.final_price ?? sv.price ?? sv.sale_price ?? sv.current_price;
+      const vf = Number(rawSale);
+      const priceFromVariant = Number.isFinite(vf) && vf >= 0 ? vf : NaN;
+      const rawVBase =
+        sv.base_price ?? sv.list_price ?? sv.mrp ?? sv.original_price;
+      const vBase =
+        rawVBase != null && String(rawVBase).trim() !== ""
+          ? parseFloat(String(rawVBase))
+          : NaN;
+      const rawPBase = (product as unknown as { base_price?: unknown }).base_price;
+      const pBase =
+        rawPBase != null && String(rawPBase).trim() !== ""
+          ? parseFloat(String(rawPBase))
+          : NaN;
+      const bp =
+        Number.isFinite(vBase) && vBase > 0
+          ? vBase
+          : Number.isFinite(pBase) && pBase > 0
+            ? pBase
+            : NaN;
+      const prod = product as unknown as Record<string, unknown>;
+      const vDisc = sv.discount_percentage;
+      pricedEntity = {
+        ...prod,
+        effective_price: Number.isFinite(priceFromVariant)
+          ? String(priceFromVariant)
+          : prod.effective_price,
+        current_price: Number.isFinite(priceFromVariant)
+          ? priceFromVariant
+          : prod.current_price,
+        base_price:
+          Number.isFinite(bp) && bp > 0 ? String(bp) : prod.base_price,
+        discount_percentage:
+          vDisc != null && Number(vDisc) >= 0 ? Number(vDisc) : prod.discount_percentage,
+      };
+    }
+
+    const p = pricedEntity as Record<string, unknown>;
+    const price = getEffectivePrice(pricedEntity);
+    let originalPrice = getBasePrice(pricedEntity);
     if (originalPrice <= 0 && price > 0) {
       originalPrice = Math.ceil(price * 1.2);
     }
@@ -471,18 +692,58 @@ const ProductPage: React.FC = () => {
     const discountPercentage = Math.round(
       Math.min(100, Math.max(0, Number.isFinite(rawDiscountPct) ? rawDiscountPct : 0)),
     );
-    const showStrike =
-      showStrikeBase(currentProduct) ||
-      (originalPrice > 0 && price < originalPrice && discountPercentage > 0);
+
+    if (discountPercentage > 0 && price > 0 && originalPrice <= price) {
+      const inferred = price / (1 - discountPercentage / 100);
+      if (Number.isFinite(inferred) && inferred > price) {
+        originalPrice = Math.ceil(inferred);
+      }
+    }
+
+    const showStrike = originalPrice > price && price >= 0;
     const savings = Math.max(0, originalPrice - price);
     return { price, originalPrice, savings, discountPercentage, showStrike };
   };
 
   /** BOM lines from catalog product detail (`bom_items`), same shape as store detail. */
   const bomDisplayRows = useMemo(() => {
-    const p = product ? (product as unknown as Record<string, unknown>) : null;
-    if (!p) return [];
-    const raw = p.bom_items;
+    if (!product) return [];
+    const variantOverrides = Array.isArray((selectedVariant as any)?.bom_overrides)
+      ? ((selectedVariant as any).bom_overrides as unknown[])
+      : [];
+    if (variantOverrides.length > 0) {
+      const baseItems = Array.isArray((product as any).bom_items)
+        ? ((product as any).bom_items as unknown[])
+        : [];
+      return variantOverrides.map((row: any, index: number) => {
+        const invId = row?.inventory_item_id;
+        const base = baseItems.find(
+          (b: any) =>
+            b?.inventory_item === invId || b?.inventory_item_id === invId,
+        ) as Record<string, unknown> | undefined;
+        return {
+          id: row?.id ?? invId ?? `bom-ov-${index}`,
+          name: String(
+            row?.inventory_item_name ??
+              base?.inventory_item_name ??
+              row?.name ??
+              "Item",
+          ),
+          quantity: row?.quantity ?? base?.quantity ?? 1,
+          unit: String(
+            row?.inventory_item_unit ??
+              base?.inventory_item_unit ??
+              row?.unit ??
+              "",
+          ).trim(),
+          isPerishable:
+            row?.is_perishable !== undefined
+              ? row.is_perishable
+              : (base?.is_perishable as boolean | undefined),
+        };
+      });
+    }
+    const raw = (product as unknown as Record<string, unknown>).bom_items;
     if (!Array.isArray(raw)) return [];
     return raw.map((row: Record<string, unknown>, index: number) => ({
       id: row.id ?? row.inventory_item_id ?? `bom-${index}`,
@@ -493,7 +754,7 @@ const ProductPage: React.FC = () => {
       unit: String(row.inventory_item_unit ?? row.unit ?? "").trim(),
       isPerishable: row.is_perishable as boolean | undefined,
     }));
-  }, [product]);
+  }, [product, selectedVariant]);
 
   // Get product image — API uses primary_image / images[]; legacy uses imagesUrl
   const getProductImage = () => {
@@ -695,7 +956,15 @@ const ProductPage: React.FC = () => {
     }
     setAddingToBasket(true);
     try {
-      const cart = await subscriptionCartService.addItem(Number((product as any).id), 1);
+      const variantId =
+        selectedVariant && (selectedVariant as any).id != null
+          ? Number((selectedVariant as any).id)
+          : undefined;
+      const cart = await subscriptionCartService.addItem(
+        Number((product as any).id),
+        1,
+        variantId,
+      );
       setDailyCart(cart as any);
       toast.success("Added to basket", { id: "Added to basket" });
     } catch (error: unknown) {
@@ -730,7 +999,15 @@ const ProductPage: React.FC = () => {
         const cart = await subscriptionCartService.getDailyCart();
         setDailyCart(cart as any);
       } else {
-        const cart = await subscriptionCartService.addItem(productId, nextQty);
+        const variantId =
+          selectedVariant && (selectedVariant as any).id != null
+            ? Number((selectedVariant as any).id)
+            : undefined;
+        const cart = await subscriptionCartService.addItem(
+          productId,
+          nextQty,
+          variantId,
+        );
         setDailyCart(cart as any);
       }
     } catch (error: unknown) {
@@ -789,9 +1066,12 @@ const ProductPage: React.FC = () => {
   };
 
   // Update the fetchGarlandProducts function
-  const fetchGarlandProducts = async () => {
+  const fetchGarlandProducts = useCallback(async () => {
     try {
-      const sid = storeService.getStoreIdForProducts();
+      const sid =
+        feature !== "gpStore"
+          ? await resolveGpDailyCatalogStoreId().catch(() => undefined)
+          : storeService.getStoreIdForProducts();
       const allProducts = await productService.getAllProducts({
         availabilityType: productListAvailability,
         storeId: sid || undefined,
@@ -803,12 +1083,12 @@ const ProductPage: React.FC = () => {
     } catch (error) {
       console.error("Error fetching garland products:", error);
     }
-  };
+  }, [feature, productListAvailability]);
 
   // Add useEffect to fetch garland products
   useEffect(() => {
-    fetchGarlandProducts();
-  }, []);
+    void fetchGarlandProducts();
+  }, [fetchGarlandProducts]);
 
   if (loading || isCheckingBalance) {
     return <ProductDetailSkeleton />;
@@ -863,20 +1143,110 @@ const ProductPage: React.FC = () => {
 
         {/* Main Content */}
         <div className="px-4">
-          {/* Product Image — frame matches gp-store */}
+          {/* Product image — includes each size-variant `image` URL in the carousel when present */}
           <div className="mt-4">
-            <div className="relative aspect-square w-full overflow-hidden rounded-xl border-2 border-gray-900">
-              <img
-                src={getProductImage()}
-                alt={getProductName()}
-                className="h-full w-full object-cover"
-                onError={(e) => {
-                  const el = e.currentTarget;
-                  if (el.src.includes("placeholder.svg")) return;
-                  el.src = "/placeholder.svg";
-                }}
-              />
-            </div>
+            {product && catalogGallerySlides.length > 1 ? (
+              <>
+                <div
+                  className="relative aspect-square w-full cursor-grab touch-none overflow-hidden rounded-xl border-2 border-gray-900 active:cursor-grabbing"
+                  onPointerDown={handlePdpGalleryPointerDown}
+                  onPointerUp={handlePdpGalleryPointerUp}
+                  onPointerCancel={handlePdpGalleryPointerCancel}
+                  role="region"
+                  aria-label="Product images — swipe or tap a thumbnail below"
+                >
+                  <ProductImageTag
+                    labels={(product as any).labels}
+                    variant={feature === "gpStore" ? "store" : "daily"}
+                  />
+                  <AnimatePresence initial={false} custom={pdpGalleryDir} mode="sync">
+                    <motion.div
+                      key={pdpImageIndex}
+                      role="img"
+                      aria-label={catalogGallerySlides[pdpImageIndex]?.alt || getProductName()}
+                      custom={pdpGalleryDir}
+                      variants={catalogPdpGallerySlideVariants}
+                      initial="enter"
+                      animate="center"
+                      exit="exit"
+                      transition={{ type: "tween", duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
+                      className="pointer-events-none absolute inset-0 select-none"
+                    >
+                      <img
+                        src={catalogGallerySlides[pdpImageIndex]?.src || "/placeholder.svg"}
+                        alt={catalogGallerySlides[pdpImageIndex]?.alt || getProductName()}
+                        loading="lazy"
+                        draggable={false}
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/placeholder.svg";
+                        }}
+                      />
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+                <div className="mt-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                  {catalogGallerySlides.map((img, idx) => (
+                    <button
+                      key={`${img.src}-${idx}`}
+                      type="button"
+                      onClick={() => goToPdpGalleryImage(idx)}
+                      className={`h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${
+                        idx === pdpImageIndex
+                          ? feature === "gpStore"
+                            ? "border-[#2A6B28]"
+                            : "border-[#FAA222]"
+                          : "border-gray-200"
+                      }`}
+                      aria-label={`View image ${idx + 1}`}
+                    >
+                      <img
+                        src={img.src}
+                        alt={img.alt}
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/placeholder.svg";
+                        }}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2 flex justify-center gap-1.5" aria-hidden>
+                  {catalogGallerySlides.map((_, idx) => (
+                    <span
+                      key={idx}
+                      className={`h-1.5 rounded-full transition-all ${
+                        idx === pdpImageIndex
+                          ? feature === "gpStore"
+                            ? "w-5 bg-[#19411F]"
+                            : "w-5 bg-[#FAA222]"
+                          : "w-1.5 bg-gray-300"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="relative aspect-square w-full overflow-hidden rounded-xl border-2 border-gray-900">
+                {product && (product as any).labels?.length ? (
+                  <ProductImageTag
+                    labels={(product as any).labels}
+                    variant={feature === "gpStore" ? "store" : "daily"}
+                  />
+                ) : null}
+                <img
+                  src={catalogGallerySlides[0]?.src ?? getProductImage()}
+                  alt={getProductName()}
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    const el = e.currentTarget;
+                    if (el.src.includes("placeholder.svg")) return;
+                    el.src = "/placeholder.svg";
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {isGpDaily ? (
@@ -893,13 +1263,69 @@ const ProductPage: React.FC = () => {
               </div>
               <p className="mt-1 text-sm text-gray-600">{getProductWeight()}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2.5">
-                <span className="text-2xl font-bold text-[#111827]">₹{Math.round(pdp.price)}</span>
+                <span className="text-2xl font-bold text-[#111827]">
+                  ₹{formatRupeePdpAmount(pdp.price)}
+                </span>
                 {pdp.showStrike ? (
                   <span className="text-xl font-semibold text-gray-500 line-through">
-                    ₹{Math.round(pdp.originalPrice)}
+                    ₹{formatRupeePdpAmount(pdp.originalPrice)}
                   </span>
                 ) : null}
               </div>
+              {getActiveVariants().length > 0 && (
+                <div className="mt-5">
+                  <div className="mb-2.5">
+                    <span className="text-base font-medium text-[#111827]">Select Size</span>
+                  </div>
+                  <div className="-mx-1 overflow-x-auto pb-2 no-scrollbar">
+                    <div className="flex min-w-max gap-3 px-1">
+                      {getActiveVariants().map((variant: any) => {
+                        const chipSale = Number(
+                          variant.final_price ??
+                            variant.price ??
+                            variant.sale_price ??
+                            variant.current_price,
+                        );
+                        const vt = String(variant.variant_type || "size").toLowerCase();
+                        const subLabel =
+                          vt === "size"
+                            ? "Size"
+                            : formatProductTitleCase(String(variant.variant_type || "Size"));
+                        const selected = (selectedVariant as any)?.id === variant.id;
+                        return (
+                        <button
+                          key={variant.id}
+                          type="button"
+                          onClick={() => {
+                            setStockLimitMessage(null);
+                            setSelectedVariant(variant);
+                          }}
+                          className={`flex min-h-[5.5rem] min-w-[108px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 px-3 py-3 text-center transition-all ${
+                            selected
+                              ? "border-[#FAA222] bg-[#FFF4E5]"
+                              : "border-gray-200 bg-white"
+                          }`}
+                        >
+                          <span
+                            className={`text-sm font-semibold leading-tight ${
+                              selected ? "text-[#111827]" : "text-gray-900"
+                            }`}
+                          >
+                            {formatProductTitleCase(String(variant.name ?? ""))}
+                          </span>
+                          <span className="text-xs font-medium leading-none text-gray-500">
+                            {subLabel}
+                          </span>
+                          <span className="text-base font-bold leading-tight text-[#111827]">
+                            ₹{formatRupeePdpAmount(Number.isFinite(chipSale) ? chipSale : 0)}
+                          </span>
+                        </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="mt-5">
                 <h2 className="mb-2.5 font-ibm-plex-serif text-2xl font-semibold text-[#222222]">Includes</h2>
                 <div className="flex flex-wrap gap-2">
@@ -939,10 +1365,10 @@ const ProductPage: React.FC = () => {
                 ) : null}
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <span className="text-2xl font-bold text-gray-900">₹{Math.round(pdp.price)}</span>
+                <span className="text-2xl font-bold text-gray-900">₹{formatRupeePdpAmount(pdp.price)}</span>
                 {pdp.showStrike ? (
                   <span className="text-xl font-medium text-gray-500 line-through">
-                    ₹{Math.round(pdp.originalPrice)}
+                    ₹{formatRupeePdpAmount(pdp.originalPrice)}
                   </span>
                 ) : null}
               </div>

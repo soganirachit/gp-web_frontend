@@ -296,7 +296,7 @@ const GpStore_Homepage: React.FC = () => {
             );
             return;
         }
-        navigate(`${basePath}/addresses`);
+        navigate(`${basePath}/address-selection`, { state: { fromHome: true } });
     };
 
     const handleProductClick = (product: BestSeller) => {

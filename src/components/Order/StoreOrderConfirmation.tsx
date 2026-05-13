@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { GoogleMap } from '@react-google-maps/api';
+import { GoogleMap, Marker } from '@react-google-maps/api';
 import { FaBox, FaCheck, FaClock, FaMapMarkerAlt, FaRupeeSign } from 'react-icons/fa';
-import { MdLocationOn } from 'react-icons/md';
 import { useGoogleMaps } from '../../hooks/useGoogleMaps';
 import Spinner from '../common/Spinner';
 import { OrderConfirmationSkeleton } from '../common/PageSkeletons';
@@ -67,7 +66,7 @@ const SuccessCheckmark: React.FC = () => {
 
 const MapView: React.FC<{ address: MapAddress | null; themeColor: string }> = ({
   address,
-  themeColor,
+  themeColor: _themeColor,
 }) => {
   const { isLoaded, loadError } = useGoogleMaps();
 
@@ -89,10 +88,14 @@ const MapView: React.FC<{ address: MapAddress | null; themeColor: string }> = ({
 
   // Default to India center; if coordinates exist, use them.
   let center = { lat: 20.5937, lng: 78.9629 };
+  let hasValidCoords = false;
   if (address?.coordinates) {
-    const [lat, lng] = address.coordinates.split(',').map(Number);
-    if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+    const parts = address.coordinates.split(',').map((s) => Number(String(s).trim()));
+    const lat = parts[0];
+    const lng = parts[1];
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
       center = { lat, lng };
+      hasValidCoords = true;
     }
   }
 
@@ -101,7 +104,7 @@ const MapView: React.FC<{ address: MapAddress | null; themeColor: string }> = ({
       <GoogleMap
         mapContainerStyle={{ width: '100%', height: '100%' }}
         center={center}
-        zoom={16}
+        zoom={hasValidCoords ? 18 : 16}
         options={{
           zoomControl: false,
           streetViewControl: false,
@@ -115,9 +118,7 @@ const MapView: React.FC<{ address: MapAddress | null; themeColor: string }> = ({
           clickableIcons: false,
         }}
       >
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
-          <MdLocationOn className="text-4xl drop-shadow-lg" style={{ color: themeColor }} />
-        </div>
+        {hasValidCoords ? <Marker position={center} /> : null}
       </GoogleMap>
       <div className="absolute inset-0 bg-transparent" />
     </div>

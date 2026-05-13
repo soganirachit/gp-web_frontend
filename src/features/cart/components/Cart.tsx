@@ -27,7 +27,7 @@ import { SEO } from '../../../components/SEO';
 import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
-import { errorMessageFromCatch } from '../../../utils/apiErrorMessage';
+import { errorMessageFromCatch, isCartLineUnavailableMessage } from '../../../utils/apiErrorMessage';
 import {
   extractCartStockApiMessage,
   formatCartStockInlineMessage,
@@ -581,6 +581,8 @@ const Cart: React.FC = () => {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   /** Inline stock message per line item (e.g. after insufficient stock). */
   const [lineStockErrorByItemId, setLineStockErrorByItemId] = useState<Record<string, string>>({});
+  /** Product / cart line missing on server — OOS overlay until user deletes the line. */
+  const [lineCartStaleByItemId, setLineCartStaleByItemId] = useState<Record<string, boolean>>({});
   /** Remount key so the shake animation restarts on every repeat tap at limit. */
   const [stockShakeVersionByItemId, setStockShakeVersionByItemId] = useState<Record<string, number>>({});
 
@@ -1148,10 +1150,18 @@ const Cart: React.FC = () => {
       }
       const storedAddress = localStorage.getItem('selectedDeliveryAddress');
       if (storedAddress) {
-        try { 
-          setDefaultAddress(JSON.parse(storedAddress)); 
-          setIsLoadingAddress(false);
-          return; 
+        try {
+          const parsed = JSON.parse(storedAddress);
+          const currentUserId = localStorage.getItem('userId');
+          const addrUserId = parsed?.userId?.toString();
+          if (currentUserId && addrUserId && addrUserId !== currentUserId) {
+            // Stale address from a different user session — discard it
+            localStorage.removeItem('selectedDeliveryAddress');
+          } else {
+            setDefaultAddress(parsed);
+            setIsLoadingAddress(false);
+            return;
+          }
         } catch (_) {}
       }
       try {
@@ -1341,9 +1351,30 @@ const Cart: React.FC = () => {
     setEditMessage('');
   };
 
+  const hasStaleCartLine = useMemo(
+    () => items.some((it) => lineCartStaleByItemId[it.id]),
+    [items, lineCartStaleByItemId],
+  );
+
+  useEffect(() => {
+    setLineCartStaleByItemId((prev) => {
+      const ids = new Set(items.map((i) => i.id));
+      let changed = false;
+      const next = { ...prev };
+      for (const k of Object.keys(next)) {
+        if (!ids.has(k)) {
+          delete next[k];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [items]);
+
   const handleQuantityDelta = async (itemId: string, delta: number) => {
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
+    if (lineCartStaleByItemId[itemId]) return;
     if (delta > 0 && lineStockErrorByItemId[itemId]) {
       triggerStockMessageShake(itemId);
       return;
@@ -1352,6 +1383,11 @@ const Cart: React.FC = () => {
     if (next === item.quantity && delta < 0) return;
     try {
       await updateQuantity(itemId, next, item.customizedMessage || '');
+      setLineCartStaleByItemId((prev) => {
+        const n = { ...prev };
+        delete n[itemId];
+        return n;
+      });
       setLineStockErrorByItemId((prev) => {
         const n = { ...prev };
         delete n[itemId];
@@ -1364,6 +1400,10 @@ const Cart: React.FC = () => {
       });
     } catch (error: unknown) {
       const apiMessage = extractCartStockApiMessage(error);
+      if (isCartLineUnavailableMessage(apiMessage)) {
+        setLineCartStaleByItemId((prev) => ({ ...prev, [itemId]: true }));
+        return;
+      }
       if (isCartStockOrAvailabilityInlineError(apiMessage)) {
         setLineStockErrorByItemId((prev) => ({
           ...prev,
@@ -1437,6 +1477,10 @@ const Cart: React.FC = () => {
   const handleCheckout = async () => {
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
     if (items.length === 0) { toast.error('Your cart is empty'); return; }
+    if (hasStaleCartLine) {
+      toast.error('Remove unavailable items from your basket before checkout.');
+      return;
+    }
     if (!deliveryInfo) { toast.error('Please select delivery date and time'); return; }
     if (!isLoggedIn) {
       navigate(`${basePath}/login`, { state: { returnUrl: `${basePath}/basket`, fromCart: true } });
@@ -1579,12 +1623,17 @@ const Cart: React.FC = () => {
         try { deliveryDateFormatted = format(new Date(deliveryInfo.deliveryDate), 'yyyy-MM-dd'); }
         catch { deliveryDateFormatted = format(addDays(new Date(), 1), 'yyyy-MM-dd'); }
       }
+      const customerNotesFromCart = items
+        .map((i) => (i.customizedMessage || '').trim())
+        .filter(Boolean)
+        .join('\n');
+
       const checkoutData = {
         delivery_address_id: Number(defaultAddress.id),
         delivery_slot_id: selectedSlotId,
         delivery_date: deliveryDateFormatted,
         delivery_instructions: '',
-        customer_notes: '',
+        customer_notes: customerNotesFromCart,
       };
       const checkoutResponse = await paymentService.createCheckoutOrder(checkoutData);
       const normalizedRazorpayOrderId = checkoutResponse.razorpay_order_id || (checkoutResponse as any).order?.id || checkoutResponse.order_id;
@@ -1866,9 +1915,29 @@ const Cart: React.FC = () => {
           <div className="space-y-4 px-4 py-4">
             <>
               {/* Product Items */}
-              {items.map((item) => (
-                <div key={item.id} className="relative rounded-[24px] border border-[#e9e5de] bg-white p-4 shadow-sm">
-                  <div className="flex items-start gap-3">
+              {items.map((item) => {
+                const lineStale = lineCartStaleByItemId[item.id];
+                return (
+                <div key={item.id} className="relative overflow-hidden rounded-[24px] border border-[#e9e5de] bg-white p-4 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteItem(item.id)}
+                    className="absolute right-4 top-4 z-30 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-red-500 transition-colors hover:bg-gray-200"
+                    aria-label="Remove item"
+                  >
+                    <IoTrashOutline className="h-[15px] w-[15px]" aria-hidden />
+                  </button>
+
+                  {lineStale ? (
+                    <div
+                      className="absolute inset-0 z-20 flex items-center justify-center bg-white/55 backdrop-blur-[1px]"
+                      aria-hidden
+                    >
+                      <p className="text-center text-base font-semibold text-red-600">Out of stock</p>
+                    </div>
+                  ) : null}
+
+                  <div className={`flex items-start gap-3 ${lineStale ? 'pointer-events-none select-none opacity-40' : ''}`}>
                     <button
                       type="button"
                       onClick={() => navigateToProductDetail(item)}
@@ -1882,40 +1951,26 @@ const Cart: React.FC = () => {
                         onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
                       />
                       <div className="flex min-w-0 flex-1 flex-col">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <h3 className="text-sm font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere]">
-                              {item.name} x {item.quantity}
-                              {item.variant?.name && (
-                                <span className="font-normal text-gray-600"> ({item.variant.name})</span>
-                              )}
-                            </h3>
-                            {deliveryInfo && (
-                              <div className="mt-0.5 text-xs leading-snug text-gray-600">
-                                <div>Delivery: {deliveryInfo.deliveryDate}</div>
-                                <div>Time Slot: {deliveryInfo.timeSlot}</div>
-                              </div>
+                        <div className="min-w-0 flex-1 pr-10">
+                          <h3 className="text-sm font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere]">
+                            {item.name} x {item.quantity}
+                            {item.variant?.name && (
+                              <span className="font-normal text-gray-600"> ({item.variant.name})</span>
                             )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleDeleteItem(item.id);
-                            }}
-                            className="touch-target-compact flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-red-500 transition-colors hover:bg-gray-200"
-                            aria-label="Remove item"
-                          >
-                            <IoTrashOutline className="h-[15px] w-[15px]" aria-hidden />
-                          </button>
+                          </h3>
+                          {deliveryInfo && (
+                            <div className="mt-0.5 text-xs leading-snug text-gray-600">
+                              <div>Delivery: {deliveryInfo.deliveryDate}</div>
+                              <div>Time Slot: {deliveryInfo.timeSlot}</div>
+                            </div>
+                          )}
                         </div>
-                        <div className="mt-1 flex min-h-[1.75rem] items-center justify-between gap-2">
-                          <span className="text-base font-semibold leading-tight text-gray-900">
+                        <div className="mt-1 flex w-full min-h-[1.75rem] items-center gap-2">
+                          <span className="min-w-0 flex-1 truncate text-base font-semibold leading-tight text-gray-900">
                             ₹{Number(item.price).toFixed(2)} each
                           </span>
                           <div
-                            className="flex shrink-0 items-center gap-1"
+                            className="ml-auto flex shrink-0 items-center gap-1"
                             onClick={(e) => e.stopPropagation()}
                             onKeyDown={(e) => e.stopPropagation()}
                             role="presentation"
@@ -1945,6 +2000,8 @@ const Cart: React.FC = () => {
                       </div>
                     </button>
                   </div>
+                  {!lineStale ? (
+                  <>
                   {/* Bouquet: custom message */}
                   {isBouquetItem(item) && editingItemId !== item.id && (
                     item.customizedMessage ? (
@@ -2019,8 +2076,11 @@ const Cart: React.FC = () => {
                       {lineStockErrorByItemId[item.id]}
                     </p>
                   ) : null}
+                  </>
+                  ) : null}
                 </div>
-              ))}
+              );
+              })}
 
               {/* Delivery Date and Time */}
               <div className="bg-white rounded-[25px] p-4 shadow-sm relative">
@@ -2334,6 +2394,7 @@ const Cart: React.FC = () => {
                 onClick={handleCheckout}
                 disabled={
                   isProcessingPayment ||
+                  hasStaleCartLine ||
                   deliveryBlockedByCoverage ||
                   deliveryBlockedByStoreMismatch ||
                   deliveryStoreOffline

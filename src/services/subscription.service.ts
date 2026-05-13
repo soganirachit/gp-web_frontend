@@ -5,6 +5,7 @@
 
 import api from "./api";
 import { getSubscriptionsUrl } from "../config/api.config";
+import { pickPrimaryImageUrl, type ProductImageLike } from "../utils/pickPrimaryImageUrl";
 
 const base = () => getSubscriptionsUrl();
 
@@ -66,16 +67,19 @@ function intWeekdaysToSelectedStrings(ints: number[]): string[] {
   return uniq.map((i) => WEEKDAY_KEYS[i]).filter(Boolean);
 }
 
-function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
-  const itemsRaw = Array.isArray(raw.items) ? (raw.items as Record<string, unknown>[]) : [];
-  const lineItems: SubscriptionLineItem[] = itemsRaw.map((it) => {
+function mapRawItemsToSubscriptionLineItems(
+  itemsRaw: Record<string, unknown>[],
+): SubscriptionLineItem[] {
+  return itemsRaw.map((it) => {
     const p = (it.product as Record<string, unknown> | undefined) ?? {};
     const qty = Number.parseFloat(String(it.quantity ?? 1));
     const unit = Number.parseFloat(
-      String(it.unit_price ?? p.current_price ?? p.sale_price ?? p.base_price ?? 0)
+      String(it.unit_price ?? p.current_price ?? p.sale_price ?? p.base_price ?? 0),
     );
-    const sub = Number.parseFloat(String(it.subtotal ?? (Number.isFinite(qty) && Number.isFinite(unit) ? qty * unit : 0)));
-    const img = String(p.primary_image ?? "");
+    const sub = Number.parseFloat(
+      String(it.subtotal ?? (Number.isFinite(qty) && Number.isFinite(unit) ? qty * unit : 0)),
+    );
+    const img = pickPrimaryImageUrl(p as ProductImageLike, "thumb");
     return {
       name: String(p.name ?? "Product"),
       imageUrl: img || undefined,
@@ -84,6 +88,19 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
       subtotal: Number.isFinite(sub) ? sub : 0,
     };
   });
+}
+
+/** Line items from raw API (e.g. GET /subscriptions/:id/) — list responses may omit `items` or skew `amount`. */
+export function subscriptionLineItemsFromApiRaw(
+  raw: Record<string, unknown> | undefined | null,
+): SubscriptionLineItem[] {
+  const itemsRaw = Array.isArray(raw?.items) ? (raw.items as Record<string, unknown>[]) : [];
+  return mapRawItemsToSubscriptionLineItems(itemsRaw);
+}
+
+function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
+  const itemsRaw = Array.isArray(raw.items) ? (raw.items as Record<string, unknown>[]) : [];
+  const lineItems: SubscriptionLineItem[] = mapRawItemsToSubscriptionLineItems(itemsRaw);
 
   const firstItem = itemsRaw[0] as Record<string, unknown> | undefined;
   const itemProduct = (firstItem?.product as Record<string, unknown> | undefined) ?? undefined;
@@ -94,12 +111,29 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
     (raw.plan_details as Record<string, unknown> | undefined) ||
     (raw.product as Record<string, unknown> | undefined);
 
+  const hasVariants =
+    plan &&
+    typeof plan.primary_image_variants === "object" &&
+    plan.primary_image_variants !== null;
+  const imagesFromVariants =
+    hasVariants && plan
+      ? [
+          ...new Set(
+            [
+              pickPrimaryImageUrl(plan as ProductImageLike, "card"),
+              pickPrimaryImageUrl(plan as ProductImageLike, "full"),
+            ].filter(Boolean),
+          ),
+        ]
+      : [];
   const images =
-    (plan?.images_url as string[] | undefined) ||
-    (plan?.imagesUrl as string[] | undefined) ||
-    (plan?.image_url ? [String(plan.image_url)] : undefined) ||
-    (plan?.primary_image ? [String(plan.primary_image)] : undefined) ||
-    (lineItems[0]?.imageUrl ? [lineItems[0].imageUrl] : undefined);
+    imagesFromVariants.length > 0
+      ? imagesFromVariants
+      : (plan?.images_url as string[] | undefined) ||
+        (plan?.imagesUrl as string[] | undefined) ||
+        (plan?.image_url ? [String(plan.image_url)] : undefined) ||
+        (plan?.primary_image ? [String(plan.primary_image)] : undefined) ||
+        (lineItems[0]?.imageUrl ? [lineItems[0].imageUrl] : undefined);
 
   const unitPriceCandidate =
     lineItems[0]?.unitPrice ??

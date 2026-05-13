@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { FaArrowLeft, FaCheck, FaTimes } from "react-icons/fa";
 import { MdLocationOn, MdMyLocation } from "react-icons/md";
@@ -10,7 +10,7 @@ import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import ReactDOM from "react-dom/client";
 import { orderService } from "../../services/order.service";
 import { subscriptionService } from "../../services/subscription.service";
-import { subscriptionCartService } from "../../services/subscriptionCart.service";
+import { subscriptionCartService, isSubscriptionCartStoreChangeConfirmation } from "../../services/subscriptionCart.service";
 import {
   validateGpDailyDeliveryAreaForAddressId,
   validateGpDailyDeliveryAreaFromCoordinates,
@@ -22,6 +22,9 @@ import { formatPhoneForDisplay } from "../../utils/phoneDisplay";
 import homeIcon from "../../assets/svg/adressbook/home.svg";
 import workIcon from "../../assets/svg/adressbook/office.svg";
 import othersIcon from "../../assets/svg/adressbook/others.svg";
+
+/** Synthetic id — device GPS selection (not a saved server address). */
+const LIVE_DEVICE_ADDRESS_ID = "__gf_live_device__";
 
 const AddressSelection: React.FC = () => {
   const navigate = useNavigate();
@@ -57,6 +60,21 @@ const AddressSelection: React.FC = () => {
   /** After saving a new address, show on-screen confirmation (replaces toast) */
   const [showAddressAddedInline, setShowAddressAddedInline] = useState(false);
 
+  /** GP Daily from-cart: server may require explicit confirm before clearing incompatible subscription cart lines. */
+  const [dailyCartFromAddressModal, setDailyCartFromAddressModal] = useState<{
+    address: Address;
+    message: string;
+  } | null>(null);
+  const [confirmingDailyCartStoreChange, setConfirmingDailyCartStoreChange] = useState(false);
+
+  /** Browser geolocation + reverse geocode — shown as first card when available. */
+  const [liveDeviceLocation, setLiveDeviceLocation] = useState<{
+    lat: number;
+    lng: number;
+    formattedAddress: string;
+  } | null>(null);
+  const liveGeoRequestedRef = useRef(false);
+
   const [formData, setFormData] = useState({
     houseNo: "",
     streetName: "",
@@ -72,6 +90,15 @@ const AddressSelection: React.FC = () => {
   });
   const isStoreProduct = location.state?.product?.isStore;
   const [userData, setUserData] = useState<any>(null);
+
+  /** Default / current delivery address first — matches home header logic. */
+  const displayAddresses = useMemo(() => {
+    return [...addresses].sort((a, b) => {
+      if (a.isDefault && !b.isDefault) return -1;
+      if (!a.isDefault && b.isDefault) return 1;
+      return 0;
+    });
+  }, [addresses]);
 
   const getTypeIcon = (type: string) => {
     const t = type?.toLowerCase();
@@ -131,7 +158,56 @@ const AddressSelection: React.FC = () => {
     loadUserData();
   }, []);
 
+  useEffect(() => {
+    if (!isLoaded || showAddForm || loadError) return;
+    if (liveGeoRequestedRef.current) return;
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    liveGeoRequestedRef.current = true;
 
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        let formatted = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        try {
+          if (window.google?.maps?.Geocoder) {
+            const geocoder = new google.maps.Geocoder();
+            const res = await geocoder.geocode({ location: { lat, lng } });
+            const first = res.results?.[0]?.formatted_address;
+            if (first?.trim()) formatted = first.trim();
+          }
+        } catch {
+          /* keep coordinate fallback */
+        }
+        setLiveDeviceLocation({ lat, lng, formattedAddress: formatted });
+      },
+      () => {
+        /* permission denied or unavailable — no card */
+      },
+      { enableHighAccuracy: true, timeout: 14_000, maximumAge: 120_000 },
+    );
+  }, [isLoaded, showAddForm, loadError]);
+
+  const buildLiveDeviceAddress = useCallback(
+    (lat: number, lng: number, formattedAddress: string): Address => ({
+      id: LIVE_DEVICE_ADDRESS_ID,
+      userId: "",
+      houseNo: "",
+      streetName: "",
+      landmark: "",
+      area: formattedAddress,
+      city: "",
+      state: "",
+      pincode: "",
+      associatedPhoneNumber: "",
+      isDefault: false,
+      type: "Others",
+      coordinates: `${lat},${lng}`,
+      createdAt: "",
+      updatedAt: "",
+    }),
+    [],
+  );
 
   const handleAuthError = (error: Error) => {
     const isAuthError =
@@ -161,17 +237,30 @@ const AddressSelection: React.FC = () => {
       const savedAddresses = await addressService.getAllAddresses();
       setAddresses(savedAddresses);
 
+      const sorted = [...savedAddresses].sort((a, b) => {
+        if (a.isDefault && !b.isDefault) return -1;
+        if (!a.isDefault && b.isDefault) return 1;
+        return 0;
+      });
       const storedAddress = localStorage.getItem("selectedDeliveryAddress");
       if (storedAddress) {
-        const parsedAddress = JSON.parse(storedAddress);
-        const addressExists = savedAddresses.some(
-          (addr) => addr.id === parsedAddress.id
-        );
-        if (addressExists) {
-          setSelectedAddress(parsedAddress);
-        } else {
+        try {
+          const parsedAddress = JSON.parse(storedAddress);
+          const addressExists =
+            String(parsedAddress.id) === LIVE_DEVICE_ADDRESS_ID ||
+            savedAddresses.some((addr) => addr.id === parsedAddress.id);
+          if (addressExists) {
+            setSelectedAddress(parsedAddress);
+          } else {
+            localStorage.removeItem("selectedDeliveryAddress");
+            setSelectedAddress(sorted[0] ?? null);
+          }
+        } catch {
           localStorage.removeItem("selectedDeliveryAddress");
+          setSelectedAddress(sorted[0] ?? null);
         }
+      } else if (sorted.length > 0) {
+        setSelectedAddress(sorted[0]);
       }
     } catch (error: any) {
       handleAuthError(error);
@@ -338,6 +427,15 @@ const AddressSelection: React.FC = () => {
   };
 
   const handleAddressSelect = async (address: Address) => {
+    if (String(address.id) === LIVE_DEVICE_ADDRESS_ID && !location.state?.fromHome) {
+      toast.error(
+        location.state?.fromCart
+          ? "Save your current location as an address to use it for checkout."
+          : "Save your current location as an address to use it for delivery.",
+      );
+      return;
+    }
+
     // Validate address before selecting
     const isAddressValid = await validateAddressInDeliveryArea(address);
     if (!isAddressValid) {
@@ -346,6 +444,24 @@ const AddressSelection: React.FC = () => {
 
     setSelectedAddress(address);
     localStorage.setItem("selectedDeliveryAddress", JSON.stringify(address));
+
+    if (location.state?.fromHome) {
+      if (String(address.id) === LIVE_DEVICE_ADDRESS_ID) {
+        toast.success("Using your current location for delivery");
+        navigate(basePath, { replace: true });
+        return;
+      }
+      try {
+        await addressService.setDefaultAddress(String(address.id));
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Could not set default address";
+        toast.error(msg);
+        return;
+      }
+      toast.success("Delivery address updated");
+      navigate(basePath, { replace: true });
+      return;
+    }
 
     // Get the current subscription data
     const subscriptionData = localStorage.getItem("currentSubscription");
@@ -410,24 +526,36 @@ const AddressSelection: React.FC = () => {
     try {
       // Check if coming from cart page (for both gp-store and gp-daily)
       if (location.state?.fromCart) {
-        // Save selected address and navigate back to cart
-        localStorage.setItem('selectedDeliveryAddress', JSON.stringify(address));
-
-        // gp-daily cart uses subscription cart APIs to set address
-        if (feature !== "gpStore" && address?.id) {
+        if (
+          feature !== "gpStore" &&
+          address?.id &&
+          String(address.id) !== LIVE_DEVICE_ADDRESS_ID
+        ) {
           try {
             const z = await subscriptionCartService.checkSubscriptionZone(
               Number(address.id),
             );
             if (Boolean((z as { eligible?: boolean })?.eligible)) {
-              await subscriptionCartService.setDeliveryAddress(Number(address.id));
+              const raw = await subscriptionCartService.setDeliveryAddress(
+                Number(address.id),
+                false,
+              );
+              if (isSubscriptionCartStoreChangeConfirmation(raw)) {
+                const msg =
+                  typeof raw.message === "string" && raw.message.trim()
+                    ? raw.message.trim()
+                    : `Your delivery address maps to ${raw.new_store?.name ?? "a different store"}. Continuing will clear items in your daily basket that may not be available there.`;
+                setDailyCartFromAddressModal({ address, message: msg });
+                return;
+              }
             }
           } catch {
             /* non-fatal — cart page will re-check zone */
           }
         }
 
-        const cartPath = feature === 'gpStore' ? '/gp-store/basket' : '/gp-daily/basket';
+        localStorage.setItem("selectedDeliveryAddress", JSON.stringify(address));
+        const cartPath = feature === "gpStore" ? "/gp-store/basket" : "/gp-daily/basket";
         navigate(cartPath, {
           state: {
             selectedAddress: address,
@@ -1175,7 +1303,7 @@ const AddressSelection: React.FC = () => {
               >
                 <IoArrowBack size={24} className="text-gray-900" />
               </button>
-              <h1 className="font-serif text-2xl font-bold text-gray-900">Delivery address</h1>
+              <h1 className="font-serif text-2xl font-bold text-gray-900">Choose location</h1>
             </div>
 
             {showAddressAddedInline && (
@@ -1201,7 +1329,68 @@ const AddressSelection: React.FC = () => {
 
             {/* Address List — layout matches My Addresses: left details + right map */}
             <div className="mb-6 space-y-4">
-              {addresses.map((address) => {
+              {liveDeviceLocation ? (
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() =>
+                    void handleAddressSelect(
+                      buildLiveDeviceAddress(
+                        liveDeviceLocation.lat,
+                        liveDeviceLocation.lng,
+                        liveDeviceLocation.formattedAddress,
+                      ),
+                    )
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      void handleAddressSelect(
+                        buildLiveDeviceAddress(
+                          liveDeviceLocation.lat,
+                          liveDeviceLocation.lng,
+                          liveDeviceLocation.formattedAddress,
+                        ),
+                      );
+                    }
+                  }}
+                  className={`cursor-pointer rounded-3xl p-5 shadow-sm transition-all ${
+                    selectedAddress?.id === LIVE_DEVICE_ADDRESS_ID
+                      ? "border-2 border-[#19411F] bg-[#F2FEF4]"
+                      : "border-2 border-[#19411F]/35 bg-[#E6F4EA]"
+                  }`}
+                >
+                  <div className="flex justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#DCFCE7]">
+                          <MdMyLocation className="h-5 w-5 text-[#166534]" aria-hidden />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">Current Location</h3>
+                        {selectedAddress?.id === LIVE_DEVICE_ADDRESS_ID ? (
+                          <span className="flex-shrink-0 rounded-2xl bg-[#DCFCE7] px-2 py-1 text-xs font-semibold text-[#166534]">
+                            Active
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mb-1 min-w-0 max-w-full text-sm leading-relaxed text-gray-700 [overflow-wrap:anywhere]">
+                        {liveDeviceLocation.formattedAddress}
+                      </p>
+                      <p className="text-xs text-gray-500">Based on this device&apos;s location</p>
+                    </div>
+                    <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                      {isLoaded ? (
+                        <AddressThumbnailMap
+                          coordinates={`${liveDeviceLocation.lat},${liveDeviceLocation.lng}`}
+                        />
+                      ) : (
+                        <div className="h-full w-full animate-pulse bg-gray-200" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              {displayAddresses.map((address) => {
                 const icon = getTypeIcon(address.type || "home");
                 const addressTypeLower = address.type?.toLowerCase() || "";
                 const isGreenBg = addressTypeLower !== "work" && addressTypeLower !== "office";
@@ -1313,6 +1502,73 @@ const AddressSelection: React.FC = () => {
           </div>
         )}
       </div>
+
+      {dailyCartFromAddressModal ? (
+        <div
+          className="fixed inset-0 z-[220] flex items-center justify-center bg-black/45 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="gp-address-daily-cart-store-title"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h2 id="gp-address-daily-cart-store-title" className="text-lg font-semibold text-gray-900">
+              Address changed
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-gray-600 whitespace-pre-wrap">
+              {dailyCartFromAddressModal.message}
+            </p>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
+              <button
+                type="button"
+                disabled={confirmingDailyCartStoreChange}
+                onClick={async () => {
+                  const m = dailyCartFromAddressModal;
+                  if (!m) return;
+                  setConfirmingDailyCartStoreChange(true);
+                  try {
+                    const raw = await subscriptionCartService.setDeliveryAddress(
+                      Number(m.address.id),
+                      true,
+                    );
+                    if (isSubscriptionCartStoreChangeConfirmation(raw)) {
+                      toast.error("Could not confirm address change. Try again.");
+                      return;
+                    }
+                    setDailyCartFromAddressModal(null);
+                    localStorage.setItem(
+                      "selectedDeliveryAddress",
+                      JSON.stringify(m.address),
+                    );
+                    navigate("/gp-daily/basket", {
+                      state: {
+                        selectedAddress: m.address,
+                        addressUpdated: true,
+                      },
+                    });
+                  } catch (err) {
+                    toast.error(
+                      err instanceof Error ? err.message : "Could not confirm address change.",
+                    );
+                  } finally {
+                    setConfirmingDailyCartStoreChange(false);
+                  }
+                }}
+                className="rounded-xl bg-gray-900 py-3 text-center text-base font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {confirmingDailyCartStoreChange ? "Please wait…" : "Continue"}
+              </button>
+              <button
+                type="button"
+                disabled={confirmingDailyCartStoreChange}
+                onClick={() => setDailyCartFromAddressModal(null)}
+                className="rounded-xl border border-gray-200 py-3 text-center text-base font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

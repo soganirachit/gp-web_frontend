@@ -14,6 +14,7 @@ import {
   type GuestAreaModalVariant,
 } from "../../config/guestAreaModalCopy";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import { resolveGpDailyZoneAtLatLng } from "../../services/subscriptionZone.service";
 
 function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace("#", "").trim();
@@ -35,6 +36,24 @@ function hexToRgba(hex: string, alpha: number): string {
 function pickRandomStore(stores: Store[]): Store | null {
   if (!stores.length) return null;
   return stores[Math.floor(Math.random() * stores.length)]!;
+}
+
+async function resolveDailyGuestStoreIdFromCityStores(
+  stores: Store[],
+): Promise<number | null> {
+  const sorted = [...stores].sort((a, b) => a.name.localeCompare(b.name));
+  for (const s of sorted) {
+    const lat = parseFloat(String(s.latitude ?? ""));
+    const lng = parseFloat(String(s.longitude ?? ""));
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    try {
+      const r = await resolveGpDailyZoneAtLatLng(lat, lng);
+      if (r.eligible && r.storeId != null && r.storeId > 0) return r.storeId;
+    } catch {
+      /* try next store in city */
+    }
+  }
+  return null;
 }
 
 export interface GuestServiceAreaModalProps {
@@ -75,8 +94,10 @@ const panelVariants = {
 };
 
 /**
- * Logged-out users outside delivery coverage (or without location): pick a city;
- * a random online store in that city is assigned automatically.
+ * Logged-out users outside delivery coverage (or without location): pick a city.
+ * GP Store: a random online store in that city is assigned. GP Daily: prefer the
+ * subscription zone store resolved from a store location in that city, then fall back
+ * to a random store in the city.
  */
 export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
   open,
@@ -154,7 +175,11 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
     storeService.setTemporaryStoreId(storeId);
     notifyGuestTemporaryStoreUpdated();
     completeWithStore();
-    if (!pathname.startsWith("/gp-store")) {
+    if (feature === "gpDaily") {
+      if (!pathname.startsWith("/gp-daily")) {
+        navigate("/gp-daily", { replace: true });
+      }
+    } else if (!pathname.startsWith("/gp-store")) {
       navigate("/gp-store", { replace: true });
     }
   };
@@ -168,10 +193,19 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
         setError(`No active store found in ${city.name} right now. Try another city.`);
         return;
       }
-      const store = pickRandomStore(storesInCity);
-      if (store) {
-        finalizeStore(store.id);
+      let storeId: number | null = null;
+      if (feature === "gpDaily") {
+        storeId = await resolveDailyGuestStoreIdFromCityStores(storesInCity);
       }
+      if (storeId == null) {
+        const store = pickRandomStore(storesInCity);
+        if (!store) {
+          setError(`No active store found in ${city.name} right now. Try another city.`);
+          return;
+        }
+        storeId = store.id;
+      }
+      finalizeStore(storeId);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not load stores.");
     } finally {
