@@ -16,7 +16,6 @@ const GpStore_Homepage = lazy(() => import('../pages/GpStore_Homepage'));
 const HomePage = lazy(() => import('../pages/home_page'));
 const Products = lazy(() => import('../components/ProductPage/page'));
 const ProductPage = lazy(() => import('../components/ProductPage/ProductDisplaypage'));
-const Search = lazy(() => import('../components/ProductPage/SearchPage'));
 const ExploreMore = lazy(() => import('../components/ProductPage/ExploreMore'));
 
 const Startup = lazy(() => import('../components/Customer/forms/login/Startup'));
@@ -73,7 +72,7 @@ const router = createBrowserRouter(
     children: [
       { path: '/', element: <Startup /> },
       { path: '/startup', element: <Startup /> },
-      { path: '/search', element: <Search /> },
+      { path: '/search', element: <Navigate to="/home" replace /> },
       { path: '/explore-more', element: <ExploreMore /> },
       { path: '/home', element: <HomePage /> },
       {

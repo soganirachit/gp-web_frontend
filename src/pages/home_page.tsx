@@ -203,7 +203,6 @@ const HomePage: React.FC = () => {
             <SearchBar
               mode="product"
               storeId={offersStoreId}
-              searchPagePath="/search"
               productBasePath={feature === 'gpStore' ? '/gp-store' : '/gp-daily'}
             />
           </div>

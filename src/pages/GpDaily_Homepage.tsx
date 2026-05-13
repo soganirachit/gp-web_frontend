@@ -822,7 +822,6 @@ const Home2: React.FC = () => {
                 <SearchBar
                   mode="product"
                   productBasePath="/gp-daily"
-                  searchPagePath="/search"
                   storeId={storeService.getStoreIdForProducts() ?? undefined}
                 />
               </div>

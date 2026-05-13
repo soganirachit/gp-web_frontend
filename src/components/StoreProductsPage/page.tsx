@@ -335,7 +335,6 @@ const StoreProductsPages: React.FC = () => {
               mode="product"
               storeId={storeService.getStoreIdForProducts() ?? undefined}
               productBasePath="/gp-store"
-              searchPagePath="/search"
               value={searchQuery}
               onChange={setSearchQuery}
             />

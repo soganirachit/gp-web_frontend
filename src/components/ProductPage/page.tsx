@@ -316,7 +316,6 @@ const ProductBrowsePage: React.FC = () => {
               mode="product"
               storeId={storeService.getStoreIdForProducts() ?? undefined}
               productBasePath={basePath}
-              searchPagePath="/search"
               value={searchQuery}
               onChange={setSearchQuery}
             />

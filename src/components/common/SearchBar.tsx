@@ -35,8 +35,6 @@ interface SearchBarProps {
   /** Order mode: pass orders for client-side filtering */
   orders?: OrderSuggestion[];
   onOrderSelect?: (order: OrderSuggestion) => void;
-  /** Optional: navigate to search page with query on Enter when no suggestion selected */
-  searchPagePath?: string;
   /** Controlled: parent can filter list by query */
   value?: string;
   onChange?: (query: string) => void;
@@ -54,7 +52,6 @@ export function SearchBar({
   productBasePath = '/gp-store',
   orders = [],
   onOrderSelect,
-  searchPagePath = '/search',
   value,
   onChange,
   className = '',
@@ -169,20 +166,14 @@ export function SearchBar({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      /** GP Daily: inline suggestions only — never open standalone `/search` (matches mobile). */
-      if (productBasePath === '/gp-daily') {
-        /** Match mobile: Enter does not open product detail or search page. */
-        e.preventDefault();
-        return;
-      }
-      if (suggestions.length > 0 && mode === 'product') {
+      /** Inline suggestions only — same as mobile: no standalone search results page. */
+      e.preventDefault();
+      if (mode === 'product' && suggestions.length > 0) {
         handleProductSuggestionClick(suggestions[0] as ProductSuggestion);
-      } else if (suggestions.length > 0 && mode === 'order' && onOrderSelect) {
+      } else if (mode === 'order' && suggestions.length > 0 && onOrderSelect) {
         handleOrderSuggestionClick(suggestions[0] as OrderSuggestion);
-      } else if (query.trim()) {
-        navigate(`${searchPagePath}?q=${encodeURIComponent(query.trim())}`);
-        setShowSuggestions(false);
       }
+      return;
     }
     if (e.key === 'Escape') setShowSuggestions(false);
   };

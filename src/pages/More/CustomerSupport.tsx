@@ -19,7 +19,31 @@ function normalizeOrderNumber(n: string | null | undefined): string {
 /** Orders cannot open a duplicate ticket while one of these is still open. */
 function isActiveSupportTicketStatus(status: string | undefined): boolean {
   const s = normalizeSupportStatus(status);
-  return s === "open" || s === "pending" || s === "in_progress" || s === "new";
+  if (
+    s === "closed" ||
+    s === "close" ||
+    s === "resolved" ||
+    s === "solved" ||
+    s === "cancelled" ||
+    s === "canceled"
+  ) {
+    return false;
+  }
+  return (
+    s === "open" ||
+    s === "pending" ||
+    s === "new" ||
+    s === "in_progress" ||
+    s === "processing" ||
+    s === "assigned" ||
+    s === "working" ||
+    s === "reopened" ||
+    s === "awaiting_reply" ||
+    s === "awaiting_customer" ||
+    s === "active" ||
+    s === "answered" ||
+    s === "waiting_on_customer"
+  );
 }
 
 function orderNumbersWithActiveTickets(tickets: SupportTicket[]): Set<string> {
@@ -111,9 +135,37 @@ const CustomerSupport: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     const s = normalizeSupportStatus(status);
-    if (s === "open" || s === "pending" || s === "new") return "bg-yellow-100 text-yellow-800";
-    if (s === "resolved" || s === "closed") return "bg-green-100 text-green-800";
-    if (s === "in_progress") return "bg-blue-100 text-blue-800";
+    if (
+      s === "open" ||
+      s === "pending" ||
+      s === "new" ||
+      s === "reopened" ||
+      s === "awaiting_reply" ||
+      s === "awaiting_customer" ||
+      s === "active"
+    ) {
+      return "bg-yellow-100 text-yellow-800";
+    }
+    if (
+      s === "resolved" ||
+      s === "closed" ||
+      s === "close" ||
+      s === "solved" ||
+      s === "cancelled" ||
+      s === "canceled"
+    ) {
+      return "bg-green-100 text-green-800";
+    }
+    if (
+      s === "in_progress" ||
+      s === "processing" ||
+      s === "assigned" ||
+      s === "working" ||
+      s === "answered" ||
+      s === "waiting_on_customer"
+    ) {
+      return "bg-blue-100 text-blue-800";
+    }
     return "bg-gray-100 text-gray-800";
   };
 

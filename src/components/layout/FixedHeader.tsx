@@ -308,7 +308,7 @@ const FixedHeader: React.FC = () => {
               src={searchImage} 
               alt="search" 
               className="w-6 h-6 sm:w-8 sm:h-8 md:w-8 md:h-8 cursor-pointer" 
-              onClick={() => navigate('/search')}
+              onClick={() => navigate('/home')}
             />
           )}
           <img

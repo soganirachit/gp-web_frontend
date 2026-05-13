@@ -127,6 +127,32 @@ export interface EligibleOrder {
 }
 
 /**
+ * Known API statuses → user-facing labels (Open, In Progress, Closed).
+ */
+const SUPPORT_STATUS_LABEL: Record<string, string> = {
+  open: "Open",
+  new: "Open",
+  reopened: "Open",
+  pending: "Open",
+  awaiting_reply: "Open",
+  awaiting_customer: "Open",
+  active: "Open",
+  in_progress: "In Progress",
+  inprogress: "In Progress",
+  processing: "In Progress",
+  assigned: "In Progress",
+  working: "In Progress",
+  answered: "In Progress",
+  waiting_on_customer: "In Progress",
+  closed: "Close",
+  close: "Close",
+  resolved: "Close",
+  solved: "Close",
+  cancelled: "Close",
+  canceled: "Close",
+};
+
+/**
  * Normalize API status for comparisons (lowercase, trim, spaces → underscores).
  */
 export function normalizeSupportStatus(status: string | undefined | null): string {
@@ -138,49 +164,17 @@ export function normalizeSupportStatus(status: string | undefined | null): strin
 }
 
 /**
- * User-facing status label in camelCase (e.g. `open` → "open", `in_progress` / `In Progress` / `inProgress` → "inProgress").
+ * User-facing status: Open, In Progress, Closed (plus Title Case for unknown values).
  */
 export function formatSupportStatusLabel(status: string | undefined | null): string {
-  const raw = String(status ?? "").trim();
-  if (!raw) return "";
-
-  const underscored = raw
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_")
-    .replace(/-+/g, "_");
-  const fromUnderscore = underscored.split("_").filter(Boolean);
-  if (fromUnderscore.length > 1) {
-    return (
-      fromUnderscore[0].toLowerCase() +
-      fromUnderscore
-        .slice(1)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-        .join("")
-    );
-  }
-
-  const camelSplit = raw
-    .replace(/([a-z\d])([A-Z])/g, "$1 $2")
-    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
-    .trim()
-    .split(/\s+/)
-    .map((w) => w.replace(/[^a-zA-Z0-9]/g, "").toLowerCase())
-    .filter(Boolean);
-  if (camelSplit.length >= 2) {
-    return (
-      camelSplit[0].toLowerCase() +
-      camelSplit
-        .slice(1)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join("")
-    );
-  }
-
-  if (fromUnderscore.length === 1) {
-    return fromUnderscore[0].toLowerCase();
-  }
-  return raw;
+  const key = normalizeSupportStatus(status);
+  if (!key) return "";
+  if (SUPPORT_STATUS_LABEL[key]) return SUPPORT_STATUS_LABEL[key];
+  return key
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
 }
 
 export interface TicketQuestionOption {

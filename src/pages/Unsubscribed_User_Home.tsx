@@ -90,7 +90,7 @@ function Unsubscribed_User_Home() {
               src={searchImage} 
               alt="search" 
               className="w-6 h-6 sm:w-8 sm:h-8 md:w-8 md:h-8 mb-1 sm:mb-4 md:mb-4" 
-              onClick={() => navigate('/search')}
+              onClick={(e) => { e.stopPropagation(); navigate('/home'); }}
             />
             <button onClick={() => navigate('/wallet')} className="w-12 h-12 mb-2 md:w-14 md:h-14">
               <img src={wallet} alt="Wallet" className="w-full h-full" />

@@ -19,6 +19,47 @@ import { useFeatureTheme } from '../../context/FeatureThemeContext';
 const MESSAGE_IMAGE_ROW = 200;
 const MESSAGE_IMAGE_GAP = 2;
 
+const CLOSED_SUPPORT_STATUSES = new Set([
+  "closed",
+  "close",
+  "resolved",
+  "solved",
+  "cancelled",
+  "canceled",
+]);
+
+function isSupportTicketClosedLike(statusNorm: string): boolean {
+  return CLOSED_SUPPORT_STATUSES.has(statusNorm);
+}
+
+function supportStatusPillClass(statusNorm: string): string {
+  if (
+    statusNorm === "open" ||
+    statusNorm === "pending" ||
+    statusNorm === "new" ||
+    statusNorm === "reopened" ||
+    statusNorm === "awaiting_reply" ||
+    statusNorm === "awaiting_customer" ||
+    statusNorm === "active"
+  ) {
+    return "bg-yellow-100 text-yellow-800";
+  }
+  if (CLOSED_SUPPORT_STATUSES.has(statusNorm)) {
+    return "bg-green-100 text-green-800";
+  }
+  if (
+    statusNorm === "in_progress" ||
+    statusNorm === "processing" ||
+    statusNorm === "assigned" ||
+    statusNorm === "working" ||
+    statusNorm === "answered" ||
+    statusNorm === "waiting_on_customer"
+  ) {
+    return "bg-blue-100 text-blue-800";
+  }
+  return "bg-gray-100 text-gray-800";
+}
+
 type ImageGalleryState = { uris: string[]; index: number } | null;
 
 function ImageLightbox({
@@ -448,7 +489,7 @@ const SupportTicketChat: React.FC = () => {
             </div>
             
             {/* Action Buttons - Request Agent/Callback */}
-            {ticket && ticketSt !== 'closed' && ticketSt !== 'resolved' && (
+            {ticket && !isSupportTicketClosedLike(ticketSt) && (
               <div className="flex gap-2 mb-2">
                 {!ticket.callback_requested && (
                   <button
@@ -460,7 +501,7 @@ const SupportTicketChat: React.FC = () => {
                     {requestingCallback ? 'Requesting...' : 'Request Callback'}
                   </button>
                 )}
-                {ticketSt !== 'closed' && ticketSt !== 'resolved' && (
+                {!isSupportTicketClosedLike(ticketSt) && (
                   <button
                     onClick={handleCloseTicketClick}
                     disabled={closingTicket}
@@ -497,7 +538,7 @@ const SupportTicketChat: React.FC = () => {
           className="flex-shrink-0" 
           style={{ 
             height: ticket 
-              ? (ticketSt !== 'closed' && ticketSt !== 'resolved'
+              ? (!isSupportTicketClosedLike(ticketSt)
                   ? ((ticket.agent_requested || ticket.callback_requested) ? '160px' : '130px')
                   : '110px')
               : '100px'
@@ -506,7 +547,7 @@ const SupportTicketChat: React.FC = () => {
 
         {/* Messages - Scrollable area */}
         <div className="flex-1 px-4 overflow-y-auto min-h-0" style={{ 
-          paddingBottom: ticket && ticketSt !== 'closed' && ticketSt !== 'resolved' ? '200px' : '90px',
+          paddingBottom: ticket && !isSupportTicketClosedLike(ticketSt) ? '200px' : '90px',
           paddingTop: '16px'
         }}>
           {ticket && (
@@ -532,15 +573,7 @@ const SupportTicketChat: React.FC = () => {
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   <span
-                    className={`px-2 py-1 rounded-full text-xs font-bold ${
-                      ticketSt === 'open' || ticketSt === 'pending' || ticketSt === 'new'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : ticketSt === 'resolved'
-                          ? 'bg-green-100 text-green-800'
-                          : ticketSt === 'closed'
-                            ? 'bg-gray-100 text-gray-800'
-                            : 'bg-gray-100 text-gray-800'
-                    }`}
+                    className={`px-2 py-1 rounded-full text-xs font-bold ${supportStatusPillClass(ticketSt)}`}
                   >
                     {formatSupportStatusLabel(ticket.status)}
                   </span>
@@ -647,7 +680,7 @@ const SupportTicketChat: React.FC = () => {
         </div>
 
         {/* Message Input */}
-        {ticket && ticketSt !== 'closed' && ticketSt !== 'resolved' && (
+        {ticket && !isSupportTicketClosedLike(ticketSt) && (
           <div className="fixed bottom-[70px] left-0 right-0 z-30 mx-auto max-w-[800px] border-t border-gray-200 bg-white p-4">
             {filePreviewUrls.length > 0 ? (
               <div className="mb-3">
@@ -752,12 +785,10 @@ const SupportTicketChat: React.FC = () => {
           </div>
         )}
 
-        {(ticket && (ticketSt === 'closed' || ticketSt === 'resolved')) && (
+        {(ticket && isSupportTicketClosedLike(ticketSt)) && (
           <div className="sticky bottom-0 bg-gray-100 border-t border-gray-200 p-4 text-center">
             <p className="text-gray-600 text-sm">
-              {ticketSt === 'closed' 
-                ? 'This ticket is closed. You cannot send new messages.'
-                : 'This ticket is resolved. You cannot send new messages.'}
+              This ticket is closed. You cannot send new messages.
             </p>
           </div>
         )}

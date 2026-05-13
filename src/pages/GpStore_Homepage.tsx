@@ -423,7 +423,6 @@ const GpStore_Homepage: React.FC = () => {
                                     mode="product"
                                     storeId={storeId}
                                     productBasePath="/gp-store"
-                                    searchPagePath="/search"
                                 />
                             </div>
 
