@@ -68,10 +68,12 @@ export function AppToaster() {
         error: {
           duration: 3600,
           icon: null,
+          // Match mobile `AppToastProvider` errorToast (#BE2727)
           style: {
-            background: 'rgba(69, 10, 10, 0.96)',
-            color: '#fef2f2',
-            border: '1px solid rgba(252, 165, 165, 0.28)',
+            background: '#BE2727',
+            color: '#F9FAFB',
+            border: '1px solid #BE2727',
+            boxShadow: '0 6px 10px rgba(0, 0, 0, 0.18)',
           },
         },
         loading: {

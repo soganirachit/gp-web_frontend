@@ -1039,6 +1039,15 @@ const StorePage: React.FC = () => {
                   {stockLimitMessage}
                 </p>
               )}
+              <button
+                type="button"
+                onClick={() => navigate(`${basePath}/basket`)}
+                className="mt-3.5 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#19411F] px-5 py-3.5 text-base font-bold text-white transition-transform hover:bg-[#1e5a1c] active:scale-[0.99]"
+              >
+                <IoCartOutline className="shrink-0 text-xl" aria-hidden />
+                View basket
+                <FaChevronRight className="text-sm opacity-90" aria-hidden />
+              </button>
             </div>
           ) : !isLoggedIn ? (
             <button

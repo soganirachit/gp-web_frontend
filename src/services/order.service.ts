@@ -56,6 +56,8 @@ async function fetchAllOrderPages(
     const all: any[] = [];
     let url = `${getApiUrl()}/orders/`;
     let firstParams = sanitizeOrderListParams(params);
+    const subscriptionOnlyRequest =
+        String(firstParams?.order_type ?? "").toLowerCase() === "subscription";
 
     for (let p = 0; p < MAX_ORDER_LIST_PAGES; p++) {
         const response = await api.get(

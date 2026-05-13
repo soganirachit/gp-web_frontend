@@ -188,6 +188,18 @@ function historyOrderCancelled(o: Record<string, unknown>): boolean {
 }
 
 const DELIVERY_HISTORY_PAGE_SIZE = 6;
+/** Show Support link only within 4h of `delivered_at` (match mobile `SubscriptionsScreen`). */
+const SUPPORT_TICKET_WINDOW_MS = 4 * 60 * 60 * 1000;
+
+function isSupportAvailableForDelivery(
+  delivered: boolean,
+  deliveredAtRaw: unknown,
+): boolean {
+  if (!delivered || !deliveredAtRaw) return false;
+  const deliveredMs = new Date(String(deliveredAtRaw)).getTime();
+  if (!Number.isFinite(deliveredMs) || deliveredMs <= 0) return false;
+  return Date.now() < deliveredMs + SUPPORT_TICKET_WINDOW_MS;
+}
 
 function normalizeApiStatusKey(raw: string): string {
   return String(raw || "")
@@ -1069,7 +1081,11 @@ const ManageMySubscription: React.FC = () => {
                         >
                           {statusLabel}
                         </span>
-                        {delivered ? (
+                        {delivered &&
+                        isSupportAvailableForDelivery(
+                          true,
+                          order.delivered_at,
+                        ) ? (
                           <button
                             type="button"
                             onClick={() =>

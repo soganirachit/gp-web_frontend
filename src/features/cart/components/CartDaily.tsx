@@ -2310,7 +2310,7 @@ const Cart: React.FC = () => {
 
               {/* Select Delivery Days — matches app `CartScreen` (dailyDeliveryCard + chips + warning) */}
               <div className="relative mb-3.5 rounded-2xl bg-white p-3 shadow-sm" style={{ marginLeft: 2, marginRight: 2 }}>
-                <h2 className="mb-2.5 font-ibm-plex-serif text-2xl font-semibold text-[#222222]">Select Delivery Days</h2>
+                <h2 className="mb-2.5 font-ibm-plex-serif text-xl font-semibold text-[#222222]">Select Delivery Days</h2>
 
                 <div className="mb-2.5 flex flex-row flex-wrap gap-2">
                   {(['Daily', 'Mon-Sat', 'Customize'] as const).map((opt) => {

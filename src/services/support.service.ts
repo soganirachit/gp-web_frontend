@@ -1,5 +1,5 @@
 import api from "./api";
-import { getApiUrl } from "../config/api.config";
+import { getApiUrl, getApiOrigin } from "../config/api.config";
 import { headerService } from "./headers.service";
 
 const API_URL = `${getApiUrl()}/support/tickets`;
@@ -29,6 +29,74 @@ export interface SupportMessage {
   created_by_name: string;
   created_at: string;
   image_url?: string | null;
+  /** When API returns several URLs in one message (align with mobile). */
+  image_urls?: string[] | null;
+}
+
+/** Collect raw image URL strings from API (single or array fields). */
+export function collectRawImageUrlsFromMessage(m: {
+  image_urls?: unknown;
+  images?: unknown;
+  image_url?: unknown;
+  image?: unknown;
+}): string[] {
+  const out: string[] = [];
+  if (Array.isArray(m?.image_urls)) {
+    for (const u of m.image_urls) {
+      if (typeof u === "string" && u.trim()) out.push(u.trim());
+    }
+  }
+  if (Array.isArray(m?.images)) {
+    for (const u of m.images) {
+      if (typeof u === "string" && u.trim()) out.push(u.trim());
+    }
+  }
+  if (out.length) return out;
+  const one =
+    m?.image_url != null && m.image_url !== ""
+      ? String(m.image_url)
+      : m?.image != null && m.image !== ""
+        ? String(m.image)
+        : null;
+  return one && one.trim() ? [one.trim()] : [];
+}
+
+export function resolveSupportImageUrl(
+  raw: string | null | undefined,
+): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  if (/^https?:\/\//i.test(s)) return s;
+  const origin = getApiOrigin();
+  if (s.startsWith("/")) return `${origin}${s}`;
+  return `${origin}/${s.replace(/^\/+/, "")}`;
+}
+
+export function getResolvedMessageImageUris(msg: SupportMessage): string[] {
+  if (Array.isArray(msg.image_urls) && msg.image_urls.length > 0) {
+    return msg.image_urls
+      .map((u) => resolveSupportImageUrl(u))
+      .filter((u): u is string => Boolean(u));
+  }
+  const one = resolveSupportImageUrl(msg.image_url ?? null);
+  return one ? [one] : [];
+}
+
+export function normalizeSupportMessagePayload(m: any): SupportMessage {
+  const raw = collectRawImageUrlsFromMessage(m);
+  return {
+    id: Number(m.id),
+    message: String(m?.message ?? m?.text ?? m?.body ?? ""),
+    is_internal: Boolean(m.is_internal),
+    is_from_customer: m.is_from_customer,
+    created_by_name: String(
+      m?.created_by_name ?? m?.user?.full_name ?? "User",
+    ),
+    created_at: m.created_at,
+    image_url: raw[0] ?? null,
+    image_urls: raw.length > 0 ? raw : null,
+  };
 }
 
 export interface SupportTicketDetail {
@@ -58,6 +126,30 @@ export interface EligibleOrder {
   created_at: string;
 }
 
+/**
+ * Normalize API status for comparisons (lowercase, trim, spaces → underscores).
+ */
+export function normalizeSupportStatus(status: string | undefined | null): string {
+  return String(status ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+}
+
+/**
+ * User-facing status label: title case words (e.g. `open` → "Open", `in_progress` → "In Progress").
+ * Matches common “proper case” / camel-case style labels on support UIs.
+ */
+export function formatSupportStatusLabel(status: string | undefined | null): string {
+  const s = normalizeSupportStatus(status);
+  if (!s) return "";
+  return s
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export interface TicketQuestionOption {
   value: string;
   label: string;
@@ -80,7 +172,7 @@ export interface PredefinedAnswers {
 
 class SupportService {
   /**
-   * Get eligible orders for support (delivered in last 12 hours)
+   * Get eligible orders for support (delivered in last 4 hours)
    */
   async getEligibleOrders(): Promise<EligibleOrder[]> {
     try {
@@ -179,13 +271,20 @@ class SupportService {
 
       const data = response.data;
 
-      // Handle wrapped response structure: { success, message, data: {...ticket...} }
-      if (data && typeof data === 'object' && 'data' in data) {
-        return (data as { data: SupportTicketDetail }).data;
+      const normalizeDetail = (d: SupportTicketDetail): SupportTicketDetail => ({
+        ...d,
+        messages: Array.isArray(d.messages)
+          ? d.messages.map((m) => normalizeSupportMessagePayload(m))
+          : d.messages,
+      });
+
+      if (data && typeof data === "object" && "data" in data) {
+        return normalizeDetail(
+          (data as { data: SupportTicketDetail }).data,
+        );
       }
 
-      // Fallback: response is directly the ticket detail
-      return data as SupportTicketDetail;
+      return normalizeDetail(data as SupportTicketDetail);
     } catch (error: any) {
       console.error('Error fetching ticket details:', error);
       headerService.handleError(error);
@@ -325,11 +424,9 @@ class SupportService {
         formData.append('image', imageFile);
         formData.append('is_internal', isInternal.toString());
 
-        // Omit Content-Type to let browser set it with multipart boundary
         const response = await api.post<SupportMessage>(
           `${API_URL}/${ticketNumber}/messages/`,
           formData,
-          { headers: { 'Content-Type': undefined } }
         );
         return response.data;
       } else {

@@ -7,13 +7,43 @@ import basketIcon from "../../assets/icon/navbar/basket.svg";
 import accountIcon from "../../assets/icon/navbar/account.svg";
 import storeLogo from "../../assets/svg/store_logo.svg";
 import orderStoreIcon from "../../assets/svg/gp_store_svg/orderstore.svg";
-import activeBg from "../../assets/All/Vector (1).png";
 import dailyOrangeBanner from "../../assets/svg/gp_daily svg/orangebanner.svg";
 import storeGreenBanner from "../../assets/svg/gp_store_svg/greenbanner.svg";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import { subscriptionCartService } from "../../services/subscriptionCart.service";
+
+/**
+ * GP Daily tab glyphs: app tints the same SVGs to `#6B7280` / `#222222` (`DAILY_TEXT_ON_PRIMARY`).
+ * `<img src>` cannot honor `currentColor` — use the asset as a CSS mask so the fill matches the app.
+ */
+function DailyNavGlyph({
+  src,
+  active,
+  className = "mb-0.5 h-5 w-5",
+}: {
+  src: string;
+  active: boolean;
+  className?: string;
+}) {
+  return (
+    <span
+      aria-hidden
+      className={`inline-block shrink-0 ${active ? "bg-[#222222]" : "bg-[#6B7280]"} ${className}`}
+      style={{
+        maskImage: `url(${src})`,
+        WebkitMaskImage: `url(${src})`,
+        maskSize: "contain",
+        maskRepeat: "no-repeat",
+        maskPosition: "center",
+        WebkitMaskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+      }}
+    />
+  );
+}
 
 const BottomNav: React.FC = () => {
   const location = useLocation();
@@ -287,28 +317,27 @@ const BottomNav: React.FC = () => {
               }`}
           >
             {isActive("/home") && dailyActivePill}
-            <img
+            <DailyNavGlyph
               src={homeIcon}
-              alt="Home"
-              className={`w-5 h-5 mb-0.5 relative z-10 ${isActive("/home") ? "" : "opacity-75"}`}
-              style={isActive("/home") ? { filter: "brightness(0) saturate(100%)" } : undefined}
+              active={isActive("/home")}
+              className="mb-0.5 h-5 w-5 relative z-10"
             />
             <span className={`text-[10px] font-medium relative z-10 ${isActive("/home") ? "text-[#222222]" : "text-[#6B7280]"}`}>Home</span>
           </Link>
 
           <Link
             to="/gp-daily"
+            aria-label="Daily"
             className={`flex flex-col items-center justify-center flex-1 relative min-h-[44px] ${isActive("/gp-daily")
               ? theme.classes.bottomNavActiveText
               : theme.classes.bottomNavInactiveText
               }`}
           >
             {isActive("/gp-daily") && dailyActivePill}
-            <img
+            <DailyNavGlyph
               src={dailyIcon}
-              alt="Daily"
-              className={`w-9 h-9 relative z-10 ${isActive("/gp-daily") ? "" : "opacity-75"}`}
-              style={isActive("/gp-daily") ? { filter: "brightness(0) saturate(100%)" } : undefined}
+              active={isActive("/gp-daily")}
+              className="h-9 w-9 relative z-10"
             />
           </Link>
 
@@ -320,11 +349,10 @@ const BottomNav: React.FC = () => {
               }`}
           >
             {isActive(`${basePath}/wallet`) && dailyActivePill}
-            <img
+            <DailyNavGlyph
               src={walletIcon}
-              alt="Wallet"
-              className={`w-5 h-5 mb-0.5 relative z-10 ${isActive(`${basePath}/wallet`) ? "" : "opacity-75"}`}
-              style={isActive(`${basePath}/wallet`) ? { filter: "brightness(0) saturate(100%)" } : undefined}
+              active={isActive(`${basePath}/wallet`)}
+              className="mb-0.5 h-5 w-5 relative z-10"
             />
             <span className={`text-[10px] font-medium relative z-10 ${isActive(`${basePath}/wallet`) ? "text-[#222222]" : "text-[#6B7280]"}`}>Wallet</span>
           </Link>
@@ -339,11 +367,10 @@ const BottomNav: React.FC = () => {
           >
             {basketTabActive && dailyActivePill}
             <div className="relative">
-              <img
+              <DailyNavGlyph
                 src={basketIcon}
-                alt="Basket"
-                className={`w-5 h-5 mb-0.5 relative z-10 ${basketTabActive ? "" : "opacity-75"}`}
-                style={basketTabActive ? { filter: "brightness(0) saturate(100%)" } : undefined}
+                active={basketTabActive}
+                className="mb-0.5 h-5 w-5 relative z-10"
               />
               {cartItemCount > 0 && (
                 <span

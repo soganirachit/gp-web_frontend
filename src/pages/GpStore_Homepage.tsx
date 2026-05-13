@@ -16,7 +16,11 @@ import {
   showStrikeBaseOnCard,
   PRODUCT_AVAILABILITY_STORE,
 } from "../services/product.service";
-import { GUEST_STORE_UPDATED_EVENT, storeService } from "../services/store.service";
+import {
+  GUEST_STORE_UPDATED_EVENT,
+  GPS_CATALOG_LOCATION_UPDATED_EVENT,
+  storeService,
+} from "../services/store.service";
 import { toast } from "react-hot-toast";
 import { StoreHomeSkeleton } from "../components/common/PageSkeletons";
 import { SearchBar } from "../components/common/SearchBar";
@@ -195,10 +199,20 @@ const GpStore_Homepage: React.FC = () => {
                 return;
             }
             const addresses = await addressService.getAllAddresses();
-            // Get default address first, otherwise get the latest address
-            const defaultAddress = addresses.find(addr => addr.isDefault);
-            const selectedAddress = defaultAddress || addresses
-                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+            const overrideId = storeService.getGpStoreCatalogAddressOverrideId();
+            const fromOverride = overrideId
+                ? addresses.find((a) => String(a.id) === String(overrideId))
+                : null;
+            const defaultAddress = addresses.find((addr) => addr.isDefault);
+            const selectedAddress =
+                fromOverride ||
+                defaultAddress ||
+                addresses
+                    .sort(
+                        (a, b) =>
+                            new Date(b.updatedAt).getTime() -
+                            new Date(a.updatedAt).getTime()
+                    )[0];
 
             if (selectedAddress) {
                 const formattedAddress = [
@@ -285,6 +299,26 @@ const GpStore_Homepage: React.FC = () => {
         };
         window.addEventListener(GUEST_STORE_UPDATED_EVENT, onGuestStore);
         return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, onGuestStore);
+    }, [isLoggedIn]);
+
+    useEffect(() => {
+        if (!isLoggedIn) return;
+        const onCatalog = () => {
+            void fetchLatestAddress();
+            const sid = storeService.getStoreIdForProducts();
+            setStoreId(sid ?? null);
+            void fetchProducts();
+            void fetchCategories();
+            void fetchBestSellers();
+        };
+        window.addEventListener(GPS_CATALOG_LOCATION_UPDATED_EVENT, onCatalog);
+        return () =>
+            window.removeEventListener(
+                GPS_CATALOG_LOCATION_UPDATED_EVENT,
+                onCatalog,
+            );
+        // Event handler uses the latest fetch* and fetchLatestAddress from the render when the listener is attached.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isLoggedIn]);
 
     const handleLocationClick = () => {
