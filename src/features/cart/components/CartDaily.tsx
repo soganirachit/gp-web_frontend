@@ -714,7 +714,7 @@ const Cart: React.FC = () => {
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerRangeMessage, setDatePickerRangeMessage] = useState<string | null>(null);
-  const [selectedDateOption, setSelectedDateOption] = useState<'today' | 'tomorrow' | 'dayAfter' | 'pickDate'>('tomorrow');
+  const [selectedDateOption, setSelectedDateOption] = useState<'today' | 'tomorrow' | 'pickDate'>('tomorrow');
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const [availableSlots, setAvailableSlots] = useState<DeliverySlot[]>([]);
@@ -1508,8 +1508,7 @@ const Cart: React.FC = () => {
       if (isToday(dateObj)) setSelectedDateOption('today');
       else if (isTomorrow(dateObj)) setSelectedDateOption('tomorrow');
       else {
-        const dayAfter = addDays(new Date(), 2);
-        setSelectedDateOption(format(dateObj, 'yyyy-MM-dd') === format(dayAfter, 'yyyy-MM-dd') ? 'dayAfter' : 'pickDate');
+        setSelectedDateOption('pickDate');
       }
       // Restore display label from stored slot, then fetch fresh slots
       if (deliveryInfo.timeSlot) setSelectedTimeSlot(deliveryInfo.timeSlot);
@@ -1551,14 +1550,14 @@ const Cart: React.FC = () => {
     [datePickerMinStart, deliveryDateMaxStart],
   );
 
-  const handleDateOptionSelect = (option: 'today' | 'tomorrow' | 'dayAfter' | 'pickDate') => {
+  const handleDateOptionSelect = (option: 'today' | 'tomorrow' | 'pickDate') => {
     setSelectedDateOption(option);
     if (option === 'pickDate') {
       setDatePickerRangeMessage(null);
       setShowDatePicker(true);
       return;
     }
-    const dateMap = { today: new Date(), tomorrow: addDays(new Date(), 1), dayAfter: addDays(new Date(), 2) };
+    const dateMap = { today: new Date(), tomorrow: addDays(new Date(), 1) } as const;
     const selectedDate = startOfDay(dateMap[option]);
     updateDeliveryInfo({ deliveryDate: format(selectedDate, 'dd MMM yyyy'), timeSlot: '', slotId: undefined, selectedDate });
     fetchSlotsForDate(selectedDate);
@@ -1579,11 +1578,8 @@ const Cart: React.FC = () => {
       }
       setDatePickerRangeMessage(null);
       setShowDatePicker(false);
-      const today = startOfDay(new Date());
-      const dayAfter = addDays(today, 2);
       if (isToday(pickedDate)) setSelectedDateOption('today');
       else if (isTomorrow(pickedDate)) setSelectedDateOption('tomorrow');
-      else if (format(pickedDate, 'yyyy-MM-dd') === format(dayAfter, 'yyyy-MM-dd')) setSelectedDateOption('dayAfter');
       else setSelectedDateOption('pickDate');
       updateDeliveryInfo({ deliveryDate: format(pickedDate, 'dd MMM yyyy'), timeSlot: '', slotId: undefined, selectedDate: pickedDate });
       fetchSlotsForDate(pickedDate);

@@ -133,21 +133,54 @@ export function normalizeSupportStatus(status: string | undefined | null): strin
   return String(status ?? "")
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, "_");
+    .replace(/\s+/g, "_")
+    .replace(/-+/g, "_");
 }
 
 /**
- * User-facing status label: title case words (e.g. `open` → "Open", `in_progress` → "In Progress").
- * Matches common “proper case” / camel-case style labels on support UIs.
+ * User-facing status label in camelCase (e.g. `open` → "open", `in_progress` / `In Progress` / `inProgress` → "inProgress").
  */
 export function formatSupportStatusLabel(status: string | undefined | null): string {
-  const s = normalizeSupportStatus(status);
-  if (!s) return "";
-  return s
-    .split("_")
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(" ");
+  const raw = String(status ?? "").trim();
+  if (!raw) return "";
+
+  const underscored = raw
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/-+/g, "_");
+  const fromUnderscore = underscored.split("_").filter(Boolean);
+  if (fromUnderscore.length > 1) {
+    return (
+      fromUnderscore[0].toLowerCase() +
+      fromUnderscore
+        .slice(1)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join("")
+    );
+  }
+
+  const camelSplit = raw
+    .replace(/([a-z\d])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .trim()
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-zA-Z0-9]/g, "").toLowerCase())
+    .filter(Boolean);
+  if (camelSplit.length >= 2) {
+    return (
+      camelSplit[0].toLowerCase() +
+      camelSplit
+        .slice(1)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join("")
+    );
+  }
+
+  if (fromUnderscore.length === 1) {
+    return fromUnderscore[0].toLowerCase();
+  }
+  return raw;
 }
 
 export interface TicketQuestionOption {

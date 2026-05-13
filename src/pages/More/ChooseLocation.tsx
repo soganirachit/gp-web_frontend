@@ -212,11 +212,11 @@ const ChooseLocation: React.FC = () => {
                   <h3 className="text-lg font-semibold text-gray-800">
                     Current location
                   </h3>
-                  {browseOverrideId == null ? (
+                  {/* {browseOverrideId == null ? (
                     <span className="rounded-2xl bg-[#E6F4EA] px-2 py-0.5 text-xs font-semibold text-[#1E8E3E]">
                       Active
                     </span>
-                  ) : null}
+                  ) : null} */}
                 </div>
                 <p className="text-sm text-gray-500">
                   {gpsBusy
@@ -285,16 +285,6 @@ const ChooseLocation: React.FC = () => {
                         <h3 className="text-lg font-semibold capitalize text-gray-800">
                           {address.type || "Others"}
                         </h3>
-                        {address.isDefault ? (
-                          <span className="rounded-2xl bg-[#E6F4EA] px-2 py-1 text-xs font-semibold text-[#1E8E3E]">
-                            Default
-                          </span>
-                        ) : null}
-                        {isSelected ? (
-                          <span className="rounded-2xl bg-[#E6F4EA] px-2 py-1 text-xs font-semibold text-[#1E8E3E]">
-                            Pinned
-                          </span>
-                        ) : null}
                       </div>
                       <p className="line-clamp-2 pr-2 text-sm leading-relaxed break-words text-gray-500 [overflow-wrap:anywhere]">
                         {[
@@ -309,9 +299,40 @@ const ChooseLocation: React.FC = () => {
                           .join(", ")}{" "}
                         - {address.pincode}
                       </p>
-                      <p className="font-base mt-1 mb-3 text-sm text-gray-800">
-                        +91 {formatPhoneForDisplay(address.associatedPhoneNumber)}
-                      </p>
+                      <div className="mb-3 mt-1 flex min-w-0 flex-wrap items-center gap-2">
+                        {(() => {
+                          const digits = formatPhoneForDisplay(
+                            address.associatedPhoneNumber,
+                          ).replace(/\D/g, "");
+                          const last10 =
+                            digits.length >= 10 ? digits.slice(-10) : "";
+                          const hasPhone = last10.length === 10;
+                          if (!hasPhone && !address.isDefault && !isSelected) {
+                            return null;
+                          }
+                          return (
+                            <>
+                              {hasPhone ? (
+                                <p className="min-w-0 shrink text-sm text-gray-800">
+                                  +91 {last10.slice(0, 5)} {last10.slice(5)}
+                                </p>
+                              ) : null}
+                              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                {address.isDefault ? (
+                                  <span className="rounded-2xl bg-[#E6F4EA] px-2 py-1 text-xs font-semibold text-[#1E8E3E]">
+                                    Default
+                                  </span>
+                                ) : null}
+                                {/* {isSelected ? (
+                                  <span className="rounded-2xl bg-[#E6F4EA] px-2 py-1 text-xs font-semibold text-[#1E8E3E]">
+                                    Active
+                                  </span>
+                                ) : null} */}
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
                     </div>
                     {address.coordinates ? (
                       <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">

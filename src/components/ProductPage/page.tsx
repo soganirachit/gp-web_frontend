@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { IoSwapVerticalOutline } from "react-icons/io5";
 import { FaChevronRight } from "react-icons/fa";
@@ -25,6 +25,17 @@ import { resolveGpDailyCatalogStoreId } from "../../utils/gpDailyCatalogStore";
 
 const DAILY_AVAILABILITY = PRODUCT_AVAILABILITY_GP_DAILY_LIST;
 
+function dailySortByToApiOrdering(sortType: string): string | undefined {
+  switch (sortType) {
+    case "Price":
+      return "current_price";
+    case "New":
+      return "-created_at";
+    default:
+      return undefined;
+  }
+}
+
 const ProductBrowsePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -44,7 +55,8 @@ const ProductBrowsePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const [categoryName, setCategoryName] = useState("All Products");
-  const [displayedProducts, setDisplayedProducts] = useState(6);
+  const [nextProductPageUrl, setNextProductPageUrl] = useState<string | null>(null);
+  const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const basePath = "/gp-daily";
@@ -80,6 +92,7 @@ const ProductBrowsePage: React.FC = () => {
       try {
         setIsLoading(true);
         setError(null);
+        setNextProductPageUrl(null);
 
         if (!localStorage.getItem("phoneNumber")) {
           const existing = storeService.getTemporaryStoreId();
@@ -97,6 +110,10 @@ const ProductBrowsePage: React.FC = () => {
 
         if (stateCategoryName) {
           setCategoryName(stateCategoryName);
+        } else if (categorySlug === "puja" || categorySlug === "pujaflowers") {
+          setCategoryName("Puja Flowers");
+        } else if (categorySlug === "exotic") {
+          setCategoryName("Exotic Flowers");
         } else if (categorySlug) {
           const formatted = categorySlug
             .split("-")
@@ -107,52 +124,45 @@ const ProductBrowsePage: React.FC = () => {
           setCategoryName("All Products");
         }
 
-        let list: any[] = [];
-        const rawAll = async () => {
-          const rows = await productService.getAllProductsPaged({
-            availabilityType: DAILY_AVAILABILITY,
-            storeId: storeId || undefined,
-          });
-          return rows
-            .filter((p: any) => p.isActive !== false)
-            .map((p: any) => mapGpDailyCatalogRowToProduct(p as Record<string, unknown>));
-        };
+        const ordering = dailySortByToApiOrdering(sortBy);
 
-        if (!categorySlug) {
-          list = await rawAll();
-        } else if (categorySlug === "puja" || categorySlug === "pujaflowers") {
-          const all = await rawAll();
-          list = all.filter((p) => p.category?.toUpperCase() === "PUJA");
-          setCategoryName("Puja Flowers");
-        } else if (categorySlug === "exotic") {
-          const all = await rawAll();
-          list = all.filter((p) => p.category?.toUpperCase() === "EXOTIC");
-          setCategoryName("Exotic Flowers");
-        } else {
-          const result = await productService.getProductsByCategory(
-            categorySlug,
-            storeId || undefined,
-            DAILY_AVAILABILITY,
-            100,
-          );
-          list = (result || []).map((p: any) =>
+        const apiCategorySlug =
+          categorySlug === "pujaflowers" ? "puja" : categorySlug || undefined;
+
+        const { products: firstBatch, nextUrl } =
+          await productService.getStoreProductListFirstPage({
+            categorySlug: apiCategorySlug,
+            ordering,
+            storeId,
+            availabilityType: DAILY_AVAILABILITY,
+          });
+
+        let mapped = (firstBatch || [])
+          .filter((p: any) => p?.is_active !== false && p?.isActive !== false)
+          .map((p: any) =>
             mapGpDailyCatalogRowToProduct(p as Record<string, unknown>),
           );
+
+        if (categorySlug === "puja" || categorySlug === "pujaflowers") {
+          mapped = mapped.filter((p) => p.category?.toUpperCase() === "PUJA");
+        } else if (categorySlug === "exotic") {
+          mapped = mapped.filter((p) => p.category?.toUpperCase() === "EXOTIC");
         }
 
-        setProducts(list);
-        setDisplayedProducts(6);
+        setProducts(mapped);
+        setNextProductPageUrl(nextUrl);
       } catch (e) {
         console.error(e);
         setError("Failed to load products");
         setProducts([]);
+        setNextProductPageUrl(null);
       } finally {
         setIsLoading(false);
       }
     };
 
     run();
-  }, [categorySlug, stateCategoryName]);
+  }, [categorySlug, stateCategoryName, sortBy]);
 
   useEffect(() => {
     if (!categorySlug || stateCategoryName) return;
@@ -195,7 +205,39 @@ const ProductBrowsePage: React.FC = () => {
     }
   };
 
-  const handleLoadMore = () => setDisplayedProducts((p) => p + 6);
+  const loadNextProductPageRef = useRef<() => void>(() => {});
+  const loadingMoreRef = useRef(false);
+  const loadNextProductPage = useCallback(() => {
+    void (async () => {
+      const url = nextProductPageUrl;
+      if (!url || loadingMoreRef.current) return;
+      loadingMoreRef.current = true;
+      setLoadingMoreProducts(true);
+      try {
+        const { products: batch, nextUrl } =
+          await productService.getStoreProductListNextPage(url);
+        let mapped = (batch || [])
+          .filter((p: any) => p?.is_active !== false && p?.isActive !== false)
+          .map((p: any) =>
+            mapGpDailyCatalogRowToProduct(p as Record<string, unknown>),
+          );
+        if (categorySlug === "puja" || categorySlug === "pujaflowers") {
+          mapped = mapped.filter((p) => p.category?.toUpperCase() === "PUJA");
+        } else if (categorySlug === "exotic") {
+          mapped = mapped.filter((p) => p.category?.toUpperCase() === "EXOTIC");
+        }
+        setProducts((prev) => [...prev, ...mapped]);
+        setNextProductPageUrl(nextUrl);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        loadingMoreRef.current = false;
+        setLoadingMoreProducts(false);
+      }
+    })();
+  }, [nextProductPageUrl, categorySlug]);
+
+  loadNextProductPageRef.current = loadNextProductPage;
 
   const sortedProducts = sortProducts(products, sortBy);
   const filteredProducts =
@@ -207,8 +249,24 @@ const ProductBrowsePage: React.FC = () => {
           const desc = String(item.description ?? item.short_description ?? "").toLowerCase();
           return name.includes(q) || desc.includes(q);
         });
-  const visibleProducts = filteredProducts.slice(0, displayedProducts);
-  const hasMoreProducts = filteredProducts.length > displayedProducts;
+  const visibleProducts = filteredProducts;
+  const hasMoreFromApi = Boolean(nextProductPageUrl);
+
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!hasMoreFromApi) return;
+    const el = loadMoreSentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const ob = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadNextProductPageRef.current();
+      },
+      { root: null, rootMargin: "280px 0px", threshold: 0 },
+    );
+    ob.observe(el);
+    return () => ob.disconnect();
+  }, [hasMoreFromApi, products.length, categorySlug, sortBy]);
 
   const isPageLoading = isLoading || isLoadingCategories;
 
@@ -533,17 +591,16 @@ const ProductBrowsePage: React.FC = () => {
                 </div>
               )}
 
-              {hasMoreProducts && (
-                <div className="flex justify-center mb-6">
-                  <button
-                    type="button"
-                    onClick={handleLoadMore}
-                    className="inline-flex min-h-[44px] items-center justify-center px-6 py-2.5 text-sm font-medium text-gray-700 underline rounded-lg transition-colors hover:bg-gray-200"
-                  >
-                    Load More
-                  </button>
-                </div>
+              {hasMoreFromApi && (
+                <div
+                  ref={loadMoreSentinelRef}
+                  className="flex min-h-[40px] justify-center py-2"
+                  aria-hidden
+                />
               )}
+              {loadingMoreProducts ? (
+                <p className="mb-4 text-center text-sm text-gray-500">Loading more…</p>
+              ) : null}
             </>
           )}
         </div>

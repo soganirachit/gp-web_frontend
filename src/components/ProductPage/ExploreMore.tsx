@@ -237,6 +237,24 @@ const ExploreMore: React.FC = () => {
 
   const handleLoadMore = () => setDisplayedCount((prev) => prev + 6);
 
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  const handleLoadMoreRef = useRef(handleLoadMore);
+  handleLoadMoreRef.current = handleLoadMore;
+
+  useEffect(() => {
+    if (!hasMore) return;
+    const el = loadMoreSentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const ob = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) handleLoadMoreRef.current();
+      },
+      { root: null, rootMargin: "200px 0px", threshold: 0 },
+    );
+    ob.observe(el);
+    return () => ob.disconnect();
+  }, [hasMore, displayedCount, filteredProducts.length]);
+
   const getPageTitle = (): string => {
     if (section) return section;
     if (category) {
@@ -310,14 +328,11 @@ const ExploreMore: React.FC = () => {
               )}
 
               {hasMore && (
-                <div className="text-center mt-6">
-                  <button
-                    onClick={handleLoadMore}
-                    className="text-gray-700 underline text-base font-medium hover:text-gray-900"
-                  >
-                    Load More
-                  </button>
-                </div>
+                <div
+                  ref={loadMoreSentinelRef}
+                  className="w-full min-h-[32px] mt-4"
+                  aria-hidden
+                />
               )}
             </>
           )}

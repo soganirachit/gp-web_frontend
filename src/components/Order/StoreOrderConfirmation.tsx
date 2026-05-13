@@ -12,10 +12,6 @@ import { format } from 'date-fns';
 import flowerCnfSvg from '../../assets/svg/gp_daily svg/flower_cnf.svg';
 import savingsCnfSvg from '../../assets/svg/gp_daily svg/savings_cnf.svg';
 
-interface MapAddress {
-  coordinates?: string | null;
-}
-
 interface DeliveryAddress {
   address_type?: string;
   address_line1?: string;
@@ -25,6 +21,50 @@ interface DeliveryAddress {
   state?: string;
   pincode?: string;
   coordinates?: string | null;
+  lat_lng?: string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  lat?: number | string | null;
+  lng?: number | string | null;
+  location?: Record<string, unknown> | null;
+}
+
+function parseCoordString(raw: unknown): { lat: number; lng: number } | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim();
+  if (!s) return null;
+  const parts = s.split(",").map((x) => Number(String(x).trim()));
+  if (parts.length >= 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
+    return { lat: parts[0], lng: parts[1] };
+  }
+  return null;
+}
+
+function pickLatLngFromDeliveryAddress(
+  addr: DeliveryAddress | null | undefined,
+): { lat: number; lng: number } | null {
+  if (!addr) return null;
+  const a = addr as Record<string, unknown>;
+  const tryObj = (o: Record<string, unknown> | null | undefined) => {
+    if (!o) return null;
+    return (
+      parseCoordString(o.coordinates) ||
+      parseCoordString(o.lat_lng) ||
+      parseCoordString(o.coordinate) ||
+      (() => {
+        const lat = Number(o.latitude ?? o.lat);
+        const lng = Number(o.longitude ?? o.lng ?? o.lon);
+        return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+      })()
+    );
+  };
+  let r = tryObj(a as Record<string, unknown>);
+  if (r) return r;
+  const loc = a.location;
+  if (loc && typeof loc === "object") {
+    r = tryObj(loc as Record<string, unknown>);
+  }
+  return r;
 }
 
 interface OrderItem {
@@ -64,8 +104,8 @@ const SuccessCheckmark: React.FC = () => {
   );
 };
 
-const MapView: React.FC<{ address: MapAddress | null; themeColor: string }> = ({
-  address,
+const MapView: React.FC<{ deliveryAddress: DeliveryAddress | null | undefined; themeColor: string }> = ({
+  deliveryAddress,
   themeColor: _themeColor,
 }) => {
   const { isLoaded, loadError } = useGoogleMaps();
@@ -86,25 +126,20 @@ const MapView: React.FC<{ address: MapAddress | null; themeColor: string }> = ({
     );
   }
 
-  // Default to India center; if coordinates exist, use them.
+  const picked = pickLatLngFromDeliveryAddress(deliveryAddress ?? null);
   let center = { lat: 20.5937, lng: 78.9629 };
   let hasValidCoords = false;
-  if (address?.coordinates) {
-    const parts = address.coordinates.split(',').map((s) => Number(String(s).trim()));
-    const lat = parts[0];
-    const lng = parts[1];
-    if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      center = { lat, lng };
-      hasValidCoords = true;
-    }
+  if (picked) {
+    center = picked;
+    hasValidCoords = true;
   }
 
   return (
     <div className="w-full h-[170px] rounded-lg overflow-hidden relative">
       <GoogleMap
-        mapContainerStyle={{ width: '100%', height: '100%' }}
+        mapContainerStyle={{ width: "100%", height: "100%" }}
         center={center}
-        zoom={hasValidCoords ? 18 : 16}
+        zoom={hasValidCoords ? 16 : 4}
         options={{
           zoomControl: false,
           streetViewControl: false,
@@ -114,7 +149,7 @@ const MapView: React.FC<{ address: MapAddress | null; themeColor: string }> = ({
           scrollwheel: false,
           disableDoubleClickZoom: true,
           disableDefaultUI: true,
-          gestureHandling: 'none',
+          gestureHandling: "none",
           clickableIcons: false,
         }}
       >
@@ -260,7 +295,7 @@ const StoreOrderConfirmation: React.FC = () => {
           </div>
           <div className="mt-3 -mx-4 sm:-mx-5">
             <MapView
-              address={{ coordinates: order.delivery_address?.coordinates ?? null }}
+              deliveryAddress={order.delivery_address}
               themeColor={theme.colors.primary}
             />
           </div>

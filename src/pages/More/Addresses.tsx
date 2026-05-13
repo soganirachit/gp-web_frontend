@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaPen, FaTrash } from 'react-icons/fa';
-import { BsCheckSquareFill } from 'react-icons/bs';
 import { addressService, type Address } from '../../services/address.service';
 import { SettingsListSkeleton } from '../../components/common/PageSkeletons';
-import { GoogleMap, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 
 // Import SVG icons
 import homeIcon from '../../assets/svg/adressbook/home.svg';
@@ -14,6 +13,7 @@ import defaultIcon from '../../assets/svg/adressbook/default.svg';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { UniformPageHeader } from '../../components/layout/UniformPageHeader';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
+import { storeService } from '../../services/store.service';
 
 const Addresses: React.FC = () => {
   const navigate = useNavigate();
@@ -24,6 +24,7 @@ const Addresses: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [catalogPinId, setCatalogPinId] = useState<string | null>(null);
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
@@ -49,6 +50,14 @@ const Addresses: React.FC = () => {
   useEffect(() => {
     loadAddresses();
   }, [navigate]);
+
+  useEffect(() => {
+    if (feature !== 'gpStore') {
+      setCatalogPinId(null);
+      return;
+    }
+    setCatalogPinId(storeService.getGpStoreCatalogAddressOverrideId());
+  }, [feature, addresses]);
 
   const handleEdit = (address: Address) => {
     navigate(`${basePath}/addresses/edit`, { state: { address } });
@@ -97,7 +106,7 @@ const Addresses: React.FC = () => {
       <GoogleMap
         mapContainerStyle={{ width: '100%', height: '100%', borderRadius: '0.5rem' }}
         center={{ lat, lng }}
-        zoom={15}
+        zoom={16}
         options={{
           disableDefaultUI: true,
           draggable: false,
@@ -105,7 +114,9 @@ const Addresses: React.FC = () => {
           scrollwheel: false,
           disableDoubleClickZoom: true,
         }}
-      />
+      >
+        <Marker position={{ lat, lng }} />
+      </GoogleMap>
     );
   };
 
@@ -167,6 +178,11 @@ const Addresses: React.FC = () => {
                     const isGreenBg = addressTypeLower !== 'work' && addressTypeLower !== 'office';
                     const iconBgClass = isGreenBg ? 'bg-[#ECFDF5]' : 'bg-[#EEF2FF]';
 
+                    const isCatalogPinned =
+                      feature === 'gpStore' &&
+                      catalogPinId != null &&
+                      String(address.id) === String(catalogPinId);
+
                     return (
                       <div
                         key={address.id}
@@ -176,7 +192,6 @@ const Addresses: React.FC = () => {
 
                           {/* Left Details Section */}
                           <div className="flex-1 min-w-0">
-                            {/* Header: Icon + Type + Default Badge */}
                             <div className="flex items-center gap-3 mb-2">
                               <div className={`w-10 h-10 rounded-full ${iconBgClass} flex items-center justify-center flex-shrink-0`}>
                                 <img src={icon} alt={address.type} className="w-5 h-5" />
@@ -184,16 +199,8 @@ const Addresses: React.FC = () => {
                               <h3 className="text-lg font-semibold text-gray-800 capitalize">
                                 {address.type || 'Others'}
                               </h3>
-
-                              {address.isDefault && (
-                                <span className="bg-[#E6F4EA] text-[#1E8E3E] text-xs px-2 py-1 rounded-2xl font-semibold">
-                                  Default
-                                </span>
-                              )}
-
                             </div>
 
-                            {/* Address Text — max 2 lines, then ellipsis */}
                             <p className="text-gray-500 text-sm leading-relaxed mb-1 pr-2 break-words line-clamp-2 [overflow-wrap:anywhere]">
                               {[
                                 address.houseNo,
@@ -205,13 +212,35 @@ const Addresses: React.FC = () => {
                               ].filter(Boolean).join(', ')} - {address.pincode}
                             </p>
 
-                            {/* Phone Text */}
-                            <p className="text-gray-800 font-base text-sm mb-4">
-                              +91 {formatPhoneForDisplay(address.associatedPhoneNumber)}
-                            </p>
+                            <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2">
+                              {(() => {
+                                const digits = formatPhoneForDisplay(
+                                  address.associatedPhoneNumber,
+                                ).replace(/\D/g, '');
+                                const last10 =
+                                  digits.length >= 10 ? digits.slice(-10) : '';
+                                const hasPhone = last10.length === 10;
+                                if (!hasPhone && !isCatalogPinned) return null;
+                                return (
+                                  <>
+                                    {hasPhone ? (
+                                      <p className="min-w-0 shrink text-sm font-normal text-gray-800">
+                                        +91 {last10.slice(0, 5)} {last10.slice(5)}
+                                      </p>
+                                    ) : null}
+                                    {/* {isCatalogPinned ? (
+                                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                        <span className="rounded-2xl bg-[#E6F4EA] px-2 py-1 text-xs font-semibold text-[#1E8E3E]">
+                                          Active
+                                        </span>
+                                      </div>
+                                    ) : null} */}
+                                  </>
+                                );
+                              })()}
+                            </div>
                           </div>
 
-                          {/* Right Map Section */}
                           {address.coordinates && (
                             <div className="w-28 h-28 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
                               <AddressMap coordinates={address.coordinates} />
@@ -219,9 +248,9 @@ const Addresses: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Action Buttons Row */}
-                        <div className="flex items-center gap-6 mt-2">
+                        <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-gray-100 pt-3">
                           <button
+                            type="button"
                             onClick={() => handleEdit(address)}
                             className="flex items-center gap-1.5 text-[#00A082] font-semibold text-sm hover:opacity-80 disabled:opacity-50"
                             disabled={actionInProgress}
@@ -231,6 +260,7 @@ const Addresses: React.FC = () => {
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => handleDeleteClick(address.id)}
                             className="flex items-center gap-1.5 text-[#FF3B30] font-semibold text-sm hover:opacity-80 disabled:opacity-50"
                             disabled={actionInProgress}
@@ -241,14 +271,21 @@ const Addresses: React.FC = () => {
 
                           {!address.isDefault && (
                             <button
+                              type="button"
                               onClick={() => handleSetDefault(address.id)}
                               disabled={actionInProgress}
                               className="flex items-center gap-1.5 text-[#3B82F6] font-semibold text-sm hover:opacity-80 disabled:opacity-50"
                             >
-                              <img src={defaultIcon} alt="default" className="w-5 h-5" />
+                              <img src={defaultIcon} alt="" className="w-5 h-5" />
                               Set as Default
                             </button>
                           )}
+
+                          {address.isDefault ? (
+                            <span className="inline-flex items-center rounded-2xl bg-[#E6F4EA] px-2 py-1 text-xs font-semibold text-[#1E8E3E]">
+                              Default
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     );

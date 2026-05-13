@@ -19,7 +19,7 @@ const bannerSvg = '/banner.svg';
 const bottomBannerSvg = '/bottom_banner.svg';
 // SVG Imports
 import namasteSvg from '../assets/svg/namaste.svg';
-import dailyLogoSvg from '../assets/svg/daily_logo.svg';
+import dailyTabGlyph from '../assets/icon/navbar/daily.svg';
 import storeLogoSvg from '../assets/svg/store_logo.svg';
 import truckSvg from '../assets/svg/truck.svg';
 import sajawatLogoSvg from '../assets/svg/sajawat_logo.svg';
@@ -152,7 +152,7 @@ const HomePage: React.FC = () => {
           ]
         }}
       />
-      <div className="mx-auto min-h-screen w-full max-w-[min(800px,100vw)] bg-white pb-safe-bottom">
+      <div className="mx-auto w-full max-w-[min(800px,100vw)] bg-white pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]">
         {/* Top Navigation Bar */}
         <div className="bg-white sticky top-0 z-20 isolate px-3 sm:px-4 py-2 sm:py-3">
           <div className="flex items-center justify-between">
@@ -210,7 +210,7 @@ const HomePage: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="relative z-0 px-3 sm:px-4 pb-8">
+        <div className="relative z-0 px-3 sm:px-4 pb-2">
           {/* Greeting Section with Namaste SVG */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -258,7 +258,20 @@ const HomePage: React.FC = () => {
                   className="pointer-events-none absolute inset-x-0 bottom-0 mx-auto h-[92%] w-[118%] max-w-none object-contain object-bottom sm:h-[94%] sm:w-[108%]"
                 />
                 <div className="absolute right-0 top-0.5 z-10 w-[45%] max-w-[4.25rem] sm:top-1.5 sm:max-w-[6rem] md:max-w-[8rem]">
-                  <img src={dailyLogoSvg} alt="Genda Phool Daily" className="h-auto w-full object-contain object-right drop-shadow-sm" />
+                  <span
+                    aria-hidden
+                    className="block aspect-square w-full shrink-0 bg-[#DD7600] drop-shadow-sm"
+                    style={{
+                      maskImage: `url(${dailyTabGlyph})`,
+                      WebkitMaskImage: `url(${dailyTabGlyph})`,
+                      maskSize: "contain",
+                      maskRepeat: "no-repeat",
+                      maskPosition: "center",
+                      WebkitMaskSize: "contain",
+                      WebkitMaskRepeat: "no-repeat",
+                      WebkitMaskPosition: "center",
+                    }}
+                  />
                 </div>
               </div>
               <p className="mt-1 min-w-0 px-0.5 text-left text-[10px] font-medium leading-snug text-[#DD7600] [overflow-wrap:anywhere] sm:mt-1.5 sm:px-1 sm:text-[11px] md:text-xs md:leading-snug">
@@ -521,7 +534,7 @@ const HomePage: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.9 }}
-            className="mb-8 sm:mb-10"
+            className="mb-0"
           >
             <div className="flex flex-col gap-2 items-start">
               <img

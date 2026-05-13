@@ -174,6 +174,16 @@ const StorePage: React.FC = () => {
   }, [items, product, selectedVariant?.id]);
   const basketQuantity = activeCartLine?.quantity ?? 0;
 
+  const isBouquetCategory = Boolean(
+    product?.category_slug?.toLowerCase().includes("bouquet"),
+  );
+
+  useEffect(() => {
+    if (!isBouquetCategory) return;
+    const msg = (activeCartLine?.customizedMessage ?? "").trim();
+    setCustomMessage(msg);
+  }, [isBouquetCategory, activeCartLine?.id, activeCartLine?.customizedMessage]);
+
   const resolveFreeDeliveryDisplay = useCallback(
     async (pd: ProductDetail | null) => {
       if (!pd) {
@@ -434,7 +444,12 @@ const StorePage: React.FC = () => {
       if (nextQty < 1) {
         await removeFromCart(activeCartLine.id);
       } else {
-        await updateQuantity(activeCartLine.id, nextQty, activeCartLine.customizedMessage);
+        const bouquetInstructions = product?.category_slug
+          ?.toLowerCase()
+          .includes("bouquet")
+          ? customMessage.trim() || undefined
+          : activeCartLine.customizedMessage;
+        await updateQuantity(activeCartLine.id, nextQty, bouquetInstructions);
       }
     } catch (error: unknown) {
       console.error("Error updating basket quantity:", error);
@@ -1039,15 +1054,6 @@ const StorePage: React.FC = () => {
                   {stockLimitMessage}
                 </p>
               )}
-              <button
-                type="button"
-                onClick={() => navigate(`${basePath}/basket`)}
-                className="mt-3.5 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#19411F] px-5 py-3.5 text-base font-bold text-white transition-transform hover:bg-[#1e5a1c] active:scale-[0.99]"
-              >
-                <IoCartOutline className="shrink-0 text-xl" aria-hidden />
-                View basket
-                <FaChevronRight className="text-sm opacity-90" aria-hidden />
-              </button>
             </div>
           ) : !isLoggedIn ? (
             <button

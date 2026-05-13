@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { FaArrowLeft, FaCheck, FaTimes } from "react-icons/fa";
+import { FaArrowLeft, FaCheck, FaPen, FaTimes, FaTrash } from "react-icons/fa";
 import { MdLocationOn, MdMyLocation } from "react-icons/md";
 import { IoArrowBack } from "react-icons/io5";
 import { toast } from "react-hot-toast";
@@ -22,6 +22,7 @@ import { formatPhoneForDisplay } from "../../utils/phoneDisplay";
 import homeIcon from "../../assets/svg/adressbook/home.svg";
 import workIcon from "../../assets/svg/adressbook/office.svg";
 import othersIcon from "../../assets/svg/adressbook/others.svg";
+import defaultIcon from "../../assets/svg/adressbook/default.svg";
 
 /** Synthetic id — device GPS selection (not a saved server address). */
 const LIVE_DEVICE_ADDRESS_ID = "__gf_live_device__";
@@ -90,6 +91,8 @@ const AddressSelection: React.FC = () => {
   });
   const isStoreProduct = location.state?.product?.isStore;
   const [userData, setUserData] = useState<any>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [actionInProgress, setActionInProgress] = useState(false);
 
   /** Default / current delivery address first — matches home header logic. */
   const displayAddresses = useMemo(() => {
@@ -266,6 +269,47 @@ const AddressSelection: React.FC = () => {
       handleAuthError(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEditSavedAddress = (e: React.MouseEvent, address: Address) => {
+    e.stopPropagation();
+    navigate(`${basePath}/addresses/edit`, { state: { address } });
+  };
+
+  const handleDeleteSavedClick = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setDeleteId(id);
+  };
+
+  const handleDeleteSavedConfirm = async () => {
+    if (!deleteId) return;
+    try {
+      setActionInProgress(true);
+      await addressService.deleteAddress(deleteId);
+      setDeleteId(null);
+      await loadAddresses();
+      window.dispatchEvent(new Event("addressUpdated"));
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Could not delete address");
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  const handleSetDefaultSaved = async (e: React.MouseEvent, addressId: string) => {
+    e.stopPropagation();
+    try {
+      setActionInProgress(true);
+      await addressService.setDefaultAddress(addressId);
+      await loadAddresses();
+      window.dispatchEvent(new Event("addressUpdated"));
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Could not set default address",
+      );
+    } finally {
+      setActionInProgress(false);
     }
   };
 
@@ -1367,11 +1411,11 @@ const AddressSelection: React.FC = () => {
                           <MdMyLocation className="h-5 w-5 text-[#166534]" aria-hidden />
                         </div>
                         <h3 className="text-lg font-semibold text-gray-900">Current Location</h3>
-                        {selectedAddress?.id === LIVE_DEVICE_ADDRESS_ID ? (
+                        {/* {selectedAddress?.id === LIVE_DEVICE_ADDRESS_ID ? (
                           <span className="flex-shrink-0 rounded-2xl bg-[#DCFCE7] px-2 py-1 text-xs font-semibold text-[#166534]">
                             Active
                           </span>
-                        ) : null}
+                        ) : null} */}
                       </div>
                       <p className="mb-1 min-w-0 max-w-full text-sm leading-relaxed text-gray-700 [overflow-wrap:anywhere]">
                         {liveDeviceLocation.formattedAddress}
@@ -1396,68 +1440,111 @@ const AddressSelection: React.FC = () => {
                 const isGreenBg = addressTypeLower !== "work" && addressTypeLower !== "office";
                 const iconBgClass = isGreenBg ? "bg-[#ECFDF5]" : "bg-[#EEF2FF]";
                 const isSelected = selectedAddress?.id === address.id;
+                const phoneDisplay = formatPhoneForDisplay(address.associatedPhoneNumber);
+                const phoneDigits = phoneDisplay.replace(/\D/g, "");
+                const showPhoneLine = phoneDigits.length === 10;
 
                 return (
                   <div
                     key={address.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleAddressSelect(address)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleAddressSelect(address);
-                      }
-                    }}
-                    className={`cursor-pointer rounded-3xl p-5 shadow-sm transition-all ${
+                    className={`rounded-3xl p-5 shadow-sm transition-all ${
                       isSelected
                         ? "border-2 border-[#19411F] bg-[#F2FEF4]"
                         : "border border-transparent bg-white"
                     }`}
                   >
-                    <div className="flex justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-2 flex items-center gap-3">
-                          <div
-                            className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${iconBgClass}`}
-                          >
-                            <img src={icon} alt={address.type || "Address"} className="h-5 w-5" />
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleAddressSelect(address)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          void handleAddressSelect(address);
+                        }
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <div className="flex justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-2 flex items-center gap-3">
+                            <div
+                              className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${iconBgClass}`}
+                            >
+                              <img src={icon} alt={address.type || "Address"} className="h-5 w-5" />
+                            </div>
+                            <h3 className="text-lg font-semibold capitalize text-gray-800">
+                              {address.type || "Home"}
+                            </h3>
+                            {/* {isSelected ? (
+                              <span className="flex-shrink-0 rounded-2xl bg-[#DCFCE7] px-2 py-1 text-xs font-semibold text-[#166534]">
+                                Active
+                              </span>
+                            ) : null} */}
                           </div>
-                          <h3 className="text-lg font-semibold capitalize text-gray-800">
-                            {address.type || "Home"}
-                          </h3>
-                          {address.isDefault && (
-                            <span className="flex-shrink-0 rounded-2xl bg-[#E6F4EA] px-2 py-1 text-xs font-semibold text-[#1E8E3E]">
-                              Default
-                            </span>
+                          <p className="mb-1 min-w-0 max-w-full break-words pr-2 text-sm leading-relaxed text-gray-500 line-clamp-2 [overflow-wrap:anywhere]">
+                            {[
+                              address.houseNo,
+                              address.streetName,
+                              address.area,
+                              address.landmark,
+                              address.city,
+                              address.state,
+                            ]
+                              .filter(Boolean)
+                              .join(", ")}
+                            {address.pincode ? ` - ${address.pincode}` : ""}
+                          </p>
+                          {showPhoneLine ? (
+                            <p className="mt-0.5 text-sm font-medium text-gray-800">
+                              <span className="whitespace-nowrap">+91 {phoneDisplay}</span>
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                          {address.coordinates ? (
+                            <AddressThumbnailMap coordinates={address.coordinates} />
+                          ) : (
+                            <div className="h-full w-full bg-gray-200" />
                           )}
                         </div>
-                        <p className="mb-1 min-w-0 max-w-full break-words pr-2 text-sm leading-relaxed text-gray-500 line-clamp-2 [overflow-wrap:anywhere]">
-                          {[
-                            address.houseNo,
-                            address.streetName,
-                            address.area,
-                            address.landmark,
-                            address.city,
-                            address.state,
-                          ]
-                            .filter(Boolean)
-                            .join(", ")}
-                          {address.pincode ? ` - ${address.pincode}` : ""}
-                        </p>
-                        <p className="text-sm font-medium text-gray-800">
-                          {address.associatedPhoneNumber
-                            ? `+91 ${formatPhoneForDisplay(address.associatedPhoneNumber)}`
-                            : "+91 —"}
-                        </p>
                       </div>
-                      <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                        {address.coordinates ? (
-                          <AddressThumbnailMap coordinates={address.coordinates} />
-                        ) : (
-                          <div className="h-full w-full bg-gray-200" />
-                        )}
-                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-gray-100 pt-3">
+                      <button
+                        type="button"
+                        onClick={(e) => handleEditSavedAddress(e, address)}
+                        disabled={actionInProgress}
+                        className="flex items-center gap-1.5 text-sm font-semibold text-[#00A082] hover:opacity-80 disabled:opacity-50"
+                      >
+                        <FaPen className="text-xs" aria-hidden />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteSavedClick(e, String(address.id))}
+                        disabled={actionInProgress}
+                        className="flex items-center gap-1.5 text-sm font-semibold text-[#FF3B30] hover:opacity-80 disabled:opacity-50"
+                      >
+                        <FaTrash className="text-xs" aria-hidden />
+                        Delete
+                      </button>
+                      {!address.isDefault ? (
+                        <button
+                          type="button"
+                          onClick={(e) => void handleSetDefaultSaved(e, String(address.id))}
+                          disabled={actionInProgress}
+                          className="flex items-center gap-1.5 text-sm font-semibold text-[#3B82F6] hover:opacity-80 disabled:opacity-50"
+                        >
+                          <img src={defaultIcon} alt="" className="h-5 w-5" />
+                          Set as Default
+                        </button>
+                      ) : null}
+                      {address.isDefault ? (
+                        <span className="inline-flex items-center rounded-2xl bg-[#E6F4EA] px-2 py-1 text-xs font-semibold text-[#1E8E3E]">
+                          Default
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                 );
@@ -1502,6 +1589,37 @@ const AddressSelection: React.FC = () => {
           </div>
         )}
       </div>
+
+      {deleteId ? (
+        <div className="fixed inset-0 z-[230] flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-2 text-center text-xl font-bold text-gray-900">
+              Confirm Delete
+            </h3>
+            <p className="mb-6 text-center text-gray-500">
+              Are you sure you want to delete this address?
+            </p>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => void handleDeleteSavedConfirm()}
+                disabled={actionInProgress}
+                className="w-full rounded-xl bg-red-50 py-3.5 font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
+              >
+                Delete Address
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteId(null)}
+                disabled={actionInProgress}
+                className="w-full rounded-xl bg-gray-50 py-3.5 font-semibold text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {dailyCartFromAddressModal ? (
         <div

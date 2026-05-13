@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { SEO } from "../SEO";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { FaChevronRight } from "react-icons/fa";
@@ -21,6 +21,17 @@ import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
 
+function storeSortByToApiOrdering(sortType: string): string | undefined {
+  switch (sortType) {
+    case "Price":
+      return "current_price";
+    case "New":
+      return "-created_at";
+    default:
+      return undefined;
+  }
+}
+
 const StoreProductsPages: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -39,7 +50,8 @@ const StoreProductsPages: React.FC = () => {
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const [categoryName, setCategoryName] = useState<string>("All Products");
   const [selectedCategorySlug, setSelectedCategorySlug] = useState<string | null>(null);
-  const [displayedProducts, setDisplayedProducts] = useState(6); // For Load More functionality
+  const [nextProductPageUrl, setNextProductPageUrl] = useState<string | null>(null);
+  const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Memoize the category slug from URL
@@ -78,18 +90,18 @@ const StoreProductsPages: React.FC = () => {
     return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, onPick);
   }, [isLoggedIn]);
 
-  // Fetch products
+  // Fetch products — first API page only (6 items); scroll loads `next` pages (same pattern as My Orders).
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        
-        // Get category name from location state or use default
+        setNextProductPageUrl(null);
+
         if (stateCategoryName) {
           setCategoryName(stateCategoryName);
         } else if (categorySlug) {
-          const formattedName = categorySlug.split('-').map((word: string) => 
+          const formattedName = categorySlug.split('-').map((word: string) =>
             word.charAt(0).toUpperCase() + word.slice(1)
           ).join(' ');
           setCategoryName(formattedName);
@@ -97,41 +109,32 @@ const StoreProductsPages: React.FC = () => {
           setCategoryName("All Products");
         }
 
-        // Set selected category slug
         setSelectedCategorySlug(categorySlug);
 
-        // Get store ID (temporary for logged-out, selected for logged-in)
         const storeId = storeService.getStoreIdForProducts();
+        const ordering = storeSortByToApiOrdering(sortBy);
 
-        if (categorySlug) {
-          // Fetch products by category slug
-          const result = await productService.getProductsByCategory(
-            categorySlug,
-            storeId || undefined,
-            "store"
-          );
-          setProducts(result || []);
-        } else {
-          // Fetch all products for the store (no special ordering)
-          const result = await productService.getProductsByOrdering(
-            undefined,
-            storeId || undefined,
-            undefined,
-            PRODUCT_AVAILABILITY_STORE,
-          );
-          setProducts(result || []);
-        }
-        setDisplayedProducts(6); // Reset displayed products count
+        const { products: firstBatch, nextUrl } =
+          await productService.getStoreProductListFirstPage({
+            categorySlug: categorySlug || undefined,
+            ordering,
+            storeId: storeId || undefined,
+            availabilityType: PRODUCT_AVAILABILITY_STORE,
+          });
+        setProducts(firstBatch || []);
+        setNextProductPageUrl(nextUrl);
       } catch (error) {
         console.error("Error fetching data:", error);
         setError("Failed to load products");
+        setProducts([]);
+        setNextProductPageUrl(null);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchData();
-  }, [categorySlug, stateCategoryName, isLoggedIn, guestStoreEpoch]);
+    void fetchData();
+  }, [categorySlug, stateCategoryName, isLoggedIn, guestStoreEpoch, sortBy]);
 
   const getItemPrice = (item: any): number => getEffectivePrice(item);
 
@@ -170,9 +173,29 @@ const StoreProductsPages: React.FC = () => {
     }
   };
 
-  const handleLoadMore = () => {
-    setDisplayedProducts(prev => prev + 6);
-  };
+  const loadNextProductPageRef = useRef<() => void>(() => {});
+  const loadingMoreRef = useRef(false);
+  const loadNextProductPage = useCallback(() => {
+    void (async () => {
+      const url = nextProductPageUrl;
+      if (!url || loadingMoreRef.current) return;
+      loadingMoreRef.current = true;
+      setLoadingMoreProducts(true);
+      try {
+        const { products: batch, nextUrl } =
+          await productService.getStoreProductListNextPage(url);
+        setProducts((prev) => [...prev, ...batch]);
+        setNextProductPageUrl(nextUrl);
+      } catch (e) {
+        console.error("Error loading more products:", e);
+      } finally {
+        loadingMoreRef.current = false;
+        setLoadingMoreProducts(false);
+      }
+    })();
+  }, [nextProductPageUrl]);
+
+  loadNextProductPageRef.current = loadNextProductPage;
 
   const getProductImageUrl = (item: any): string => {
     // Helper to convert relative path to full URL
@@ -222,9 +245,45 @@ const StoreProductsPages: React.FC = () => {
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.short_description?.toLowerCase().includes(searchQuery.toLowerCase())
       );
-  
-  const visibleProducts = filteredProducts.slice(0, displayedProducts);
-  const hasMoreProducts = filteredProducts.length > displayedProducts;
+
+  const visibleProducts = filteredProducts;
+  const hasMoreFromApi = Boolean(nextProductPageUrl);
+
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!hasMoreFromApi) return;
+    const el = loadMoreSentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const ob = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadNextProductPageRef.current();
+      },
+      { root: null, rootMargin: "280px 0px", threshold: 0 },
+    );
+    ob.observe(el);
+    return () => ob.disconnect();
+  }, [hasMoreFromApi, products.length, categorySlug, sortBy]);
+
+  /** Fallback when `next` exists but the sentinel does not intersect (nested scroll, IO quirks). */
+  useEffect(() => {
+    if (!hasMoreFromApi) return;
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(() => {
+        ticking = false;
+        const el = document.documentElement;
+        const remaining =
+          el.scrollHeight - window.innerHeight - window.scrollY;
+        if (remaining < 480) loadNextProductPageRef.current();
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [hasMoreFromApi, products.length, categorySlug, sortBy]);
 
   // Combined loading state for full-screen loader
   const isPageLoading = isLoading || isLoadingCategories;
@@ -478,18 +537,16 @@ const StoreProductsPages: React.FC = () => {
                 </div>
               )}
 
-              {/* Load More Button */}
-              {hasMoreProducts && (
-                <div className="flex justify-center mb-6">
-                  <button
-                    type="button"
-                    onClick={handleLoadMore}
-                    className="inline-flex min-h-[44px] items-center justify-center px-6 py-2.5 text-sm font-medium text-gray-700 underline rounded-lg transition-colors hover:bg-gray-200"
-                  >
-                    Load More
-                  </button>
-                </div>
+              {hasMoreFromApi && (
+                <div
+                  ref={loadMoreSentinelRef}
+                  className="flex min-h-[40px] justify-center py-2"
+                  aria-hidden
+                />
               )}
+              {loadingMoreProducts ? (
+                <p className="mb-4 text-center text-sm text-gray-500">Loading more…</p>
+              ) : null}
             </>
           )}
         </div>

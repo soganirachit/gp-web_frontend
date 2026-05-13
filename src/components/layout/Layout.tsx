@@ -80,9 +80,11 @@ const Layout: React.FC = () => {
                 ? ""
                 : !shouldHideBottomNav
                 ? `min-h-[calc(100dvh-144px)] min-h-[calc(100vh-144px)] ${isGpStoreOrDailyRoute ? "pb-0" : "pb-layout-pb"}`
-                : isGpStoreOrDailyRoute
-                ? "pb-0"
-                : "pb-layout-pb"
+                : shouldHideBottomNav
+                  ? "pb-0"
+                  : isGpStoreOrDailyRoute
+                    ? "pb-0"
+                    : "pb-layout-pb"
             }
           >
           <FadingOutlet />

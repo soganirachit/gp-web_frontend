@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { SEO } from '../SEO';
 import { useNavigate } from 'react-router-dom';
 import { FaChevronRight } from 'react-icons/fa';
@@ -233,6 +233,25 @@ const MyOrders: React.FC = () => {
   const canRevealMoreLocally = displayLimit < filteredOrders.length;
   const showLoadMore = canRevealMoreLocally || Boolean(nextPageUrl);
 
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  const handleLoadMoreRef = useRef(handleLoadMore);
+  handleLoadMoreRef.current = handleLoadMore;
+
+  useEffect(() => {
+    if (!showLoadMore) return;
+    const el = loadMoreSentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const ob = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting || loadingMore) return;
+        void handleLoadMoreRef.current();
+      },
+      { root: null, rootMargin: "160px 0px", threshold: 0 },
+    );
+    ob.observe(el);
+    return () => ob.disconnect();
+  }, [showLoadMore, loadingMore, displayLimit, filteredOrders.length, nextPageUrl, searchQuery]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f8f6f1]">
@@ -356,14 +375,14 @@ const MyOrders: React.FC = () => {
               })}
 
               {showLoadMore && (
-                <button
-                  type="button"
-                  className="w-full py-4 text-center text-gray-500 font-medium underline disabled:opacity-50"
-                  disabled={loadingMore}
-                  onClick={() => void handleLoadMore()}
+                <div
+                  ref={loadMoreSentinelRef}
+                  className="w-full py-2 flex items-center justify-center min-h-[40px]"
                 >
-                  {loadingMore ? "Loading…" : "Load More"}
-                </button>
+                  {loadingMore ? (
+                    <span className="text-gray-500 text-sm">Loading…</span>
+                  ) : null}
+                </div>
               )}
             </div>
           ) : (

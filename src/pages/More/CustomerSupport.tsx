@@ -18,9 +18,7 @@ function normalizeOrderNumber(n: string | null | undefined): string {
 
 /** Orders cannot open a duplicate ticket while one of these is still open. */
 function isActiveSupportTicketStatus(status: string | undefined): boolean {
-  const s = String(status ?? "")
-    .toLowerCase()
-    .replace(/\s+/g, "_");
+  const s = normalizeSupportStatus(status);
   return s === "open" || s === "pending" || s === "in_progress" || s === "new";
 }
 

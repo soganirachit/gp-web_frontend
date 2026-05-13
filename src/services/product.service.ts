@@ -20,14 +20,25 @@ export const PRODUCT_AVAILABILITY_GP_DAILY_LIST = "daily,both";
  */
 export const PRODUCT_AVAILABILITY_DAILY = PRODUCT_AVAILABILITY_GP_DAILY_LIST;
 
+function apiRootProtocol(): string {
+  const root = getApiUrl().replace(/\/$/, "");
+  try {
+    const base = root.includes("://") ? root : `https://${root}`;
+    return new URL(base).protocol;
+  } catch {
+    return "https:";
+  }
+}
+
 function normalizeProductListNextUrl(nextOrPath: string): string {
   const root = getApiUrl().replace(/\/$/, "");
+  const scheme = apiRootProtocol();
   const s = nextOrPath.trim();
   if (!s) return root;
   if (/^https?:\/\//i.test(s)) {
     try {
       const u = new URL(s);
-      if (u.protocol === "http:") u.protocol = "https:";
+      u.protocol = scheme;
       return u.href;
     } catch {
       return s;
@@ -44,6 +55,46 @@ function normalizeProductListNextUrl(nextOrPath: string): string {
     }
   }
   return `${root}${path}`;
+}
+
+/** Default page size for store / browse product grids (matches web orders “load 6”). */
+export const STORE_PRODUCT_LIST_PAGE_SIZE = 6;
+
+/** One page from GET /products/ or a paginated `next` URL (DRF `{ results, next }`, etc.). */
+export function extractProductListPage(data: unknown): {
+  results: any[];
+  nextUrl: string | null;
+} {
+  const d = data as Record<string, unknown> | null | undefined;
+  if (!d) return { results: [], nextUrl: null };
+
+  const innerData =
+    d.data != null && typeof d.data === "object" && !Array.isArray(d.data)
+      ? (d.data as Record<string, unknown>)
+      : null;
+
+  let results: any[] = [];
+  if (Array.isArray(d.results)) results = d.results as any[];
+  else if (innerData && Array.isArray(innerData.results))
+    results = innerData.results as any[];
+  else if (d.success && Array.isArray(d.data)) results = d.data as any[];
+  else if (Array.isArray(d.data)) results = d.data as any[];
+  else if (Array.isArray(d)) results = d as any[];
+
+  let nextRaw: unknown = d.next;
+  if (
+    (typeof nextRaw !== "string" || !nextRaw.trim()) &&
+    innerData &&
+    typeof innerData.next === "string"
+  ) {
+    nextRaw = innerData.next;
+  }
+
+  const nextUrl =
+    typeof nextRaw === "string" && nextRaw.trim()
+      ? normalizeProductListNextUrl(nextRaw.trim())
+      : null;
+  return { results, nextUrl };
 }
 
 async function fetchAllProductPages(
@@ -463,6 +514,48 @@ export const productService = {
       }
       throw new Error("An unknown error occurred");
     }
+  },
+
+  /**
+   * First page of GET /products/ for browse grids (does not follow `next`).
+   * Use {@link productService.getStoreProductListNextPage} for infinite scroll.
+   */
+  async getStoreProductListFirstPage(opts: {
+    categorySlug?: string | null;
+    ordering?: string;
+    storeId?: number;
+    availabilityType?: string;
+    pageSize?: number;
+    signal?: AbortSignal;
+  }): Promise<{ products: any[]; nextUrl: string | null }> {
+    const pageSize = opts.pageSize ?? STORE_PRODUCT_LIST_PAGE_SIZE;
+    const params: Record<string, unknown> = {
+      page_size: pageSize,
+      limit: pageSize,
+    };
+    if (opts.categorySlug) params.category = opts.categorySlug;
+    if (opts.ordering) params.ordering = opts.ordering;
+    if (opts.storeId != null && Number.isFinite(Number(opts.storeId))) {
+      params.store_id = Number(opts.storeId);
+    }
+    if (opts.availabilityType) params.availability_type = opts.availabilityType;
+    const res = await api.get(`${PRODUCTS_BASE}/`, {
+      params,
+      signal: opts.signal,
+    });
+    const { results, nextUrl } = extractProductListPage(res.data);
+    return { products: results, nextUrl };
+  },
+
+  async getStoreProductListNextPage(
+    nextPageUrl: string,
+    signal?: AbortSignal,
+  ): Promise<{ products: any[]; nextUrl: string | null }> {
+    const res = await api.get(normalizeProductListNextUrl(nextPageUrl), {
+      signal,
+    });
+    const { results, nextUrl: followingUrl } = extractProductListPage(res.data);
+    return { products: results, nextUrl: followingUrl };
   },
 
   /** GET /products/labels/ — active label definitions (slug, name, …). */
