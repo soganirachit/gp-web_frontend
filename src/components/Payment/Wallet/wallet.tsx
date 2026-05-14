@@ -158,21 +158,11 @@ const Wallet = () => {
 
     } catch (error: any) {
       console.error('Error fetching wallet:', error);
-      if (error.message.includes("Session expired")) {
-        toast.error("Session expired. Please login again.");
-        navigate("/login", {
-          state: {
-            returnUrl: location.pathname,
-            ...location.state,
-          },
-        });
-      } else {
-        toast.error("Failed to fetch wallet balance");
-      }
+      toast.error("Failed to fetch wallet balance");
     } finally {
       setIsLoadingBalance(false);
     }
-  }, [navigate, location.pathname, location.state]);
+  }, []);
 
   useEffect(() => {
     if (feature !== "gpDaily" || !isLoggedIn) {
@@ -461,7 +451,7 @@ const Wallet = () => {
           feature === "gpDaily" &&
           isLoggedIn &&
           gpDailyOrderHold.show && (
-            <div className="w-full shrink-0 rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white">
+            <div className="w-full shrink-0 rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white mb-5">
               <div className="flex items-start gap-2">
                 <img
                   src={lowbalanceIcon}

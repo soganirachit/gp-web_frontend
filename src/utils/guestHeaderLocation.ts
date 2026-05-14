@@ -1,6 +1,10 @@
 /** Shown as the bold title in the header address row when the customer is not logged in. */
 export const GUEST_HEADER_LOCATION_TITLE = "Current location";
 
+/** Secondary line when guest GPS/network did not return a city label. */
+export const GUEST_LOCATION_UNAVAILABLE_HINT =
+  "We could not detect your city. Check connection or location permissions, then tap to set your area.";
+
 async function reverseGeocodeOsm(lat: number, lng: number): Promise<string> {
   const params = new URLSearchParams({
     format: "json",
@@ -21,24 +25,55 @@ async function reverseGeocodeOsm(lat: number, lng: number): Promise<string> {
     address?: Record<string, string>;
   };
   const addr = d.address || {};
-  const roadLine = [addr.house_number, addr.road].filter(Boolean).join(" ").trim();
-  const parts = [
-    roadLine,
-    addr.suburb || addr.neighbourhood,
-    addr.city || addr.town || addr.village,
-    addr.state,
-  ]
-    .map((s) => String(s || "").trim())
-    .filter(Boolean);
+  const city = (
+    addr.city ||
+    addr.town ||
+    addr.village ||
+    addr.municipality ||
+    addr.state_district ||
+    ""
+  )
+    .toString()
+    .trim();
+  if (city) return city;
   const line =
-    parts.join(", ") ||
-    (d.display_name ? d.display_name.split(",").slice(0, 4).join(",").trim() : "");
-  return (d.display_name || line || "").trim();
+    (d.display_name ? d.display_name.split(",").slice(-3, -2)[0] : "") || "";
+  return line.trim();
+}
+
+function pickCityFromGoogleResults(
+  results: google.maps.GeocoderResult[] | undefined,
+): string {
+  if (!results?.length) return "";
+  for (const r of results) {
+    for (const c of r.address_components || []) {
+      if (
+        c.types.includes("locality") ||
+        c.types.includes("postal_town") ||
+        c.types.includes("administrative_area_level_3")
+      ) {
+        const n = (c.long_name || "").trim();
+        if (n) return n;
+      }
+    }
+  }
+  const fa = results[0]?.formatted_address;
+  if (fa) {
+    const parts = fa.split(",").map((s) => s.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      return (
+        parts[Math.max(0, parts.length - 3)] ||
+        parts[parts.length - 2] ||
+        parts[0]
+      );
+    }
+  }
+  return "";
 }
 
 /**
  * Browser GPS + reverse geocode for the guest header. Persists `userCoordinates` and
- * `userLocation` when a label is found (same keys as elsewhere in the app).
+ * `userLocation` with a **city-only** label (same keys as elsewhere in the app).
  */
 export function fetchGuestDeviceLocationLabel(
   signal?: AbortSignal,
@@ -62,7 +97,7 @@ export function fetchGuestDeviceLocationLabel(
           if (typeof window !== "undefined" && window.google?.maps) {
             const geocoder = new google.maps.Geocoder();
             const { results } = await geocoder.geocode({ location: { lat, lng } });
-            label = (results?.[0]?.formatted_address || "").trim();
+            label = pickCityFromGoogleResults(results);
           }
           if (!label) {
             label = (await reverseGeocodeOsm(lat, lng)).trim();

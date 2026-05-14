@@ -9,6 +9,7 @@ import { OrderConfirmationSkeleton } from '../common/PageSkeletons';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { orderService } from '../../services/order.service';
 import { format } from 'date-fns';
+import { formatCartDeliveryAddress } from '../../utils/formatCartDeliveryAddress';
 import flowerCnfSvg from '../../assets/svg/gp_daily svg/flower_cnf.svg';
 import savingsCnfSvg from '../../assets/svg/gp_daily svg/savings_cnf.svg';
 
@@ -211,11 +212,16 @@ const StoreOrderConfirmation: React.FC = () => {
   const addressText = useMemo(() => {
     if (!order?.delivery_address) return '';
     const a = order.delivery_address;
-    const line1 = [a.address_line1, a.address_line2].filter(Boolean).join(', ');
-    const landmark = a.landmark ? `, ${a.landmark}` : '';
-    const tail = [a.city, a.state, a.pincode].filter(Boolean).join(', ');
+    const street = [a.address_line1, a.address_line2].filter(Boolean).join(', ');
+    const body = formatCartDeliveryAddress({
+      streetName: street,
+      area: a.landmark,
+      city: a.city,
+      state: a.state,
+      pincode: a.pincode,
+    });
     const typePrefix = a.address_type ? `${a.address_type === 'work' ? 'Work' : 'Home'}: ` : '';
-    return `${typePrefix}${line1}${landmark}${tail ? `, ${tail}` : ''}`.replace(/^,\s*/, '');
+    return `${typePrefix}${body}`.trim();
   }, [order?.delivery_address]);
 
   const savingsPercent = useMemo(() => {
@@ -372,8 +378,8 @@ const StoreOrderConfirmation: React.FC = () => {
           </motion.div>
         )}
 
-        {/* Explore more */}
-        <div className="px-2">
+        {/* Explore more — spacing from confirmation card above */}
+        <div className="px-2 mt-6">
           <button
             onClick={() => navigate(`${basePath}/products`)}
             className="w-full bg-[#19411F] text-white py-3.5 rounded-full text-[15px] font-semibold hover:bg-[#1e5a1c] transition-colors"

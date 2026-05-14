@@ -13,6 +13,7 @@ import defaultIcon from '../../assets/svg/adressbook/default.svg';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { UniformPageHeader } from '../../components/layout/UniformPageHeader';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
+import { formatCartDeliveryAddress } from '../../utils/formatCartDeliveryAddress';
 import { storeService } from '../../services/store.service';
 
 const Addresses: React.FC = () => {
@@ -202,14 +203,15 @@ const Addresses: React.FC = () => {
                             </div>
 
                             <p className="text-gray-500 text-sm leading-relaxed mb-1 pr-2 break-words line-clamp-2 [overflow-wrap:anywhere]">
-                              {[
-                                address.houseNo,
-                                address.streetName,
-                                address.area,
-                                address.landmark,
-                                address.city,
-                                address.state
-                              ].filter(Boolean).join(', ')} - {address.pincode}
+                              {formatCartDeliveryAddress({
+                                houseNo: address.houseNo,
+                                streetName: address.streetName,
+                                area: address.area,
+                                landmark: address.landmark,
+                                city: address.city,
+                                state: address.state,
+                                pincode: address.pincode,
+                              })}
                             </p>
 
                             <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2">

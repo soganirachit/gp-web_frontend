@@ -20,6 +20,7 @@ import { customerService } from "../../services/getcustomer.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { AddressSelectionSkeleton } from "../common/PageSkeletons";
 import { formatPhoneForDisplay } from "../../utils/phoneDisplay";
+import { formatCartDeliveryAddress } from "../../utils/formatCartDeliveryAddress";
 import homeIcon from "../../assets/svg/adressbook/home.svg";
 import workIcon from "../../assets/svg/adressbook/office.svg";
 import othersIcon from "../../assets/svg/adressbook/others.svg";
@@ -1484,17 +1485,15 @@ const AddressSelection: React.FC = () => {
                             ) : null} */}
                           </div>
                           <p className="mb-1 min-w-0 max-w-full break-words pr-2 text-sm leading-relaxed text-gray-500 line-clamp-2 [overflow-wrap:anywhere]">
-                            {[
-                              address.houseNo,
-                              address.streetName,
-                              address.area,
-                              address.landmark,
-                              address.city,
-                              address.state,
-                            ]
-                              .filter(Boolean)
-                              .join(", ")}
-                            {address.pincode ? ` - ${address.pincode}` : ""}
+                            {formatCartDeliveryAddress({
+                              houseNo: address.houseNo,
+                              streetName: address.streetName,
+                              area: address.area,
+                              landmark: address.landmark,
+                              city: address.city,
+                              state: address.state,
+                              pincode: address.pincode,
+                            })}
                           </p>
                           {showPhoneLine ? (
                             <p className="mt-0.5 text-sm font-medium text-gray-800">

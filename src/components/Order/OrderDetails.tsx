@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { IoDownloadOutline } from 'react-icons/io5';
+import { IoDownloadOutline, IoStorefrontOutline, IoPersonOutline } from 'react-icons/io5';
+import { MdLocationOn } from 'react-icons/md';
 import { FaCopy } from 'react-icons/fa';
 import { orderService } from '../../services/order.service';
 import { format } from 'date-fns';
@@ -10,8 +11,6 @@ import supportIcon from '../../assets/svg/gp_store_svg/support.svg';
 import orderTickIcon from '../../assets/svg/gp_store_svg/ordertick.svg';
 import orderDeliveredIcon from '../../assets/svg/gp_store_svg/orderdelivered.svg';
 import truckStoreIcon from '../../assets/svg/gp_store_svg/truckhome.svg';
-import detailshomeIcon from '../../assets/svg/gp_store_svg/detailshome.svg';
-import detailsuserIcon from '../../assets/svg/gp_store_svg/detailsuser.svg';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
 import { invoiceService, type OrderInvoicePayload } from '../../services/invoice.service';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
@@ -22,7 +21,7 @@ interface OrderItem {
   product: {
     id: number;
     name: string;
-    slug: string;
+    slug?: string;
     primary_image: string;
     category_name: string;
     unit: string;
@@ -54,6 +53,29 @@ interface DeliveryAddress {
   pincode: string;
   receiver_name: string;
   receiver_phone: string;
+}
+
+/** Street / locality line from API fields. */
+function buildStreetLineFromDelivery(addr: DeliveryAddress): string {
+  return [addr.address_line1, addr.address_line2, addr.landmark].filter(Boolean).join(', ');
+}
+
+/**
+ * City + state + pin line only when it adds information (API often duplicates this in line1).
+ */
+function cityStatePinLineIfDistinct(addr: DeliveryAddress, street: string): string | null {
+  const cityState = [addr.city, addr.state].filter(Boolean).join(', ');
+  const pin = (addr.pincode || '').trim();
+  const line =
+    !cityState && !pin ? '' : !cityState ? pin : !pin ? cityState : `${cityState} - ${pin}`;
+  if (!line) return null;
+  const st = street.replace(/\s+/g, ' ').trim().toLowerCase();
+  const ln = line.replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!st) return line;
+  if (st.includes(ln)) return null;
+  const loose = (s: string) => s.replace(/[\s,:-]+/g, '');
+  if (loose(st).includes(loose(ln)) && loose(ln).length >= 8) return null;
+  return line;
 }
 
 interface SubscriptionInfo {
@@ -148,6 +170,15 @@ const OrderDetails: React.FC = () => {
   const timelineAccentClass = isDaily ? 'bg-[#FAA222]' : 'bg-[#16A249]';
   const fromSubscriptionHistory = Boolean(
     (location.state as OrderDetailsLocationState | null)?.fromSubscriptionHistory,
+  );
+
+  const navigateToProductDetail = useCallback(
+    (slug: string | undefined | null) => {
+      const s = (slug || '').trim();
+      if (!s) return;
+      navigate(`${basePath}/product/${encodeURIComponent(s)}`);
+    },
+    [navigate, basePath],
   );
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -387,45 +418,58 @@ const OrderDetails: React.FC = () => {
           <div className="space-y-4">
             {/* Order Item Card */}
             <div className="p-4">
-              {/* <div className="flex items-start justify-between mb-3">
+              <div className="flex items-start justify-between gap-2 mb-3">
                 <h2 className="text-lg font-bold text-gray-900">Order Items</h2>
-                <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${getStatusColor(order.status)} flex-shrink-0`}>
+                <span
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold ${getStatusColor(order.status)} flex-shrink-0`}
+                >
                   {getStatusText(order.status)}
                 </span>
-              </div> */}
+              </div>
               <div className="space-y-3">
-                {order.items.map((item, index) => (
-                  <div key={item.id || index} className="flex gap-3">
-                    <div className="w-16 h-16 flex-shrink-0">
-                      <img
-                        src={item.product.primary_image || '/placeholder.svg'}
-                        alt={item.product.name}
-                        loading="lazy"
-                        className="w-full h-full object-cover rounded-xl"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-1">
-                      {/* First row: name + status */}
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {item.product.name}
-                        </p>
-                        <span
-                          className={`px-3 py-1 rounded-lg text-xs font-semibold ${getStatusColor(
-                            order.status
-                          )} flex-shrink-0`}
-                        >
-                          {getStatusText(order.status)}
-                        </span>
+                {order.items.map((item, index) => {
+                  const slug = (item.product.slug || '').trim();
+                  const inner = (
+                    <>
+                      <div className="w-16 h-16 flex-shrink-0">
+                        <img
+                          src={item.product.primary_image || '/placeholder.svg'}
+                          alt={item.product.name}
+                          loading="lazy"
+                          className="w-full h-full object-cover rounded-xl"
+                        />
                       </div>
-                      {/* Second row: quantity + price */}
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-gray-600">x{item.quantity}</p>
-                        <p className="text-sm font-semibold text-gray-900">₹{item.subtotal}</p>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {item.product.name}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-gray-600">x{item.quantity}</p>
+                          <p className="text-sm font-semibold text-gray-900">₹{item.subtotal}</p>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    </>
+                  );
+                  if (!slug) {
+                    return (
+                      <div key={item.id || index} className="flex gap-3">
+                        {inner}
+                      </div>
+                    );
+                  }
+                  return (
+                    <button
+                      key={item.id || index}
+                      type="button"
+                      onClick={() => navigateToProductDetail(slug)}
+                      className="flex w-full gap-3 rounded-xl p-2 -m-2 text-left cursor-pointer hover:bg-gray-50 active:bg-gray-100"
+                    >
+                      {inner}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -474,60 +518,72 @@ const OrderDetails: React.FC = () => {
             </div>
 
             {/* Delivery Details */}
-            {order.delivery_address && (
+            {(order.delivery_address || order.store_name) && (
               <div className="bg-white rounded-2xl p-4 shadow-sm">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Delivery Details</h2>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <img
-                      src={detailshomeIcon}
-                      alt="Home"
-                      className="w-5 h-5 mt-0.5 flex-shrink-0"
-                      style={
-                        isDaily
-                          ? {
-                              filter:
-                                "invert(58%) sepia(89%) saturate(457%) hue-rotate(359deg) brightness(102%) contrast(97%)",
-                            }
-                          : undefined
-                      }
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-gray-900">
-                        {order.delivery_address.address_type === 'home' ? 'Home' :
-                          order.delivery_address.address_type === 'work' ? 'Work' : 'Other'}{' '}
-                        <span className="text-sm font-normal text-gray-600">
-                          {order.delivery_address.address_line1}
-                          {order.delivery_address.address_line2 && `, ${order.delivery_address.address_line2}`}
-                          {order.delivery_address.landmark && `, ${order.delivery_address.landmark}`}
-                          {`, ${order.delivery_address.city}, ${order.delivery_address.state} - ${order.delivery_address.pincode}`}
-                        </span>
+                <div className="space-y-5">
+                  {order.store_name ? (
+                    <div className="flex min-w-0 items-start gap-2">
+                      <IoStorefrontOutline
+                        className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-500"
+                        aria-hidden
+                      />
+                      <p className="min-w-0 flex-1 text-sm leading-snug text-gray-600">
+                        <span className="font-semibold text-gray-900">Store </span>
+                        {order.store_name}
                       </p>
                     </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <img
-                      src={detailsuserIcon}
-                      alt="User"
-                      className="w-5 h-5 mt-0.5 flex-shrink-0"
-                      style={
-                        isDaily
-                          ? {
-                              filter:
-                                "invert(58%) sepia(89%) saturate(457%) hue-rotate(359deg) brightness(102%) contrast(97%)",
-                            }
-                          : undefined
-                      }
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-gray-900">
-                        {order.delivery_address.receiver_name}{' '}
-                        <span className="text-sm font-normal text-gray-600">
-                          {formatPhoneForDisplay(order.delivery_address.receiver_phone) || order.delivery_address.receiver_phone}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
+                  ) : null}
+                  {order.delivery_address ? (
+                    <>
+                      <div className="flex min-w-0 items-start gap-2">
+                        <MdLocationOn
+                          className="mt-0.5 flex-shrink-0 text-lg text-gray-500"
+                          aria-hidden
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium leading-snug text-gray-900">
+                            {order.delivery_address.address_type === 'home'
+                              ? 'Home'
+                              : order.delivery_address.address_type === 'work'
+                                ? 'Work'
+                                : 'Other'}
+                          </p>
+                          {(() => {
+                            const addr = order.delivery_address;
+                            if (!addr) return null;
+                            const street = buildStreetLineFromDelivery(addr);
+                            const cityLine = cityStatePinLineIfDistinct(addr, street);
+                            return (
+                              <>
+                                {street ? (
+                                  <p className="mt-0.5 text-sm leading-snug text-gray-600">{street}</p>
+                                ) : null}
+                                {cityLine ? (
+                                  <p className="mt-0.5 text-sm leading-snug text-gray-600">{cityLine}</p>
+                                ) : null}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex min-w-0 items-start gap-2">
+                        <IoPersonOutline
+                          className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-500"
+                          aria-hidden
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium leading-snug text-gray-900">
+                            {order.delivery_address.receiver_name}
+                          </p>
+                          <p className="mt-0.5 text-sm leading-snug text-gray-600">
+                            {formatPhoneForDisplay(order.delivery_address.receiver_phone) ||
+                              order.delivery_address.receiver_phone}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               </div>
             )}

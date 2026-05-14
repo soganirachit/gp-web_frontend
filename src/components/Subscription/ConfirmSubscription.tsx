@@ -18,6 +18,7 @@ import RazorpayPayment from "../Payment/Rezorpay/RezorpayPayment";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import Spinner from "../common/Spinner";
 import { SubscriptionFlowSkeleton } from "../common/PageSkeletons";
+import { formatCartDeliveryAddress } from "../../utils/formatCartDeliveryAddress";
 
 interface SubscriptionDetails {
   basePackId: string;
@@ -1109,10 +1110,30 @@ const ConfirmSubscription: React.FC = () => {
                   <FaMapMarkerAlt className="text-gray-600 mt-1 flex-shrink-0 text-lg" />
                   <p className="text-gray-900 text-sm leading-relaxed">
                     {checkoutAddr
-                      ? `${checkoutAddr.address_line1 || checkoutAddr.houseNo || ''} ${checkoutAddr.address_line2 || checkoutAddr.streetName || ''}, ${checkoutAddr.landmark || checkoutAddr.area || ''}, ${checkoutAddr.city || ''}, ${checkoutAddr.state || ''} - ${checkoutAddr.pincode || ''}`.replace(/^[\s,]+|[\s,]+$/g, '')
+                      ? formatCartDeliveryAddress({
+                          houseNo: checkoutAddr.houseNo,
+                          streetName: [
+                            checkoutAddr.address_line1,
+                            checkoutAddr.address_line2,
+                            checkoutAddr.streetName,
+                          ]
+                            .filter(Boolean)
+                            .join(" ")
+                            .trim(),
+                          area: checkoutAddr.area || checkoutAddr.landmark,
+                          city: checkoutAddr.city,
+                          state: checkoutAddr.state,
+                          pincode: checkoutAddr.pincode,
+                        })
                       : selectedAddress
-                      ? `${selectedAddress?.street || ''}, ${selectedAddress?.area || ''}, ${selectedAddress?.city || ''}, ${selectedAddress?.state || ''} - ${selectedAddress?.pincode || ''}`.replace(/^[\s,]+|[\s,]+$/g, '')
-                      : 'Address not available'}
+                        ? formatCartDeliveryAddress({
+                            streetName: selectedAddress.street,
+                            area: selectedAddress.area,
+                            city: selectedAddress.city,
+                            state: selectedAddress.state,
+                            pincode: selectedAddress.pincode,
+                          })
+                        : "Address not available"}
                   </p>
                 </div>
                 <div className="mt-3 overflow-hidden -mx-4">

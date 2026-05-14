@@ -27,6 +27,7 @@ import { SEO } from '../../../components/SEO';
 import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
+import { formatCartDeliveryAddress } from '../../../utils/formatCartDeliveryAddress';
 import { errorMessageFromCatch, isCartLineUnavailableMessage } from '../../../utils/apiErrorMessage';
 import {
   extractCartStockApiMessage,
@@ -506,9 +507,9 @@ const Cart: React.FC = () => {
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   // (Bouquet message editing uses inline UI; no overflow menu needed)
 
-  // Check authentication and redirect if session expired
+  // Check authentication — rely on `isLoggedIn` only (token may hydrate after paint).
   useEffect(() => {
-    if (!isLoggedIn || !localStorage.getItem('access_token')) {
+    if (!isLoggedIn) {
       const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
       navigate(`${basePath}/login`, {
         state: { returnUrl: location.pathname, fromCart: true },
@@ -542,6 +543,8 @@ const Cart: React.FC = () => {
   const [editMessage, setEditMessage] = useState<string>('');
   const datePickerRef = useRef<HTMLDivElement>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  /** After Razorpay succeeds — verify / poll order (avoid “Preparing payment” copy here). */
+  const [isConfirmingOrder, setIsConfirmingOrder] = useState(false);
   const [shouldTriggerPayment, setShouldTriggerPayment] = useState(false);
   const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
   const [razorpayKey, setRazorpayKey] = useState<string>('');
@@ -1700,7 +1703,7 @@ const Cart: React.FC = () => {
     razorpay_signature: string;
     payment_status: string;
   }) => {
-    setIsProcessingPayment(true);
+    setIsConfirmingOrder(true);
     setShouldTriggerPayment(false);
 
     // Persist to localStorage immediately — so a crash/background here doesn't lose the payment
@@ -1742,7 +1745,7 @@ const Cart: React.FC = () => {
       }
     }
 
-    setIsProcessingPayment(false);
+    setIsConfirmingOrder(false);
   };
 
   // On mount: recover any pending payments from a previous session that crashed after Razorpay SDK
@@ -1786,6 +1789,7 @@ const Cart: React.FC = () => {
   const handlePaymentError = (error: Error) => {
     toast.error(error.message || 'Payment failed. Please try again.');
     setIsProcessingPayment(false);
+    setIsConfirmingOrder(false);
     setShouldTriggerPayment(false);
   };
 
@@ -1800,11 +1804,6 @@ const Cart: React.FC = () => {
   const total =
     cartTotals?.total ??
     subtotal + deliveryFee + tax + surcharge - discount;
-
-  const formatAddress = (address: Address | null): string => {
-    if (!address) return '';
-    return [address.houseNo, address.streetName, address.area, address.city, address.state, address.pincode].filter(Boolean).join(', ');
-  };
 
   const displayStoreName =
     cartStoreName.trim() || (isLoadingCartTotals ? '' : 'Selected store');
@@ -1825,7 +1824,7 @@ const Cart: React.FC = () => {
     undefined;
 
   // Auth guard
-  if (!isLoggedIn || !localStorage.getItem('access_token')) {
+  if (!isLoggedIn) {
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
     return <Navigate to={`${basePath}/login`} state={{ returnUrl: location.pathname, fromCart: true }} replace />;
   }
@@ -2237,7 +2236,7 @@ const Cart: React.FC = () => {
                         {defaultAddress.type}
                       </p>
                       <p className="line-clamp-4 pl-7 text-sm leading-snug text-gray-600">
-                        {formatAddress(defaultAddress)}
+                        {formatCartDeliveryAddress(defaultAddress)}
                       </p>
                       {isCheckingDeliveryCoverage && defaultAddress.coordinates && (
                         <p className="mt-2 pl-7 text-xs text-gray-400">Checking delivery area…</p>
@@ -2380,7 +2379,7 @@ const Cart: React.FC = () => {
                     onSuccess={handlePaymentSuccess}
                     onError={handlePaymentError}
                     buttonText=""
-                    disabled={isProcessingPayment}
+                    disabled={isProcessingPayment || isConfirmingOrder}
                   />
                 </div>
               )}
@@ -2390,6 +2389,7 @@ const Cart: React.FC = () => {
                 onClick={handleCheckout}
                 disabled={
                   isProcessingPayment ||
+                  isConfirmingOrder ||
                   hasStaleCartLine ||
                   deliveryBlockedByCoverage ||
                   deliveryBlockedByStoreMismatch ||
@@ -2397,10 +2397,14 @@ const Cart: React.FC = () => {
                 }
                 className="w-full bg-[#19411F] text-white py-4 rounded-[25px] text-base font-semibold hover:bg-[#1e5a1c] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {isProcessingPayment && (
+                {(isProcessingPayment || isConfirmingOrder) && (
                   <Spinner size={22} variant="light" className="!inline-flex" />
                 )}
-                {isProcessingPayment ? 'Preparing payment…' : 'Checkout'}
+                {isConfirmingOrder
+                  ? 'Confirming your order…'
+                  : isProcessingPayment
+                    ? 'Preparing payment…'
+                    : 'Checkout'}
               </button>
             </>
           </div>

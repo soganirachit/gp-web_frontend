@@ -32,6 +32,7 @@ import { SOCIAL_URLS } from '../config/socialUrls';
 import {
   fetchGuestDeviceLocationLabel,
   GUEST_HEADER_LOCATION_TITLE,
+  GUEST_LOCATION_UNAVAILABLE_HINT,
 } from '../utils/guestHeaderLocation';
 
 const HomePage: React.FC = () => {
@@ -126,6 +127,15 @@ const HomePage: React.FC = () => {
     navigate(`${basePath}/addresses`);
   };
 
+  const handleProfileClick = () => {
+    const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+    if (!isLoggedIn) {
+      navigate('/gp-store/login');
+      return;
+    }
+    navigate(`${basePath}/account`);
+  };
+
   // Fire PageView for /home (this route is outside Layout so tracking is here)
   useEffect(() => { trackPageView(); }, []);
 
@@ -178,15 +188,23 @@ const HomePage: React.FC = () => {
                   <span className="text-xs sm:text-sm text-gray-600 truncate font-medium">
                     {isLoadingAddress
                       ? 'Loading...'
-                      : (deliveryLocation || 'Tap to set address')}
+                      : deliveryLocation ||
+                        (!isLoggedIn
+                          ? GUEST_LOCATION_UNAVAILABLE_HINT
+                          : 'Tap to set address')}
                   </span>
                 </div>
                 <MdKeyboardArrowDown className="text-gray-600 flex-shrink-0 text-lg sm:text-xl" />
               </div>
             </div>
 
-            {/* Right Side Icons */}
-            <div className="relative flex h-14 w-14 flex-shrink-0 cursor-default items-center justify-center xs:h-16 xs:w-16 sm:h-20 sm:w-20">
+            {/* Profile — nudged toward the right edge; guests go to store login */}
+            <button
+              type="button"
+              onClick={handleProfileClick}
+              className="relative flex h-12 w-12 flex-shrink-0 translate-x-2 cursor-pointer items-center justify-center xs:h-16 xs:w-12 sm:h-20 sm:w-20 sm:translate-x-4 sm:-mr-1"
+              aria-label={isLoggedIn ? 'Account' : 'Log in'}
+            >
               <img
                 src={profilehomeIcon}
                 alt=""
@@ -199,7 +217,7 @@ const HomePage: React.FC = () => {
                 aria-hidden
                 className="relative z-10 h-5 w-5 object-contain"
               />
-            </div>
+            </button>
           </div>
 
           {/* Search Bar — unified styling, product suggestions as you type */}

@@ -42,6 +42,7 @@ import { formatProductTitleCase } from "../lib/formatProductTitleCase";
 import {
   fetchGuestDeviceLocationLabel,
   GUEST_HEADER_LOCATION_TITLE,
+  GUEST_LOCATION_UNAVAILABLE_HINT,
 } from "../utils/guestHeaderLocation";
 import { ProductImageTag } from "../components/common/ProductImageTag";
 import namasteSvg from '../assets/svg/namaste.svg';
@@ -199,10 +200,13 @@ const GpStore_Homepage: React.FC = () => {
             if (!isLoggedIn) {
                 setAddressType(GUEST_HEADER_LOCATION_TITLE);
                 setDeliveryLocation("");
-                setIsLoadingAddress(false);
-                void fetchGuestDeviceLocationLabel().then((label) => {
+                setIsLoadingAddress(true);
+                try {
+                    const label = await fetchGuestDeviceLocationLabel();
                     setDeliveryLocation(label);
-                });
+                } finally {
+                    setIsLoadingAddress(false);
+                }
                 return;
             }
             const addresses = await addressService.getAllAddresses();
@@ -397,7 +401,10 @@ const GpStore_Homepage: React.FC = () => {
                                             <span className="text-xs sm:text-sm text-gray-700 truncate font-medium">
                                                 {isLoadingAddress
                                                   ? 'Loading...'
-                                                  : (deliveryLocation || 'Tap to set address')}
+                                                  : deliveryLocation ||
+                                                    (!isLoggedIn
+                                                      ? GUEST_LOCATION_UNAVAILABLE_HINT
+                                                      : "Tap to set address")}
                                             </span>
                                         </div>
                                         <MdKeyboardArrowDown className="text-gray-600 flex-shrink-0 text-lg sm:text-xl" />
@@ -405,7 +412,7 @@ const GpStore_Homepage: React.FC = () => {
                                 </div>
 
                                 {/* Right Side Icons - Only Profile */}
-                                <div className="relative w-14 h-14 xs:w-16 xs:h-16 sm:w-20 sm:h-20 flex-shrink-0 flex items-center justify-center">
+                                <div className="relative w-14 h-14 xs:w-16 xs:h-16 sm:w-20 sm:h-20 flex-shrink-0 flex translate-x-1 sm:translate-x-2 items-center justify-center">
                                     <img
                                         src={profilehomeIcon}
                                         alt="Profile"

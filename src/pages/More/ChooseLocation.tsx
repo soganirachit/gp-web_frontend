@@ -9,6 +9,7 @@ import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { UniformPageHeader } from "../../components/layout/UniformPageHeader";
 import { formatPhoneForDisplay } from "../../utils/phoneDisplay";
+import { formatCartDeliveryAddress } from "../../utils/formatCartDeliveryAddress";
 import homeIcon from "../../assets/svg/adressbook/home.svg";
 import workIcon from "../../assets/svg/adressbook/office.svg";
 import othersIcon from "../../assets/svg/adressbook/others.svg";
@@ -287,17 +288,15 @@ const ChooseLocation: React.FC = () => {
                         </h3>
                       </div>
                       <p className="line-clamp-2 pr-2 text-sm leading-relaxed break-words text-gray-500 [overflow-wrap:anywhere]">
-                        {[
-                          address.houseNo,
-                          address.streetName,
-                          address.area,
-                          address.landmark,
-                          address.city,
-                          address.state,
-                        ]
-                          .filter(Boolean)
-                          .join(", ")}{" "}
-                        - {address.pincode}
+                        {formatCartDeliveryAddress({
+                          houseNo: address.houseNo,
+                          streetName: address.streetName,
+                          area: address.area,
+                          landmark: address.landmark,
+                          city: address.city,
+                          state: address.state,
+                          pincode: address.pincode,
+                        })}
                       </p>
                       <div className="mb-3 mt-1 flex min-w-0 flex-wrap items-center gap-2">
                         {(() => {

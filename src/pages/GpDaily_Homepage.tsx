@@ -48,6 +48,7 @@ import {
 import {
   fetchGuestDeviceLocationLabel,
   GUEST_HEADER_LOCATION_TITLE,
+  GUEST_LOCATION_UNAVAILABLE_HINT,
 } from "../utils/guestHeaderLocation";
 
 interface DayInfo {
@@ -413,9 +414,10 @@ const Home2: React.FC = () => {
     } else if (!isLoggedIn) {
       setAddressType(GUEST_HEADER_LOCATION_TITLE);
       setDeliveryLocation("");
-      setIsLoadingAddress(false);
+      setIsLoadingAddress(true);
       void fetchGuestDeviceLocationLabel().then((label) => {
         setDeliveryLocation(label);
+        setIsLoadingAddress(false);
       });
     } else {
       setIsLoadingAddress(false);
@@ -799,7 +801,9 @@ const Home2: React.FC = () => {
                             ? deliveryLocation.length > 50
                               ? `${deliveryLocation.slice(0, 50)}...`
                               : deliveryLocation
-                            : "Tap to set address"}
+                            : !isLoggedIn
+                              ? GUEST_LOCATION_UNAVAILABLE_HINT
+                              : "Tap to set address"}
                       </span>
                     </div>
                     <MdKeyboardArrowDown className="text-[#4B5563] flex-shrink-0 text-xl" />
@@ -809,7 +813,7 @@ const Home2: React.FC = () => {
 
                 <button
                   type="button"
-                  className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full flex items-center justify-center"
+                  className="relative h-10 w-10 shrink-0 translate-x-1 overflow-hidden rounded-full flex items-center justify-center"
                   onClick={() => navigate("/gp-daily/account")}
                   aria-label={isLoggedIn ? "Wallet" : "Log in"}
                 >
