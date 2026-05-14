@@ -7,6 +7,13 @@ import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import { addressService } from "../../services/address.service";
 import { validateGpDailyDeliveryAreaFromCoordinates } from "../../services/subscriptionZone.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import {
+  GEO_MSG_GEOCODE_EMPTY,
+  GEO_MSG_NETWORK,
+  GEO_MSG_UNSUPPORTED,
+  isLikelyNetworkError,
+  messageFromGeolocationPositionError,
+} from "../../utils/geolocationMessages";
 import Spinner from "../../components/common/Spinner";
 import {
   MapLoadingPlaceholder,
@@ -60,7 +67,6 @@ const HomePageLocation: React.FC = () => {
   const [isLocationServiced, setIsLocationServiced] = useState(true);
   const [isValidatingDeliveryZone, setIsValidatingDeliveryZone] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
-  const [, setShowErrorModal] = useState(false);
   // const [useRegularMarker, setUseRegularMarker] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
   // const markerRef = useRef<any>(null);
@@ -117,8 +123,10 @@ const HomePageLocation: React.FC = () => {
         const coords = JSON.parse(savedCoordinates);
         setSelectedPosition(coords);
         updateAddressDetails(coords.lat, coords.lng);
-      } catch (error) {
-        setShowErrorModal(true);
+      } catch {
+        setError(
+          "Saved location could not be loaded. Search for your address on the map or allow location again.",
+        );
       }
     } else {
       getCurrentLocation();
@@ -135,6 +143,7 @@ const HomePageLocation: React.FC = () => {
 
   const getCurrentLocation = () => {
     setIsLoadingLocation(true);
+    setError(null);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -144,40 +153,52 @@ const HomePageLocation: React.FC = () => {
 
           try {
             const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-           
+
             if (!apiKey) {
               console.error("Google Maps API key is not configured.");
-              setShowErrorModal(true);
+              setError(
+                "Maps are not configured on this build. Please search for your address on the map.",
+              );
               setIsLoadingLocation(false);
               return;
             }
 
             const response = await fetch(
-              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`
+              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`,
             );
-            const data = await response.json();
-            if (data.results && data.results[0]) {
-              const address = data.results[0].formatted_address;
-              setLocationSearchQuery(address);
-              updateAddressDetails(latitude, longitude);
-            } else {
-              console.error("Geocoding API did not return results:", data);
+            if (!response.ok) {
+              setError(GEO_MSG_NETWORK);
+              setIsLoadingLocation(false);
+              return;
             }
+            const data = await response.json();
+            if (data.status === "ZERO_RESULTS" || !data.results?.[0]) {
+              setError(GEO_MSG_GEOCODE_EMPTY);
+              setIsLoadingLocation(false);
+              return;
+            }
+            const address = data.results[0].formatted_address;
+            setLocationSearchQuery(address);
+            updateAddressDetails(latitude, longitude);
           } catch (error) {
             console.error("Error fetching address details:", error);
-            setShowErrorModal(true);
+            setError(
+              isLikelyNetworkError(error)
+                ? GEO_MSG_NETWORK
+                : "We couldn't load that address. Try searching on the map.",
+            );
           }
           setIsLoadingLocation(false);
         },
-        (error) => {
-          console.error("Error getting current location:", error);
-          setShowErrorModal(true);
+        (geoErr) => {
+          console.error("Error getting current location:", geoErr);
+          setError(messageFromGeolocationPositionError(geoErr));
           setIsLoadingLocation(false);
-        }
+        },
+        { enableHighAccuracy: false, timeout: 20_000, maximumAge: 60_000 },
       );
     } else {
-      console.error("Geolocation is not supported by this browser.");
-      setShowErrorModal(true);
+      setError(GEO_MSG_UNSUPPORTED);
       setIsLoadingLocation(false);
     }
   };
@@ -199,7 +220,7 @@ const HomePageLocation: React.FC = () => {
  
 
       if (!result?.results?.[0]) {
-        console.error("No results found in geocoding response.");
+        setError(GEO_MSG_GEOCODE_EMPTY);
         return;
       }
 
@@ -280,7 +301,11 @@ const HomePageLocation: React.FC = () => {
       }
     } catch (error) {
       console.error("Error in updateAddressDetails:", error);
-      // Only show user-friendly error message
+      setError(
+        isLikelyNetworkError(error)
+          ? GEO_MSG_NETWORK
+          : GEO_MSG_GEOCODE_EMPTY,
+      );
     }
   };
 

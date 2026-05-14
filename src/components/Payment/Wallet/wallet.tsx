@@ -409,9 +409,11 @@ const Wallet = () => {
         />
 
         <div className={`${pagePad} space-y-0 pb-20`}>
+        {/* Stack balance + alerts with `gap` so spacing never collapses (margin alone looked flush on device). */}
+        <div className="flex flex-col gap-6">
         {/* Balance card — match mobile `WalletScreen` gradient, radius, type scale */}
         <div
-          className="w-full text-white rounded-[30px] p-[22px] shadow-sm relative overflow-hidden"
+          className="w-full shrink-0 text-white rounded-[30px] p-[22px] shadow-sm relative overflow-hidden"
           style={{
             background:
               "linear-gradient(280.14deg, rgba(2, 133, 50, 0.85) 5.56%, rgba(22, 163, 74, 0.85) 129.06%)",
@@ -459,7 +461,7 @@ const Wallet = () => {
           feature === "gpDaily" &&
           isLoggedIn &&
           gpDailyOrderHold.show && (
-            <div className="mt-2.5 w-full rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white">
+            <div className="w-full shrink-0 rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white">
               <div className="flex items-start gap-2">
                 <img
                   src={lowbalanceIcon}
@@ -484,7 +486,7 @@ const Wallet = () => {
           isLoggedIn &&
           !gpDailyOrderHold.show &&
           balance < 500 && (
-            <div className="mt-2.5 w-full flex flex-row items-start gap-2 rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white">
+            <div className="w-full shrink-0 flex flex-row items-start gap-2 rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white">
               <IoAlertCircle className="h-[18px] w-[18px] shrink-0 text-white" style={{ marginTop: 1 }} aria-hidden />
               <div className="min-w-0 flex-1">
                 <h3 className="font-serif text-[13px] font-bold leading-[18px] text-white">Low Balance</h3>
@@ -496,7 +498,7 @@ const Wallet = () => {
           )}
 
         {!isLoadingBalance && feature === "gpStore" && balance < 500 && (
-          <div className="mt-2.5 w-full flex flex-row items-start gap-2 rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white">
+          <div className="w-full shrink-0 flex flex-row items-start gap-2 rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white">
             <IoAlertCircle className="h-[18px] w-[18px] shrink-0 text-white" style={{ marginTop: 1 }} aria-hidden />
             <div className="min-w-0 flex-1">
               <h3 className="font-serif text-[13px] font-bold leading-[18px] text-white">Low Balance</h3>
@@ -506,6 +508,7 @@ const Wallet = () => {
             </div>
           </div>
         )}
+        </div>
 
         {/* Add Money — match mobile `WalletScreen` chips, labels, field, CTA */}
         <div className="mt-3 w-full">

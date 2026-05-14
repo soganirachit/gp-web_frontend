@@ -7,7 +7,8 @@ import { getApiUrl } from "../config/api.config";
 // So we use relative paths like '/products/...'
 const PRODUCTS_BASE = '/products';
 
-export const PRODUCT_AVAILABILITY_STORE = "store";
+/** Store catalog: include `store` and `both` rows (same pattern as GP Daily `daily,both`). */
+export const PRODUCT_AVAILABILITY_STORE = "store,both";
 
 /**
  * GP Daily catalog: `GET /products/?availability_type=daily,both` (include `daily` and `both` rows).
@@ -280,7 +281,7 @@ export interface BestSeller {
 
 export const productService = {
   /**
-   * GET /products/ — optional `availability_type` (e.g. `daily,both` for GP Daily catalog, `store` for store).
+   * GET /products/ — optional `availability_type` (e.g. `daily,both` for GP Daily catalog, `store,both` for store).
    */
   async getAllProducts(opts?: {
     storeId?: number;

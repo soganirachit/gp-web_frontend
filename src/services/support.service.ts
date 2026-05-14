@@ -5,6 +5,27 @@ import { headerService } from "./headers.service";
 const API_URL = `${getApiUrl()}/support/tickets`;
 const SUPPORT_API_URL = `${getApiUrl()}/support`;
 
+/** DRF `next`/`previous` may be absolute; normalize for axios when `baseURL` matches. */
+function normalizeTicketsRequestUrl(url: string): string {
+  const u = url.trim();
+  if (!u) return `${API_URL}/`;
+  if (!/^https?:\/\//i.test(u)) return u.startsWith("/") ? u : `/${u}`;
+  try {
+    const parsed = new URL(u);
+    const base = getApiUrl().replace(/\/$/, "");
+    const baseParsed = new URL(base.endsWith("/") ? base : `${base}/`);
+    if (parsed.origin !== baseParsed.origin) return u;
+    const basePath = baseParsed.pathname.replace(/\/$/, "");
+    let path = parsed.pathname + parsed.search;
+    if (basePath && path.startsWith(basePath)) {
+      path = path.slice(basePath.length) || "/";
+    }
+    return path.startsWith("/") ? path : `/${path}`;
+  } catch {
+    return u;
+  }
+}
+
 export interface SupportTicket {
   id: number;
   ticket_number: string;
@@ -19,6 +40,14 @@ export interface SupportTicket {
   callback_requested?: boolean;
   messages_count?: number;
   has_unread_by_customer?: boolean;
+}
+
+/** Paginated list response from support tickets API (DRF-style). */
+export interface SupportTicketsPage {
+  results: SupportTicket[];
+  count: number;
+  next: string | null;
+  previous: string | null;
 }
 
 export interface SupportMessage {
@@ -199,7 +228,7 @@ export interface PredefinedAnswers {
 
 class SupportService {
   /**
-   * Get eligible orders for support (delivered in last 4 hours)
+   * Get eligible orders for support (delivered in last 12 hours; server may apply its own window)
    */
   async getEligibleOrders(): Promise<EligibleOrder[]> {
     try {
@@ -253,31 +282,61 @@ class SupportService {
   }
 
   /**
-   * Get all support tickets for the current user
+   * Fetch one page of support tickets. Pass `nextUrl` from a previous page's `next` field, or omit for first page.
    */
-  async getTickets(): Promise<SupportTicket[]> {
+  async getTicketsPage(nextUrl?: string | null): Promise<SupportTicketsPage> {
+    const empty: SupportTicketsPage = {
+      results: [],
+      count: 0,
+      next: null,
+      previous: null,
+    };
     try {
       const headers = headerService.getHeaders();
       if (!headers) {
-        return [];
+        return empty;
       }
-      const response = await api.get<{ count: number; next: string | null; previous: string | null; results: SupportTicket[] } | SupportTicket[]>(`${API_URL}/`);
-      console.log('Tickets API response:', response.data);
-      
-      // Handle paginated response structure
-      if (response.data && typeof response.data === 'object' && 'results' in response.data && Array.isArray(response.data.results)) {
-        return response.data.results;
+      const raw =
+        nextUrl != null && String(nextUrl).trim() !== ""
+          ? String(nextUrl).trim()
+          : `${API_URL}/`;
+      const url = normalizeTicketsRequestUrl(raw);
+      const response = await api.get<
+        | { count: number; next: string | null; previous: string | null; results: SupportTicket[] }
+        | SupportTicket[]
+      >(url);
+
+      const data = response.data;
+      if (data && typeof data === "object" && "results" in data && Array.isArray(data.results)) {
+        return {
+          results: data.results,
+          count: typeof data.count === "number" ? data.count : data.results.length,
+          next: data.next ?? null,
+          previous: data.previous ?? null,
+        };
       }
-      // Fallback: if response.data is directly an array
-      if (Array.isArray(response.data)) {
-        return response.data;
+      if (Array.isArray(data)) {
+        return {
+          results: data,
+          count: data.length,
+          next: null,
+          previous: null,
+        };
       }
-      return [];
+      return empty;
     } catch (error: any) {
-      console.error('Error fetching support tickets:', error);
+      console.error("Error fetching support tickets page:", error);
       headerService.handleError(error);
-      return [];
+      return empty;
     }
+  }
+
+  /**
+   * Get all support tickets for the current user (first page only — prefer {@link getTicketsPage} for pagination).
+   */
+  async getTickets(): Promise<SupportTicket[]> {
+    const page = await this.getTicketsPage();
+    return page.results;
   }
 
   /**

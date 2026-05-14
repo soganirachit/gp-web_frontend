@@ -45,6 +45,10 @@ import {
   formatNamasteDeliveryLine,
   subscriptionProductLabel,
 } from "../utils/subscriptionNextDelivery";
+import {
+  fetchGuestDeviceLocationLabel,
+  GUEST_HEADER_LOCATION_TITLE,
+} from "../utils/guestHeaderLocation";
 
 interface DayInfo {
   date: string;
@@ -406,6 +410,13 @@ const Home2: React.FC = () => {
     validateDeliveryZone(false);
     if (localStorage.getItem("access_token")) {
       fetchLatestAddress();
+    } else if (!isLoggedIn) {
+      setAddressType(GUEST_HEADER_LOCATION_TITLE);
+      setDeliveryLocation("");
+      setIsLoadingAddress(false);
+      void fetchGuestDeviceLocationLabel().then((label) => {
+        setDeliveryLocation(label);
+      });
     } else {
       setIsLoadingAddress(false);
     }

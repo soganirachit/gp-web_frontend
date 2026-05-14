@@ -63,6 +63,10 @@ const CustomerSupport: React.FC = () => {
   
   const [orders, setOrders] = useState<any[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [ticketsNext, setTicketsNext] = useState<string | null>(null);
+  const [ticketsPrevious, setTicketsPrevious] = useState<string | null>(null);
+  const [ticketsTotalCount, setTicketsTotalCount] = useState(0);
+  const [ticketsLoadingMore, setTicketsLoadingMore] = useState(false);
   const [selectedOrderNumber, setSelectedOrderNumber] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [isOrderDropdownOpen, setIsOrderDropdownOpen] = useState(false);
@@ -89,19 +93,36 @@ const CustomerSupport: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Fetch eligible orders (delivered in last 4 hours)
+      // Fetch eligible orders (delivered in last 12 hours)
       const eligibleOrders = await supportService.getEligibleOrders();
       console.log('Fetched eligible orders:', eligibleOrders);
       setOrders(eligibleOrders);
       
-      // Fetch support tickets
-      const supportTickets = await supportService.getTickets();
-      console.log('Fetched support tickets:', supportTickets);
-      setTickets(supportTickets);
+      const page = await supportService.getTicketsPage();
+      setTickets(page.results);
+      setTicketsNext(page.next);
+      setTicketsPrevious(page.previous);
+      setTicketsTotalCount(page.count);
     } catch (err) {
       console.error("Failed to fetch data:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTicketsAtUrl = async (url: string | null) => {
+    if (!url?.trim()) return;
+    try {
+      setTicketsLoadingMore(true);
+      const page = await supportService.getTicketsPage(url);
+      setTickets(page.results);
+      setTicketsNext(page.next);
+      setTicketsPrevious(page.previous);
+      setTicketsTotalCount(page.count);
+    } catch (err) {
+      console.error("Failed to load tickets page:", err);
+    } finally {
+      setTicketsLoadingMore(false);
     }
   };
 
@@ -116,7 +137,7 @@ const CustomerSupport: React.FC = () => {
 
   const getSelectedOrderText = () => {
     if (!selectedOrderNumber) {
-      return orders.length === 0 ? 'No orders available (delivered in last 4 hours)' : 'Select an order delivered in last 4 hours';
+      return orders.length === 0 ? 'No orders available (delivered in last 12 hours)' : 'Select an order delivered in last 12 hours';
     }
     return selectedOrderNumber;
   };
@@ -190,10 +211,10 @@ const CustomerSupport: React.FC = () => {
 
         {/* Content */}
         <div className="px-4 pb-nav-bottom">
-          {/* Orders Dropdown - Delivered in last 6 hours */}
+          {/* Orders Dropdown - Delivered in last 12 hours */}
           <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
             <label className="text-sm font-semibold text-gray-700 mb-3 block">
-              Select Order (Delivered in last 4 hours)
+              Select Order (Delivered in last 12 hours)
             </label>
             <div ref={dropdownRef} className="relative w-full">
               {/* Custom Dropdown Button */}
@@ -293,6 +314,14 @@ const CustomerSupport: React.FC = () => {
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Support Ticket History</h2>
             {tickets.length > 0 ? (
+              <>
+              {ticketsTotalCount > tickets.length || ticketsNext || ticketsPrevious ? (
+                <p className="text-xs text-gray-500 mb-3">
+                  {ticketsTotalCount > 0
+                    ? `Showing ${tickets.length} of ${ticketsTotalCount} tickets`
+                    : `Showing ${tickets.length} ticket${tickets.length === 1 ? "" : "s"}`}
+                </p>
+              ) : null}
               <div className="space-y-3">
                 {tickets.map((ticket) => (
                   <div
@@ -341,6 +370,27 @@ const CustomerSupport: React.FC = () => {
                   </div>
                 ))}
               </div>
+              {(ticketsPrevious || ticketsNext) && (
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-4">
+                  <button
+                    type="button"
+                    disabled={!ticketsPrevious || ticketsLoadingMore}
+                    onClick={() => void loadTicketsAtUrl(ticketsPrevious)}
+                    className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!ticketsNext || ticketsLoadingMore}
+                    onClick={() => void loadTicketsAtUrl(ticketsNext)}
+                    className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {ticketsLoadingMore ? "Loading…" : "Next"}
+                  </button>
+                </div>
+              )}
+              </>
             ) : (
               <div className="text-center py-8 text-gray-500">
                 <p>No support tickets found.</p>

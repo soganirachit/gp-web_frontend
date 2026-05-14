@@ -29,6 +29,10 @@ import profilehomeIcon from '../assets/svg/gp_daily svg/profilehome.svg';
 import profilelogoIcon from '../assets/svg/gp_daily svg/profilelogo.svg';
 import locationhomeIcon from '../assets/svg/gp_daily svg/locationhome.svg';
 import { SOCIAL_URLS } from '../config/socialUrls';
+import {
+  fetchGuestDeviceLocationLabel,
+  GUEST_HEADER_LOCATION_TITLE,
+} from '../utils/guestHeaderLocation';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -59,9 +63,11 @@ const HomePage: React.FC = () => {
   // Function to fetch the latest address from API (only when logged in — avoids wrong JWT for guests)
   const fetchLatestAddress = useCallback(async () => {
     if (!isLoggedIn) {
-      // Logged out: never show a previously-saved address in the header.
+      setAddressType(GUEST_HEADER_LOCATION_TITLE);
       setDeliveryLocation('');
-      setAddressType('Home');
+      setIsLoadingAddress(true);
+      const label = await fetchGuestDeviceLocationLabel();
+      setDeliveryLocation(label);
       setIsLoadingAddress(false);
       return;
     }
@@ -172,9 +178,7 @@ const HomePage: React.FC = () => {
                   <span className="text-xs sm:text-sm text-gray-600 truncate font-medium">
                     {isLoadingAddress
                       ? 'Loading...'
-                      : isLoggedIn
-                      ? (deliveryLocation || 'Tap to set address')
-                      : 'Tap to set address'}
+                      : (deliveryLocation || 'Tap to set address')}
                   </span>
                 </div>
                 <MdKeyboardArrowDown className="text-gray-600 flex-shrink-0 text-lg sm:text-xl" />

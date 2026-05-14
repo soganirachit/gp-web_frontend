@@ -23,6 +23,7 @@ import { paymentService } from '../../../services/payment.service';
 import { orderService } from '../../../services/order.service';
 import { customerService } from '../../../services/getcustomer.service';
 import { cartService, type CartData } from '../../../services/cart.service';
+import { walletService } from '../../../services/wallet.service';
 import Spinner from '../../../components/common/Spinner';
 import { CartPageSkeleton } from '../../../components/common/PageSkeletons';
 import api from '../../../services/api';
@@ -1790,6 +1791,13 @@ const Cart: React.FC = () => {
     // Prereq: set address on daily cart first.
     try {
       setIsProcessingPayment(true);
+      const { balance: walletBalance } = await walletService.getWalletBalance();
+      const cartAmount = Number(total);
+      if (Number.isFinite(cartAmount) && walletBalance < cartAmount) {
+        toast.error('Wallet balance is low. First recharge the wallet.');
+        setIsProcessingPayment(false);
+        return;
+      }
       const addrOk = await applySubscriptionCartDeliveryAddress(Number(defaultAddress.id));
       if (!addrOk) {
         setIsProcessingPayment(false);

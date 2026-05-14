@@ -188,8 +188,8 @@ function historyOrderCancelled(o: Record<string, unknown>): boolean {
 }
 
 const DELIVERY_HISTORY_PAGE_SIZE = 6;
-/** Show Support link only within 4h of `delivered_at` (match mobile `SubscriptionsScreen`). */
-const SUPPORT_TICKET_WINDOW_MS = 4 * 60 * 60 * 1000;
+/** Show Support link only within 12h of `delivered_at` (match mobile `SubscriptionsScreen`). */
+const SUPPORT_TICKET_WINDOW_MS = 12 * 60 * 60 * 1000;
 
 function isSupportAvailableForDelivery(
   delivered: boolean,

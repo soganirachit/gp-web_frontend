@@ -117,7 +117,7 @@ function formatPaymentMethodLabel(raw: string | undefined): string {
   return raw;
 }
 
-const SUPPORT_TICKET_WINDOW_MS = 4 * 60 * 60 * 1000;
+const SUPPORT_TICKET_WINDOW_MS = 12 * 60 * 60 * 1000;
 
 function isWithinSupportWindowAfterDelivery(
   status: string,
@@ -734,7 +734,7 @@ const OrderDetails: React.FC = () => {
               </button>
             </div>
 
-            {/* Support Section — only within 4 hours of delivery timestamp */}
+            {/* Support Section — only within 12 hours of delivery timestamp */}
             {showSupportTicketSection && (
               <div className="bg-white rounded-2xl p-4 shadow-sm">
                 <div className="mb-3 flex items-start gap-3">
@@ -744,7 +744,7 @@ const OrderDetails: React.FC = () => {
                     className="mt-0.5 h-5 w-5 shrink-0"
                   />
                   <p className="flex-1 text-left text-sm leading-relaxed text-gray-600">
-                    Support requests can only be raised within 4 hours after delivery.
+                    Support requests can only be raised within 12 hours after delivery.
                   </p>
                 </div>
                 <div className="text-center">

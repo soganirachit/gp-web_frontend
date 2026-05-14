@@ -15,9 +15,34 @@ import { useAuth } from "../../context/AuthContext";
 import { subscriptionCartService } from "../../services/subscriptionCart.service";
 
 /**
- * GP Daily tab glyphs: app tints the same SVGs to `#6B7280` / `#222222` (`DAILY_TEXT_ON_PRIMARY`).
- * `<img src>` cannot honor `currentColor` — use the asset as a CSS mask so the fill matches the app.
+ * Small navbar SVGs are often inlined by Vite as `data:` URLs. `mask-image: url(data:…)`
+ * is unreliable in WebViews (icons show as solid squares); `<img src>` is fine.
  */
+function DailyNavMonoIcon({
+  src,
+  active,
+  className = "mb-0.5 h-5 w-5",
+}: {
+  src: string;
+  active: boolean;
+  className?: string;
+}) {
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden
+      className={`inline-block shrink-0 object-contain ${className}`}
+      style={
+        active
+          ? { filter: "brightness(0) saturate(100%)" }
+          : { filter: "brightness(0) saturate(100%)", opacity: 0.5 }
+      }
+    />
+  );
+}
+
+/** Daily logo stays a separate asset; CSS mask tint is OK here. */
 function DailyNavGlyph({
   src,
   active,
@@ -317,7 +342,7 @@ const BottomNav: React.FC = () => {
               }`}
           >
             {isActive("/home") && dailyActivePill}
-            <DailyNavGlyph
+            <DailyNavMonoIcon
               src={homeIcon}
               active={isActive("/home")}
               className="relative z-10 mb-1 h-5 w-5"
@@ -349,7 +374,7 @@ const BottomNav: React.FC = () => {
               }`}
           >
             {isActive(`${basePath}/wallet`) && dailyActivePill}
-            <DailyNavGlyph
+            <DailyNavMonoIcon
               src={walletIcon}
               active={isActive(`${basePath}/wallet`)}
               className="relative z-10 mb-1 h-5 w-5"
@@ -367,7 +392,7 @@ const BottomNav: React.FC = () => {
           >
             {basketTabActive && dailyActivePill}
             <div className="relative">
-              <DailyNavGlyph
+              <DailyNavMonoIcon
                 src={basketIcon}
                 active={basketTabActive}
                 className="relative z-10 mb-1 h-5 w-5"

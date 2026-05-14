@@ -69,7 +69,6 @@ export function SearchBar({
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const blurCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchProductSuggestions = useCallback(async (q: string) => {
     if (!q.trim()) {
@@ -127,26 +126,24 @@ export function SearchBar({
   }, [query, mode, orders]);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handlePointerDownOutside = (e: PointerEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setShowSuggestions(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('pointerdown', handlePointerDownOutside, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDownOutside, true);
   }, []);
 
   useEffect(() => {
-    const close = () => setShowSuggestions(false);
-    window.addEventListener('scroll', close, true);
-    return () => window.removeEventListener('scroll', close, true);
-  }, []);
-  useEffect(() => {
-    return () => {
-      if (blurCloseRef.current) clearTimeout(blurCloseRef.current);
+    const handleScroll = (e: Event) => {
+      const t = e.target;
+      if (t instanceof Node && containerRef.current?.contains(t)) return;
+      setShowSuggestions(false);
     };
+    document.addEventListener('scroll', handleScroll, true);
+    return () => document.removeEventListener('scroll', handleScroll, true);
   }, []);
-
 
   const handleProductSuggestionClick = (item: ProductSuggestion) => {
     setShowSuggestions(false);
@@ -191,14 +188,7 @@ export function SearchBar({
             setShowSuggestions(true);
           }}
           onFocus={() => {
-            if (blurCloseRef.current) {
-              clearTimeout(blurCloseRef.current);
-              blurCloseRef.current = null;
-            }
             if (query.trim()) setShowSuggestions(true);
-          }}
-          onBlur={() => {
-            blurCloseRef.current = setTimeout(() => setShowSuggestions(false), 180);
           }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
@@ -209,7 +199,10 @@ export function SearchBar({
       </div>
 
       {showSuggestions && hasSuggestions && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[60] max-h-64 overflow-y-auto">
+        <div
+          className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[60] max-h-64 overflow-y-auto overscroll-contain touch-pan-y"
+          onWheel={(e) => e.stopPropagation()}
+        >
           {loading && mode === 'product' ? (
             <div className="px-4 py-6 text-center text-sm text-gray-500">Searching...</div>
           ) : mode === 'product' ? (

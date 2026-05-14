@@ -11,6 +11,12 @@ import { customerService } from '../../services/getcustomer.service';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { MapLoadingPlaceholder } from '../../components/common/PageSkeletons';
 import { UniformPageHeader } from '../../components/layout/UniformPageHeader';
+import {
+  GEO_MSG_NETWORK,
+  GEO_MSG_UNSUPPORTED,
+  isLikelyNetworkError,
+  messageFromGeolocationPositionError,
+} from '../../utils/geolocationMessages';
 
 /** When Google Geocoding REST is unavailable or returns nothing, fill fields from OSM (usage policy: identify app). */
 async function reverseGeocodeWithOsm(
@@ -408,7 +414,7 @@ const AddEditAddress: React.FC = () => {
     setIsLocating(true);
 
     if (!navigator.geolocation) {
-      const errorMsg = 'Geolocation is not supported by your browser';
+      const errorMsg = GEO_MSG_UNSUPPORTED;
       if (lastToastMessage.current !== errorMsg) {
         lastToastMessage.current = errorMsg;
         toast.error(errorMsg);
@@ -460,7 +466,9 @@ const AddEditAddress: React.FC = () => {
           window.setTimeout(() => setShowMapLocationHint(false), 4000);
         } catch (error) {
           console.error('Error fetching address:', error);
-          const errorMsg = 'Failed to fetch location details';
+          const errorMsg = isLikelyNetworkError(error)
+            ? GEO_MSG_NETWORK
+            : "We couldn't load address details for this spot. Drag the pin or search for your address.";
           if (lastToastMessage.current !== errorMsg) {
             lastToastMessage.current = errorMsg;
             toast.error(errorMsg);
@@ -472,14 +480,15 @@ const AddEditAddress: React.FC = () => {
       },
       (error) => {
         console.error('Error accessing location:', error);
-        const errorMsg = 'Failed to access location';
+        const errorMsg = messageFromGeolocationPositionError(error);
         if (lastToastMessage.current !== errorMsg) {
           lastToastMessage.current = errorMsg;
           toast.error(errorMsg);
         }
         isLocationRequestInProgress.current = false;
         setIsLocating(false);
-      }
+      },
+      { enableHighAccuracy: false, timeout: 20_000, maximumAge: 60_000 },
     );
   };
 

@@ -15,6 +15,7 @@ import {
   validateGpDailyDeliveryAreaForAddressId,
   validateGpDailyDeliveryAreaFromCoordinates,
 } from "../../services/subscriptionZone.service";
+import { messageFromGeolocationPositionError } from "../../utils/geolocationMessages";
 import { customerService } from "../../services/getcustomer.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { AddressSelectionSkeleton } from "../common/PageSkeletons";
@@ -184,10 +185,10 @@ const AddressSelection: React.FC = () => {
         }
         setLiveDeviceLocation({ lat, lng, formattedAddress: formatted });
       },
-      () => {
-        /* permission denied or unavailable — no card */
+      (err) => {
+        toast.error(messageFromGeolocationPositionError(err), { id: "live-device-geo" });
       },
-      { enableHighAccuracy: true, timeout: 14_000, maximumAge: 120_000 },
+      { enableHighAccuracy: false, timeout: 20_000, maximumAge: 120_000 },
     );
   }, [isLoaded, showAddForm, loadError]);
 

@@ -39,6 +39,10 @@ import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
 // Large banner served from public/ for better caching
 const bannerSvg = '/gp_store_banner.svg';
 import { formatProductTitleCase } from "../lib/formatProductTitleCase";
+import {
+  fetchGuestDeviceLocationLabel,
+  GUEST_HEADER_LOCATION_TITLE,
+} from "../utils/guestHeaderLocation";
 import { ProductImageTag } from "../components/common/ProductImageTag";
 import namasteSvg from '../assets/svg/namaste.svg';
 
@@ -193,9 +197,12 @@ const GpStore_Homepage: React.FC = () => {
         try {
             setIsLoadingAddress(true);
             if (!isLoggedIn) {
-                // Logged out: never show a previously-saved address in the header.
+                setAddressType(GUEST_HEADER_LOCATION_TITLE);
                 setDeliveryLocation("");
-                setAddressType("Home");
+                setIsLoadingAddress(false);
+                void fetchGuestDeviceLocationLabel().then((label) => {
+                    setDeliveryLocation(label);
+                });
                 return;
             }
             const addresses = await addressService.getAllAddresses();
@@ -258,9 +265,7 @@ const GpStore_Homepage: React.FC = () => {
                 }
             } else {
                 if (isMounted) {
-                    setDeliveryLocation("");
-                    setAddressType("Home");
-                    setIsLoadingAddress(false);
+                    void fetchLatestAddress();
                 }
 
             }
@@ -392,9 +397,7 @@ const GpStore_Homepage: React.FC = () => {
                                             <span className="text-xs sm:text-sm text-gray-700 truncate font-medium">
                                                 {isLoadingAddress
                                                   ? 'Loading...'
-                                                  : isLoggedIn
-                                                  ? (deliveryLocation || 'Tap to set address')
-                                                  : 'Tap to set address'}
+                                                  : (deliveryLocation || 'Tap to set address')}
                                             </span>
                                         </div>
                                         <MdKeyboardArrowDown className="text-gray-600 flex-shrink-0 text-lg sm:text-xl" />

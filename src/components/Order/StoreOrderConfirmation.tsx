@@ -382,9 +382,9 @@ const StoreOrderConfirmation: React.FC = () => {
           </button>
         </div>
 
-        <p className="text-center text-gray-600 text-xs mt-3">
+        {/* <p className="text-center text-gray-600 text-xs mt-3">
           Our customer care is available 24/7
-        </p>
+        </p> */}
 
       </div>
     </div>

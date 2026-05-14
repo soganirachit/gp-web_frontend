@@ -1293,14 +1293,14 @@ const ConfirmSubscription: React.FC = () => {
             </motion.div>
 
             {/* Customer Care Info */}
-            <motion.p
+            {/* <motion.p
               className="text-center text-gray-600 text-xs mb-24"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 1.5 }}
             >
               Our customer care is available 24/7
-            </motion.p>
+            </motion.p> */}
 
           </>
         )}

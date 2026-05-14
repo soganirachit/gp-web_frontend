@@ -6,6 +6,10 @@ import { cartService } from "./cart.service";
 import {
   resolveGpDailyZoneAtLatLng,
 } from "./subscriptionZone.service";
+import {
+  GEO_MSG_UNSUPPORTED,
+  messageFromGeolocationPositionError,
+} from "../utils/geolocationMessages";
 
 /** Dispatched on `window` after a guest picks a store from the city picker (home / products refresh). */
 export const GUEST_STORE_UPDATED_EVENT = "gp-guest-temporary-store-updated";
@@ -463,7 +467,7 @@ class StoreService {
   async applyUseCurrentGpsForCatalog(): Promise<void> {
     this.setGpStoreCatalogAddressOverrideId(null);
     if (!navigator.geolocation) {
-      throw new Error("Location is not supported in this browser.");
+      throw new Error(GEO_MSG_UNSUPPORTED);
     }
     await new Promise<void>((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(
@@ -527,13 +531,9 @@ class StoreService {
           }
         },
         (geoErr) => {
-          let msg = "Failed to get your location.";
-          if (geoErr?.code === geoErr?.PERMISSION_DENIED) {
-            msg = "Location permission denied. Enable location in your browser settings.";
-          }
-          reject(new Error(msg));
+          reject(new Error(messageFromGeolocationPositionError(geoErr)));
         },
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+        { enableHighAccuracy: false, timeout: 20_000, maximumAge: 60_000 },
       );
     });
   }
@@ -560,7 +560,7 @@ class StoreService {
   async getStoreFromLocation(): Promise<number | null> {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
-        const err = new Error("Geolocation is not supported by your browser") as Error & {
+        const err = new Error(GEO_MSG_UNSUPPORTED) as Error & {
           code?: string;
         };
         err.code = GUEST_NEED_CITY_PICKER_CODE;
@@ -569,9 +569,9 @@ class StoreService {
       }
 
       const options = {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+        enableHighAccuracy: false,
+        timeout: 20_000,
+        maximumAge: 60_000,
       };
 
       navigator.geolocation.getCurrentPosition(
@@ -586,18 +586,7 @@ class StoreService {
           }
         },
         (error) => {
-          let errorMessage = "Failed to get your location";
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage = "Location permission denied. Please enable location access.";
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage = "Location information unavailable.";
-              break;
-            case error.TIMEOUT:
-              errorMessage = "Location request timed out.";
-              break;
-          }
+          const errorMessage = messageFromGeolocationPositionError(error);
           const err = new Error(errorMessage) as Error & { code?: string };
           err.code = GUEST_NEED_CITY_PICKER_CODE;
           reject(err);

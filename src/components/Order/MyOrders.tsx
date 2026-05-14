@@ -383,7 +383,8 @@ const MyOrders: React.FC = () => {
                     <span className="text-gray-500 text-sm">Loading…</span>
                   ) : null}
                 </div>
-              )}
+
+)}
             </div>
           ) : (
             <div className="text-center pt-20 text-gray-500">
