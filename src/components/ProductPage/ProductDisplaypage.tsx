@@ -30,6 +30,7 @@ import { ProductImageTag } from "../common/ProductImageTag";
 import cautionIcon from "../../assets/svg/gp_daily svg/caution.svg";
 import deliveryTruckIcon from "../../assets/svg/gp_daily svg/delivery_truck.svg";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import { useAuth } from "../../context/AuthContext";
 import { storeService } from "../../services/store.service";
 import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
 import {
@@ -199,6 +200,7 @@ const ProductPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { feature, theme } = useFeatureTheme();
+  const { isLoggedIn } = useAuth();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const productListAvailability =
     feature === 'gpStore' ? PRODUCT_AVAILABILITY_STORE : PRODUCT_AVAILABILITY_DAILY;
@@ -389,15 +391,6 @@ const ProductPage: React.FC = () => {
         return;
       }
 
-      if (!localStorage.getItem("phoneNumber")) {
-        navigate(`${basePath}/login`, {
-          state: {
-            returnUrl: `${basePath}/product/${encodeURIComponent(slug ?? "")}`,
-          },
-        });
-        return;
-      }
-
       const catalogSidForDaily =
         feature !== "gpStore"
           ? await resolveGpDailyCatalogStoreId().catch(() => undefined)
@@ -514,6 +507,10 @@ const ProductPage: React.FC = () => {
   // gp-daily uses subscription cart APIs for basket quantity
   useEffect(() => {
     if (feature === "gpStore") return;
+    if (!isLoggedIn) {
+      setDailyCart(null);
+      return;
+    }
     if (!(product as any)?.id) return;
     let mounted = true;
     (async () => {
@@ -535,7 +532,7 @@ const ProductPage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [feature, product, basePath, navigate]);
+  }, [feature, product, basePath, navigate, isLoggedIn]);
 
   const handleBestSellerCardClick = (item: any) => {
     const pathSlug = item.slug ?? item.id;
@@ -1148,7 +1145,7 @@ const ProductPage: React.FC = () => {
             {product && catalogGallerySlides.length > 1 ? (
               <>
                 <div
-                  className="relative aspect-square w-full cursor-grab touch-none overflow-hidden rounded-xl border-2 border-gray-900 active:cursor-grabbing"
+                  className="relative aspect-square w-full cursor-grab touch-none overflow-hidden rounded-xl border-0 outline-none ring-0 bg-[#f8f6f1] active:cursor-grabbing"
                   onPointerDown={handlePdpGalleryPointerDown}
                   onPointerUp={handlePdpGalleryPointerUp}
                   onPointerCancel={handlePdpGalleryPointerCancel}
@@ -1177,7 +1174,7 @@ const ProductPage: React.FC = () => {
                         alt={catalogGallerySlides[pdpImageIndex]?.alt || getProductName()}
                         loading="lazy"
                         draggable={false}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full border-0 object-cover"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = "/placeholder.svg";
                         }}
@@ -1228,7 +1225,7 @@ const ProductPage: React.FC = () => {
                 </div>
               </>
             ) : (
-              <div className="relative aspect-square w-full overflow-hidden rounded-xl border-2 border-gray-900">
+              <div className="relative aspect-square w-full overflow-hidden rounded-xl border-0 outline-none ring-0 bg-[#f8f6f1]">
                 {product && (product as any).labels?.length ? (
                   <ProductImageTag
                     labels={(product as any).labels}
@@ -1238,7 +1235,7 @@ const ProductPage: React.FC = () => {
                 <img
                   src={catalogGallerySlides[0]?.src ?? getProductImage()}
                   alt={getProductName()}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full border-0 object-cover"
                   onError={(e) => {
                     const el = e.currentTarget;
                     if (el.src.includes("placeholder.svg")) return;
@@ -1519,6 +1516,21 @@ const ProductPage: React.FC = () => {
                 </p>
               )}
             </div>
+          ) : !isLoggedIn ? (
+            <button
+              type="button"
+              onClick={() =>
+                navigate(`${basePath}/login`, {
+                  state: {
+                    returnUrl: `${basePath}/product/${encodeURIComponent(slug ?? "")}`,
+                  },
+                })
+              }
+              className="mb-6 mt-6 flex w-full items-center justify-center rounded-[25px] bg-[#FAA222] py-3.5 text-base font-semibold text-gray-900 transition-colors hover:bg-[#e8941a] disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!product}
+            >
+              Log in to add to basket
+            </button>
           ) : (
             <button
               type="button"

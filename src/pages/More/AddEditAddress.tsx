@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MdLocationOn, MdMyLocation } from 'react-icons/md';
 import { addressService, Address } from '../../services/address.service';
@@ -6,6 +6,11 @@ import { validateGpDailyDeliveryAreaFromCoordinates } from '../../services/subsc
 import { toast } from 'react-hot-toast';
 import { GoogleMap, Autocomplete } from '@react-google-maps/api';
 import { useGoogleMaps } from '../../hooks/useGoogleMaps';
+import {
+  ONBOARDING_STYLE_PLACES_AUTOCOMPLETE_OPTIONS,
+  attachPlacesAutocompleteToMapBounds,
+  panMapToPlaceResult,
+} from '../../utils/googlePlacesAutocompleteConfig';
 
 import { customerService } from '../../services/getcustomer.service';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
@@ -73,9 +78,13 @@ const AddEditAddress: React.FC = () => {
   const isEdit = location.pathname.includes('edit');
   const existingAddress = location.state?.address as Address | undefined;
   const mapRef = useRef<google.maps.Map | null>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const placesSearchInputRef = useRef<HTMLInputElement | null>(null);
   const { isLoaded, loadError } = useGoogleMaps();
-  const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const placesAutocompleteMountKey = useMemo(
+    () => `${location.pathname}-${existingAddress?.id ?? 'new'}-${location.key}`,
+    [location.pathname, location.key, existingAddress?.id],
+  );
   const isLocationRequestInProgress = useRef(false);
   const lastToastMessage = useRef<string | null>(null);
   const hasInitialized = useRef(false);
@@ -209,6 +218,7 @@ const AddEditAddress: React.FC = () => {
 
   const onLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
+    attachPlacesAutocompleteToMapBounds(autocompleteRef.current, map);
     // If editing and we have coordinates, center the map on them
     if (isEdit && existingAddress?.coordinates) {
       try {
@@ -349,11 +359,16 @@ const AddEditAddress: React.FC = () => {
     }
   };
 
+  const syncPlacesSearchInput = (text: string) => {
+    const el = placesSearchInputRef.current;
+    if (el) el.value = text;
+  };
+
   /** Apply a Geocoder / Places result to search box, pin line, and pincode (same shape as Autocomplete). */
   const applyGeocodedPlaceToForm = (place: google.maps.GeocoderResult) => {
     const formattedAddress = place.formatted_address || '';
     setDeliveryAddress(formattedAddress);
-    setSearchQuery(formattedAddress);
+    syncPlacesSearchInput(formattedAddress);
 
     const addressComponents: Record<string, string> = {};
     place.address_components?.forEach((component) => {
@@ -454,7 +469,7 @@ const AddEditAddress: React.FC = () => {
               const osm = await reverseGeocodeWithOsm(latitude, longitude);
               if (osm) {
                 setDeliveryAddress(osm.formatted);
-                setSearchQuery(osm.formatted);
+                syncPlacesSearchInput(osm.formatted);
                 setFormData((prev) => ({ ...prev, completeAddress: osm.line }));
                 if (osm.pin) setPincode(osm.pin);
               }
@@ -509,7 +524,7 @@ const AddEditAddress: React.FC = () => {
       const osm = await reverseGeocodeWithOsm(lat, lng);
       if (osm) {
         setDeliveryAddress(osm.formatted);
-        setSearchQuery(osm.formatted);
+        syncPlacesSearchInput(osm.formatted);
         setFormData((prev) => ({ ...prev, completeAddress: osm.line }));
         if (osm.pin) setPincode(osm.pin);
       }
@@ -517,6 +532,13 @@ const AddEditAddress: React.FC = () => {
       /* ignore */
     }
   };
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (deliveryAddress.trim()) {
+      syncPlacesSearchInput(deliveryAddress);
+    }
+  }, [isLoaded, deliveryAddress]);
 
   const handleMapDrag = () => {
     if (mapRef.current) {
@@ -529,28 +551,6 @@ const AddEditAddress: React.FC = () => {
         setSelectedPosition(newPosition);
         setLocationValidation(null);
         void reverseGeocodeMapCenter(newPosition.lat, newPosition.lng);
-      }
-    }
-  };
-
-  const onLoadAutocomplete = useCallback((autocomplete: google.maps.places.Autocomplete) => {
-    setAutocomplete(autocomplete);
-  }, []);
-
-  const onPlaceChanged = () => {
-    if (autocomplete) {
-      const place = autocomplete.getPlace();
-      if (!place.geometry?.location) {
-        return;
-      }
-      const location = {
-        lat: place.geometry.location.lat(),
-        lng: place.geometry.location.lng()
-      };
-      setSelectedPosition(location);
-      if (mapRef.current) {
-        mapRef.current.panTo(location);
-        mapRef.current.setZoom(15);
       }
     }
   };
@@ -596,32 +596,32 @@ const AddEditAddress: React.FC = () => {
           <div className="absolute top-3 left-3 right-3 z-30">
             {isLoaded ? (
               <Autocomplete
-                onLoad={(autocomplete) => {
-                  setAutocomplete(autocomplete);
+                key={placesAutocompleteMountKey}
+                options={ONBOARDING_STYLE_PLACES_AUTOCOMPLETE_OPTIONS}
+                onLoad={(ac) => {
+                  autocompleteRef.current = ac;
+                  attachPlacesAutocompleteToMapBounds(ac, mapRef.current);
                 }}
                 onPlaceChanged={() => {
-                  if (!autocomplete) return;
-                  const place = autocomplete.getPlace();
+                  const ac = autocompleteRef.current;
+                  if (!ac) return;
+                  const place = ac.getPlace();
                   if (!place.geometry?.location) return;
-                  const location = {
+                  const next = {
                     lat: place.geometry.location.lat(),
                     lng: place.geometry.location.lng(),
                   };
-                  setSelectedPosition(location);
-                  if (mapRef.current) {
-                    mapRef.current.panTo(location);
-                    mapRef.current.setZoom(15);
-                  }
+                  setSelectedPosition(next);
+                  panMapToPlaceResult(place, mapRef.current);
                   applyGeocodedPlaceToForm(place as google.maps.GeocoderResult);
                 }}
-                fields={['address_components', 'geometry', 'formatted_address']}
               >
                 <div className="relative">
                   <input
+                    ref={placesSearchInputRef}
                     type="text"
                     placeholder="Search anything...."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    defaultValue=""
                     className="w-full p-3 pl-4 pr-10 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent shadow-md text-left"
                     style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
                     onFocus={(e) => {
@@ -714,7 +714,7 @@ const AddEditAddress: React.FC = () => {
             className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm flex items-center gap-2 shadow-sm hover:bg-gray-50 z-20 disabled:opacity-60 disabled:pointer-events-none"
           >
             <MdMyLocation className={`h-4 w-4 ${isLocating ? 'animate-pulse' : ''}`} />
-            <span>{isLocating ? 'Locating' : 'Locate Me'}</span>
+            <span>{isLocating ? 'Locating' : 'Locate me'}</span>
           </button>
           {/* Paper airplane icon button (top right) */}
           <button

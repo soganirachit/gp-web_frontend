@@ -1,4 +1,5 @@
 import { errorMessageFromParsedBody } from "../utils/apiErrorMessage";
+import { clearAuthSession, redirectToLoginAfterSessionExpired } from "./auth.service";
 
 class HeaderService {
     getHeaders() {
@@ -11,14 +12,8 @@ class HeaderService {
 
     handleError(error: any) {
         if (error.response?.status === 401) {
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-            localStorage.removeItem('phoneNumber');
-            localStorage.removeItem('userName');
-            localStorage.removeItem('userId');
-            localStorage.removeItem('gp_store_cart');
-            localStorage.removeItem('gp_store_cart_delivery_info');
-            window.dispatchEvent(new Event('tokenRemoved'));
+            clearAuthSession();
+            redirectToLoginAfterSessionExpired();
             throw new Error('Session expired. Please login again.');
         }
 

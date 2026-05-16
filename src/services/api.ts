@@ -3,7 +3,11 @@ import axios, {
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from "axios";
-import { authService } from "./auth.service";
+import {
+  authService,
+  clearAuthSession,
+  redirectToLoginAfterSessionExpired,
+} from "./auth.service";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:3000",
@@ -161,13 +165,29 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// Response interceptor — on 401, refresh the access token and retry
+// Response interceptor — on 401, refresh the access token and retry (Bearer requests only; not auth login/OTP paths)
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      const authHeader = originalRequest.headers?.Authorization;
+      const hasBearer =
+        typeof authHeader === "string" && authHeader.toLowerCase().startsWith("bearer ");
+      let fullUrl = "";
+      try {
+        fullUrl = axios.getUri(originalRequest);
+      } catch {
+        fullUrl = `${originalRequest.baseURL || ""}${originalRequest.url || ""}`;
+      }
+      const isPublicAuthPath = /\/auth\/(send-otp|verify-otp|refresh|logout)(\/|$|\?)/i.test(
+        fullUrl,
+      );
+      if (!hasBearer || isPublicAuthPath) {
+        return Promise.reject(error);
+      }
+
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -191,20 +211,8 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         isRefreshing = false;
-        // Clear all auth data and redirect to login
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("phoneNumber");
-        localStorage.removeItem("userName");
-        localStorage.removeItem("userId");
-        localStorage.removeItem("gp_store_cart");
-        localStorage.removeItem("gp_store_cart_delivery_info");
-        window.dispatchEvent(new Event("tokenRemoved"));
-        {
-          const p = typeof window !== "undefined" ? window.location.pathname : "";
-          const loginPath = p.startsWith("/gp-daily") ? "/gp-daily/login" : "/gp-store/login";
-          window.location.href = loginPath;
-        }
+        clearAuthSession();
+        redirectToLoginAfterSessionExpired();
         return Promise.reject(refreshError);
       }
     }

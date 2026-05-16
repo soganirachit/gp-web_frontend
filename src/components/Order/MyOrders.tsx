@@ -327,7 +327,7 @@ const MyOrders: React.FC = () => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-4 pb-nav-bottom relative bg-[#f8f6f1]">
+        <div className="relative flex-1 overflow-x-hidden bg-[#f8f6f1] px-4 pb-nav-bottom">
           {filteredOrders.length > 0 ? (
             <div className="space-y-4">
               {visibleOrders.map((order, index) => {
@@ -338,10 +338,10 @@ const MyOrders: React.FC = () => {
                   <div
                     key={order.id || index}
                     onClick={() => order.order_number && navigate(`${basePath}/orders/${order.order_number}`)}
-                    className="flex gap-4 p-4 border-b border-gray-200 cursor-pointer hover:shadow-md transition-shadow"
+                    className="flex w-full max-w-full min-w-0 gap-4 border-b border-gray-200 p-4 cursor-pointer transition-shadow hover:shadow-md"
                   >
                     {/* Image */}
-                    <div className="w-20 h-20 flex-shrink-0">
+                    <div className="h-20 w-20 shrink-0">
                       <img
                         src={productImg}
                         alt={order.order_number || order.product?.name}
@@ -351,24 +351,24 @@ const MyOrders: React.FC = () => {
                     </div>
 
                     {/* Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className={`text-sm font-semibold mb-1 ${statusColor}`}>
-                            {getStatusText(order)}
-                          </p>
-                          <h3 className="text-base font-medium text-gray-900 mb-1 truncate">
-                            {order.order_number || order.product?.name}
-                          </h3>
-                          <p className="text-sm font-semibold text-gray-700">
-                            ₹{order.total_amount || order.product?.sellingPrice || '0.00'}
-                          </p>
-                        </div>
-
-                        <div className="pt-1 text-gray-400">
-                          <FaChevronRight size={14} />
-                        </div>
-                      </div>
+                    <div className="relative min-w-0 w-0 max-w-full flex-1 overflow-hidden pr-5">
+                      <p className={`mb-1 text-sm font-semibold ${statusColor}`}>
+                        {getStatusText(order)}
+                      </p>
+                      <p
+                        className="mb-1 text-base font-medium leading-snug text-gray-900"
+                        style={{ overflowWrap: 'anywhere', wordBreak: 'break-all' }}
+                      >
+                        {order.order_number || order.product?.name}
+                      </p>
+                      <p className="text-sm font-semibold text-gray-700">
+                        ₹{order.total_amount || order.product?.sellingPrice || '0.00'}
+                      </p>
+                      <FaChevronRight
+                        className="absolute right-0 top-1 text-gray-400"
+                        size={14}
+                        aria-hidden
+                      />
                     </div>
                   </div>
                 );

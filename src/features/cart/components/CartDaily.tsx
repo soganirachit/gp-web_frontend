@@ -2543,11 +2543,9 @@ const Cart: React.FC = () => {
                       {(dailyCart?.zone_id != null ||
                         subscriptionDeliveryFee != null ||
                         (dailyCart?.delivery_fee != null &&
-                          String(dailyCart.delivery_fee).trim() !== '')) ? (
-                        <span className="text-[11px] font-normal text-gray-500">
-                          Your zone rate from the subscription cart.
-                        </span>
-                      ) : deliveryFee === 0 && deliveryAddressId === null ? (
+                          String(dailyCart.delivery_fee).trim() !== ''))
+                        ? null
+                        : deliveryFee === 0 && deliveryAddressId === null ? (
                         <span className="text-[11px] font-normal text-gray-400">
                           Confirmed when your delivery address is set on this cart.
                         </span>
@@ -2620,7 +2618,7 @@ const Cart: React.FC = () => {
                   ? 'Confirming your order…'
                   : isProcessingPayment
                     ? 'Preparing payment…'
-                    : 'Checkout'}
+                    : 'Subscribe'}
               </button>
             </>
           </div>

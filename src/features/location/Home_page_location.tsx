@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { GoogleMap, Autocomplete } from "@react-google-maps/api";
 import { MdLocationOn, MdMyLocation, MdArrowBack } from "react-icons/md";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -19,6 +19,11 @@ import {
   MapLoadingPlaceholder,
   MapPanelSkeleton,
 } from "../../components/common/PageSkeletons";
+import {
+  ONBOARDING_STYLE_PLACES_AUTOCOMPLETE_OPTIONS,
+  attachPlacesAutocompleteToMapBounds,
+  panMapToPlaceResult,
+} from "../../utils/googlePlacesAutocompleteConfig";
 
 // List of cities where delivery is available
 const SERVICED_CITIES = [
@@ -56,8 +61,9 @@ const HomePageLocation: React.FC = () => {
   const location = useLocation();
   const { theme, feature } = useFeatureTheme();
   const returnUrl = location.state?.returnUrl || "/Allset";
-  const [locationSearchQuery, setLocationSearchQuery] = useState("");
-  const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  const placesAutocompleteMountKey = useMemo(() => location.key, [location.key]);
+  const placesSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   // const [, setLocationPredictions] = useState<PlacePrediction[]>([]);
   const [selectedPosition, setSelectedPosition] = useState<{
     lat: number;
@@ -72,7 +78,7 @@ const HomePageLocation: React.FC = () => {
   // const markerRef = useRef<any>(null);
   const [deliveryZoneAvailable, setDeliveryZoneAvailable] = useState(true);
 
-  const { isLoaded, loadError, GOOGLE_MAPS_API_KEY } = useGoogleMaps();
+  const { isLoaded, loadError } = useGoogleMaps();
 
   const [selectedAddress, setSelectedAddress] = useState({
     city: "",
@@ -113,28 +119,38 @@ const HomePageLocation: React.FC = () => {
     if (localStorage.getItem("needLocation") === "true") {
       setShowLocationModal(true);
     }
+  }, []);
 
+  // Hydrate saved coordinates / geocode only after the Maps script is ready.
+  useEffect(() => {
+    if (!isLoaded) return;
     const savedLocation = localStorage.getItem("userLocation");
     const savedCoordinates = localStorage.getItem("userCoordinates");
-
     if (savedLocation && savedCoordinates) {
       try {
-        setLocationSearchQuery(savedLocation);
         const coords = JSON.parse(savedCoordinates);
         setSelectedPosition(coords);
-        updateAddressDetails(coords.lat, coords.lng);
+        void (async () => {
+          await updateAddressDetails(coords.lat, coords.lng);
+          if (placesSearchInputRef.current) {
+            placesSearchInputRef.current.value = savedLocation;
+          }
+        })();
       } catch {
         setError(
           "Saved location could not be loaded. Search for your address on the map or allow location again.",
         );
+        return;
       }
-    } else {
-      getCurrentLocation();
+      return;
     }
-  }, []);
+    getCurrentLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstrap once when `isLoaded` becomes true
+  }, [isLoaded]);
 
   const onLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
+    attachPlacesAutocompleteToMapBounds(autocompleteRef.current, map);
   }, []);
 
   const onUnmount = useCallback(() => {
@@ -178,7 +194,9 @@ const HomePageLocation: React.FC = () => {
               return;
             }
             const address = data.results[0].formatted_address;
-            setLocationSearchQuery(address);
+            if (placesSearchInputRef.current) {
+              placesSearchInputRef.current.value = address;
+            }
             updateAddressDetails(latitude, longitude);
           } catch (error) {
             console.error("Error fetching address details:", error);
@@ -275,7 +293,11 @@ const HomePageLocation: React.FC = () => {
 
       setAddressDetails(newAddressDetails);
 
-      setLocationSearchQuery(fullAddress);
+      if (placesSearchInputRef.current) {
+        placesSearchInputRef.current.value = fullAddress;
+      }
+
+      setSelectedLocationType((prev) => prev || "Home");
 
       // Check if the point is within delivery zone using the new API
       setIsValidatingDeliveryZone(true);
@@ -497,100 +519,15 @@ const HomePageLocation: React.FC = () => {
   setupRouterWarningSuppress();
 
   const onPlaceChanged = () => {
-    if (autocomplete) {
-      const place = autocomplete.getPlace();
-      if (!place.geometry?.location) {
-        return;
-      }
-      
-      const location = {
-        lat: place.geometry.location.lat(),
-        lng: place.geometry.location.lng()
-      };
-      
-      setSelectedPosition(location);
-      
-      // Update the map view
-      if (mapRef.current) {
-        mapRef.current.panTo(location);
-        mapRef.current.setZoom(15);
-      }
-      
-      // Initialize address components
-      let streetNumber = '';
-      let route = '';
-      let locality = '';
-      let sublocality = '';
-      let city = '';
-      let state = '';
-      let pincode = '';
-      let district = '';
-      
-      // Extract address components
-      if (place.address_components) {
-        place.address_components.forEach(component => {
-          const types = component.types;
-          
-          if (types.includes('street_number')) {
-            streetNumber = component.long_name;
-          }
-          if (types.includes('route')) {
-            route = component.long_name;
-          }
-          if (types.includes('sublocality_level_1') || types.includes('sublocality')) {
-            sublocality = component.long_name;
-          }
-          if (types.includes('locality')) {
-            city = component.long_name;
-            locality = component.long_name;
-          }
-          if (types.includes('administrative_area_level_1')) {
-            state = component.long_name;
-          }
-          if (types.includes('postal_code')) {
-            pincode = component.long_name;
-          }
-          if (types.includes('administrative_area_level_2')) {
-            district = component.long_name;
-          }
-        });
-      }
-      
-      // Construct address parts
-      const streetAddress = [streetNumber, route].filter(Boolean).join(' ');
-      const area = sublocality || locality || '';
-      
-      // Update the address details
-      setAddressDetails({
-        houseNo: streetNumber || '',
-        apartment: route || '',
-        directions: place.name || area || ''
-      });
-      
-      // Update the selected address
-      setSelectedAddress({
-        city: city || '',
-        fullAddress: place.formatted_address || [streetAddress, area, city, state, pincode].filter(Boolean).join(', '),
-        district: district || '',
-        state: state || '',
-        pincode: pincode || ''
-      });
-      
-      // Update the search query
-      setLocationSearchQuery(place.formatted_address || '');
-      
-      // Check if the location is in a serviced city
-      const isServiced = city ? SERVICED_CITIES.some(
-        servicedCity => servicedCity.toLowerCase() === city.toLowerCase()
-      ) : false;
-      
-      setIsLocationServiced(isServiced);
-      
-      // Set a default location type if not set
-      if (!selectedLocationType) {
-        setSelectedLocationType('Home');
-      }
-    }
+    const ac = autocompleteRef.current;
+    if (!ac) return;
+    const place = ac.getPlace();
+    if (!place.geometry?.location) return;
+    const lat = place.geometry.location.lat();
+    const lng = place.geometry.location.lng();
+    setSelectedPosition({ lat, lng });
+    panMapToPlaceResult(place, mapRef.current);
+    void updateAddressDetails(lat, lng);
   };
 
   return (
@@ -627,18 +564,20 @@ const HomePageLocation: React.FC = () => {
           <div className="relative">
             {isLoaded ? (
               <Autocomplete
-                onLoad={(autocomplete) => {
-                  setAutocomplete(autocomplete);
+                key={placesAutocompleteMountKey}
+                options={ONBOARDING_STYLE_PLACES_AUTOCOMPLETE_OPTIONS}
+                onLoad={(ac) => {
+                  autocompleteRef.current = ac;
+                  attachPlacesAutocompleteToMapBounds(ac, mapRef.current);
                 }}
                 onPlaceChanged={onPlaceChanged}
-                fields={['address_components', 'geometry', 'formatted_address']}
               >
                 <div className="relative">
                   <input
+                    ref={placesSearchInputRef}
                     type="text"
                     placeholder="Search for a location..."
-                    value={locationSearchQuery}
-                    onChange={(e) => setLocationSearchQuery(e.target.value)}
+                    defaultValue=""
                     className="w-full p-3 pl-4 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent text-left"
                     style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
                     onFocus={(e) => e.target.style.borderColor = theme.colors.primary}
@@ -727,13 +666,13 @@ const HomePageLocation: React.FC = () => {
                 <MdArrowBack />
               </button>
 
-              {/* Current Location Button */}
+              {/* Locate me */}
               <button
                 onClick={getCurrentLocation}
                 className="absolute left-1/2 bottom-4 -translate-x-1/2 bg-white rounded-full px-4 py-2 shadow-lg z-10 hover:bg-gray-50 flex items-center gap-2 text-sm"
               >
                 <MdMyLocation className="text-[#F15A22]" />
-                <span>Use current location</span>
+                <span>Locate me</span>
               </button>
             </GoogleMap>
           ) : (

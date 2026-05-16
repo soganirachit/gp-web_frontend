@@ -1,6 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { IoDownloadOutline, IoStorefrontOutline, IoPersonOutline } from 'react-icons/io5';
+import {
+  IoDownloadOutline,
+  IoStorefrontOutline,
+  IoPersonOutline,
+  IoTimeOutline,
+} from 'react-icons/io5';
 import { MdLocationOn } from 'react-icons/md';
 import { FaCopy } from 'react-icons/fa';
 import { orderService } from '../../services/order.service';
@@ -127,6 +132,24 @@ function formatRupee(amount: string | number | undefined | null): string {
   const n = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
   if (Number.isNaN(n)) return '0.00';
   return n.toFixed(2);
+}
+
+function formatOrderDeliverySchedule(
+  deliveryDate: string | null | undefined,
+  timeSlot: string | null | undefined,
+): string | null {
+  const parts: string[] = [];
+  const rawDate = (deliveryDate || '').trim();
+  if (rawDate) {
+    try {
+      parts.push(format(new Date(rawDate), 'd MMM yyyy'));
+    } catch {
+      parts.push(rawDate);
+    }
+  }
+  const slot = (timeSlot || '').trim();
+  if (slot) parts.push(slot);
+  return parts.length > 0 ? parts.join(', ') : null;
 }
 
 function formatPaymentMethodLabel(raw: string | undefined): string {
@@ -518,7 +541,9 @@ const OrderDetails: React.FC = () => {
             </div>
 
             {/* Delivery Details */}
-            {(order.delivery_address || order.store_name) && (
+            {(order.delivery_address ||
+              order.store_name ||
+              formatOrderDeliverySchedule(order.delivery_date, order.delivery_time_slot)) && (
               <div className="bg-white rounded-2xl p-4 shadow-sm">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Delivery Details</h2>
                 <div className="space-y-5">
@@ -582,7 +607,36 @@ const OrderDetails: React.FC = () => {
                           </p>
                         </div>
                       </div>
+                      {formatOrderDeliverySchedule(order.delivery_date, order.delivery_time_slot) ? (
+                        <div className="mt-3 flex min-w-0 items-start gap-2">
+                          <IoTimeOutline
+                            className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-500"
+                            aria-hidden
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-gray-900">Delivery date & slot</p>
+                            <p className="mt-0.5 text-sm leading-snug text-gray-600">
+                              {formatOrderDeliverySchedule(order.delivery_date, order.delivery_time_slot)}
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
                     </>
+                  ) : null}
+                  {!order.delivery_address &&
+                  formatOrderDeliverySchedule(order.delivery_date, order.delivery_time_slot) ? (
+                    <div className="flex min-w-0 items-start gap-2">
+                      <IoTimeOutline
+                        className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-500"
+                        aria-hidden
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-gray-900">Delivery date & slot</p>
+                        <p className="mt-0.5 text-sm leading-snug text-gray-600">
+                          {formatOrderDeliverySchedule(order.delivery_date, order.delivery_time_slot)}
+                        </p>
+                      </div>
+                    </div>
                   ) : null}
                 </div>
               </div>

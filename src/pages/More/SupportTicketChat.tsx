@@ -477,13 +477,16 @@ const SupportTicketChat: React.FC = () => {
                 <IoArrowBack size={24} />
               </button>
               <div className="flex-1 min-w-0">
-                <h1 className="font-ibm-plex-serif text-[22px] font-semibold leading-7 tracking-normal text-[#111827] mb-1 break-words">
-                  {ticket?.subject 
-                    ? ticket.subject.split('—')[0].split('Order')[0].trim() 
-                    : 'Support Ticket'}
+                <h1 className="font-ibm-plex-serif mb-1 text-[22px] font-semibold leading-7 tracking-normal text-[#111827]">
+                  Support
                 </h1>
                 {ticket?.order_number && (
-                  <p className="text-xs text-gray-500 font-medium mt-0.5">Order: {ticket.order_number}</p>
+                  <p
+                    className="mt-0.5 text-xs font-medium text-gray-500"
+                    style={{ overflowWrap: 'anywhere', wordBreak: 'break-all' }}
+                  >
+                    Order: {ticket.order_number}
+                  </p>
                 )}
               </div>
             </div>

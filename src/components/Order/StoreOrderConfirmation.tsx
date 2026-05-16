@@ -9,10 +9,7 @@ import { OrderConfirmationSkeleton } from '../common/PageSkeletons';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { orderService } from '../../services/order.service';
 import { format } from 'date-fns';
-import { formatCartDeliveryAddress } from '../../utils/formatCartDeliveryAddress';
-import flowerCnfSvg from '../../assets/svg/gp_daily svg/flower_cnf.svg';
-import savingsCnfSvg from '../../assets/svg/gp_daily svg/savings_cnf.svg';
-
+import { formatDeliveryAddressOrFallback } from '../../utils/formatDeliveryAddress';
 interface DeliveryAddress {
   address_type?: string;
   address_line1?: string;
@@ -212,25 +209,10 @@ const StoreOrderConfirmation: React.FC = () => {
   const addressText = useMemo(() => {
     if (!order?.delivery_address) return '';
     const a = order.delivery_address;
-    const street = [a.address_line1, a.address_line2].filter(Boolean).join(', ');
-    const body = formatCartDeliveryAddress({
-      streetName: street,
-      area: a.landmark,
-      city: a.city,
-      state: a.state,
-      pincode: a.pincode,
-    });
+    const body = formatDeliveryAddressOrFallback(a as Record<string, unknown>);
     const typePrefix = a.address_type ? `${a.address_type === 'work' ? 'Work' : 'Home'}: ` : '';
     return `${typePrefix}${body}`.trim();
   }, [order?.delivery_address]);
-
-  const savingsPercent = useMemo(() => {
-    const subtotal = parseFloat(order?.subtotal || '0');
-    const discount = parseFloat(order?.discount_amount || '0');
-    const listing = subtotal + discount;
-    if (!listing || listing <= 0 || !discount || discount <= 0) return 0;
-    return Math.round((discount / listing) * 100);
-  }, [order?.subtotal, order?.discount_amount]);
 
   const deliveryDateLabel = useMemo(() => {
     const raw = order?.delivery_date || order?.created_at || '';
@@ -340,43 +322,6 @@ const StoreOrderConfirmation: React.FC = () => {
             </div>
           </div>
         </motion.div>
-
-        {/* Savings banner (matches the gp-daily confirmation style) */}
-        {savingsPercent > 0 && (
-          <motion.div
-            className="bg-opacity-20 rounded-xl p-4 mt-4 mb-3 flex items-center justify-center relative overflow-hidden"
-            style={{ backgroundColor: `${theme.colors.primary}33` }}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <img
-              src={flowerCnfSvg}
-              alt="Flower"
-              className="absolute left-0 top-1/2 -translate-y-1/2 w-12 h-12 opacity-70"
-            />
-
-            <div className="relative z-10 px-2">
-              {savingsPercent === 50 ? (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-900 text-sm font-medium">You're saving</span>
-                  <img src={savingsCnfSvg} alt="50" className="w-12 h-12" />
-                  <span className="text-gray-900 text-sm font-medium">this month!</span>
-                </div>
-              ) : (
-                <span className="text-gray-900 text-sm font-medium">
-                  You're saving {savingsPercent}% this month!
-                </span>
-              )}
-            </div>
-
-            <img
-              src={flowerCnfSvg}
-              alt="Flower"
-              className="absolute right-0 top-1/2 -translate-y-1/2 w-12 h-12 opacity-70 rotate-180"
-            />
-          </motion.div>
-        )}
 
         {/* Explore more — spacing from confirmation card above */}
         <div className="px-2 mt-6">

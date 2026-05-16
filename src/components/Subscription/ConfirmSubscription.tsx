@@ -2,10 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaMapMarkerAlt, FaCheck, FaClock, FaBox, FaRupeeSign } from "react-icons/fa";
 import ordercnfSvg from "../../assets/svg/gp_daily svg/ordercnf.svg";
-import flowerCnfSvg from "../../assets/svg/gp_daily svg/flower_cnf.svg";
 import paycnfSvg from "../../assets/svg/gp_daily svg/paycnf.svg";
 import clockSvg from "../../assets/svg/gp_daily svg/clock.svg";
-import savingsCnfSvg from "../../assets/svg/gp_daily svg/savings_cnf.svg";
 import allsetLogo from "../../assets/All/allset_logo.png";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
@@ -19,6 +17,7 @@ import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import Spinner from "../common/Spinner";
 import { SubscriptionFlowSkeleton } from "../common/PageSkeletons";
 import { formatCartDeliveryAddress } from "../../utils/formatCartDeliveryAddress";
+import { formatDeliveryAddressOrFallback } from "../../utils/formatDeliveryAddress";
 
 interface SubscriptionDetails {
   basePackId: string;
@@ -1110,21 +1109,18 @@ const ConfirmSubscription: React.FC = () => {
                   <FaMapMarkerAlt className="text-gray-600 mt-1 flex-shrink-0 text-lg" />
                   <p className="text-gray-900 text-sm leading-relaxed">
                     {checkoutAddr
-                      ? formatCartDeliveryAddress({
-                          houseNo: checkoutAddr.houseNo,
-                          streetName: [
-                            checkoutAddr.address_line1,
-                            checkoutAddr.address_line2,
-                            checkoutAddr.streetName,
-                          ]
-                            .filter(Boolean)
-                            .join(" ")
-                            .trim(),
-                          area: checkoutAddr.area || checkoutAddr.landmark,
-                          city: checkoutAddr.city,
-                          state: checkoutAddr.state,
-                          pincode: checkoutAddr.pincode,
-                        })
+                      ? checkoutAddr.address_line1 || checkoutAddr.address_line2
+                        ? formatDeliveryAddressOrFallback(
+                            checkoutAddr as Record<string, unknown>
+                          )
+                        : formatCartDeliveryAddress({
+                            houseNo: checkoutAddr.houseNo,
+                            streetName: checkoutAddr.streetName,
+                            area: checkoutAddr.area || checkoutAddr.landmark,
+                            city: checkoutAddr.city,
+                            state: checkoutAddr.state,
+                            pincode: checkoutAddr.pincode,
+                          })
                       : selectedAddress
                         ? formatCartDeliveryAddress({
                             streetName: selectedAddress.street,
@@ -1265,36 +1261,6 @@ const ConfirmSubscription: React.FC = () => {
                   ₹{grandTotal}
                 </span>
               </div>
-            </motion.div>
-
-            {/* Savings Banner */}
-            <motion.div
-              className="bg-opacity-20 rounded-xl mx-4 p-4 mb-4 flex items-center justify-center relative overflow-hidden min-h-[80px]"
-              style={{ backgroundColor: `${theme.colors.primary}33` }}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.1 }}
-            >
-              {/* Left flower decoration */}
-              <img 
-                src={flowerCnfSvg} 
-                alt="Flower" 
-                className="absolute left-0 top-1/2 -translate-y-1/2 w-12 h-12 sm:w-16 sm:h-16 opacity-70"
-              />
-              
-              {/* Center text with 50 graphic */}
-              <div className="flex items-center gap-1.5 sm:gap-2 relative z-10 px-4">
-                <span className="text-gray-900 text-sm sm:text-base md:text-lg font-medium">You're saving</span>
-                <img src={savingsCnfSvg} alt="50" className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16" />
-                <span className="text-gray-900 text-sm sm:text-base md:text-lg font-medium">this month!</span>
-              </div>
-              
-              {/* Right flower decoration */}
-              <img 
-                src={flowerCnfSvg} 
-                alt="Flower" 
-                className="absolute right-0 top-1/2 -translate-y-1/2 w-12 h-12 sm:w-16 sm:h-16 opacity-70 rotate-180"
-              />
             </motion.div>
 
             {/* View My Subscription Button */}

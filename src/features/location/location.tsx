@@ -1,3 +1,8 @@
+/**
+ * Legacy location picker (AutocompleteService + custom list). The app router
+ * lazy-loads `Home_page_location.tsx` instead — prefer extending that screen.
+ * Kept for reference / deep links until confirmed unused (rg for imports).
+ */
 import React, { useState, KeyboardEvent, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { MdMyLocation, MdSearch } from 'react-icons/md';
@@ -226,7 +231,7 @@ const Location: React.FC = () => {
               <button
                 onClick={getCurrentLocation}
                 className="absolute right-12 top-1/2 transform -translate-y-1/2 p-2 hover:bg-gray-100 rounded-full"
-                aria-label="Get current location"
+                aria-label="Locate me"
               >
                 <MdMyLocation className="text-gray-500 text-xl" />
               </button>
@@ -308,10 +313,12 @@ const Location: React.FC = () => {
               </GoogleMap>
               <button
                 onClick={getCurrentLocation}
-                className="absolute top-4 right-4 bg-white p-2 rounded-full shadow-md hover:bg-gray-100"
-                aria-label="Get current location"
+                className="absolute top-4 right-4 flex items-center gap-1.5 bg-white px-3 py-2 rounded-full shadow-md hover:bg-gray-100 text-sm font-medium text-gray-800"
+                aria-label="Locate me"
+                title="Locate me"
               >
-                <MdMyLocation className="text-gray-700 text-xl" />
+                <MdMyLocation className="text-gray-700 text-xl shrink-0" />
+                <span>Locate me</span>
               </button>
             </div>
           )}

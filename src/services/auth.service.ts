@@ -90,6 +90,54 @@ function normalizeOtpDeliveryStatusBody(body: unknown): OtpDeliveryStatusData {
 const OTP_DELIVERY_POLL_INTERVAL_MS = 3000;
 const OTP_DELIVERY_POLL_MAX_ATTEMPTS = 5;
 
+/** Clears JWT + user session keys and notifies listeners (AuthContext, cart, etc.). */
+export function clearAuthSession(): void {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("phoneNumber");
+  localStorage.removeItem("userName");
+  localStorage.removeItem("userId");
+  localStorage.removeItem("gp_store_cart");
+  localStorage.removeItem("gp_store_cart_delivery_info");
+  window.dispatchEvent(new Event("tokenRemoved"));
+}
+
+/** After refresh fails (401) or session is invalid — send user to feature login. */
+export function redirectToLoginAfterSessionExpired(): void {
+  if (typeof window === "undefined") return;
+  const path = window.location.pathname;
+  if (/\/login(\/|$)/i.test(path)) return;
+  const loginPath = path.startsWith("/gp-daily") ? "/gp-daily/login" : "/gp-store/login";
+  window.location.replace(loginPath);
+}
+
+function parseRefreshResponse(body: unknown): { accessToken: string; refreshToken: string } {
+  let cur: unknown = body;
+  for (let i = 0; i < 6 && cur && typeof cur === "object"; i++) {
+    const o = cur as Record<string, unknown>;
+    const inner =
+      typeof o.data === "object" && o.data !== null
+        ? (o.data as Record<string, unknown>)
+        : {};
+    const accessToken = String(
+      o.access_token ?? o.access ?? inner.access_token ?? inner.access ?? "",
+    ).trim();
+    const refreshToken = String(
+      o.refresh_token ?? o.refresh ?? inner.refresh_token ?? inner.refresh ?? "",
+    ).trim();
+    if (accessToken && refreshToken) {
+      return { accessToken, refreshToken };
+    }
+    const next = o.data;
+    if (next && typeof next === "object" && next !== cur) {
+      cur = next;
+      continue;
+    }
+    break;
+  }
+  return { accessToken: "", refreshToken: "" };
+}
+
 export type OtpDeliveryPollCallbacks = {
   onNotOnWhatsapp?: (message?: string) => void;
   onDelivered?: () => void;
@@ -234,8 +282,9 @@ export const authService = {
   },
 
   /**
-   * Refreshes access token using the refresh token stored in localStorage.
-   * Returns the new access token string so the interceptor can retry with it.
+   * Refreshes tokens via POST /auth/refresh/ with body `{ refresh }`.
+   * Backend rotates refresh: response must include both access_token and refresh_token;
+   * the previous refresh is blacklisted — always persist the new refresh_token.
    */
   async refreshToken(): Promise<string> {
     const refreshToken = localStorage.getItem("refresh_token");
@@ -244,31 +293,30 @@ export const authService = {
     }
 
     try {
-      const response = await axios.post(
-        `${API_URL}/refresh/`,
-        { refresh: refreshToken }
-      );
+      const response = await axios.post(`${API_URL}/refresh/`, {
+        refresh: refreshToken,
+      });
 
-      const newAccessToken = response.data.access || response.data.access_token || response.data.data?.access_token;
-      if (newAccessToken) {
-        localStorage.setItem("access_token", newAccessToken);
-        // Some backends also rotate the refresh token
-        const newRefreshToken = response.data.refresh || response.data.refresh_token || response.data.data?.refresh_token;
-        if (newRefreshToken) {
-          localStorage.setItem("refresh_token", newRefreshToken);
-        }
-        return newAccessToken;
+      const { accessToken, refreshToken: newRefreshToken } = parseRefreshResponse(
+        response.data,
+      );
+      if (!accessToken) {
+        throw new Error("No access token in refresh response");
+      }
+      if (!newRefreshToken) {
+        throw new Error("No refresh token in refresh response");
       }
 
-      throw new Error("No access token in refresh response");
-    } catch (error: any) {
-      // Clear all auth data on refresh failure — user must log in again
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("phoneNumber");
-      localStorage.removeItem("userName");
-      localStorage.removeItem("userId");
-      throw error.response?.data || error;
+      localStorage.setItem("access_token", accessToken);
+      localStorage.setItem("refresh_token", newRefreshToken);
+      return accessToken;
+    } catch (error: unknown) {
+      clearAuthSession();
+      redirectToLoginAfterSessionExpired();
+      if (axios.isAxiosError(error)) {
+        throw error.response?.data || error;
+      }
+      throw error;
     }
   },
 
@@ -280,16 +328,18 @@ export const authService = {
   },
 
   /**
-   * Logs out user — clears all auth tokens and user info
+   * Logs out user — blacklists refresh server-side when possible, then clears local session.
+   * POST /auth/logout/ body: `{ refresh: "<current_refresh_token>" }`.
    */
   async logout() {
     let apiResponse = null;
 
     try {
       const token = localStorage.getItem("access_token");
+      const refreshToken = localStorage.getItem("refresh_token");
       const response = await axios.post(
         `${API_URL}/logout/`,
-        {},
+        refreshToken ? { refresh: refreshToken } : {},
         {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         }
@@ -315,15 +365,7 @@ export const authService = {
       };
     }
 
-    // Always clear all auth data regardless of API result
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("phoneNumber");
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("gp_store_cart");
-    localStorage.removeItem("gp_store_cart_delivery_info");
-    window.dispatchEvent(new Event("tokenRemoved"));
+    clearAuthSession();
 
     return apiResponse || {
       success: true,

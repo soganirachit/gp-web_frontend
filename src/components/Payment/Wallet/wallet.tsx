@@ -125,6 +125,7 @@ const Wallet = () => {
   const [returnUrl, setReturnUrl] = useState<string | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [gpDailyActiveSubs, setGpDailyActiveSubs] = useState<Subscription[]>([]);
+  const [gpDailyHasSubscription, setGpDailyHasSubscription] = useState(false);
   const [gpDailySubExtra, setGpDailySubExtra] = useState<Record<
     string,
     unknown
@@ -167,6 +168,7 @@ const Wallet = () => {
   useEffect(() => {
     if (feature !== "gpDaily" || !isLoggedIn) {
       setGpDailyActiveSubs([]);
+      setGpDailyHasSubscription(false);
       setGpDailySubExtra(null);
       return;
     }
@@ -175,6 +177,7 @@ const Wallet = () => {
       try {
         const list = await subscriptionService.getCustomerSubscriptions();
         if (cancelled) return;
+        setGpDailyHasSubscription((list || []).length > 0);
         const active = (list || []).filter((s) => s.status === "ACTIVE");
         setGpDailyActiveSubs(active);
         const first = active[0];
@@ -191,6 +194,7 @@ const Wallet = () => {
       } catch {
         if (!cancelled) {
           setGpDailyActiveSubs([]);
+          setGpDailyHasSubscription(false);
           setGpDailySubExtra(null);
         }
       }
@@ -450,6 +454,7 @@ const Wallet = () => {
         {!isLoadingBalance &&
           feature === "gpDaily" &&
           isLoggedIn &&
+          gpDailyHasSubscription &&
           gpDailyOrderHold.show && (
             <div className="w-full shrink-0 rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white mb-5">
               <div className="flex items-start gap-2">

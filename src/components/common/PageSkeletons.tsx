@@ -116,7 +116,7 @@ export function ProductDetailSkeleton() {
           </div>
         </div>
         <div className="px-4 mt-4">
-          <Pulse className="aspect-square w-full rounded-xl border-2 border-gray-200/80" />
+          <Pulse className="aspect-square w-full rounded-xl" />
           <div className="mt-4 space-y-2">
             <Pulse className="h-6 w-[85%]" />
             <Pulse className="h-10 w-32" />

@@ -774,7 +774,7 @@ const StorePage: React.FC = () => {
           {/* Product Image Gallery */}
           <div className="mt-4">
             <div
-              className={`relative aspect-square w-full overflow-hidden rounded-xl border-2 border-gray-900 ${
+              className={`relative aspect-square w-full overflow-hidden rounded-xl border-0 ${
                 orderedImages.length > 1
                   ? 'cursor-grab touch-none active:cursor-grabbing'
                   : ''
@@ -808,7 +808,7 @@ const StorePage: React.FC = () => {
                     alt={orderedImages[selectedImageIndex]?.alt || product.name}
                     loading="lazy"
                     draggable={false}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full border-0 object-cover"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = '/placeholder.svg';
                     }}

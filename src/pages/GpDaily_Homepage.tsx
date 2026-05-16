@@ -83,6 +83,7 @@ const Home2: React.FC = () => {
   const [activeSubscriptions, setActiveSubscriptions] = useState<
     Subscription[]
   >([]);
+  const [hasCustomerSubscription, setHasCustomerSubscription] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoadingSubscriptions, setIsLoadingSubscriptions] = useState(true);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
@@ -158,6 +159,10 @@ const Home2: React.FC = () => {
       const fetchedSubscriptions =
         await subscriptionService.getCustomerSubscriptions();
 
+      setHasCustomerSubscription(
+        Boolean(fetchedSubscriptions && fetchedSubscriptions.length > 0),
+      );
+
       if (fetchedSubscriptions && fetchedSubscriptions.length > 0) {
         /** Namaste carousel: active + paused only (same as mobile). */
         const rank = (s: (typeof fetchedSubscriptions)[0]) => {
@@ -194,6 +199,7 @@ const Home2: React.FC = () => {
           setActiveSubscriptionExtra(null);
         }
       } else {
+        setHasCustomerSubscription(false);
         setActiveSubscriptions([]);
         setSelectedSubscription(null);
         setSubscriptionCarouselIndex(0);
@@ -201,6 +207,7 @@ const Home2: React.FC = () => {
       }
     } catch (error: any) {
       console.error("Error fetching subscriptions:", error);
+      setHasCustomerSubscription(false);
       setActiveSubscriptions([]);
       setSelectedSubscription(null);
       setSubscriptionCarouselIndex(0);
@@ -868,7 +875,10 @@ const Home2: React.FC = () => {
 
           <div className="px-4 py-4 space-y-4">
               {/* Order in Hold Banner - Only show after balance is loaded */}
-              {!isLoadingBalance && isLoggedIn && orderOnHold.show && (
+              {!isLoadingBalance &&
+                isLoggedIn &&
+                hasCustomerSubscription &&
+                orderOnHold.show && (
                 <div className="rounded-[18px] p-4 text-white" style={{ backgroundColor: "rgba(255, 38, 41, 0.8)" }}>
                   <div className="flex items-start gap-2 mb-2">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">

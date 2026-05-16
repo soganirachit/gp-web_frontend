@@ -1226,7 +1226,7 @@ const AddressSelection: React.FC = () => {
                 className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-sm hover:bg-gray-50"
               >
                 <MdMyLocation className="text-orange-500 h-3 w-3" />
-                <span>Use current location</span>
+                <span>Locate me</span>
               </button>
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
                 <MdLocationOn className="text-orange-500 text-4xl drop-shadow-lg animate-bounce" />
