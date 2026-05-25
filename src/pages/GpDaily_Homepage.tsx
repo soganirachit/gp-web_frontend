@@ -2,6 +2,9 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { useNavigate, useLocation } from "react-router-dom";
 import { MdKeyboardArrowDown } from "react-icons/md";
 import { IoPlay } from "react-icons/io5";
+import pauseSubIcon from "../assets/svg/cancelpage/pause.svg";
+
+import { SubscriptionResumeButton } from "../components/Subscription/SubscriptionResumeButton";
 import logo from "../assets/All/logo.png";
 import { walletService } from "../services/wallet.service";
 import {
@@ -32,7 +35,6 @@ import { GpDailyHomeSkeleton } from "../components/common/PageSkeletons";
 import { SearchBar } from "../components/common/SearchBar";
 import smallgendaIcon from "../assets/svg/smallgenda.svg";
 import scooterIcon from "../assets/svg/gp_daily svg/scooter.svg";
-import clockIcon from "../assets/svg/gp_daily svg/clock.svg";
 import flowerIcon from "../assets/svg/gp_daily svg/flower.svg";
 import bannerPng from "../assets/svg/gp_daily svg/banner.png";
 import dailyOfferImage from "../assets/svg/gp_daily svg/offer.png";
@@ -40,9 +42,16 @@ import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
 import locationhomeIcon from "../assets/svg/gp_daily svg/locationhome.svg";
 import profilehomeIcon from "../assets/svg/gp_daily svg/profilehome.svg";
 import profilelogoIcon from "../assets/svg/gp_daily svg/profilelogo.svg";
+import {
+  ProfileAvatarButton,
+  PROFILE_HEADER_AVATAR_CLASS,
+  PROFILE_HEADER_FALLBACK_HOME_CLASS,
+  PROFILE_HEADER_LOGO_CLASS,
+} from "../components/common/ProfileAvatarButton";
 import alertIcon from "../assets/svg/gp_daily svg/lowbalance.svg";
 import {
   formatNamasteDeliveryLine,
+  formatNamasteSubscriptionStatusLine,
   subscriptionProductLabel,
 } from "../utils/subscriptionNextDelivery";
 import {
@@ -50,6 +59,17 @@ import {
   GUEST_HEADER_LOCATION_TITLE,
   GUEST_LOCATION_UNAVAILABLE_HINT,
 } from "../utils/guestHeaderLocation";
+import {
+  formatHomeHeaderAddressDisplay,
+  HOME_HEADER_ADDRESS_LINE,
+  HOME_HEADER_ADDRESS_PROFILE_ROW,
+  HOME_HEADER_ADDRESS_TYPE,
+  HOME_HEADER_CHEVRON,
+  HOME_HEADER_LOCATION_CLICK,
+  HOME_HEADER_LOCATION_ICON,
+  HOME_HEADER_LOCATION_ROW,
+  HOME_HEADER_PROFILE_OFFSET,
+} from "../constants/homeHeaderLayout";
 
 interface DayInfo {
   date: string;
@@ -58,11 +78,22 @@ interface DayInfo {
   deliveryStatus?: "pending" | "delivered" | "next";
 }
 
-/** Matches `NAMASTE_TIME_SLOT_DISPLAY` on mobile GP Daily home. */
-const NAMASTE_TIME_SLOT_DISPLAY = "7 AM – 12 PM";
 /** Namaste subscription carousel — auto-advance loop (web). */
 /** Matches app `GpDailyHomeScreen` namaste autoplay interval. */
-const NAMASTE_CAROUSEL_AUTOPLAY_MS = 3500;
+const NAMASTE_CAROUSEL_AUTOPLAY_MS = 5000;
+const NAMASTE_SCROLL_SETTLE_MS = 280;
+
+function readNamasteCarouselPosition(el: HTMLDivElement): {
+  slideWidth: number;
+  virtualIndex: number;
+} {
+  const slide = el.querySelector<HTMLElement>("[data-namaste-slide]");
+  const slideWidth =
+    slide && slide.offsetWidth > 0 ? slide.offsetWidth : el.clientWidth;
+  const virtualIndex =
+    slideWidth > 0 ? Math.round(el.scrollLeft / slideWidth) : 0;
+  return { slideWidth, virtualIndex };
+}
 
 const Home2: React.FC = () => {
   const navigate = useNavigate();
@@ -97,10 +128,13 @@ const Home2: React.FC = () => {
    */
   const [namasteVirtualIndex, setNamasteVirtualIndex] = useState(0);
   const namasteJumpingRef = useRef(false);
+  const namasteVirtualIndexRef = useRef(1);
+  const namasteScrollRafRef = useRef<number | null>(null);
   const namasteScrollSettleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Pause autoplay while pointer is over the carousel (manual read without fighting the timer). */
-  const [namasteCarouselHoverPause, setNamasteCarouselHoverPause] =
+  /** Pause autoplay while user holds / hovers the carousel. */
+  const [namasteCarouselAutoplayPaused, setNamasteCarouselAutoplayPaused] =
     useState(false);
+  const namasteAutoplayInFlightRef = useRef(false);
   const [allPackProducts, setAllPackProducts] = useState<ProductType[]>([]);
   const [pujaPackProducts, setPujaPackProducts] = useState<ProductType[]>([]);
   const [exoticPackProducts, setExoticPackProducts] = useState<ProductType[]>([]);
@@ -153,9 +187,12 @@ const Home2: React.FC = () => {
   };
 
   /** Single list request — avoids duplicate calls (was fetchSubscriptions + fetchActiveSubscriptions). */
-  const fetchSubscriptions = async () => {
+  const fetchSubscriptions = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
     try {
-      setIsLoadingSubscriptions(true);
+      if (!silent || activeSubscriptions.length === 0) {
+        setIsLoadingSubscriptions(true);
+      }
       const fetchedSubscriptions =
         await subscriptionService.getCustomerSubscriptions();
 
@@ -549,6 +586,18 @@ const Home2: React.FC = () => {
     [activeSubscriptions]
   );
 
+  const applyNamasteCarouselState = useCallback(
+    (virtualIndex: number) => {
+      namasteVirtualIndexRef.current = virtualIndex;
+      setNamasteVirtualIndex(virtualIndex);
+      const dot = getNamasteRealIndexFromVirtual(virtualIndex);
+      setSubscriptionCarouselIndex(dot);
+      const s = activeSubscriptions[dot];
+      if (s) setSelectedSubscription(s);
+    },
+    [activeSubscriptions, getNamasteRealIndexFromVirtual],
+  );
+
   /** Init scroll to first real slide (virtual index 1) when loop, or 0 when single. */
   useEffect(() => {
     const el = subscriptionCarouselRef.current;
@@ -557,6 +606,7 @@ const Home2: React.FC = () => {
     if (n === 0) return;
     if (n <= 1) {
       el.scrollTo({ left: 0, behavior: "auto" });
+      namasteVirtualIndexRef.current = 0;
       setNamasteVirtualIndex(0);
       setSubscriptionCarouselIndex(0);
       if (activeSubscriptions[0]) {
@@ -564,14 +614,11 @@ const Home2: React.FC = () => {
       }
       return;
     }
-    setSubscriptionCarouselIndex(0);
-    if (activeSubscriptions[0]) {
-      setSelectedSubscription(activeSubscriptions[0]);
-    }
     namasteJumpingRef.current = true;
-    setNamasteVirtualIndex(1);
+    applyNamasteCarouselState(1);
     const apply = () => {
-      const w = el.clientWidth || 1;
+      const { slideWidth } = readNamasteCarouselPosition(el);
+      const w = slideWidth || el.clientWidth || 1;
       if (w > 0) {
         el.scrollTo({ left: w, behavior: "auto" });
       }
@@ -580,24 +627,20 @@ const Home2: React.FC = () => {
       }, 0);
     };
     requestAnimationFrame(() => requestAnimationFrame(apply));
-  }, [subscriptionCarouselKey, activeSubscriptions]);
+  }, [subscriptionCarouselKey, activeSubscriptions, applyNamasteCarouselState]);
 
   const runNamasteBoundaryJump = useCallback(() => {
     const el = subscriptionCarouselRef.current;
     if (!el || activeSubscriptions.length <= 1) return;
-    const w = el.clientWidth || 1;
+    const { slideWidth, virtualIndex: rawIdx } = readNamasteCarouselPosition(el);
+    const w = slideWidth || 1;
     const n = activeSubscriptions.length;
     const lastRealVirtual = n;
     const firstCloneVirtual = n + 1;
-    const rawIdx = Math.round(el.scrollLeft / w);
     if (rawIdx === 0) {
       namasteJumpingRef.current = true;
       el.scrollTo({ left: lastRealVirtual * w, behavior: "auto" });
-      setNamasteVirtualIndex(lastRealVirtual);
-      setSubscriptionCarouselIndex(n - 1);
-      if (activeSubscriptions[n - 1]) {
-        setSelectedSubscription(activeSubscriptions[n - 1]);
-      }
+      applyNamasteCarouselState(lastRealVirtual);
       requestAnimationFrame(() => {
         namasteJumpingRef.current = false;
       });
@@ -606,16 +649,40 @@ const Home2: React.FC = () => {
     if (rawIdx === firstCloneVirtual) {
       namasteJumpingRef.current = true;
       el.scrollTo({ left: w, behavior: "auto" });
-      setNamasteVirtualIndex(1);
-      setSubscriptionCarouselIndex(0);
-      if (activeSubscriptions[0]) {
-        setSelectedSubscription(activeSubscriptions[0]);
-      }
+      applyNamasteCarouselState(1);
       requestAnimationFrame(() => {
         namasteJumpingRef.current = false;
       });
     }
-  }, [activeSubscriptions]);
+  }, [activeSubscriptions, applyNamasteCarouselState]);
+
+  /** Pagination dots + virtual index from live scroll (always runs on manual swipe). */
+  const syncNamasteCarouselFromScroll = useCallback(() => {
+    const el = subscriptionCarouselRef.current;
+    if (!el || activeSubscriptions.length <= 1) return;
+    const { virtualIndex } = readNamasteCarouselPosition(el);
+    applyNamasteCarouselState(virtualIndex);
+  }, [activeSubscriptions.length, applyNamasteCarouselState]);
+
+  const snapNamasteCarouselToNearest = useCallback(() => {
+    const el = subscriptionCarouselRef.current;
+    if (!el || namasteJumpingRef.current || activeSubscriptions.length <= 1) {
+      return;
+    }
+    const { slideWidth, virtualIndex: nearest } = readNamasteCarouselPosition(el);
+    const w = slideWidth || 1;
+    if (w <= 0) return;
+    const targetLeft = nearest * w;
+    if (Math.abs(el.scrollLeft - targetLeft) > 1) {
+      namasteJumpingRef.current = true;
+      el.scrollTo({ left: targetLeft, behavior: "auto" });
+      requestAnimationFrame(() => {
+        namasteJumpingRef.current = false;
+      });
+    }
+    applyNamasteCarouselState(nearest);
+    runNamasteBoundaryJump();
+  }, [activeSubscriptions.length, applyNamasteCarouselState, runNamasteBoundaryJump]);
 
   /**
    * After scroll settles, jump off clone slides (same as app `onMomentumScrollEnd`).
@@ -626,43 +693,41 @@ const Home2: React.FC = () => {
     if (activeSubscriptions.length <= 1) return;
     const onSettle = () => {
       if (namasteJumpingRef.current) return;
-      runNamasteBoundaryJump();
+      snapNamasteCarouselToNearest();
     };
     const onScroll = () => {
+      if (namasteScrollRafRef.current != null) {
+        cancelAnimationFrame(namasteScrollRafRef.current);
+      }
+      namasteScrollRafRef.current = requestAnimationFrame(() => {
+        namasteScrollRafRef.current = null;
+        syncNamasteCarouselFromScroll();
+      });
       if (namasteJumpingRef.current) return;
       if (namasteScrollSettleRef.current) {
         clearTimeout(namasteScrollSettleRef.current);
       }
-      namasteScrollSettleRef.current = setTimeout(onSettle, 120);
+      namasteScrollSettleRef.current = setTimeout(onSettle, NAMASTE_SCROLL_SETTLE_MS);
     };
+    const onScrollEnd = () => onSettle();
     el.addEventListener("scroll", onScroll, { passive: true });
+    el.addEventListener("scrollend", onScrollEnd, { passive: true });
     return () => {
+      if (namasteScrollRafRef.current != null) {
+        cancelAnimationFrame(namasteScrollRafRef.current);
+      }
       if (namasteScrollSettleRef.current) {
         clearTimeout(namasteScrollSettleRef.current);
       }
       el.removeEventListener("scroll", onScroll);
+      el.removeEventListener("scrollend", onScrollEnd);
     };
-  }, [activeSubscriptions, subscriptionCarouselKey, runNamasteBoundaryJump]);
-
-  const handleSubscriptionCarouselScroll = useCallback(() => {
-    if (namasteJumpingRef.current) return;
-    const el = subscriptionCarouselRef.current;
-    if (!el || activeSubscriptions.length === 0) return;
-    if (activeSubscriptions.length <= 1) {
-      setSubscriptionCarouselIndex(0);
-      if (activeSubscriptions[0]) {
-        setSelectedSubscription(activeSubscriptions[0]);
-      }
-      return;
-    }
-    const w = el.clientWidth || 1;
-    const virtualIdx = Math.round(el.scrollLeft / w);
-    setNamasteVirtualIndex(virtualIdx);
-    const dot = getNamasteRealIndexFromVirtual(virtualIdx);
-    setSubscriptionCarouselIndex(dot);
-    const s = activeSubscriptions[dot];
-    if (s) setSelectedSubscription(s);
-  }, [activeSubscriptions, getNamasteRealIndexFromVirtual]);
+  }, [
+    activeSubscriptions,
+    subscriptionCarouselKey,
+    snapNamasteCarouselToNearest,
+    syncNamasteCarouselFromScroll,
+  ]);
 
   const scrollSubscriptionCarouselTo = useCallback(
     (index: number) => {
@@ -672,47 +737,64 @@ const Home2: React.FC = () => {
         el.scrollTo({ left: 0, behavior: "smooth" });
         return;
       }
-      const w = el.clientWidth || 1;
+      const { slideWidth } = readNamasteCarouselPosition(el);
+      const w = slideWidth || 1;
       const virtual = index + 1;
-      setNamasteVirtualIndex(virtual);
+      applyNamasteCarouselState(virtual);
       el.scrollTo({ left: virtual * w, behavior: "smooth" });
-      setSubscriptionCarouselIndex(index);
-      const s = activeSubscriptions[index];
-      if (s) setSelectedSubscription(s);
     },
-    [activeSubscriptions]
+    [activeSubscriptions, applyNamasteCarouselState]
   );
 
   useEffect(() => {
-    if (activeSubscriptions.length <= 1 || namasteCarouselHoverPause) {
+    if (activeSubscriptions.length <= 1 || namasteCarouselAutoplayPaused) {
       return;
     }
     const tick = () => {
-      if (document.visibilityState !== "visible") return;
-      setNamasteVirtualIndex((prev) => {
-        const n = activeSubscriptions.length;
-        if (n <= 1) return prev;
-        const next = prev + 1;
-        const el = subscriptionCarouselRef.current;
-        if (el) {
-          const w = el.clientWidth || 1;
-          el.scrollTo({ left: next * w, behavior: "smooth" });
+      if (
+        document.visibilityState !== "visible" ||
+        namasteJumpingRef.current ||
+        namasteAutoplayInFlightRef.current
+      ) {
+        return;
+      }
+      const el = subscriptionCarouselRef.current;
+      if (!el) return;
+      const n = activeSubscriptions.length;
+      if (n <= 1) return;
+
+      const { slideWidth, virtualIndex: currentVirtual } =
+        readNamasteCarouselPosition(el);
+      const w = slideWidth || 1;
+      const nextVirtual = currentVirtual + 1;
+
+      namasteAutoplayInFlightRef.current = true;
+      applyNamasteCarouselState(nextVirtual);
+      el.scrollTo({ left: nextVirtual * w, behavior: "smooth" });
+
+      const finishAutoplay = () => {
+        if (!namasteJumpingRef.current) {
+          runNamasteBoundaryJump();
+          syncNamasteCarouselFromScroll();
         }
-        const dot = getNamasteRealIndexFromVirtual(next);
-        setSubscriptionCarouselIndex(dot);
-        if (activeSubscriptions[dot]) {
-          setSelectedSubscription(activeSubscriptions[dot]!);
-        }
-        return next;
-      });
+        namasteAutoplayInFlightRef.current = false;
+      };
+      if ("onscrollend" in el) {
+        el.addEventListener("scrollend", finishAutoplay, { once: true });
+      } else {
+        window.setTimeout(finishAutoplay, 550);
+      }
     };
     const id = window.setInterval(tick, NAMASTE_CAROUSEL_AUTOPLAY_MS);
     return () => window.clearInterval(id);
   }, [
     activeSubscriptions,
-    namasteCarouselHoverPause,
+    namasteCarouselAutoplayPaused,
     subscriptionCarouselKey,
+    applyNamasteCarouselState,
     getNamasteRealIndexFromVirtual,
+    runNamasteBoundaryJump,
+    syncNamasteCarouselFromScroll,
   ]);
 
   const isPageLoading =
@@ -743,7 +825,7 @@ const Home2: React.FC = () => {
       setResumingSubId(subId);
       await subscriptionService.toggleSubscriptionStatus(subId);
       toast.success("Subscription resumed");
-      await fetchSubscriptions();
+      await fetchSubscriptions({ silent: true });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Could not resume";
       toast.error(msg);
@@ -787,62 +869,50 @@ const Home2: React.FC = () => {
             /> */}
 
             <div className="relative z-10">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <div className={HOME_HEADER_ADDRESS_PROFILE_ROW}>
+                <div className={HOME_HEADER_LOCATION_ROW}>
                   <img
                     src={locationhomeIcon}
                     alt=""
-                    className="w-[18px] h-[18px] flex-shrink-0"
+                    className={HOME_HEADER_LOCATION_ICON}
                     aria-hidden
                   />
                   <div
-                    className="flex items-center gap-1 cursor-pointer min-w-0 flex-1"
+                    className={HOME_HEADER_LOCATION_CLICK}
                     onClick={handleLocationClick}
                   >
                     <div className="flex flex-col min-w-0">
-                      <span className="text-sm sm:text-base font-bold text-[#111827]">{addressType}</span>
-                      <span className="text-xs sm:text-sm text-[#374151] truncate font-medium">
+                      <span className={`${HOME_HEADER_ADDRESS_TYPE} text-[#111827]`}>{addressType}</span>
+                      <span className={`${HOME_HEADER_ADDRESS_LINE} text-[#374151]`}>
                         {isLoadingAddress
                           ? "Loading..."
                           : deliveryLocation
-                            ? deliveryLocation.length > 50
-                              ? `${deliveryLocation.slice(0, 50)}...`
-                              : deliveryLocation
+                            ? formatHomeHeaderAddressDisplay(deliveryLocation)
                             : !isLoggedIn
                               ? GUEST_LOCATION_UNAVAILABLE_HINT
                               : "Tap to set address"}
                       </span>
                     </div>
-                    <MdKeyboardArrowDown className="text-[#4B5563] flex-shrink-0 text-xl" />
+                    <MdKeyboardArrowDown className={`${HOME_HEADER_CHEVRON} text-[#4B5563]`} />
                   </div>
                 </div>
 
-
-                <button
-                  type="button"
-                  className="relative h-10 w-10 shrink-0 translate-x-1 overflow-hidden rounded-full flex items-center justify-center"
+                <ProfileAvatarButton
+                  className={`${PROFILE_HEADER_AVATAR_CLASS} ${HOME_HEADER_PROFILE_OFFSET}`}
+                  profileHomeSrc={profilehomeIcon}
+                  profileLogoSrc={profilelogoIcon}
+                  fallbackHomeClassName={PROFILE_HEADER_FALLBACK_HOME_CLASS}
+                  logoClassName={`${PROFILE_HEADER_LOGO_CLASS} brightness-0 invert`}
                   onClick={() => navigate("/gp-daily/account")}
-                  aria-label={isLoggedIn ? "Wallet" : "Log in"}
-                >
-                  <img
-                    src={profilehomeIcon}
-                    alt=""
-                    className="absolute inset-0 h-full w-full object-cover"
-                    aria-hidden
-                  />
-                  <img
-                    src={profilelogoIcon}
-                    alt=""
-                    className="relative z-10 h-[18px] w-[18px] object-contain brightness-0 invert"
-                    aria-hidden
-                  />
-                </button>
+                  ariaLabel={isLoggedIn ? "Account" : "Log in"}
+                />
               </div>
 
               {/* Search Bar — unified styling, product suggestions as you type */}
               <div className="mt-2">
                 <SearchBar
                   mode="product"
+                  variant="homepage"
                   productBasePath="/gp-daily"
                   storeId={storeService.getStoreIdForProducts() ?? undefined}
                 />
@@ -879,7 +949,7 @@ const Home2: React.FC = () => {
                 isLoggedIn &&
                 hasCustomerSubscription &&
                 orderOnHold.show && (
-                <div className="rounded-[18px] p-4 text-white" style={{ backgroundColor: "rgba(255, 38, 41, 0.8)" }}>
+                <div className="rounded-[40px] p-4 text-white" style={{ backgroundColor: "rgba(255, 38, 41, 0.8)" }}>
                   <div className="flex items-start gap-2 mb-2">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                       <img src={alertIcon} alt="" className="w-[18px] h-[18px]" aria-hidden />
@@ -904,33 +974,23 @@ const Home2: React.FC = () => {
               )}
 
               {/* Namaste + active subscriptions carousel */}
-              <div className="rounded-[22px] border border-[#F2E9D7] bg-[#fcf5eb] p-4">
-                <div className="flex items-center justify-between mb-3.5 pl-1">
-                  <div className="flex min-w-0 flex-1 items-center gap-2 pr-2">
-                    <h2 className="min-w-0 flex-1 font-serif text-2xl font-semibold leading-7 text-[#222222] [overflow-wrap:anywhere]">
-                      {isLoggedIn ? `Namaste, ${userFirstName || "User"}` : "Namaste!"}
-                    </h2>
-                    {isLoggedIn ? (
-                      <img
-                        src={smallgendaIcon}
-                        alt=""
-                        className="h-[34px] w-[34px] shrink-0"
-                        aria-hidden
-                      />
-                    ) : null}
-                  </div>
+              <div className="relative overflow-hidden rounded-[40px] border border-[#F2E9D7] bg-[#f3e8d5] px-4 pt-3 pb-2">
+                <div className="mb-2.5 flex items-center justify-between gap-3">
+                  <h2 className="min-w-0 flex-1 font-serif text-xl font-semibold leading-6 text-[#222222] [overflow-wrap:anywhere]">
+                    {isLoggedIn ? `Namaste, ${userFirstName || "User"}` : "Namaste!"}
+                  </h2>
                   {isLoggedIn ? (
                     <button
                       type="button"
                       onClick={() => navigate(`${basePath}/manage-my-subscription`)}
-                      className="shrink-0 text-sm font-medium text-[#E1522D] underline"
+                      className="shrink-0 rounded-full bg-[#E1522D]/15 px-3 py-1 text-sm font-medium text-[#E1522D] hover:bg-[#E1522D]/25"
                     >
                       Manage
                     </button>
                   ) : null}
                 </div>
 
-                {isLoadingSubscriptions ? (
+                {isLoadingSubscriptions && activeSubscriptions.length === 0 ? (
                   <div className="space-y-3 pl-1 animate-pulse">
                     <div className="h-5 w-[85%] rounded bg-gray-200/80" />
                     <div className="h-5 w-[55%] rounded bg-gray-200/80" />
@@ -940,38 +1000,54 @@ const Home2: React.FC = () => {
                   <p className="pl-1 text-sm font-medium leading-5 text-[#6B7280]">
                     {isLoggedIn
                       ? "No subscriptions yet. Explore packs below to subscribe."
-                      : "Sign in to see your subscriptions here."}
+                      : ""}
                   </p>
                 ) : (
                   <>
                     <div
-                      className="-mx-1 px-1"
-                      onMouseEnter={() => setNamasteCarouselHoverPause(true)}
-                      onMouseLeave={() => setNamasteCarouselHoverPause(false)}
+                      className={`relative min-h-[8rem] transition-opacity duration-300 ${
+                        isLoadingSubscriptions ? "opacity-70" : ""
+                      }`}
+                      onMouseEnter={() => setNamasteCarouselAutoplayPaused(true)}
+                      onMouseLeave={() => setNamasteCarouselAutoplayPaused(false)}
+                      onPointerDown={() => setNamasteCarouselAutoplayPaused(true)}
+                      onPointerUp={() => {
+                        syncNamasteCarouselFromScroll();
+                        setNamasteCarouselAutoplayPaused(false);
+                      }}
+                      onPointerCancel={() => {
+                        syncNamasteCarouselFromScroll();
+                        setNamasteCarouselAutoplayPaused(false);
+                      }}
+                      onPointerLeave={() => setNamasteCarouselAutoplayPaused(false)}
+                      onTouchStart={() => setNamasteCarouselAutoplayPaused(true)}
+                      onTouchEnd={() => {
+                        syncNamasteCarouselFromScroll();
+                        setNamasteCarouselAutoplayPaused(false);
+                      }}
                     >
                     <div
                       ref={subscriptionCarouselRef}
-                      onScroll={handleSubscriptionCarouselScroll}
-                      className="flex snap-x snap-mandatory overflow-x-auto no-scrollbar"
+                      className="flex min-h-[6rem] snap-x snap-mandatory overflow-x-auto overscroll-x-contain no-scrollbar touch-pan-x [scroll-snap-stop:always]"
                     >
                       {namasteLoopSlides.map((sub, loopIdx) => (
                         <div
                           key={`${String(sub.id)}-namaste-loop-${loopIdx}`}
-                          className="w-full min-w-full shrink-0 snap-center px-1"
+                          data-namaste-slide
+                          className="box-border w-full min-w-0 shrink-0 grow-0 basis-full snap-center snap-always"
                         >
-                          <div className="space-y-3 pl-1">
-                            <div className="flex items-start justify-between gap-2 text-[#222222]">
-                              <div className="flex min-w-0 flex-1 items-start gap-3">
-                                <img
-                                  src={scooterIcon}
-                                  alt=""
-                                  className="mt-0.5 h-5 w-5 flex-shrink-0"
-                                  aria-hidden
-                                />
-                                <span className="min-w-0 flex-1 text-base font-medium leading-snug [overflow-wrap:anywhere]">
-                                  {formatNamasteDeliveryLine(sub)}
-                                </span>
-                              </div>
+                          <div className="flex min-h-[6rem] flex-col justify-start gap-2">
+                            <div className="flex min-h-6 items-center gap-3 text-[#222222]">
+                              <img
+                                src={scooterIcon}
+                                alt=""
+                                className="h-5 w-5 shrink-0"
+                                aria-hidden
+                              />
+                              <span className="min-w-0 flex-1 text-base font-medium leading-6 [overflow-wrap:anywhere]">
+                                {formatNamasteDeliveryLine(sub)}
+                              </span>
+                              {/* Status badge — hidden per design
                               {sub.status === "PAUSED" ? (
                                 <span className="inline-flex shrink-0 items-center rounded-md border-2 border-[#664D03] px-2 py-0.5 text-[11px] font-semibold text-[#664D03]">
                                   Paused
@@ -981,73 +1057,65 @@ const Home2: React.FC = () => {
                                   Active
                                 </span>
                               )}
+                              */}
                             </div>
-                            <div className="flex items-center gap-3 text-[#222222]">
-                              <img
-                                src={clockIcon}
-                                alt=""
-                                className="h-5 w-5 flex-shrink-0"
-                                aria-hidden
-                              />
-                              <span className="text-base font-medium text-[#222222]">{NAMASTE_TIME_SLOT_DISPLAY}</span>
+                            <div className="flex min-h-6 items-center gap-3 text-[#222222]">
+                              {sub.status === "PAUSED" ? (
+                                <img
+                                  src={pauseSubIcon}
+                                  alt=""
+                                  className="h-5 w-5 shrink-0"
+                                  aria-hidden
+                                />
+                              ) : (
+                                <IoPlay
+                                  className="h-5 w-5 shrink-0 text-[#222222]"
+                                  aria-hidden
+                                />
+                              )}
+                              <span className="text-base font-medium leading-6 text-[#222222]">
+                                {formatNamasteSubscriptionStatusLine(sub)}
+                              </span>
                             </div>
-                            <div className="flex items-center justify-between gap-2 text-[#222222]">
+                            <div className="flex min-h-9 items-center justify-between gap-2 text-[#222222]">
                               <div className="flex min-w-0 flex-1 items-center gap-3">
                                 <img
                                   src={flowerIcon}
                                   alt=""
-                                  className="h-5 w-5 flex-shrink-0"
+                                  className="h-5 w-5 shrink-0"
                                   aria-hidden
                                 />
-                                <span className="min-w-0 text-base font-medium [overflow-wrap:anywhere]">
+                                <span className="min-w-0 text-base font-medium leading-6 [overflow-wrap:anywhere]">
                                   {subscriptionProductLabel(sub)}
                                 </span>
                               </div>
-                              {sub.status === "PAUSED" ? (
-                                <button
-                                  type="button"
-                                  onClick={(e) => void handleNamasteResume(e, sub.id)}
-                                  disabled={resumingSubId === sub.id}
-                                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border-[1.5px] border-[#2563EB] bg-white px-2.5 py-1.5 text-[13px] font-semibold text-[#2563EB] disabled:opacity-60"
-                                >
-                                  {resumingSubId === sub.id ? (
-                                    "…"
-                                  ) : (
-                                    <>
-                                      <IoPlay className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                                      Resume
-                                    </>
-                                  )}
-                                </button>
-                              ) : null}
+                              <div className="flex h-9 w-[5.5rem] shrink-0 items-center justify-end">
+                                {sub.status === "PAUSED" ? (
+                                  <SubscriptionResumeButton
+                                    onClick={(e) => void handleNamasteResume(e, sub.id)}
+                                    loading={resumingSubId === sub.id}
+                                  />
+                                ) : null}
+                              </div>
                             </div>
                           </div>
                         </div>
                       ))}
                     </div>
-                    {activeSubscriptions.length > 1 && (
-                      <div className="mt-2.5 flex justify-center gap-1.5">
-                        {activeSubscriptions.map((sub, i) => (
-                          <button
-                            key={sub.id}
-                            type="button"
-                            aria-label={`Subscription ${i + 1}`}
-                            aria-current={i === subscriptionCarouselIndex ? "true" : undefined}
-                            onClick={() => scrollSubscriptionCarouselTo(i)}
-                            className="touch-target-compact inline-flex shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 touch-manipulation"
-                          >
-                            <span
-                              className={`rounded-full transition-[width,height,background-color] ${
-                                i === subscriptionCarouselIndex
-                                  ? "h-1.5 w-1.5 bg-[#E1522D]"
-                                  : "h-1.5 w-1.5 bg-[#D1D5DB]"
-                              }`}
-                              aria-hidden
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {activeSubscriptions.length > 1 ? (
+                      <p
+                        className="pointer-events-none absolute bottom-2 left-4 z-[2] text-xs font-semibold tabular-nums text-[#6B7280]"
+                        aria-live="polite"
+                      >
+                        {subscriptionCarouselIndex + 1} / {activeSubscriptions.length}
+                      </p>
+                    ) : null}
+                    <img
+                      src={smallgendaIcon}
+                      alt=""
+                      className="pointer-events-none absolute bottom-0 right-0 z-[1] h-[2.75rem] w-[2.75rem] translate-x-1 translate-y-1 object-contain object-bottom-right select-none"
+                      aria-hidden
+                    />
                     </div>
                   </>
                 )}
@@ -1063,7 +1131,7 @@ const Home2: React.FC = () => {
             {/* All Packs — same idea as mobile: horizontal strip + Explore full catalog */}
             <div>
               <div className="flex items-center justify-between gap-2 mb-4 min-w-0">
-                <h2 className="min-w-0 flex-1 pr-2 font-serif text-2xl font-semibold text-[#222222]">
+                <h2 className="min-w-0 flex-1 pr-2 font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-[#222222]">
                   All Packs
                 </h2>
                 <button
@@ -1106,7 +1174,7 @@ const Home2: React.FC = () => {
             {/* Puja Packs — GET /products/?category=puja-packs&availability_type=daily,both */}
             <div>
               <div className="flex items-center justify-between gap-2 mb-4 min-w-0">
-                <h2 className="min-w-0 flex-1 pr-2 font-serif text-2xl font-semibold text-[#222222]">
+                <h2 className="min-w-0 flex-1 pr-2 font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-[#222222]">
                   Puja Packs
                 </h2>
                 <button
@@ -1154,7 +1222,7 @@ const Home2: React.FC = () => {
             {/* Exotic Packs — GET /products/?category=exotic-packs&availability_type=daily,both */}
             <div>
               <div className="flex items-center justify-between gap-2 mb-4 min-w-0">
-                <h2 className="min-w-0 flex-1 pr-2 font-serif text-2xl font-semibold text-[#222222]">
+                <h2 className="min-w-0 flex-1 pr-2 font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-[#222222]">
                   Exotic Packs
                 </h2>
                 <button
@@ -1204,7 +1272,7 @@ const Home2: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate(`${basePath}/Products`)}
-                className="w-full max-w-none rounded-2xl bg-[#FFB343] px-3.5 py-2.5 text-[15px] font-normal text-[#222222] transition-opacity hover:opacity-95"
+                className="w-full max-w-none rounded-lg bg-[#FFB343] px-3.5 py-3.5 text-[15px] font-normal text-[#222222] transition-opacity hover:opacity-95"
               >
                 View All Category
               </button>

@@ -225,7 +225,7 @@ const Location: React.FC = () => {
                 value={location}
                 onChange={(e) => handleLocationSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent shadow-sm text-left"
+                className="w-full rounded-xl border border-[#808080] bg-transparent px-4 py-3 pr-20 text-left text-gray-900 placeholder:text-[#808080] focus:border-[#808080] focus:outline-none focus:ring-2"
                 placeholder="Search for your location"
               />
               <button
@@ -239,7 +239,7 @@ const Location: React.FC = () => {
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 hover:bg-gray-100 rounded-full"
                 aria-label="Search location"
               >
-                <MdSearch className="text-gray-500 text-xl" />
+                <MdSearch className="text-xl text-[#808080]" />
               </button>
             </div>
 

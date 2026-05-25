@@ -8,6 +8,19 @@ import { OrdersListSkeleton } from '../common/PageSkeletons';
 import { SearchBar } from '../common/SearchBar';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { UniformPageHeader } from '../layout/UniformPageHeader';
+import {
+  getCustomerOrderStatusLabel,
+  getCustomerOrderStatusTextClass,
+  toCustomerOrderStatusKey,
+} from '../../utils/customerOrderStatus';
+import {
+  cleanSubscriptionProductDisplayName,
+  extractFirstItemNameFromOrderRaw,
+  extractSecondItemImageFromOrderRaw,
+  formatOrderListProductLabel,
+  resolveOrderItemsCount,
+} from '../../utils/orderListDisplay';
+import { OrderListThumb } from './OrderListThumb';
 
 const ORDER_LIST_PAGE_SIZE = 6;
 
@@ -22,6 +35,8 @@ interface Order {
   deliveryTime?: string;
   total_amount?: string;
   preview_image?: string;
+  /** Card title: first item name, or "Name + N more" */
+  productListLabel?: string;
   product?: {
     name: string;
     image: string[];
@@ -30,6 +45,7 @@ interface Order {
     sellingPrice?: number;
   };
   quantity: number;
+  secondItemImage?: string;
 }
 
 const MyOrders: React.FC = () => {
@@ -55,25 +71,43 @@ const MyOrders: React.FC = () => {
   }, [searchQuery]);
 
   const mapRawToOrders = (fetchedOrders: any[]): Order[] =>
-    fetchedOrders.map((order: any) => ({
-      id: order.id?.toString() || order.order_number || Math.random().toString(),
-      order_number: order.order_number || `Order #${order.id}`,
-      order_type: String(order.order_type ?? order.orderType ?? "").trim() || undefined,
-      status: order.status || "pending",
-      createdAt: order.created_at || order.createdAt || new Date().toISOString(),
-      deliveryDate: order.delivery_date || order.deliveryDate,
-      deliveryTime: order.delivery_time_slot || order.deliveryTime,
-      total_amount: order.total_amount || order.total || "0",
-      preview_image: order.preview_image || null,
-      product: {
-        name: order.order_number || "Order",
-        image: order.preview_image ? [order.preview_image] : [],
-        imagesUrl: order.preview_image ? [order.preview_image] : [],
-        price: parseFloat(order.total_amount || order.total || "0"),
-        sellingPrice: parseFloat(order.total_amount || order.total || "0"),
-      },
-      quantity: order.items_count || 1,
-    }));
+    fetchedOrders.map((order: any) => {
+      const itemsCount = resolveOrderItemsCount(order);
+      const productListLabel =
+        (typeof order.product_list_label === "string" &&
+          order.product_list_label.trim()) ||
+        formatOrderListProductLabel(
+          extractFirstItemNameFromOrderRaw(order),
+          itemsCount,
+        ) ||
+        undefined;
+      const cardTitle = productListLabel || order.order_number || "Order";
+      return {
+        id: order.id?.toString() || order.order_number || Math.random().toString(),
+        order_number: order.order_number || `Order #${order.id}`,
+        order_type: String(order.order_type ?? order.orderType ?? "").trim() || undefined,
+        status: order.status || "pending",
+        createdAt: order.created_at || order.createdAt || new Date().toISOString(),
+        deliveryDate: order.delivery_date || order.deliveryDate,
+        deliveryTime: order.delivery_time_slot || order.deliveryTime,
+        total_amount: order.total_amount || order.total || "0",
+        preview_image: order.preview_image || null,
+        productListLabel,
+        product: {
+          name: cardTitle,
+          image: order.preview_image ? [order.preview_image] : [],
+          imagesUrl: order.preview_image ? [order.preview_image] : [],
+          price: parseFloat(order.total_amount || order.total || "0"),
+          sellingPrice: parseFloat(order.total_amount || order.total || "0"),
+        },
+        quantity: itemsCount,
+        secondItemImage:
+          extractSecondItemImageFromOrderRaw(order as Record<string, unknown>) ||
+          (typeof order.second_item_image === "string"
+            ? order.second_item_image
+            : undefined),
+      };
+    });
 
   const filterOrdersForFeature = (sorted: Order[]): Order[] => {
     const isSubscriptionRow = (o: Order) =>
@@ -90,7 +124,10 @@ const MyOrders: React.FC = () => {
       const { orders: raw, nextUrl } = await orderService.getOrdersFirstPage(
         subscriptionListOnly ? { order_type: "subscription" } : undefined,
       );
-      const transformedOrders = mapRawToOrders(raw || []);
+      const enrichedRaw = await orderService.enrichOrderListProductLabels(
+        (raw || []) as Record<string, unknown>[],
+      );
+      const transformedOrders = mapRawToOrders(enrichedRaw);
       const sortedOrders = transformedOrders.sort(
         (a: Order, b: Order) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -109,8 +146,11 @@ const MyOrders: React.FC = () => {
           subscriptionListOnly,
         );
         url = n;
+        const enrichedBatch = await orderService.enrichOrderListProductLabels(
+          (raw2 || []) as Record<string, unknown>[],
+        );
         const batch = filterOrdersForFeature(
-          mapRawToOrders(raw2 || []).sort(
+          mapRawToOrders(enrichedBatch).sort(
             (a: Order, b: Order) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
           ),
@@ -137,7 +177,7 @@ const MyOrders: React.FC = () => {
     return list.filter(
       (order) =>
         (order.order_number || "").toLowerCase().includes(ql) ||
-        (order.product?.name || "").toLowerCase().includes(ql),
+        (order.productListLabel || order.product?.name || "").toLowerCase().includes(ql),
     );
   };
 
@@ -170,8 +210,11 @@ const MyOrders: React.FC = () => {
           subscriptionListOnly,
         );
         url = nextUrl;
+        const enrichedMore = await orderService.enrichOrderListProductLabels(
+          (raw || []) as Record<string, unknown>[],
+        );
         const batch = filterOrdersForFeature(
-          mapRawToOrders(raw || []).sort(
+          mapRawToOrders(enrichedMore).sort(
             (a: Order, b: Order) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
           ),
@@ -194,28 +237,16 @@ const MyOrders: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    const s = status?.toLowerCase() || '';
-    if (s === 'delivered') return 'text-[#166534]';
-    if (s === 'canceled' || s === 'cancelled') return 'text-[#EF4444]';
-    if (s === 'out_for_delivery') return 'text-[#1D4ED8]';
-    if (s === 'confirmed' || s === 'pending' || s === 'processing')
-      return 'text-[#92400E]';
-    return 'text-[#1F2937]';
-  };
-
   const getStatusText = (order: Order) => {
-    const s = order.status?.toLowerCase() || '';
-    // Use created_at date since delivery_date is null in the API response
+    const key = toCustomerOrderStatusKey(order.status ?? '');
     const date = format(new Date(order.createdAt), 'MMM d');
 
-    if (s === 'delivered') return `Delivered on ${date}`;
-    if (s === 'canceled' || s === 'cancelled') return `Canceled on ${date}`;
-    // For other statuses, show the order date instead of "Expected Delivery" 
-    // since there's no actual delivery_date in the response
-    if (s === 'out_for_delivery') return `Out for Delivery`;
-    if (s === 'scheduled') return `Scheduled`;
-    if (s === 'confirmed') return `Confirmed`;
+    if (key === 'delivered') return `Delivered on ${date}`;
+    if (key === 'cancelled') return `Canceled on ${date}`;
+    if (key === 'failed') return `Failed on ${date}`;
+    if (key === 'out_for_delivery') return 'Out for Delivery';
+    if (key === 'preparing') return 'Preparing';
+    if (key === 'confirmed') return 'Confirmed';
     return `Ordered on ${date}`;
   };
 
@@ -224,7 +255,7 @@ const MyOrders: React.FC = () => {
       (order.order_number || '')
         .toLowerCase()
         .includes(searchQuery.toLowerCase()) ||
-      (order.product?.name || '')
+      (order.productListLabel || order.product?.name || '')
         .toLowerCase()
         .includes(searchQuery.toLowerCase()),
   );
@@ -331,8 +362,12 @@ const MyOrders: React.FC = () => {
           {filteredOrders.length > 0 ? (
             <div className="space-y-4">
               {visibleOrders.map((order, index) => {
-                const statusColor = getStatusColor(order.status);
-                const productImg = order.preview_image || order.product?.imagesUrl?.[0] || order.product?.image?.[0] || "/placeholder.svg";
+                const statusColor = getCustomerOrderStatusTextClass(order.status);
+                const productImg =
+                  order.preview_image ||
+                  order.product?.imagesUrl?.[0] ||
+                  order.product?.image?.[0] ||
+                  null;
 
                 return (
                   <div
@@ -340,15 +375,11 @@ const MyOrders: React.FC = () => {
                     onClick={() => order.order_number && navigate(`${basePath}/orders/${order.order_number}`)}
                     className="flex w-full max-w-full min-w-0 gap-4 border-b border-gray-200 p-4 cursor-pointer transition-shadow hover:shadow-md"
                   >
-                    {/* Image */}
-                    <div className="h-20 w-20 shrink-0">
-                      <img
-                        src={productImg}
-                        alt={order.order_number || order.product?.name}
-                        loading="lazy"
-                        className="w-full h-full object-cover rounded-xl"
-                      />
-                    </div>
+                    <OrderListThumb
+                      primaryImageUrl={productImg}
+                      itemsCount={order.quantity}
+                      secondImageUrl={order.secondItemImage}
+                    />
 
                     {/* Details */}
                     <div className="relative min-w-0 w-0 max-w-full flex-1 overflow-hidden pr-5">
@@ -359,7 +390,14 @@ const MyOrders: React.FC = () => {
                         className="mb-1 text-base font-medium leading-snug text-gray-900"
                         style={{ overflowWrap: 'anywhere', wordBreak: 'break-all' }}
                       >
-                        {order.order_number || order.product?.name}
+                        {(subscriptionListOnly
+                          ? cleanSubscriptionProductDisplayName
+                          : (s: string) => s)(
+                          order.productListLabel ||
+                            order.product?.name ||
+                            order.order_number ||
+                            "Order",
+                        )}
                       </p>
                       <p className="text-sm font-semibold text-gray-700">
                         ₹{order.total_amount || order.product?.sellingPrice || '0.00'}

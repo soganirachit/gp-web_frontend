@@ -9,8 +9,11 @@ import {
   getEffectivePrice,
   getBasePrice,
   showStrikeBaseOnCard,
-  PRODUCT_AVAILABILITY_STORE,
+  availabilityTypeForChannel,
+  parseProductAvailabilityChannel,
+  type ProductAvailabilityChannel,
 } from "../../services/product.service";
+import { ProductAvailabilityFilterChips } from "../common/ProductAvailabilityFilterChips";
 import { ProductBrowseSkeleton } from "../common/PageSkeletons";
 import { SearchBar } from "../common/SearchBar";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
@@ -56,7 +59,13 @@ const StoreProductsPages: React.FC = () => {
 
   // Memoize the category slug from URL
   const categorySlug = useMemo(() => searchParams.get('category'), [searchParams]);
+  const availabilityChannel = useMemo(
+    () => parseProductAvailabilityChannel(searchParams.get("channel"), "store"),
+    [searchParams],
+  );
   const stateCategoryName = useMemo(() => location.state?.categoryName, [location.state?.categoryName]);
+  const chipActive = "bg-[#19411f] text-white";
+  const chipInactive = "bg-transparent text-[#222222]";
 
   // Fetch categories
   useEffect(() => {
@@ -66,7 +75,7 @@ const StoreProductsPages: React.FC = () => {
         const storeId = storeService.getStoreIdForProducts();
         const fetchedCategories = await productService.getCategories(
           storeId || undefined,
-          "store"
+          availabilityTypeForChannel(availabilityChannel),
         );
         const activeCategories = fetchedCategories
           .filter((cat) => cat.is_active)
@@ -81,7 +90,7 @@ const StoreProductsPages: React.FC = () => {
     };
 
     fetchCategories();
-  }, [guestStoreEpoch]);
+  }, [guestStoreEpoch, availabilityChannel]);
 
   useEffect(() => {
     if (isLoggedIn) return;
@@ -119,7 +128,7 @@ const StoreProductsPages: React.FC = () => {
             categorySlug: categorySlug || undefined,
             ordering,
             storeId: storeId || undefined,
-            availabilityType: PRODUCT_AVAILABILITY_STORE,
+            availabilityType: availabilityTypeForChannel(availabilityChannel),
           });
         setProducts(firstBatch || []);
         setNextProductPageUrl(nextUrl);
@@ -134,7 +143,7 @@ const StoreProductsPages: React.FC = () => {
     };
 
     void fetchData();
-  }, [categorySlug, stateCategoryName, isLoggedIn, guestStoreEpoch, sortBy]);
+  }, [categorySlug, stateCategoryName, isLoggedIn, guestStoreEpoch, sortBy, availabilityChannel]);
 
   const getItemPrice = (item: any): number => getEffectivePrice(item);
 
@@ -162,15 +171,30 @@ const StoreProductsPages: React.FC = () => {
 
   const handleProductClick = (product: any) => {
     const productIdentifier = product.slug || product.id;
-    navigate(`/gp-store/product/${productIdentifier}`, { state: { product } });
+    const productBase =
+      availabilityChannel === "daily" ? "/gp-daily/product" : "/gp-store/product";
+    navigate(`${productBase}/${productIdentifier}`, { state: { product } });
+  };
+
+  const updateBrowseSearchParams = (
+    patch: (next: URLSearchParams) => void,
+  ) => {
+    const next = new URLSearchParams(searchParams);
+    patch(next);
+    setSearchParams(next);
+  };
+
+  const handleAvailabilityChannelClick = (channel: ProductAvailabilityChannel) => {
+    updateBrowseSearchParams((next) => {
+      next.set("channel", channel);
+    });
   };
 
   const handleCategoryClick = (slug: string | null) => {
-    if (slug) {
-      setSearchParams({ category: slug });
-    } else {
-      setSearchParams({});
-    }
+    updateBrowseSearchParams((next) => {
+      if (slug) next.set("category", slug);
+      else next.delete("category");
+    });
   };
 
   const loadNextProductPageRef = useRef<() => void>(() => {});
@@ -334,7 +358,9 @@ const StoreProductsPages: React.FC = () => {
             <SearchBar
               mode="product"
               storeId={storeService.getStoreIdForProducts() ?? undefined}
-              productBasePath="/gp-store"
+              productBasePath={
+                availabilityChannel === "daily" ? "/gp-daily" : "/gp-store"
+              }
               value={searchQuery}
               onChange={setSearchQuery}
             />
@@ -343,13 +369,17 @@ const StoreProductsPages: React.FC = () => {
           {/* Category chips — sizing matches Sort/Filter below */}
           <div className="px-4 pb-3">
             <div className="flex gap-2.5 overflow-x-auto no-scrollbar">
+              <ProductAvailabilityFilterChips
+                value={availabilityChannel}
+                onChange={handleAvailabilityChannelClick}
+                chipActiveClass={chipActive}
+                chipInactiveClass={chipInactive}
+              />
               <button
                 type="button"
                 onClick={() => handleCategoryClick(null)}
                 className={`touch-target-compact inline-flex flex-shrink-0 items-center rounded-lg px-3.5 py-2 text-xs leading-snug font-medium transition-colors ${
-                  !selectedCategorySlug
-                    ? 'bg-[#19411f] text-white'
-                    : 'bg-transparent text-[#222222]'
+                  !selectedCategorySlug ? chipActive : chipInactive
                 }`}
               >
                 All
@@ -360,9 +390,7 @@ const StoreProductsPages: React.FC = () => {
                   key={category.id}
                   onClick={() => handleCategoryClick(category.slug)}
                   className={`touch-target-compact inline-flex flex-shrink-0 items-center rounded-lg px-3.5 py-2 text-xs leading-snug font-medium transition-colors whitespace-nowrap ${
-                    selectedCategorySlug === category.slug
-                      ? 'bg-[#19411f] text-white'
-                      : 'bg-transparent text-[#222222]'
+                    selectedCategorySlug === category.slug ? chipActive : chipInactive
                   }`}
                 >
                   {category.name}
@@ -477,7 +505,10 @@ const StoreProductsPages: React.FC = () => {
                     >
                     {/* Product Image */}
                     <div className="aspect-square bg-white overflow-hidden relative">
-                      <ProductImageTag labels={item.labels} />
+                      <ProductImageTag
+                        labels={item.labels}
+                        variant={availabilityChannel === "daily" ? "daily" : "store"}
+                      />
                       <img
                         src={getProductImageUrl(item)}
                         alt={item.name}

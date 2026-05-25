@@ -90,12 +90,7 @@ const NameInput: React.FC = () => {
         localStorage.setItem("userEmail", email.trim());
         localStorage.setItem("needLocation", "true");
 
-        toast.success(
-          "Profile details saved!" +
-            (response.customerId
-              ? ` Your Customer ID: ${response.customerId}`
-              : "")
-        );
+        toast.success("Profile details saved!");
 
         navigate(`${basePath}/location`, {
           state: {

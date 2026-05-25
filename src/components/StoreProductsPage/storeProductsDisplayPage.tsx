@@ -117,7 +117,8 @@ const StorePage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { items, addToCart, updateQuantity, removeFromCart } = useCart();
+  const { items, addToCart, updateQuantity, removeFromCart, updateCustomizedMessage } =
+    useCart();
   const { isLoggedIn } = useAuth();
   const { theme, basePath } = useFeatureTheme();
   const [guestStoreEpoch, setGuestStoreEpoch] = useState(0);
@@ -142,6 +143,7 @@ const StorePage: React.FC = () => {
   const [deliveryTime, setDeliveryTime] = useState<Date | null>(new Date(new Date().setHours(12, 0, 0, 0)));
   const [activeTab, setActiveTab] = useState<"Description" | "Details" | "More">("Description");
   const [customMessage, setCustomMessage] = useState<string>("");
+  const [isSavingMessage, setIsSavingMessage] = useState(false);
   const [isUpdatingBasket, setIsUpdatingBasket] = useState(false);
   const [stockLimitMessage, setStockLimitMessage] = useState<string | null>(null);
   const [pdpStockShakeNonce, setPdpStockShakeNonce] = useState(0);
@@ -428,6 +430,29 @@ const StorePage: React.FC = () => {
           errorMessageFromCatch(error, "Failed to add product to basket. Please try again.");
         toast.error(msg, { id: msg.length > 100 ? msg.slice(0, 100) : msg });
       }
+    }
+  };
+
+  const savedCartMessage = (activeCartLine?.customizedMessage ?? "").trim();
+  const canSaveCustomMessage =
+    isBouquetCategory &&
+    basketQuantity > 0 &&
+    Boolean(activeCartLine) &&
+    customMessage.trim() !== savedCartMessage;
+
+  const handleSaveCustomMessage = async () => {
+    if (!activeCartLine || !canSaveCustomMessage) return;
+    setIsSavingMessage(true);
+    try {
+      await updateCustomizedMessage(activeCartLine.id, customMessage.trim());
+      toast.success("Message saved", { id: "pdp-message-saved" });
+    } catch (error: unknown) {
+      toast.error(
+        errorMessageFromCatch(error, "Failed to save message. Please try again."),
+        { id: "pdp-message-save-error" },
+      );
+    } finally {
+      setIsSavingMessage(false);
     }
   };
 
@@ -987,9 +1012,21 @@ const StorePage: React.FC = () => {
                   maxLength={500}
                   aria-label="Customized message"
                 />
-                <p className="mt-1 text-right text-xs font-medium text-[#19411F]">
-                  {customMessage.length}/500
-                </p>
+          <div className="mt-1 flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-[#19411F]">
+                    {customMessage.length}/500
+                  </p>
+                  {basketQuantity > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveCustomMessage()}
+                      disabled={!canSaveCustomMessage || isSavingMessage}
+                      className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#19411F] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#1e5a1c] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isSavingMessage ? "Saving…" : "Save"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
           )}

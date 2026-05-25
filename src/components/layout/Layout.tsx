@@ -43,11 +43,9 @@ const Layout: React.FC = () => {
   ];
   const isAuthRoute = authRoutes.includes(location.pathname);
 
-  // Routes that should not show BottomNav (landing, location pages, support question form)
+  // Routes that should not show BottomNav (landing, location pages)
   const routesWithoutBottomNav = ["/home", "/location"];
-  const shouldHideBottomNav = routesWithoutBottomNav.includes(
-    location.pathname
-  ) || location.pathname.includes("/customer-support/questions");
+  const shouldHideBottomNav = routesWithoutBottomNav.includes(location.pathname);
 
   // Routes that should not have top padding.
   // Important: pathname is like `/gp-store/orders`, so we must use prefix matching.
@@ -56,11 +54,29 @@ const Layout: React.FC = () => {
     location.pathname.startsWith(p)
   );
 
-  // Many GP Store/Daily screens already apply their own `pb-nav-bottom`.
-  // Avoid double bottom padding from `pb-layout-pb`.
-  const isGpStoreOrDailyRoute = routesWithoutTopPadding.some((p) =>
-    location.pathname.startsWith(p)
-  );
+  const isGpDailyRoute = location.pathname.startsWith("/gp-daily");
+  const dailyHeadingsClass = isGpDailyRoute ? " gp-daily-headings" : "";
+  const showBottomNav = !isAuthRoute && !shouldHideBottomNav;
+
+  const isSupportRoute = location.pathname.includes("/customer-support");
+  /** Chat + question flow: fixed viewport band above bottom nav (no extra pb). */
+  const isSupportDockedComposer =
+    location.pathname.includes("/customer-support/chat") ||
+    location.pathname.includes("/customer-support/questions");
+
+  /** Landing + location: scroll the document (no trapped overflow on `<main>`). */
+  const useDocumentScroll =
+    shouldHideBottomNav && !isAuthRoute && !isSupportDockedComposer;
+
+  const contentClassName = isAuthRoute
+    ? dailyHeadingsClass.trim()
+    : showBottomNav
+      ? isSupportDockedComposer
+        ? `h-0 min-h-0 overflow-hidden${dailyHeadingsClass}`
+        : isSupportRoute
+          ? `min-h-[calc(100dvh-var(--gp-bottom-nav-offset))] pb-nav-bottom${dailyHeadingsClass}`
+          : `min-h-[calc(100dvh-144px)] min-h-[calc(100vh-144px)] pb-nav-bottom${dailyHeadingsClass}`
+      : `pb-0${dailyHeadingsClass}`;
 
   return (
     <FeatureThemeProvider>
@@ -68,25 +84,32 @@ const Layout: React.FC = () => {
       <WebOrderPushBridge />
       <AppToaster />
       {/* Fix_V0.9: data-testid for Playwright / QA without changing layout behaviour */}
-    <div className="min-h-screen bg-[#f8f6f1]" data-testid="gp-root-layout">
+    <div
+      className={
+        showBottomNav && !isAuthRoute && !isSupportDockedComposer
+          ? "flex h-[100dvh] max-h-[100dvh] flex-col bg-[#f8f6f1]"
+          : "min-h-screen bg-[#f8f6f1]"
+      }
+      data-testid="gp-root-layout"
+    >
       <GuestStoreLocationBootstrap />
       {/* Fixed Header - Hide on auth routes */}
       {/* {!isAuthRoute && <FixedHeader />} */}
 
-      <main className={!isAuthRoute && !shouldHideTopPadding ? "pt-0" : ""}>
-          <div
-            className={
-              isAuthRoute
-                ? ""
-                : !shouldHideBottomNav
-                ? `min-h-[calc(100dvh-144px)] min-h-[calc(100vh-144px)] ${isGpStoreOrDailyRoute ? "pb-0" : "pb-layout-pb"}`
-                : shouldHideBottomNav
-                  ? "pb-0"
-                  : isGpStoreOrDailyRoute
-                    ? "pb-0"
-                    : "pb-layout-pb"
-            }
-          >
+      <main
+        className={
+          !isAuthRoute
+            ? isSupportDockedComposer
+              ? "h-0 overflow-hidden pt-0"
+              : useDocumentScroll
+                ? "block min-h-0 pt-0"
+                : !shouldHideTopPadding
+                  ? "min-h-0 flex-1 overflow-y-auto overscroll-y-contain pt-0"
+                  : ""
+            : ""
+        }
+      >
+          <div className={contentClassName}>
           <FadingOutlet />
         </div>
       </main>

@@ -85,7 +85,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                 e.stopPropagation();
                 // Handle daily button click if needed
               }}
-              className="bg-[#ffb042] text-[#3C2A00] text-[10px] font-medium px-2 py-0.5 rounded flex-shrink-0"
+              className="bg-[#ffb042] text-[#3C2A00] text-[10px] font-medium px-2 py-0.5 rounded-sm flex-shrink-0"
             >
               Daily
             </button>

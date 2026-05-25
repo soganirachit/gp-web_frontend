@@ -50,7 +50,7 @@ const CancelSubscriptionReason: React.FC = () => {
     };
 
     return (
-        <div className="bg-[#f8f6f1] min-h-screen pb-6">
+        <div className="bg-[#f8f6f1] min-h-screen pb-nav-bottom">
             <div className="max-w-[800px] mx-auto px-4">
 
                 {/* Navbar */}
@@ -125,7 +125,7 @@ const CancelSubscriptionReason: React.FC = () => {
                 </div>
 
                 {/* Footer Buttons */}
-                <div className="flex gap-4">
+                <div className="flex gap-4 pb-2">
                     <button
                         onClick={handleSubmit}
                         disabled={!selectedReason || isCancelling}

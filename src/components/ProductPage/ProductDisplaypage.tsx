@@ -42,7 +42,10 @@ import {
   subscriptionCartService,
   isSubscriptionCartZoneStaleError,
 } from "../../services/subscriptionCart.service";
+import { notifyDailyCartUpdated } from "../../utils/dailyCartEvents";
+import { GP_DAILY_ZONE_STALE_TOAST } from "../../utils/gpDailyCustomerMessages";
 import { resolveGpDailyCatalogStoreId } from "../../utils/gpDailyCatalogStore";
+import { setGpDailyPendingSubscriptionCheckout } from "../../utils/gpDailyPendingSubscriptionCheckout";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
 
 // Add interface for content items
@@ -519,7 +522,7 @@ const ProductPage: React.FC = () => {
         if (mounted) setDailyCart(cart as any);
       } catch (e) {
         if (isSubscriptionCartZoneStaleError(e)) {
-          toast.error(e.message, { id: "sub-cart-zone-stale" });
+          toast.error(GP_DAILY_ZONE_STALE_TOAST, { id: "sub-cart-zone-stale" });
           if (mounted) {
             navigate(`${basePath}/address-selection`, { state: { fromCart: true } });
           }
@@ -963,6 +966,7 @@ const ProductPage: React.FC = () => {
         variantId,
       );
       setDailyCart(cart as any);
+      notifyDailyCartUpdated(cart);
       toast.success("Added to basket", { id: "Added to basket" });
     } catch (error: unknown) {
       console.error("Error adding to cart:", error);
@@ -995,6 +999,7 @@ const ProductPage: React.FC = () => {
         if (itemId) await subscriptionCartService.removeItem(itemId);
         const cart = await subscriptionCartService.getDailyCart();
         setDailyCart(cart as any);
+        notifyDailyCartUpdated(cart);
       } else {
         const variantId =
           selectedVariant && (selectedVariant as any).id != null
@@ -1006,6 +1011,7 @@ const ProductPage: React.FC = () => {
           variantId,
         );
         setDailyCart(cart as any);
+        notifyDailyCartUpdated(cart);
       }
     } catch (error: unknown) {
       const apiMessage = extractCartStockApiMessage(error);
@@ -1023,12 +1029,64 @@ const ProductPage: React.FC = () => {
   };
 
   const handleRechargeWallet = () => {
+    const currentProduct = product || basePack;
+    if (!currentProduct || !slug) {
+      setShowInsufficientBalanceModal(false);
+      navigate(`${basePath}/wallet`);
+      return;
+    }
+
+    const resolvedEntityId = product?.id ?? basePack?.id;
+    const minDays = selectedType === "CUSTOM" ? selectedDays.length : 7;
+    const pricePerPack = getEffectivePrice(currentProduct);
+    const productImage = getProductImage();
+    const subscriptionDetails = {
+      basePackId: resolvedEntityId,
+      productId: product?.id ?? resolvedEntityId,
+      type: selectedType,
+      startDate: startDate.toISOString(),
+      amount: pricePerPack,
+      quantity: 1,
+      packDetails: {
+        name: currentProduct.name,
+        description: currentProduct.description,
+        imageUrl: productImage,
+        contents: getProductContents(),
+      },
+      deliveryCount: minDays,
+      pricePerPack,
+      deliveryPattern:
+        selectedType === "DAILY"
+          ? "Every day"
+          : `Custom (${selectedDays.join(", ")})`,
+      walletBalance: balanceDetails.currentBalance,
+      selectedDays:
+        selectedType === "CUSTOM"
+          ? selectedDays.map((day) => day.toUpperCase())
+          : [
+              "MONDAY",
+              "TUESDAY",
+              "WEDNESDAY",
+              "THURSDAY",
+              "FRIDAY",
+              "SATURDAY",
+              "SUNDAY",
+            ],
+    };
+
+    setGpDailyPendingSubscriptionCheckout({
+      kind: "product_address_flow",
+      requiredAmount: balanceDetails.requiredAmount,
+      returnPath: `${basePath}/product/${encodeURIComponent(slug)}`,
+      subscriptionDetails,
+    });
+
     setShowInsufficientBalanceModal(false);
     navigate(`${basePath}/wallet`, {
       state: {
         requiredAmount: balanceDetails.shortageAmount,
         currentBalance: balanceDetails.currentBalance,
-        returnUrl: `${basePath}/product/${encodeURIComponent(slug ?? "")}`,
+        returnUrl: `${basePath}/address-selection`,
         subscriptionType: balanceDetails.subscriptionType,
         minimumDays: 7,
         maximumDays: selectedType === "DAILY" ? 30 : 14,
@@ -1755,7 +1813,7 @@ const ProductPage: React.FC = () => {
                   </button>
                   <button
                     onClick={handleRechargeWallet}
-                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                    className={`flex-1 rounded-lg px-4 py-2 font-semibold transition-colors ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
                   >
                     Recharge Wallet
                   </button>

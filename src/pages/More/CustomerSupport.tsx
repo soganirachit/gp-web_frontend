@@ -6,7 +6,9 @@ import {
   SupportTicket,
   formatSupportStatusLabel,
   normalizeSupportStatus,
+  type EligibleOrder,
 } from "@/services/support.service";
+import { formatItemsPreviewAsProductLabel } from "@/utils/orderListDisplay";
 import { format } from "date-fns";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { SettingsListSkeleton } from "../../components/common/PageSkeletons";
@@ -93,7 +95,7 @@ const CustomerSupport: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Fetch eligible orders (delivered in last 12 hours)
+      // Fetch eligible orders (preparing/OOD anytime; delivered within 12h)
       const eligibleOrders = await supportService.getEligibleOrders();
       console.log('Fetched eligible orders:', eligibleOrders);
       setOrders(eligibleOrders);
@@ -137,9 +139,17 @@ const CustomerSupport: React.FC = () => {
 
   const getSelectedOrderText = () => {
     if (!selectedOrderNumber) {
-      return orders.length === 0 ? 'No orders available (delivered in last 12 hours)' : 'Select an order delivered in last 12 hours';
+      return orders.length === 0
+        ? 'No orders available for support'
+        : 'Select an order (active or delivered in last 12 hours)';
     }
-    return selectedOrderNumber;
+    const match = orders.find(
+      (o) => normalizeOrderNumber(o.order_number) === normalizeOrderNumber(selectedOrderNumber),
+    );
+    if (match) {
+      return orderProductLabel(match);
+    }
+    return "Selected order";
   };
 
   const handleTicketClick = (ticketNumber: string) => {
@@ -195,13 +205,36 @@ const CustomerSupport: React.FC = () => {
     [tickets],
   );
 
+  const productLabelByOrderNumber = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const order of orders) {
+      const key = normalizeOrderNumber(order.order_number);
+      if (!key) continue;
+      const label =
+        formatItemsPreviewAsProductLabel(order.items_preview) || "Your order";
+      map.set(key, label);
+    }
+    return map;
+  }, [orders]);
+
+  const orderProductLabel = (order: EligibleOrder) =>
+    formatItemsPreviewAsProductLabel(order.items_preview) || "Your order";
+
+  const ticketProductLabel = (ticket: SupportTicket) => {
+    const key = normalizeOrderNumber(ticket.order_number);
+    if (key && productLabelByOrderNumber.has(key)) {
+      return productLabelByOrderNumber.get(key)!;
+    }
+    return ticket.subject?.trim() || "Support ticket";
+  };
+
   if (loading) {
     return <SettingsListSkeleton />;
   }
 
   return (
-    <div className="bg-[#f8f6f1] min-h-screen">
-      <div className="max-w-[800px] mx-auto">
+    <div className="min-h-0 flex-1 bg-[#f8f6f1]">
+      <div className="mx-auto max-w-[800px]">
         <UniformPageHeader
           title="Customer Support"
           onBack={() => navigate(`${basePath}/account`, { replace: true })}
@@ -210,11 +243,11 @@ const CustomerSupport: React.FC = () => {
         />
 
         {/* Content */}
-        <div className="px-4 pb-nav-bottom">
-          {/* Orders Dropdown - Delivered in last 12 hours */}
+        <div className="px-4 pb-4">
+          {/* Orders Dropdown — preparing/OOD anytime; delivered within 12h */}
           <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
             <label className="text-sm font-semibold text-gray-700 mb-3 block">
-              Select Order (Delivered in last 12 hours)
+              Select Order
             </label>
             <div ref={dropdownRef} className="relative w-full">
               {/* Custom Dropdown Button */}
@@ -280,12 +313,7 @@ const CustomerSupport: React.FC = () => {
                           }`}
                         >
                           <div className="flex flex-col">
-                            <span className="font-semibold">{order.order_number}</span>
-                            {order.items_preview && (
-                              <span className="text-xs text-gray-500 truncate mt-1">
-                                {order.items_preview}
-                              </span>
-                            )}
+                            <span className="font-semibold">{orderProductLabel(order)}</span>
                             <div className="flex items-center justify-between mt-1">
                               <span className="text-xs text-gray-500">₹{parseFloat(order.total_amount).toLocaleString('en-IN')}</span>
                               <span className="text-xs text-gray-500">{orderDate}</span>
@@ -352,9 +380,9 @@ const CustomerSupport: React.FC = () => {
                             {ticket.messages_count} message{ticket.messages_count !== 1 ? 's' : ''}
                           </p>
                         )}
-                        {ticket.order_number && (
+                        {(ticket.order_number || ticket.subject) && (
                           <p className="text-xs text-gray-500 mb-1">
-                            Order: {ticket.order_number}
+                            {ticketProductLabel(ticket)}
                           </p>
                         )}
                         <p className="text-xs text-gray-500">

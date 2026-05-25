@@ -2,9 +2,19 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaSearch } from 'react-icons/fa';
 
-/** Home page reference styling */
-const SEARCH_BAR_CLASSES =
-  'w-full rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 bg-white shadow-sm border border-[#808080] text-left';
+/** Shared search field chrome — map/location inputs should match these tokens. */
+export const GP_SEARCH_FIELD_WRAP_CLASSES =
+  "w-full rounded-xl border border-[#808080] bg-transparent px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 text-left";
+
+export const GP_SEARCH_FIELD_INPUT_CLASSES =
+  "flex-1 min-w-0 bg-transparent text-left text-sm font-medium text-gray-900 placeholder:text-[#808080] focus:outline-none sm:text-base";
+
+export const GP_SEARCH_ICON_CLASSES =
+  "h-4 w-4 shrink-0 text-[#808080] sm:h-5 sm:w-5";
+
+/** GP Store / GP Daily home hero search — frosted white, no border. */
+export const GP_HOMEPAGE_SEARCH_WRAP_CLASSES =
+  "w-full rounded-xl border-0 bg-[#FFFFFFE5] px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 text-left";
 
 export type SearchBarMode = 'product' | 'order';
 
@@ -39,6 +49,8 @@ interface SearchBarProps {
   value?: string;
   onChange?: (query: string) => void;
   className?: string;
+  /** `homepage`: #FFFFFFE5 fill, no border (GP Store / GP Daily home). */
+  variant?: "default" | "homepage";
 }
 
 const DEBOUNCE_MS = 300;
@@ -55,6 +67,7 @@ export function SearchBar({
   value,
   onChange,
   className = '',
+  variant = 'default',
 }: SearchBarProps) {
   const navigate = useNavigate();
   const [internalQuery, setInternalQuery] = useState('');
@@ -177,9 +190,14 @@ export function SearchBar({
 
   const hasSuggestions = suggestions.length > 0 && query.trim().length >= MIN_CHARS;
 
+  const wrapClasses =
+    variant === "homepage"
+      ? GP_HOMEPAGE_SEARCH_WRAP_CLASSES
+      : GP_SEARCH_FIELD_WRAP_CLASSES;
+
   return (
     <div ref={containerRef} className={`relative ${className}`}>
-      <div className={SEARCH_BAR_CLASSES}>
+      <div className={wrapClasses}>
         <input
           type="text"
           value={query}
@@ -192,10 +210,10 @@ export function SearchBar({
           }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="flex-1 bg-transparent text-gray-900 text-sm sm:text-base font-medium placeholder:text-[#808080] focus:outline-none min-w-0 text-left"
+          className={GP_SEARCH_FIELD_INPUT_CLASSES}
           aria-label="Search"
         />
-        <FaSearch className="text-[#808080] w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+        <FaSearch className={GP_SEARCH_ICON_CLASSES} aria-hidden />
       </div>
 
       {showSuggestions && hasSuggestions && (

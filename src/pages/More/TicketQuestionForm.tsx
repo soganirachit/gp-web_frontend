@@ -263,21 +263,16 @@ const TicketQuestionForm: React.FC = () => {
   }
 
   const currentQuestion = questions[currentQuestionIndex];
-  const isLastQuestion = currentQuestionIndex === questions.length - 1;
   const currentAnswer = currentQuestion ? answers[currentQuestion.id as keyof PredefinedAnswers] : '';
 
-  // Calculate bottom offset for input bar based on options
-  const hasOptions = !submitting && currentQuestion && !currentAnswer && currentQuestion.type === 'choice' && currentQuestion.options;
-  const optionsCount = hasOptions && currentQuestion.options ? currentQuestion.options.length : 0;
-  const optionsHeight = optionsCount * 40 + 16; // Approximate height per option + padding
-  const inputBarHeight = 80;
-  const totalBottomHeight = (hasOptions ? optionsHeight : 0) + inputBarHeight;
+  const showComposer =
+    !submitting && currentQuestion && !currentAnswer;
 
   return (
-    <div className="fixed inset-0 bg-[#f8f6f1] flex flex-col overflow-hidden">
-      <div className="max-w-[800px] mx-auto w-full h-full flex flex-col relative">
+    <div className="support-docked-shell">
+      <div className="support-docked-inner">
         {/* Header */}
-        <div className="p-4 pt-6 flex-shrink-0 bg-[#f8f6f1] z-10">
+        <div className="z-10 shrink-0 bg-[#f8f6f1] p-4 pt-6">
           <div className="flex items-center gap-3 mb-2">
             <button
               type="button"
@@ -312,11 +307,8 @@ const TicketQuestionForm: React.FC = () => {
           </p>
         </div>
 
-        {/* Chat Messages - Scrollable area */}
-        <div 
-          className="flex-1 px-4 py-4 overflow-y-auto min-h-0"
-          style={{ paddingBottom: `${totalBottomHeight}px` }}
-        >
+        {/* Chat + choice options scroll together */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
           <div className="space-y-4">
             {chatMessages.map((message) => (
               <div
@@ -348,74 +340,74 @@ const TicketQuestionForm: React.FC = () => {
           </div>
         </div>
 
-        {/* Choice Options - Fixed above input bar */}
-        {/* Bottom Container (Options + Input) */}
-{!submitting && currentQuestion && !currentAnswer && (
-  <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30 max-w-[800px] mx-auto">
-
-    {/* Choice Options */}
-    {currentQuestion.type === 'choice' && currentQuestion.options && (
-      <div className="px-4 py-3 bg-[#f8f6f1]">
-        <div className="space-y-2">
-          {currentQuestion.options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() =>
-                handleAnswerSelect(currentQuestion.id, option.value, option.label)
-              }
-              className={`w-full text-center p-2 rounded-lg border border-gray-200 bg-white transition-colors text-sm ${
-                isDailySupport
-                  ? 'hover:border-amber-400 hover:bg-amber-50/80'
-                  : 'hover:border-[#166534] hover:bg-green-50'
+        {showComposer ? (
+          <div className="support-composer-dock z-30">
+            {currentQuestion.type === 'choice' && currentQuestion.options ? (
+              <div className="space-y-2 px-4 pt-3 pb-0">
+                {currentQuestion.options.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() =>
+                      handleAnswerSelect(
+                        currentQuestion.id,
+                        option.value,
+                        option.label,
+                      )
+                    }
+                    className={`w-full rounded-lg border border-gray-200 bg-white p-2.5 text-center text-sm transition-colors ${
+                      isDailySupport
+                        ? 'hover:border-amber-400 hover:bg-amber-50/80'
+                        : 'hover:border-[#166534] hover:bg-green-50'
+                    }`}
+                  >
+                    <span className="font-medium text-gray-900">
+                      {option.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div
+              className={`flex items-end gap-2 px-4 pb-3 sm:pb-4 ${
+                currentQuestion.type === 'choice' && currentQuestion.options
+                  ? 'pt-2'
+                  : 'pt-3 sm:pt-4'
               }`}
             >
-              <span className="font-medium text-gray-900">
-                {option.label}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-    )}
-
-    {/* Text Input */}
-    <div className="p-3 bg-white">
-      <div className="flex gap-2 items-end">
-        <textarea
-          value={textInput}
-          onChange={(e) => setTextInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleTextAnswerSend();
-            }
-          }}
-          placeholder={
-            currentQuestion.type === 'choice'
-              ? "Or type your answer..."
-              : currentQuestion.placeholder || "Type your answer..."
-          }
-          className={`flex-1 h-12 p-2 border border-gray-300 rounded-xl focus:outline-none resize-none bg-gray-50 text-sm ${
-            isDailySupport ? 'focus:border-amber-500' : 'focus:border-[#166534]'
-          }`}
-          rows={1}
-        />
-        <button
-          type="button"
-          onClick={handleTextAnswerSend}
-          disabled={!textInput.trim()}
-          className="p-2.5 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 hover:opacity-90"
-          style={{ backgroundColor: accentColor }}
-        >
-          <FaPaperPlane size={16} />
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-      
+                <textarea
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleTextAnswerSend();
+                    }
+                  }}
+                  placeholder={
+                    currentQuestion.type === 'choice'
+                      ? 'Or type your answer...'
+                      : currentQuestion.placeholder || 'Type your answer...'
+                  }
+                  className={`min-h-[44px] max-h-[min(7.5rem,28dvh)] flex-1 resize-none rounded-xl border border-gray-300 bg-gray-50 p-3 text-sm focus:outline-none ${
+                    isDailySupport
+                      ? 'focus:border-amber-500'
+                      : 'focus:border-[#166534]'
+                  }`}
+                  rows={2}
+                />
+                <button
+                  type="button"
+                  onClick={handleTextAnswerSend}
+                  disabled={!textInput.trim()}
+                  className="flex shrink-0 rounded-xl p-2.5 text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ backgroundColor: accentColor }}
+                >
+                  <FaPaperPlane size={16} />
+                </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

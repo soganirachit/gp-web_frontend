@@ -1,5 +1,12 @@
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
+import {
+    extractFirstItemNameFromOrderDetail,
+    extractFirstItemNameFromOrderRaw,
+    extractSecondItemImageFromOrderRaw,
+    formatOrderListProductLabel,
+    resolveOrderItemsCount,
+} from "../utils/orderListDisplay";
 
 const MAX_ORDER_LIST_PAGES = 40;
 
@@ -263,6 +270,60 @@ class OrderService {
             console.error("Error fetching orders (next page):", error);
             return { orders: [], nextUrl: null };
         }
+    }
+
+    /**
+     * Fills `product_list_label` on list rows when the list API omits `first_item_name`.
+     * Batched detail fetches; skips rows that already have a label from the list payload.
+     */
+    /**
+     * Fills list rows with product labels and second-item preview for multi-item cards.
+     */
+    async enrichOrderListProductLabels(
+        orders: Array<Record<string, unknown>>,
+        options?: { concurrency?: number; maxFetches?: number },
+    ): Promise<Array<Record<string, unknown>>> {
+        const concurrency = options?.concurrency ?? 4;
+        const maxFetches = options?.maxFetches ?? 40;
+        const needs = orders
+            .filter((o) => {
+                const num = String(o.order_number ?? "").trim();
+                if (!num) return false;
+                const count = resolveOrderItemsCount(o);
+                const fromList = formatOrderListProductLabel(
+                    extractFirstItemNameFromOrderRaw(o),
+                    count,
+                );
+                const missingSecond =
+                    count > 1 && !extractSecondItemImageFromOrderRaw(o);
+                return !fromList || missingSecond;
+            })
+            .slice(0, maxFetches);
+
+        for (let i = 0; i < needs.length; i += concurrency) {
+            const batch = needs.slice(i, i + concurrency);
+            await Promise.all(
+                batch.map(async (row) => {
+                    const orderNumber = String(row.order_number ?? "").trim();
+                    if (!orderNumber) return;
+                    const detail = await this.getOrderByOrderNumber(orderNumber);
+                    if (!detail || typeof detail !== "object") return;
+                    const detailRec = detail as Record<string, unknown>;
+                    const firstName = extractFirstItemNameFromOrderDetail(detailRec);
+                    const count = resolveOrderItemsCount(detailRec);
+                    const label = formatOrderListProductLabel(firstName, count);
+                    if (label) {
+                        row.product_list_label = label;
+                        row.first_item_name = firstName;
+                    }
+                    const secondImg = extractSecondItemImageFromOrderRaw(detailRec);
+                    if (secondImg) {
+                        row.second_item_image = secondImg;
+                    }
+                }),
+            );
+        }
+        return orders;
     }
 
     async cancelOrder(orderId: string) {

@@ -462,10 +462,10 @@ const SupportTicketChat: React.FC = () => {
   const ticketSt = normalizeSupportStatus(ticket.status);
 
   return (
-    <div className="h-screen bg-[#f8f6f1] flex flex-col overflow-hidden">
-      <div className="max-w-[800px] mx-auto w-full flex flex-col h-full">
-        {/* Fixed Header */}
-        <div className="fixed top-0 left-0 right-0 bg-white shadow-sm z-20 max-w-[800px] mx-auto">
+    <div className="support-docked-shell">
+      <div className="support-docked-inner">
+        {/* Header — in flow so composer can sit directly above bottom nav */}
+        <div className="z-20 shrink-0 bg-white shadow-sm">
           <div className="px-4 pt-4 pb-3">
             <div className="flex items-start gap-3 mb-3">
               <button
@@ -480,14 +480,14 @@ const SupportTicketChat: React.FC = () => {
                 <h1 className="font-ibm-plex-serif mb-1 text-[22px] font-semibold leading-7 tracking-normal text-[#111827]">
                   Support
                 </h1>
-                {ticket?.order_number && (
+                {ticket?.subject?.trim() ? (
                   <p
-                    className="mt-0.5 text-xs font-medium text-gray-500"
-                    style={{ overflowWrap: 'anywhere', wordBreak: 'break-all' }}
+                    className="mt-0.5 text-xs font-medium text-gray-500 line-clamp-2"
+                    style={{ overflowWrap: 'anywhere' }}
                   >
-                    Order: {ticket.order_number}
+                    {ticket.subject.trim()}
                   </p>
-                )}
+                ) : null}
               </div>
             </div>
             
@@ -536,23 +536,8 @@ const SupportTicketChat: React.FC = () => {
           </div>
         </div>
 
-        {/* Spacer for fixed header - dynamically calculate height */}
-        <div 
-          className="flex-shrink-0" 
-          style={{ 
-            height: ticket 
-              ? (!isSupportTicketClosedLike(ticketSt)
-                  ? ((ticket.agent_requested || ticket.callback_requested) ? '160px' : '130px')
-                  : '110px')
-              : '100px'
-          }}
-        ></div>
-
-        {/* Messages - Scrollable area */}
-        <div className="flex-1 px-4 overflow-y-auto min-h-0" style={{ 
-          paddingBottom: ticket && !isSupportTicketClosedLike(ticketSt) ? '200px' : '90px',
-          paddingTop: '16px'
-        }}>
+        {/* Messages — scrollable; ends above composer */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-2">
           {ticket && (
             <div className="mb-4">
               <div className="bg-white rounded-xl p-4 shadow-sm">
@@ -682,9 +667,9 @@ const SupportTicketChat: React.FC = () => {
           </div>
         </div>
 
-        {/* Message Input */}
+        {/* Message Input — docked above global bottom nav via parent height */}
         {ticket && !isSupportTicketClosedLike(ticketSt) && (
-          <div className="fixed bottom-[70px] left-0 right-0 z-30 mx-auto max-w-[800px] border-t border-gray-200 bg-white p-4">
+          <div className="support-composer-dock z-30 p-3 sm:p-4">
             {filePreviewUrls.length > 0 ? (
               <div className="mb-3">
                 {filePreviewUrls.length === 1 ? (
@@ -762,10 +747,10 @@ const SupportTicketChat: React.FC = () => {
                 placeholder="Type your message..."
                 className={
                   isDailySupport
-                    ? 'min-h-[44px] flex-1 resize-none rounded-xl border border-gray-300 p-3 focus:border-[#FFB043] focus:outline-none'
-                    : 'min-h-[44px] flex-1 resize-none rounded-xl border border-gray-300 p-3 focus:border-[#166534] focus:outline-none'
+                    ? 'min-h-[44px] max-h-[min(7.5rem,28dvh)] flex-1 resize-none rounded-xl border border-gray-300 p-3 focus:border-[#FFB043] focus:outline-none'
+                    : 'min-h-[44px] max-h-[min(7.5rem,28dvh)] flex-1 resize-none rounded-xl border border-gray-300 p-3 focus:border-[#166534] focus:outline-none'
                 }
-                rows={1}
+                rows={2}
                 disabled={sending || !ticketNumber}
               />
               <button
@@ -789,7 +774,7 @@ const SupportTicketChat: React.FC = () => {
         )}
 
         {(ticket && isSupportTicketClosedLike(ticketSt)) && (
-          <div className="sticky bottom-0 bg-gray-100 border-t border-gray-200 p-4 text-center">
+          <div className="support-composer-dock shrink-0 bg-gray-100 p-3 sm:p-4 text-center">
             <p className="text-gray-600 text-sm">
               This ticket is closed. You cannot send new messages.
             </p>

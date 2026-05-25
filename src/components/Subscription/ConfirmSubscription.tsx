@@ -18,6 +18,8 @@ import Spinner from "../common/Spinner";
 import { SubscriptionFlowSkeleton } from "../common/PageSkeletons";
 import { formatCartDeliveryAddress } from "../../utils/formatCartDeliveryAddress";
 import { formatDeliveryAddressOrFallback } from "../../utils/formatDeliveryAddress";
+import { formatNextDeliveryDateLine } from "../../utils/subscriptionNextDelivery";
+import { computeFirstSubscriptionDeliveryDateFromWeekdayInts } from "../../utils/subscriptionFirstDeliveryDate";
 
 interface SubscriptionDetails {
   basePackId: string;
@@ -1024,9 +1026,17 @@ const ConfirmSubscription: React.FC = () => {
   const fee = Number(checkoutSub?.delivery_fee ?? 0) || 0;
   const itemsTotal = checkoutItems.reduce((sum, it) => sum + (Number(it?.subtotal ?? it?.unit_price ?? 0) || 0), 0);
   const grandTotal = itemsTotal + fee;
+
+  const nextDeliveryDisplayLine =
+    deliveryDaysInts.length > 0
+      ? formatNextDeliveryDateLine(
+          computeFirstSubscriptionDeliveryDateFromWeekdayInts(deliveryDaysInts),
+        )
+      : null;
+
   return (
-    <div className="min-h-screen bg-[#f8f6f1] flex justify-center items-center px-4">
-      <div className="bg-[#f8f6f1] w-full max-w-[800px] rounded-xl pb-nav-bottom">
+    <div className="min-h-screen bg-[#f8f6f1] flex justify-center items-center px-4 pb-nav-bottom">
+      <div className="bg-[#f8f6f1] w-full max-w-[800px] rounded-xl">
         {/* Show confirm buttons if not confirmed */}
         {!isConfirmed && (
           <div className="px-4 pt-4">
@@ -1157,7 +1167,7 @@ const ConfirmSubscription: React.FC = () => {
               <div className="flex items-start gap-3 mb-4">
               <img src={clockSvg} alt="Clock" className="w-6 h-6 opacity-80" />
                 <p className="text-gray-900 text-sm">
-                  Tomorrow - 7:00 AM
+                  {nextDeliveryDisplayLine ?? "Next delivery date unavailable"}
                 </p>
               </div>
 
@@ -1263,7 +1273,7 @@ const ConfirmSubscription: React.FC = () => {
               </div>
             </motion.div>
 
-            {/* View My Subscription Button */}
+            {/* Explore more packs */}
             <motion.div
               className="px-4 mb-4"
               initial={{ opacity: 0, y: 20 }}
@@ -1271,11 +1281,11 @@ const ConfirmSubscription: React.FC = () => {
               transition={{ delay: 1.3 }}
             >
               <button
-                onClick={() => navigate(`${basePath}/manage-my-subscription`)}
+                onClick={() => navigate(`${basePath}/explore-more`)}
                 className="w-full text-grey-900 py-3.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: theme.colors.primary }}
               >
-                View My Subscription
+                Explore More Packs
               </button>
             </motion.div>
 

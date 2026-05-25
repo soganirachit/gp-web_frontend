@@ -16,6 +16,7 @@ import { customerService } from '../../services/getcustomer.service';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { MapLoadingPlaceholder } from '../../components/common/PageSkeletons';
 import { UniformPageHeader } from '../../components/layout/UniformPageHeader';
+import { GP_SEARCH_ICON_CLASSES } from '../../components/common/SearchBar';
 import {
   GEO_MSG_NETWORK,
   GEO_MSG_UNSUPPORTED,
@@ -622,21 +623,13 @@ const AddEditAddress: React.FC = () => {
                     type="text"
                     placeholder="Search anything...."
                     defaultValue=""
-                    className="w-full p-3 pl-4 pr-10 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent shadow-md text-left"
+                    className="w-full rounded-xl border border-[#808080] bg-transparent p-3 pl-4 pr-10 text-left text-gray-900 placeholder:text-[#808080] focus:border-[#808080] focus:outline-none focus:ring-2"
                     style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = theme.colors.primary;
-                      e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.primary}33`;
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = '#d1d5db';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
                   />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                  <div className={`absolute right-3 top-1/2 -translate-y-1/2 ${GP_SEARCH_ICON_CLASSES}`}>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
+                      className="h-full w-full"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -657,7 +650,7 @@ const AddEditAddress: React.FC = () => {
                   type="text"
                   placeholder="Loading map..."
                   disabled
-                  className="w-full p-3 pl-4 pr-10 border border-gray-300 rounded-lg bg-gray-100"
+                  className="w-full rounded-xl border border-[#808080] bg-transparent p-3 pl-4 pr-10 text-left text-gray-400"
                 />
               </div>
             )}

@@ -21,6 +21,25 @@ export const PRODUCT_AVAILABILITY_GP_DAILY_LIST = "daily,both";
  */
 export const PRODUCT_AVAILABILITY_DAILY = PRODUCT_AVAILABILITY_GP_DAILY_LIST;
 
+export type ProductAvailabilityChannel = "store" | "daily";
+
+export function availabilityTypeForChannel(
+  channel: ProductAvailabilityChannel,
+): string {
+  return channel === "store"
+    ? PRODUCT_AVAILABILITY_STORE
+    : PRODUCT_AVAILABILITY_GP_DAILY_LIST;
+}
+
+export function parseProductAvailabilityChannel(
+  raw: string | null | undefined,
+  fallback: ProductAvailabilityChannel,
+): ProductAvailabilityChannel {
+  const v = String(raw ?? "").trim().toLowerCase();
+  if (v === "store" || v === "daily") return v;
+  return fallback;
+}
+
 function apiRootProtocol(): string {
   const root = getApiUrl().replace(/\/$/, "");
   try {

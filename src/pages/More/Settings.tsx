@@ -20,10 +20,12 @@ import { cartService, CartSwitchStoreResponse } from '../../services/cart.servic
 import { toast } from 'react-hot-toast';
 import { editCustomerService } from '../../services/editcustomer.service';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
+import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
+import { ProfileAvatarDisplay } from '../../components/common/ProfileAvatarButton';
 
 // Import SVG icons
 import subscriptionIcon from '../../assets/icon/subscription.svg';
-import ordersIcon from '../../assets/icon/orders.png';
+import ordersIcon from '../../assets/svg/Orders Icon.svg';
 import pujaIcon from '../../assets/icon/puja.svg';
 import exoticIcon from '../../assets/icon/exotic.svg';
 import referIcon from '../../assets/icon/refer.svg';
@@ -47,6 +49,7 @@ const Settings: React.FC = () => {
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [hasEmail, setHasEmail] = useState(true);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
@@ -94,18 +97,20 @@ const Settings: React.FC = () => {
       setLoading(false);
       return;
     }
+    if (location.pathname !== `${basePath}/account`) return;
 
     const fetchUser = async () => {
       setLoading(true);
       try {
-        const customers = await customerService.getAllCustomers();
-        const user = customers[0];
-        if (user) {
-          setUserName(`${user.firstName} ${user.lastName}`);
-          setUserPhone(user.phoneNumber.toString());
-          setUserEmail(user.emailAddress);
-          setHasEmail(!!user.emailAddress);
-        }
+        const user = await customerService.getCurrentUser();
+        const name = [user.first_name, user.last_name].filter(Boolean).join(' ');
+        setUserName(name || user.full_name || '');
+        setUserPhone(user.phone || '');
+        setUserEmail(user.email || '');
+        setHasEmail(!!user.email);
+        setProfileImageUrl(
+          user.profile_image ? resolveMediaUrl(user.profile_image) : null,
+        );
       } catch (err) {
         setError("Failed to fetch customer details.");
       } finally {
@@ -114,7 +119,7 @@ const Settings: React.FC = () => {
     };
 
     void fetchUser();
-  }, [isLoggedIn]);
+  }, [isLoggedIn, location.pathname, basePath]);
 
   /** GP Store only: re-sync store dropdown when opening Account (GP Daily does not use stores / nearest-store APIs here). */
   useEffect(() => {
@@ -262,7 +267,7 @@ const Settings: React.FC = () => {
       icon: ordersIcon,
       title: 'Orders',
       path: `${basePath}/orders`,
-      isSvg: false
+      isSvg: true
     },
     {
       icon: pujaIcon,
@@ -309,7 +314,7 @@ const Settings: React.FC = () => {
       icon: ordersIcon,
       title: 'Orders',
       path: `${basePath}/manage-my-subscription?tab=history`,
-      isSvg: false
+      isSvg: true
     },
     {
       icon: pujaIcon,
@@ -571,18 +576,11 @@ const Settings: React.FC = () => {
               <IoCreateOutline className="text-xl" />
             </button>
             <div className="flex items-center gap-4">
-              <div className="relative w-20 h-20 flex-shrink-0 flex items-center justify-center">
-                <img
-                  src={theme.assets.profileBackground}
-                  alt="Profile background"
-                  className="absolute inset-0 w-full h-full object-contain"
-                />
-                <img
-                  src={theme.assets.profileLogo}
-                  alt="Account"
-                  className="relative z-10 w-7 h-7 object-contain"
-                />
-              </div>
+              <ProfileAvatarDisplay
+                imageUrl={profileImageUrl}
+                profileHomeSrc={theme.assets.headerProfileHomeIcon ?? theme.assets.profileBackground ?? ''}
+                profileLogoSrc={theme.assets.profileLogo ?? ''}
+              />
               <div className="flex-1 min-w-0">
                 <h2 className="text-lg font-semibold text-gray-900 truncate">{userName || 'User Name'}</h2>
                 <p className="text-gray-500 text-[15px] mt-0.5">{formatPhoneNumber(userPhone)}</p>
@@ -776,7 +774,13 @@ const Settings: React.FC = () => {
                   {item.isComponent ? (
                     item.icon
                   ) : (
-                    <img src={item.icon as string} alt={item.title} className="w-5 h-5 object-contain" />
+                    <img
+                      src={item.icon as string}
+                      alt={item.title}
+                      className={`object-contain ${
+                        item.title === "Orders" ? "h-6 w-6" : "h-5 w-5"
+                      }`}
+                    />
                   )}
                   <span className="text-[15px] text-gray-700 font-normal">{item.title}</span>
                 </div>

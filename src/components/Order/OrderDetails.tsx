@@ -9,6 +9,11 @@ import {
 import { MdLocationOn } from 'react-icons/md';
 import { FaCopy } from 'react-icons/fa';
 import { orderService } from '../../services/order.service';
+import {
+  supportService,
+  type SupportTicket,
+} from '../../services/support.service';
+import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
 import { OrderDetailSkeleton } from '../common/PageSkeletons';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
@@ -20,6 +25,13 @@ import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
 import { invoiceService, type OrderInvoicePayload } from '../../services/invoice.service';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
 import { UniformPageHeader } from '../layout/UniformPageHeader';
+import {
+  canRaiseSupportTicketForOrder,
+  getCustomerOrderStatusBadgeClass,
+  getCustomerOrderStatusLabel,
+  supportTicketEligibilityMessage,
+  toCustomerOrderStatusKey,
+} from '../../utils/customerOrderStatus';
 
 interface OrderItem {
   id: number;
@@ -112,6 +124,12 @@ interface OrderDetails {
   total_amount: string;
   delivery_date: string | null;
   delivery_time_slot: string;
+  delivery_slot_info?: {
+    id?: number;
+    slot_name?: string;
+    start_time?: string;
+    end_time?: string;
+  } | null;
   delivery_instructions: string;
   customer_notes: string;
   items: OrderItem[];
@@ -134,22 +152,56 @@ function formatRupee(amount: string | number | undefined | null): string {
   return n.toFixed(2);
 }
 
-function formatOrderDeliverySchedule(
-  deliveryDate: string | null | undefined,
+function formatOrderDeliveryDate(deliveryDate: string | null | undefined): string | null {
+  const rawDate = (deliveryDate || '').trim();
+  if (!rawDate) return null;
+  try {
+    return format(new Date(rawDate), 'd MMM yyyy');
+  } catch {
+    return rawDate;
+  }
+}
+
+/** 24h "HH:mm:ss" → "9 AM" / "12:30 PM" for order delivery slot display. */
+function formatClockTimeLabel(time: string): string {
+  const [hStr, mStr] = time.slice(0, 8).split(':');
+  const h24 = Number(hStr);
+  const minutes = Number(mStr) || 0;
+  if (!Number.isFinite(h24)) return time.trim();
+  const period = h24 < 12 ? 'AM' : 'PM';
+  const h12 = h24 % 12 || 12;
+  if (minutes > 0) {
+    return `${h12}:${String(minutes).padStart(2, '0')} ${period}`;
+  }
+  return `${h12} ${period}`;
+}
+
+function formatOrderDeliveryTime(
+  slotInfo: OrderDetails['delivery_slot_info'],
   timeSlot: string | null | undefined,
 ): string | null {
-  const parts: string[] = [];
-  const rawDate = (deliveryDate || '').trim();
-  if (rawDate) {
-    try {
-      parts.push(format(new Date(rawDate), 'd MMM yyyy'));
-    } catch {
-      parts.push(rawDate);
-    }
+  const start = slotInfo?.start_time?.trim();
+  const end = slotInfo?.end_time?.trim();
+  if (start && end) {
+    return `${formatClockTimeLabel(start)} – ${formatClockTimeLabel(end)}`;
   }
-  const slot = (timeSlot || '').trim();
-  if (slot) parts.push(slot);
-  return parts.length > 0 ? parts.join(', ') : null;
+  const legacy = (timeSlot || '').trim();
+  return legacy || null;
+}
+
+function formatOrderDeliveryScheduleDisplay(
+  order: OrderDetails,
+  isDaily: boolean,
+): string | null {
+  const date = formatOrderDeliveryDate(order.delivery_date);
+  if (isDaily) return date;
+  const time = formatOrderDeliveryTime(order.delivery_slot_info, order.delivery_time_slot);
+  if (date && time) return `${date}, ${time}`;
+  return date || time;
+}
+
+function orderHasDeliverySchedule(order: OrderDetails, isDaily: boolean): boolean {
+  return Boolean(formatOrderDeliveryScheduleDisplay(order, isDaily));
 }
 
 function formatPaymentMethodLabel(raw: string | undefined): string {
@@ -160,19 +212,6 @@ function formatPaymentMethodLabel(raw: string | undefined): string {
   if (normalized === 'razorpay') return 'Razor Pay';
   if (normalized === 'cod') return 'Cod';
   return raw;
-}
-
-const SUPPORT_TICKET_WINDOW_MS = 12 * 60 * 60 * 1000;
-
-function isWithinSupportWindowAfterDelivery(
-  status: string,
-  deliveredAtIso: string | null | undefined,
-): boolean {
-  if (status?.toLowerCase() !== 'delivered') return false;
-  if (!deliveredAtIso) return false;
-  const deliveredMs = new Date(deliveredAtIso).getTime();
-  if (!Number.isFinite(deliveredMs) || deliveredMs <= 0) return false;
-  return Date.now() - deliveredMs < SUPPORT_TICKET_WINDOW_MS;
 }
 
 type OrderDetailsLocationState = { fromSubscriptionHistory?: boolean };
@@ -208,6 +247,9 @@ const OrderDetails: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [invoiceInfo, setInvoiceInfo] = useState<OrderInvoicePayload | null>(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [openingSupportChat, setOpeningSupportChat] = useState(false);
+  const [existingSupportTicket, setExistingSupportTicket] =
+    useState<SupportTicket | null>(null);
 
   useEffect(() => {
     if (orderNumber) {
@@ -232,6 +274,31 @@ const OrderDetails: React.FC = () => {
       cancelled = true;
     };
   }, [orderNumber, order?.id]);
+
+  useEffect(() => {
+    if (!order?.order_number) {
+      setExistingSupportTicket(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const page = await supportService.getTicketsPage();
+        if (cancelled) return;
+        const orderKey = normalizeOrderNumber(order.order_number);
+        const found =
+          page.results.find(
+            (t) => normalizeOrderNumber(t.order_number) === orderKey,
+          ) ?? null;
+        setExistingSupportTicket(found);
+      } catch {
+        if (!cancelled) setExistingSupportTicket(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [order?.order_number]);
 
   const openInvoicePdf = useCallback(() => {
     if (!invoiceInfo?.pdf_file || !order) return;
@@ -265,25 +332,6 @@ const OrderDetails: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    const s = status?.toLowerCase() || '';
-    if (s === 'delivered') {
-      return isDaily ? 'bg-[#FAA222] text-black' : 'bg-[#16A249] text-white';
-    }
-    if (s === 'canceled' || s === 'cancelled') return 'bg-[#EF4444] text-white';
-    if (s === 'out_for_delivery') return 'bg-[#3B82F6] text-white';
-    return 'bg-gray-500 text-white';
-  };
-
-  const getStatusText = (status: string) => {
-    const s = status?.toLowerCase() || '';
-    if (s === 'delivered') return 'Delivered';
-    if (s === 'canceled' || s === 'cancelled') return 'Cancelled';
-    if (s === 'out_for_delivery') return 'Out for Delivery';
-    if (s === 'confirmed') return 'Confirmed';
-    return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
-  };
-
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -305,6 +353,32 @@ const OrderDetails: React.FC = () => {
     }
   };
 
+  const normalizeOrderNumber = (n: string | null | undefined) =>
+    String(n ?? "").trim().toLowerCase();
+
+  const handleSupportTicketAction = async () => {
+    if (!order?.id || !order.order_number) return;
+
+    if (existingSupportTicket?.ticket_number) {
+      navigate(
+        `${basePath}/customer-support/chat?ticket=${encodeURIComponent(existingSupportTicket.ticket_number)}`,
+      );
+      return;
+    }
+
+    try {
+      setOpeningSupportChat(true);
+      navigate(
+        `${basePath}/customer-support/questions?order_id=${order.id}&order_number=${encodeURIComponent(order.order_number)}`,
+      );
+    } catch (err) {
+      console.error("Failed to open support", err);
+      toast.error("Could not open support. Please try again.");
+    } finally {
+      setOpeningSupportChat(false);
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     // You can add a toast notification here
@@ -322,6 +396,31 @@ const OrderDetails: React.FC = () => {
       return;
     }
     navigate(`${basePath}/orders`);
+  };
+
+  const deliveryScheduleText =
+    order != null ? formatOrderDeliveryScheduleDisplay(order, isDaily) : null;
+  const deliveryScheduleHasTime =
+    order != null &&
+    !isDaily &&
+    Boolean(formatOrderDeliveryTime(order.delivery_slot_info, order.delivery_time_slot));
+
+  const renderDeliverySchedule = () => {
+    if (!deliveryScheduleText) return null;
+    return (
+      <div className="mt-3 flex min-w-0 items-start gap-2">
+        <IoTimeOutline
+          className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-500"
+          aria-hidden
+        />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-gray-900">
+            {deliveryScheduleHasTime ? 'Delivery date & time' : 'Delivery date'}
+          </p>
+          <p className="mt-0.5 text-sm leading-snug text-gray-600">{deliveryScheduleText}</p>
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -352,10 +451,19 @@ const OrderDetails: React.FC = () => {
   }
 
   // Get timeline events
-  const confirmedEvent = order.timeline.find(e => e.status === 'confirmed' || e.status === 'order_confirmed');
-  const outForDeliveryEvent = order.timeline.find(e => e.status === 'out_for_delivery');
-  const deliveredEvent = order.timeline.find(e => e.status === 'delivered');
-  const cancelledEvent = order.timeline.find(e => e.status === 'cancelled' || e.status === 'canceled');
+  const confirmedEvent = order.timeline.find(
+    (e) => e.status === 'confirmed' || e.status === 'order_confirmed',
+  );
+  const preparingEvent = order.timeline.find((e) =>
+    ['preparing', 'ready'].includes(e.status),
+  );
+  const outForDeliveryEvent = order.timeline.find((e) => e.status === 'out_for_delivery');
+  const deliveredEvent = order.timeline.find((e) => e.status === 'delivered');
+  const failedEvent = order.timeline.find((e) => e.status === 'failed');
+  const cancelledEvent = order.timeline.find(
+    (e) => e.status === 'cancelled' || e.status === 'canceled',
+  );
+  const customerStatusKey = toCustomerOrderStatusKey(order.status);
 
   // Determine timeline points to show
   const timelinePoints: Array<{
@@ -385,6 +493,17 @@ const OrderDetails: React.FC = () => {
     });
   }
 
+  if (preparingEvent || customerStatusKey === 'preparing') {
+    const prepAt = preparingEvent?.created_at || order.confirmed_at || order.created_at;
+    timelinePoints.push({
+      label: 'Preparing',
+      icon: orderTickIcon,
+      date: formatDateTime(prepAt).date,
+      time: formatDateTime(prepAt).time,
+      status: 'preparing',
+    });
+  }
+
   if (outForDeliveryEvent) {
     timelinePoints.push({
       label: 'Out for Delivery',
@@ -406,6 +525,16 @@ const OrderDetails: React.FC = () => {
     });
   }
 
+  if (failedEvent) {
+    timelinePoints.push({
+      label: 'Failed',
+      icon: 'cancel',
+      date: formatDateTime(failedEvent.created_at).date,
+      time: formatDateTime(failedEvent.created_at).time,
+      status: 'failed',
+    });
+  }
+
   // Show cancelled if exists (after delivered or if no delivery)
   if (order.cancelled_at || cancelledEvent) {
     const cancelledDate = cancelledEvent?.created_at || order.cancelled_at;
@@ -421,32 +550,32 @@ const OrderDetails: React.FC = () => {
   }
 
   const supportDeliveredAtIso = order.delivered_at || deliveredEvent?.created_at || null;
-  const showSupportTicketSection = isWithinSupportWindowAfterDelivery(
-    order.status,
-    supportDeliveredAtIso,
-  );
+  const showSupportTicketSection =
+    !!existingSupportTicket ||
+    canRaiseSupportTicketForOrder(order.status, supportDeliveredAtIso);
+  const supportTicketHint = supportTicketEligibilityMessage(order.status);
 
   return (
-    <div className="min-h-screen bg-[#f8f6f1]">
-      <div className="max-w-[800px] mx-auto min-h-screen flex flex-col">
+    <div className="bg-[#f8f6f1]">
+      <div className="mx-auto flex w-full max-w-[800px] flex-col">
         <UniformPageHeader
           title="Order Details"
           onBack={() => navigateBackToOrderList(order)}
           padYClassName="pt-6 pb-4"
-          className="sticky top-0 z-10"
+          className="sticky top-0 z-10 bg-[#f8f6f1]"
         />
 
-        {/* Content */}
-        <div className="flex-1 px-4 pb-nav-bottom relative bg-[#f8f6f1]">
+        {/* Content — scroll handled by Layout main */}
+        <div className="px-4 pb-nav-bottom relative bg-[#f8f6f1]">
           <div className="space-y-4">
             {/* Order Item Card */}
             <div className="p-4">
               <div className="flex items-start justify-between gap-2 mb-3">
                 <h2 className="text-lg font-bold text-gray-900">Order Items</h2>
                 <span
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold ${getStatusColor(order.status)} flex-shrink-0`}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold ${getCustomerOrderStatusBadgeClass(order.status, { isDaily })} flex-shrink-0`}
                 >
-                  {getStatusText(order.status)}
+                  {getCustomerOrderStatusLabel(order.status)}
                 </span>
               </div>
               <div className="space-y-3">
@@ -543,7 +672,7 @@ const OrderDetails: React.FC = () => {
             {/* Delivery Details */}
             {(order.delivery_address ||
               order.store_name ||
-              formatOrderDeliverySchedule(order.delivery_date, order.delivery_time_slot)) && (
+              orderHasDeliverySchedule(order, isDaily)) && (
               <div className="bg-white rounded-2xl p-4 shadow-sm">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Delivery Details</h2>
                 <div className="space-y-5">
@@ -553,10 +682,12 @@ const OrderDetails: React.FC = () => {
                         className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-500"
                         aria-hidden
                       />
-                      <p className="min-w-0 flex-1 text-sm leading-snug text-gray-600">
-                        <span className="font-semibold text-gray-900">Store </span>
-                        {order.store_name}
-                      </p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-gray-900">Store</p>
+                        <p className="mt-0.5 text-sm leading-snug text-gray-600">
+                          {order.store_name}
+                        </p>
+                      </div>
                     </div>
                   ) : null}
                   {order.delivery_address ? (
@@ -607,37 +738,10 @@ const OrderDetails: React.FC = () => {
                           </p>
                         </div>
                       </div>
-                      {formatOrderDeliverySchedule(order.delivery_date, order.delivery_time_slot) ? (
-                        <div className="mt-3 flex min-w-0 items-start gap-2">
-                          <IoTimeOutline
-                            className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-500"
-                            aria-hidden
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-gray-900">Delivery date & slot</p>
-                            <p className="mt-0.5 text-sm leading-snug text-gray-600">
-                              {formatOrderDeliverySchedule(order.delivery_date, order.delivery_time_slot)}
-                            </p>
-                          </div>
-                        </div>
-                      ) : null}
+                      {renderDeliverySchedule()}
                     </>
                   ) : null}
-                  {!order.delivery_address &&
-                  formatOrderDeliverySchedule(order.delivery_date, order.delivery_time_slot) ? (
-                    <div className="flex min-w-0 items-start gap-2">
-                      <IoTimeOutline
-                        className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-500"
-                        aria-hidden
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-gray-900">Delivery date & slot</p>
-                        <p className="mt-0.5 text-sm leading-snug text-gray-600">
-                          {formatOrderDeliverySchedule(order.delivery_date, order.delivery_time_slot)}
-                        </p>
-                      </div>
-                    </div>
-                  ) : null}
+                  {!order.delivery_address ? renderDeliverySchedule() : null}
                 </div>
               </div>
             )}
@@ -844,7 +948,7 @@ const OrderDetails: React.FC = () => {
               </button>
             </div>
 
-            {/* Support Section — only within 12 hours of delivery timestamp */}
+            {/* Support — preparing / out for delivery anytime; delivered within 12h */}
             {showSupportTicketSection && (
               <div className="bg-white rounded-2xl p-4 shadow-sm">
                 <div className="mb-3 flex items-start gap-3">
@@ -854,16 +958,21 @@ const OrderDetails: React.FC = () => {
                     className="mt-0.5 h-5 w-5 shrink-0"
                   />
                   <p className="flex-1 text-left text-sm leading-relaxed text-gray-600">
-                    Support requests can only be raised within 12 hours after delivery.
+                    {supportTicketHint}
                   </p>
                 </div>
                 <div className="text-center">
                   <button
                     type="button"
-                    onClick={() => navigate(`${basePath}/customer-support`)}
-                    className={`text-base font-medium underline underline-offset-2 ${linkAccentClass}`}
+                    disabled={openingSupportChat}
+                    onClick={() => void handleSupportTicketAction()}
+                    className={`text-base font-medium underline underline-offset-2 disabled:opacity-60 ${linkAccentClass}`}
                   >
-                    Raise a Support Ticket
+                    {openingSupportChat
+                      ? "Opening…"
+                      : existingSupportTicket
+                        ? "Support Chat"
+                        : "Raise a Support Ticket"}
                   </button>
                 </div>
               </div>

@@ -186,6 +186,13 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
   const nextDeliveryDate =
     nextRaw != null && String(nextRaw).trim() !== "" ? new Date(String(nextRaw)) : undefined;
 
+  const pausedUntilRaw =
+    raw.paused_until_date ?? raw.pausedUntilDate ?? raw.resume_date ?? raw.resumeDate;
+  const pausedUntilDate =
+    pausedUntilRaw != null && String(pausedUntilRaw).trim() !== ""
+      ? new Date(String(pausedUntilRaw))
+      : undefined;
+
   return {
     id: String(raw.id ?? ""),
     customerId: String(raw.customer_id ?? raw.customerId ?? ""),
@@ -226,6 +233,8 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
     deliveryFee: lineItems.length > 0 ? deliveryFee : undefined,
     lineItems: lineItems.length > 0 ? lineItems : undefined,
     nextDeliveryDate: nextDeliveryDate && !Number.isNaN(nextDeliveryDate.getTime()) ? nextDeliveryDate : undefined,
+    pausedUntilDate:
+      pausedUntilDate && !Number.isNaN(pausedUntilDate.getTime()) ? pausedUntilDate : undefined,
     createdAt: raw.created_at ? new Date(String(raw.created_at)) : new Date(),
     productDetails: plan
       ? {
@@ -302,6 +311,8 @@ export interface Subscription {
   totalAmount?: number;
   deliveryFee?: number;
   nextDeliveryDate?: Date;
+  /** Auto-resume date when status is PAUSED (`paused_until_date` from API). */
+  pausedUntilDate?: Date;
 }
 
 export interface SubscriptionInitiateResponse {
@@ -579,6 +590,15 @@ class SubscriptionService {
     return list.map((item) =>
       mapSubscriptionFromApi(item as Record<string, unknown>)
     );
+  }
+
+  /** Full subscription mapped for UI (includes all line items). */
+  async getCustomerSubscriptionById(
+    subscriptionId: string | number,
+  ): Promise<Subscription | null> {
+    const raw = await this.getSubscriptionById(subscriptionId);
+    if (!raw?.id) return null;
+    return mapSubscriptionFromApi(raw);
   }
 
   /** Full subscription row — list may omit plan / daily_amount fields (mobile: GET /subscriptions/:id/). */

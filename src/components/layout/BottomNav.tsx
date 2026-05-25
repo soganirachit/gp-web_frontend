@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import homeIcon from "../../assets/icon/navbar/home.svg";
 import dailyIcon from "../../assets/icon/navbar/daily.svg";
@@ -6,13 +6,27 @@ import walletIcon from "../../assets/icon/navbar/wallet.svg";
 import basketIcon from "../../assets/icon/navbar/basket.svg";
 import accountIcon from "../../assets/icon/navbar/account.svg";
 import storeLogo from "../../assets/svg/store_logo.svg";
-import orderStoreIcon from "../../assets/svg/gp_store_svg/orderstore.svg";
+import ordersNavIcon from "../../assets/svg/Orders Icon.svg";
 import dailyOrangeBanner from "../../assets/svg/gp_daily svg/orangebanner.svg";
 import storeGreenBanner from "../../assets/svg/gp_store_svg/greenbanner.svg";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import { subscriptionCartService } from "../../services/subscriptionCart.service";
+import {
+  DAILY_CART_UPDATED_EVENT,
+  countDailyCartItems,
+} from "../../utils/dailyCartEvents";
+import {
+  isAccountSectionRoute,
+  isGpDailyHubRoute,
+  isGpStoreHubRoute,
+} from "../../utils/bottomNavRoutes";
+
+/** Side tab icons (Home, Basket, Wallet, etc.) */
+const BOTTOM_NAV_SIDE_ICON = "mb-1 h-7 w-7";
+/** Center hub logo (GP Daily / GP Store) */
+const BOTTOM_NAV_CENTER_ICON = "mb-1 h-10 w-10";
 
 /**
  * Small navbar SVGs are often inlined by Vite as `data:` URLs. `mask-image: url(data:…)`
@@ -21,7 +35,7 @@ import { subscriptionCartService } from "../../services/subscriptionCart.service
 function DailyNavMonoIcon({
   src,
   active,
-  className = "mb-0.5 h-5 w-5",
+  className = BOTTOM_NAV_SIDE_ICON,
 }: {
   src: string;
   active: boolean;
@@ -42,11 +56,39 @@ function DailyNavMonoIcon({
   );
 }
 
+/** Store orders tab — grey asset on account; bottom nav tints via mask like other tabs. */
+function StoreOrdersNavIcon({
+  active,
+  className = `relative z-10 ${BOTTOM_NAV_SIDE_ICON}`,
+}: {
+  active: boolean;
+  className?: string;
+}) {
+  return (
+    <span
+      aria-hidden
+      className={`inline-block shrink-0 object-contain ${className} ${
+        active ? "bg-white" : "bg-[#19411F] opacity-90"
+      }`}
+      style={{
+        maskImage: `url(${ordersNavIcon})`,
+        WebkitMaskImage: `url(${ordersNavIcon})`,
+        maskSize: "contain",
+        maskRepeat: "no-repeat",
+        maskPosition: "center",
+        WebkitMaskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+      }}
+    />
+  );
+}
+
 /** Daily logo stays a separate asset; CSS mask tint is OK here. */
 function DailyNavGlyph({
   src,
   active,
-  className = "mb-0.5 h-5 w-5",
+  className = BOTTOM_NAV_CENTER_ICON,
 }: {
   src: string;
   active: boolean;
@@ -80,52 +122,45 @@ const BottomNav: React.FC = () => {
   const accountRootPath = `${basePath}/account`;
   const [dailyCartItemCount, setDailyCartItemCount] = useState(0);
 
-  useEffect(() => {
+  const refreshDailyCartBadge = useCallback(async () => {
     if (feature !== "gpDaily") return;
     if (!isLoggedIn || !localStorage.getItem("access_token")) {
       setDailyCartItemCount(0);
       return;
     }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const cart = await subscriptionCartService.getDailyCart();
-        const rawCount =
-          typeof (cart as any)?.items_count === "number"
-            ? (cart as any).items_count
-            : Array.isArray((cart as any)?.items)
-              ? (cart as any).items.length
-              : 0;
-        if (!cancelled) setDailyCartItemCount(Math.max(0, Number(rawCount) || 0));
-      } catch {
-        if (!cancelled) setDailyCartItemCount(0);
+    try {
+      const cart = await subscriptionCartService.getDailyCart();
+      setDailyCartItemCount(countDailyCartItems(cart));
+    } catch {
+      setDailyCartItemCount(0);
+    }
+  }, [feature, isLoggedIn]);
+
+  useEffect(() => {
+    void refreshDailyCartBadge();
+  }, [refreshDailyCartBadge, location.pathname]);
+
+  useEffect(() => {
+    if (feature !== "gpDaily") return;
+    const onCartUpdated = (e: Event) => {
+      const detail = (e as CustomEvent<{ count?: number }>).detail;
+      if (typeof detail?.count === "number") {
+        setDailyCartItemCount(Math.max(0, detail.count));
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
+      void refreshDailyCartBadge();
     };
-    // Refresh when route changes (e.g., after add/remove navigations)
-  }, [feature, isLoggedIn, location.pathname]);
+    window.addEventListener(DAILY_CART_UPDATED_EVENT, onCartUpdated);
+    return () => window.removeEventListener(DAILY_CART_UPDATED_EVENT, onCartUpdated);
+  }, [feature, refreshDailyCartBadge]);
 
   const cartItemCount = useMemo(() => {
     return feature === "gpDaily" ? dailyCartItemCount : items.length;
   }, [dailyCartItemCount, feature, items.length]);
 
   /** Treat subpages (FAQ, wallet, …) as part of Account tab; bar tap always opens settings root. */
-  const accountSectionPaths = [
-    `${basePath}/account`,
-    `${basePath}/profile`,
-    `${basePath}/faq`,
-    `${basePath}/addresses`,
-    `${basePath}/refer`,
-    `${basePath}/customer-support`,
-  ];
-
   const isAccountSectionActive = () =>
-    accountSectionPaths.some(
-      (p) =>
-        location.pathname === p || location.pathname.startsWith(`${p}/`),
-    );
+    isAccountSectionRoute(location.pathname, basePath);
 
   const handleAccountNavClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -141,33 +176,48 @@ const BottomNav: React.FC = () => {
     }
   };
 
-  const isActive = (paths: string | string[]) => {
-    if (Array.isArray(paths)) {
-      return paths.some(path => {
-        if (path === "/home") return location.pathname === "/home";
-        if (path === "/gp-daily") {
-          // Only match exact /gp-daily
-          return location.pathname === "/gp-daily";
-        }
-        if (path === "/gp-store") {
-          // Only match exact /gp-store for this special case
-          return location.pathname === "/gp-store";
-        }
-        return location.pathname === path || location.pathname.startsWith(path + "/");
+  const handleWalletClick = (e: React.MouseEvent) => {
+    if (!isLoggedIn) {
+      e.preventDefault();
+      navigate(`${basePath}/login`, {
+        state: { returnUrl: `${basePath}/wallet` },
       });
     }
-    // Special case for home - only match exactly "/home"
-    if (paths === "/home") return location.pathname === "/home";
-    // Special case for /gp-daily - only match exactly "/gp-daily"
-    if (paths === "/gp-daily") {
-      return location.pathname === "/gp-daily";
-    }
-    // Special case for /gp-store - only match exactly "/gp-store"
-    if (paths === "/gp-store") {
-      return location.pathname === "/gp-store";
-    }
-    return location.pathname === paths || location.pathname.startsWith(paths + "/");
   };
+
+  const isActive = (paths: string | string[]) => {
+    const matchPath = (path: string) => {
+      if (path === "/home") return location.pathname === "/home";
+      if (path === "/gp-daily") return isGpDailyHubRoute(location.pathname);
+      if (path === "/gp-store") return isGpStoreHubRoute(location.pathname);
+      return (
+        location.pathname === path ||
+        location.pathname.startsWith(`${path}/`)
+      );
+    };
+
+    if (Array.isArray(paths)) {
+      return paths.some(matchPath);
+    }
+    return matchPath(paths);
+  };
+
+  const storeNavPill = (show: boolean) =>
+    show ? (
+      <img
+        src={storeGreenBanner}
+        alt=""
+        className="pointer-events-none absolute top-1/2 left-1/2 h-[60px] w-[60px] -translate-x-1/2 -translate-y-1/2 object-contain"
+      />
+    ) : null;
+
+  const storeSideNavIconClass = (active: boolean) =>
+    `relative z-10 ${BOTTOM_NAV_SIDE_ICON} ${active ? "brightness-0 invert" : "opacity-90"}`;
+
+  const storeNavLabelClass = (active: boolean) =>
+    `relative z-10 text-[10px] font-medium leading-none ${
+      active ? "text-white" : "text-[#19411f]"
+    }`;
 
   // GP Store Navigation: Home, Store (logo only), Basket, Order, Account
   if (feature === "gpStore") {
@@ -178,48 +228,35 @@ const BottomNav: React.FC = () => {
         data-testid="gp-bottom-nav"
       >
         <div className="w-full max-w-none bg-white shadow-lg rounded-none pointer-events-auto overflow-visible pb-[env(safe-area-inset-bottom,0px)]">
-          <div className="flex min-h-[52px] justify-between items-center px-3 py-2.5 pt-2.5">
+          <div className="flex min-h-[56px] items-center justify-between px-3 py-2.5 pt-2.5">
             <Link
               to="/home"
-              className={`flex flex-col items-center justify-center flex-1 relative ${isActive("/home")
+              className={`relative flex min-h-[44px] flex-1 flex-col items-center justify-center ${isActive("/home")
                 ? theme.classes.bottomNavActiveText
                 : theme.classes.bottomNavInactiveText
                 }`}
             >
-              {isActive("/home") && (
-                <img
-                  src={storeGreenBanner}
-                  alt=""
-                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-[60px] w-[60px] object-contain pointer-events-none"
-                />
-              )}
+              {storeNavPill(isActive("/home"))}
               <img
                 src={homeIcon}
                 alt="Home"
-                className={`relative z-10 mb-1 h-5 w-5 ${isActive("/home") ? "brightness-0 invert" : "opacity-90"
-                  }`}
+                className={storeSideNavIconClass(isActive("/home"))}
               />
-              <span className={`text-[10px] font-medium relative z-10 ${isActive("/home") ? "text-white" : "text-[#19411f]"}`}>Home</span>
+              <span className={storeNavLabelClass(isActive("/home"))}>Home</span>
             </Link>
 
             <Link
               to="/gp-store"
-              className={`flex flex-col items-center justify-center flex-1 relative ${isActive("/gp-store")
+              className={`relative flex min-h-[44px] flex-1 flex-col items-center justify-center ${isActive("/gp-store")
                 ? theme.classes.bottomNavActiveText
                 : theme.classes.bottomNavInactiveText
                 }`}
             >
-              {isActive("/gp-store") && (
-                <img
-                  src={storeGreenBanner}
-                  alt=""
-                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-[60px] w-[60px] object-contain pointer-events-none"
-                />
-              )}
+              {storeNavPill(isActive("/gp-store"))}
               <img
                 src={storeLogo}
                 alt="Store"
-                className={`w-9 h-9 relative z-10 ${isActive("/gp-store") ? "brightness-0 invert" : "opacity-90"
+                className={`relative z-10 ${BOTTOM_NAV_CENTER_ICON} ${isActive("/gp-store") ? "brightness-0 invert" : "opacity-90"
                   }`}
               />
             </Link>
@@ -227,81 +264,54 @@ const BottomNav: React.FC = () => {
             <Link
               to={isLoggedIn ? "/gp-store/basket" : "#"}
               onClick={handleBasketClick}
-              className={`flex flex-col items-center justify-center flex-1 relative ${isActive("/gp-store/basket")
+              className={`relative flex min-h-[44px] flex-1 flex-col items-center justify-center ${isActive("/gp-store/basket")
                 ? theme.classes.bottomNavActiveText
                 : theme.classes.bottomNavInactiveText
                 }`}
             >
-              {isActive("/gp-store/basket") && (
-                <img
-                  src={storeGreenBanner}
-                  alt=""
-                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-[60px] w-[60px] object-contain pointer-events-none"
-                />
-              )}
+              {storeNavPill(isActive("/gp-store/basket"))}
               <div className="relative">
                 <img
                   src={basketIcon}
                   alt="Basket"
-                  className={`relative z-10 mb-1 h-5 w-5 ${isActive("/gp-store/basket") ? "brightness-0 invert" : "opacity-90"
-                    }`}
+                  className={storeSideNavIconClass(isActive("/gp-store/basket"))}
                 />
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-white text-[#2A6B28] text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 z-20 border border-[#2A6B28]">
+                  <span className="absolute -top-0.5 -right-0.5 z-20 flex h-[14px] min-w-[14px] items-center justify-center rounded-full border border-[#2A6B28] bg-white px-0.5 text-[9px] font-bold text-[#2A6B28]">
                     {cartItemCount > 99 ? '99+' : cartItemCount}
                   </span>
                 )}
               </div>
-              <span className={`text-[10px] font-medium relative z-10 ${isActive("/gp-store/basket") ? "text-white" : "text-[#19411f]"}`}>Basket</span>
+              <span className={storeNavLabelClass(isActive("/gp-store/basket"))}>Basket</span>
             </Link>
 
             <Link
               to={`${basePath}/orders`}
-              className={`flex flex-col items-center justify-center flex-1 relative ${isActive(`${basePath}/orders`)
+              className={`relative flex min-h-[44px] flex-1 flex-col items-center justify-center ${isActive(`${basePath}/orders`)
                 ? theme.classes.bottomNavActiveText
                 : theme.classes.bottomNavInactiveText
                 }`}
             >
-              {isActive(`${basePath}/orders`) && (
-                <img
-                  src={storeGreenBanner}
-                  alt=""
-                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-[60px] w-[60px] object-contain pointer-events-none"
-                />
-              )}
-              <img
-                src={orderStoreIcon}
-                alt="Order"
-                className={`relative z-10 mb-1 h-5 w-5 ${isActive(`${basePath}/orders`) ? "brightness-0 invert" : "opacity-90"
-                  }`}
-              />
-              <span className={`text-[10px] font-medium relative z-10 ${isActive(`${basePath}/orders`) ? "text-white" : "text-[#19411f]"}`}>Order</span>
+              {storeNavPill(isActive(`${basePath}/orders`))}
+              <StoreOrdersNavIcon active={isActive(`${basePath}/orders`)} />
+              <span className={storeNavLabelClass(isActive(`${basePath}/orders`))}>Order</span>
             </Link>
 
             <Link
               to={accountRootPath}
               onClick={handleAccountNavClick}
-              className={`flex flex-col items-center justify-center flex-1 relative ${isAccountSectionActive()
+              className={`relative flex min-h-[44px] flex-1 flex-col items-center justify-center ${isAccountSectionActive()
                 ? theme.classes.bottomNavActiveText
                 : theme.classes.bottomNavInactiveText
                 }`}
             >
-              {isAccountSectionActive() && (
-                <img
-                  src={storeGreenBanner}
-                  alt=""
-                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-[60px] w-[60px] object-contain pointer-events-none"
-                />
-              )}
+              {storeNavPill(isAccountSectionActive())}
               <img
                 src={accountIcon}
                 alt="Account"
-                className={`relative z-10 mb-1 h-5 w-5 ${isAccountSectionActive()
-                  ? "brightness-0 invert"
-                  : "opacity-90"
-                  }`}
+                className={storeSideNavIconClass(isAccountSectionActive())}
               />
-              <span className={`text-[10px] font-medium relative z-10 ${isAccountSectionActive() ? "text-white" : "text-[#19411f]"}`}>Account</span>
+              <span className={storeNavLabelClass(isAccountSectionActive())}>Account</span>
             </Link>
           </div>
         </div>
@@ -333,7 +343,7 @@ const BottomNav: React.FC = () => {
       data-testid="gp-bottom-nav"
     >
       <div className="w-full max-w-[800px] mx-auto bg-white shadow-[0_-2px_16px_rgba(0,0,0,0.08)] rounded-none pointer-events-auto overflow-visible pb-[env(safe-area-inset-bottom,0px)]">
-        <div className="flex min-h-[52px] justify-between items-center px-3 py-2.5 pt-2.5">
+        <div className="flex min-h-[56px] justify-between items-center px-3 py-2.5 pt-2.5">
           <Link
             to="/home"
             className={`flex flex-col items-center justify-center flex-1 relative min-h-[44px] ${isActive("/home")
@@ -345,7 +355,7 @@ const BottomNav: React.FC = () => {
             <DailyNavMonoIcon
               src={homeIcon}
               active={isActive("/home")}
-              className="relative z-10 mb-1 h-5 w-5"
+              className={`relative z-10 ${BOTTOM_NAV_SIDE_ICON}`}
             />
             <span className={`text-[10px] font-medium relative z-10 ${isActive("/home") ? "text-[#222222]" : "text-[#6B7280]"}`}>Home</span>
           </Link>
@@ -362,12 +372,13 @@ const BottomNav: React.FC = () => {
             <DailyNavGlyph
               src={dailyIcon}
               active={isActive("/gp-daily")}
-              className="relative z-10 mb-1 h-9 w-9"
+              className={`relative z-10 ${BOTTOM_NAV_CENTER_ICON}`}
             />
           </Link>
 
           <Link
-            to={`${basePath}/wallet`}
+            to={isLoggedIn ? `${basePath}/wallet` : "#"}
+            onClick={handleWalletClick}
             className={`flex flex-col items-center justify-center flex-1 relative min-h-[44px] ${isActive(`${basePath}/wallet`)
               ? theme.classes.bottomNavActiveText
               : theme.classes.bottomNavInactiveText
@@ -377,7 +388,7 @@ const BottomNav: React.FC = () => {
             <DailyNavMonoIcon
               src={walletIcon}
               active={isActive(`${basePath}/wallet`)}
-              className="relative z-10 mb-1 h-5 w-5"
+              className={`relative z-10 ${BOTTOM_NAV_SIDE_ICON}`}
             />
             <span className={`text-[10px] font-medium relative z-10 ${isActive(`${basePath}/wallet`) ? "text-[#222222]" : "text-[#6B7280]"}`}>Wallet</span>
           </Link>
@@ -395,7 +406,7 @@ const BottomNav: React.FC = () => {
               <DailyNavMonoIcon
                 src={basketIcon}
                 active={basketTabActive}
-                className="relative z-10 mb-1 h-5 w-5"
+                className={`relative z-10 ${BOTTOM_NAV_SIDE_ICON}`}
               />
               {cartItemCount > 0 && (
                 <span
@@ -427,15 +438,10 @@ const BottomNav: React.FC = () => {
               }`}
           >
             {isAccountSectionActive() && dailyActivePill}
-            <img
+            <DailyNavMonoIcon
               src={accountIcon}
-              alt="Account"
-              className={`relative z-10 mb-1 h-5 w-5 ${isAccountSectionActive() ? "" : "opacity-75"}`}
-              style={
-                isAccountSectionActive()
-                  ? { filter: "brightness(0) saturate(100%)" }
-                  : undefined
-              }
+              active={isAccountSectionActive()}
+              className={`relative z-10 ${BOTTOM_NAV_SIDE_ICON}`}
             />
             <span className={`text-[10px] font-medium relative z-10 ${isAccountSectionActive() ? "text-[#222222]" : "text-[#6B7280]"}`}>
               Account

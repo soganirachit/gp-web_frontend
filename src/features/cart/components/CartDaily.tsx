@@ -14,6 +14,17 @@ import {
   isSubscriptionCartStoreChangeConfirmation,
   isSubscriptionCartZoneStaleError,
 } from '../../../services/subscriptionCart.service';
+import { notifyDailyCartUpdated } from '../../../utils/dailyCartEvents';
+import {
+  LIVE_DEVICE_ADDRESS_ID,
+  resolveLiveDeviceToSavedAddress,
+} from '../../../utils/addressCoordinates';
+import {
+  GP_DAILY_ZONE_ELIGIBLE_TOAST,
+  GP_DAILY_ZONE_CHECK_ERROR_TOAST,
+  GP_DAILY_ZONE_STALE_TOAST,
+  GP_DAILY_STORE_UPDATED_TOAST,
+} from '../../../utils/gpDailyCustomerMessages';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow, startOfDay } from 'date-fns';
@@ -44,10 +55,19 @@ import { validateGpDailyDeliveryArea } from '../../../services/subscriptionZone.
 import { GpDailyOutOfZoneBanner } from '../../../components/daily/GpDailyOutOfZoneBanner';
 import { UniformPageHeader } from '../../../components/layout/UniformPageHeader';
 import { DELIVERY_DATE_MAX_DAYS_FROM_TODAY } from '../../../constants/deliveryBooking';
+import {
+  getSlotWindowMinutes,
+  isDeliverySlotSelectableForDate,
+} from '../../../utils/deliverySlotSelection';
 import { pickPrimaryImageUrl } from '../../../utils/pickPrimaryImageUrl';
 import { computeFirstSubscriptionDeliveryDateFromWeekdayInts } from '../../../utils/subscriptionFirstDeliveryDate';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
 import deliveryTruckIcon from "../../../assets/svg/gp_daily svg/delivery_truck.svg";
+import {
+  InsufficientWalletModal,
+  type InsufficientWalletDetails,
+} from '../../../components/daily/InsufficientWalletModal';
+import { setGpDailyPendingSubscriptionCheckout } from '../../../utils/gpDailyPendingSubscriptionCheckout';
 
 
 /**
@@ -86,46 +106,12 @@ const getSlotDisplayLabel = (slot: DeliverySlot): string => {
   return formatSlotTimeRange(minutesToTimeStr(start), minutesToTimeStr(end));
 };
 
-// Parse "HH:mm:ss" / "HH:mm" into minutes from midnight
-const toMinutes = (timeStr: string): number => {
-  const [h = '0', m = '0'] = (timeStr || '').split(':');
-  return Number(h) * 60 + Number(m);
-};
-
 /** For formatSlotTimeRange after normalizing minutes. */
 const minutesToTimeStr = (mins: number): string => {
   const h = Math.floor(mins / 60) % 24;
   const m = mins % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
 };
-
-/**
- * Same-day slot window in minutes from midnight.
- * Fixes common backend typo: 1 PM stored as "01:00:00" for Afternoon (e.g. 13:00–16:00).
- */
-function getSlotWindowMinutes(slot: DeliverySlot): { start: number; end: number } {
-  const rawStart = toMinutes(slot.start_time);
-  const end = toMinutes(slot.end_time);
-  let start = rawStart;
-  if (end <= start) return { start, end };
-
-  const name = (slot.slot_name || '').toLowerCase();
-  const startsVeryEarly = rawStart < 7 * 60;
-  const endsAfternoon = end >= 13 * 60;
-  const afternoonLike =
-    name.includes('afternoon') || name.includes('evening') || name.includes('noon');
-
-  if (startsVeryEarly && endsAfternoon && (afternoonLike || rawStart <= 2 * 60)) {
-    const parts = (slot.start_time || '').split(':');
-    const h = Number(parts[0] ?? 0);
-    const mi = Number(parts[1] ?? 0);
-    if (Number.isFinite(h) && h >= 0 && h <= 6) {
-      const shifted = (h + 12) * 60 + (Number.isFinite(mi) ? mi : 0);
-      if (shifted < end) start = shifted;
-    }
-  }
-  return { start, end };
-}
 
 interface ApplyCouponResponse {
   message?: string;
@@ -586,10 +572,11 @@ const Cart: React.FC = () => {
       setIsLoadingDailyCart(true);
       const cart = await subscriptionCartService.getDailyCart();
       setDailyCart(cart);
+      notifyDailyCartUpdated(cart);
       setLineCartStaleByItemId({});
     } catch (e: unknown) {
       if (isSubscriptionCartZoneStaleError(e)) {
-        toast.error(e.message, { id: 'sub-cart-zone-stale', duration: 4000 });
+        toast.error(GP_DAILY_ZONE_STALE_TOAST, { id: 'sub-cart-zone-stale', duration: 4000 });
         setDailyCart(null);
         navigate(`${basePath}/address-selection`, {
           state: { fromCart: true },
@@ -757,8 +744,6 @@ const Cart: React.FC = () => {
     return () => window.clearInterval(id);
   }, []);
 
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editMessage, setEditMessage] = useState<string>('');
   const datePickerRef = useRef<HTMLDivElement>(null);
   const lastZoneCheckedAddressIdRef = useRef<number | null>(null);
   const zoneCheckInFlightAddressIdRef = useRef<number | null>(null);
@@ -767,6 +752,9 @@ const Cart: React.FC = () => {
   const [subscriptionZoneEligible, setSubscriptionZoneEligible] = useState<boolean | null>(null);
   const [subscriptionDeliveryFee, setSubscriptionDeliveryFee] = useState<number | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [showInsufficientWalletModal, setShowInsufficientWalletModal] = useState(false);
+  const [insufficientWalletDetails, setInsufficientWalletDetails] =
+    useState<InsufficientWalletDetails | null>(null);
   const [isConfirmingOrder, setIsConfirmingOrder] = useState(false);
   const [shouldTriggerPayment, setShouldTriggerPayment] = useState(false);
   const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
@@ -897,15 +885,8 @@ const Cart: React.FC = () => {
     navigate(`${basePath}/product/${encodeURIComponent(String(item.productId))}`);
   };
 
-  const isSlotSelectable = (slot: DeliverySlot, date: Date) => {
-    // For non-today dates, all API-available slots stay selectable.
-    if (!isToday(date)) return true;
-    // For today: bookable until normalized window ends (handles 01:00→13:00 afternoon typo).
-    const now = new Date();
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const { end } = getSlotWindowMinutes(slot);
-    return end > nowMinutes;
-  };
+  const isSlotSelectable = (slot: DeliverySlot, date: Date) =>
+    isDeliverySlotSelectableForDate(slot, date);
 
   const sortSlotsByStart = (slots: DeliverySlot[]) =>
     [...slots].sort(
@@ -995,8 +976,6 @@ const Cart: React.FC = () => {
         lastZoneCheckedAddressIdRef.current = addressId;
 
         const eligible = Boolean((res as any)?.eligible);
-        const msg =
-          typeof (res as any)?.message === 'string' ? String((res as any).message).trim() : '';
         const feeRaw = (res as any)?.delivery_fee;
         const feeNum = feeRaw == null ? null : Number(feeRaw);
 
@@ -1024,7 +1003,7 @@ const Cart: React.FC = () => {
           if (eligible) {
             const zoneToastId = `sub-zone:${addressId}`;
             if (!cancelled) {
-              toast.success(msg || 'Great! This address is within our subscription delivery zone.', {
+              toast.success(GP_DAILY_ZONE_ELIGIBLE_TOAST, {
                 duration: 2600,
                 id: zoneToastId,
               });
@@ -1043,7 +1022,7 @@ const Cart: React.FC = () => {
         setSubscriptionZoneEligible(null);
         setSubscriptionDeliveryFee(null);
         if (shouldToast) {
-          toast.error(errorMessageFromCatch(e, 'Could not check delivery zone.'), {
+          toast.error(GP_DAILY_ZONE_CHECK_ERROR_TOAST, {
             duration: 3000,
             id: `sub-zone:${addressId}`,
           });
@@ -1451,7 +1430,24 @@ const Cart: React.FC = () => {
         return;
       }
       if (location.state?.selectedAddress) {
-        setDefaultAddress(location.state.selectedAddress);
+        const fromNav = location.state.selectedAddress;
+        if (String(fromNav?.id) === LIVE_DEVICE_ADDRESS_ID) {
+          try {
+            const saved = await addressService.getAllAddresses();
+            const resolved = resolveLiveDeviceToSavedAddress(fromNav, saved);
+            if (resolved.id !== fromNav.id) {
+              localStorage.setItem(
+                'selectedDeliveryAddress',
+                JSON.stringify(resolved),
+              );
+            }
+            setDefaultAddress(resolved);
+          } catch {
+            setDefaultAddress(fromNav);
+          }
+        } else {
+          setDefaultAddress(fromNav);
+        }
         setIsLoadingAddress(false);
         return;
       }
@@ -1465,7 +1461,23 @@ const Cart: React.FC = () => {
             // Stale address from a different user session — discard it
             localStorage.removeItem('selectedDeliveryAddress');
           } else {
-            setDefaultAddress(parsed);
+            if (String(parsed?.id) === LIVE_DEVICE_ADDRESS_ID) {
+              try {
+                const saved = await addressService.getAllAddresses();
+                const resolved = resolveLiveDeviceToSavedAddress(parsed, saved);
+                if (resolved.id !== parsed.id) {
+                  localStorage.setItem(
+                    'selectedDeliveryAddress',
+                    JSON.stringify(resolved),
+                  );
+                }
+                setDefaultAddress(resolved);
+              } catch {
+                setDefaultAddress(parsed);
+              }
+            } else {
+              setDefaultAddress(parsed);
+            }
             setIsLoadingAddress(false);
             return;
           }
@@ -1624,36 +1636,6 @@ const Cart: React.FC = () => {
     if (deliveryInfo) updateDeliveryInfo({ ...deliveryInfo, timeSlot: getSlotDisplayLabel(slot), slotId: slot.id });
   };
 
-  /** Must match StoreProductsDisplayPage: only category "bouquet" lines get custom messages on PDP. */
-  const isBouquetItem = (item: (typeof items)[number]) => {
-    const categorySlug = item.categorySlug?.toLowerCase() ?? '';
-    return categorySlug.includes('bouquet');
-  };
-
-  const handleEditItem = (itemId: string) => {
-    const item = items.find((i) => i.id === itemId);
-    if (!item || !isBouquetItem(item)) return;
-    setEditingItemId(itemId);
-    setEditMessage(item.customizedMessage || '');
-  };
-
-  const handleSaveEdit = async (itemId: string) => {
-    const item = items.find((i) => i.id === itemId);
-    if (!item) return;
-    try {
-      // Daily cart doesn't support bouquet message edits yet; keep UI consistent (no-op on server).
-      setEditingItemId(null);
-      toast.success('Message updated');
-    } catch (error: unknown) {
-      toast.error(errorMessageFromCatch(error, "Failed to update message. Please try again."));
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingItemId(null);
-    setEditMessage('');
-  };
-
   const handleQuantityDelta = async (itemId: string, delta: number) => {
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
@@ -1750,7 +1732,7 @@ const Cart: React.FC = () => {
       }
       setSuggestedStoreForAddress(null);
       setShowSuggestedStoreSwitchModal(false);
-      toast.success(`Store switched to ${target.name}.`);
+      toast.success(GP_DAILY_STORE_UPDATED_TOAST, { id: 'gp-daily-store-updated' });
     } catch (e: unknown) {
       toast.error(errorMessageFromCatch(e, 'Could not switch store for this address.'));
     } finally {
@@ -1796,7 +1778,23 @@ const Cart: React.FC = () => {
       const { balance: walletBalance } = await walletService.getWalletBalance();
       const cartAmount = Number(total);
       if (Number.isFinite(cartAmount) && walletBalance < cartAmount) {
-        toast.error('Wallet balance is low. First recharge the wallet.');
+        const shortage = cartAmount - walletBalance;
+        setInsufficientWalletDetails({
+          currentBalance: walletBalance,
+          requiredAmount: cartAmount,
+          shortageAmount: shortage,
+          contextLabel: 'Recharge your wallet to complete your subscription.',
+        });
+        setGpDailyPendingSubscriptionCheckout({
+          kind: 'subscription_cart_checkout',
+          requiredAmount: shortage,
+          cartAmount,
+          addressId: Number(defaultAddress.id),
+          deliveryDayInts: activeDeliveryDayInts,
+          deliveryFrequency,
+          activeDeliveryDays: [...activeDeliveryDays],
+        });
+        setShowInsufficientWalletModal(true);
         setIsProcessingPayment(false);
         return;
       }
@@ -2030,8 +2028,7 @@ const Cart: React.FC = () => {
     cartTotals?.total ??
     subtotal + deliveryFee + tax + surcharge - discount;
 
-  const displayStoreName =
-    cartStoreName.trim() || (isLoadingCartTotals ? '' : 'Selected store');
+  const displayStoreName = cartStoreName.trim();
   const deliveryBlockedByCoverage = addressOutsideDelivery === true;
   const deliveryBlockedByStoreMismatch = suggestedStoreForAddress != null;
 
@@ -2112,16 +2109,18 @@ const Cart: React.FC = () => {
         </div>
 
         {items.length === 0 ? (
-          <div className="mx-auto w-full max-w-md space-y-6 px-4 py-8 pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]">
-            <div className="flex flex-col items-center text-center">
-              <img src={emptyCartSvg} alt="" width={72} height={72} className="mb-3 shrink-0" />
-              <p className="mb-2 text-[18px] font-semibold leading-snug text-gray-900">Your basket is empty</p>
-              <p className="max-w-sm text-sm text-gray-500">Add some blooms from the store to see them here.</p>
-            </div>
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-4">
+            <img src={emptyCartSvg} alt="" width={72} height={72} className="mb-3 shrink-0" />
+            <p className="mb-2 text-center text-[18px] font-semibold leading-snug text-gray-900">
+              Your basket is empty
+            </p>
+            <p className="mb-4 max-w-sm text-center text-sm text-gray-500">
+              Add some blooms from the store to see them here.
+            </p>
             <button
               type="button"
               onClick={() => navigate(browseProductsPath)}
-              className="w-full rounded-full px-6 py-2.5 text-sm font-semibold transition-colors"
+              className="mt-2 rounded-full px-6 py-2.5 text-sm font-semibold transition-colors"
               style={{ backgroundColor: theme.colors.primary, color: 'black' }}
             >
               Browse Products
@@ -2221,80 +2220,11 @@ const Cart: React.FC = () => {
 
                   {!lineCartStaleByItemId[item.id] ? (
                     <>
-                  {/* Bouquet: add message — above first-delivery separator (aligned with cart text column) */}
-                  {isBouquetItem(item) && editingItemId !== item.id && !item.customizedMessage ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingItemId(item.id);
-                        setEditMessage('');
-                      }}
-                      className="touch-target-compact mt-2 ml-[5.25rem] mr-1 inline-flex h-auto w-auto items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold leading-snug hover:bg-[#f1f7f2] sm:ml-24"
-                      style={{ border: `1px solid ${theme.colors.primary}`, color: theme.colors.primary }}
-                    >
-                      <span
-                        className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
-                        style={{ border: `1px solid ${theme.colors.primary}`, color: theme.colors.primary }}
-                      >
-                        <svg width="10" height="10" viewBox="0 0 20 20" fill="none" aria-hidden>
-                          <path d="M10 4.5V15.5M4.5 10H15.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                        </svg>
-                      </span>
-                      Add custom message
-                    </button>
-                  ) : null}
-
                   <div className="mt-3 border-t border-gray-200 pt-3">
                     <p className="text-sm font-medium text-gray-500">
                       First Delivery: {basketFirstDeliveryLabel}
                     </p>
                   </div>
-                  {isBouquetItem(item) && editingItemId !== item.id && item.customizedMessage ? (
-                    <div className="mt-2 flex items-center justify-between gap-3 pl-[5.25rem] pr-1 sm:pl-24">
-                      <p className="min-w-0 flex-1 truncate text-xs leading-snug text-gray-500">
-                        <span className="font-medium text-gray-500">Customized Message:</span>{' '}
-                        {item.customizedMessage}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => handleEditItem(item.id)}
-                        className="touch-target-compact flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-                        aria-label="Edit custom message"
-                      >
-                        <IoCreateOutline className="text-lg" />
-                      </button>
-                    </div>
-                  ) : null}
-
-                  {editingItemId === item.id && isBouquetItem(item) && (
-                    <div className="mt-2 pl-[5.25rem] pr-1 sm:pl-24 sm:pr-3">
-                      <textarea
-                        value={editMessage}
-                        onChange={(e) => { if (e.target.value.length <= 500) setEditMessage(e.target.value); }}
-                        placeholder="Add a customized message"
-                        className="min-h-[4.75rem] w-full resize-none rounded-lg border border-gray-200 bg-[#fafafa] px-3 py-2.5 text-xs leading-snug text-gray-900 outline-none"
-                        rows={2}
-                        maxLength={500}
-                      />
-                      <div className="mt-2.5 flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={handleCancelEdit}
-                          className="touch-target-compact inline-flex h-auto items-center rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSaveEdit(item.id)}
-                          className="touch-target-compact inline-flex h-auto items-center rounded-lg px-3.5 py-2 text-xs font-semibold"
-                          style={{ backgroundColor: theme.colors.primary, color: 'black' }}
-                        >
-                          Save
-                        </button>
-                      </div>
-                    </div>
-                  )}
                   {lineStockErrorByItemId[item.id] ? (
                     <p
                       key={stockShakeVersionByItemId[item.id] ?? 0}
@@ -2382,7 +2312,8 @@ const Cart: React.FC = () => {
                     className="h-14 w-14 shrink-0 object-contain"
                   />
                   <p className="flex-1 text-sm font-semibold leading-5 text-[#111827]">
-                    Orders placed before 8 PM will be delivered next day. Sunday deliveries available on request.
+                  Orders placed before 8 PM will be delivered next day.
+                    {/* Orders placed before 8 PM will be delivered next day. Sunday deliveries available on request. */}
                   </p>
                 </div>
               </div>
@@ -2413,7 +2344,7 @@ const Cart: React.FC = () => {
                         <span className="truncate text-sm font-medium text-gray-900">From</span>
                       </div>
                       <p className="line-clamp-3 pl-7 text-sm leading-snug text-gray-600">
-                        {isLoadingCartTotals && !cartStoreName.trim() ? (
+                        {!displayStoreName ? (
                           <span className="text-gray-400">Loading store…</span>
                         ) : (
                           displayStoreName
@@ -2705,6 +2636,27 @@ const Cart: React.FC = () => {
           isDailyMode
         />
       )}
+
+      <InsufficientWalletModal
+        open={showInsufficientWalletModal}
+        details={insufficientWalletDetails}
+        onClose={() => {
+          setShowInsufficientWalletModal(false);
+          setInsufficientWalletDetails(null);
+        }}
+        onRecharge={() => {
+          if (!insufficientWalletDetails) return;
+          setShowInsufficientWalletModal(false);
+          navigate(`${basePath}/wallet`, {
+            state: {
+              returnUrl: `${basePath}/basket`,
+              requiredAmount: insufficientWalletDetails.shortageAmount,
+              currentBalance: insufficientWalletDetails.currentBalance,
+              totalRequired: insufficientWalletDetails.requiredAmount,
+            },
+          });
+        }}
+      />
 
     </div>
   );

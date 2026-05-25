@@ -31,12 +31,19 @@ export function PageFadeFallback() {
  */
 export function FadingOutlet() {
   const location = useLocation();
+  const isSupportDockedComposer =
+    location.pathname.includes("/customer-support/chat") ||
+    location.pathname.includes("/customer-support/questions");
 
   return (
     <AnimatePresence mode="wait">
       <motion.div
         key={location.pathname + location.search}
-        className="min-h-full w-full bg-background"
+        className={
+          isSupportDockedComposer
+            ? "h-full w-full"
+            : "min-h-full w-full bg-background"
+        }
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}

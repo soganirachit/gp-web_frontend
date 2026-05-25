@@ -228,7 +228,7 @@ export interface PredefinedAnswers {
 
 class SupportService {
   /**
-   * Get eligible orders for support (delivered in last 12 hours; server may apply its own window)
+   * Get eligible orders for support (preparing/out for delivery anytime; delivered within 12h)
    */
   async getEligibleOrders(): Promise<EligibleOrder[]> {
     try {

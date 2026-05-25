@@ -18,136 +18,37 @@ import {
   IoChevronUp,
   IoCreateOutline,
   IoCubeOutline,
-  IoPlay,
 } from "react-icons/io5";
+import { FaChevronRight } from "react-icons/fa";
+import { OrderListThumb } from "../Order/OrderListThumb";
+import { SubscriptionResumeButton } from "./SubscriptionResumeButton";
 import modifySubIcon from "../../assets/svg/cancelpage/modify.svg";
 import pauseSubIcon from "../../assets/svg/cancelpage/pause.svg";
-import cancelSubIcon from "../../assets/svg/cancelpage/cancel..svg";
+import cancelSubIcon from "../../assets/svg/cancelpage/cancel-circle-red.svg";
 import Spinner from "../../components/common/Spinner";
 import { SubscriptionFlowSkeleton } from "../common/PageSkeletons";
 import { format } from "date-fns";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
-
-const WEEK_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-
-function dayStringToApiInt(day: string): number | undefined {
-  const s = String(day).trim().toLowerCase();
-  if (s.startsWith("mon")) return 0;
-  if (s.startsWith("tue")) return 1;
-  if (s.startsWith("wed")) return 2;
-  if (s.startsWith("thu")) return 3;
-  if (s.startsWith("fri")) return 4;
-  if (s.startsWith("sat")) return 5;
-  if (s.startsWith("sun")) return 6;
-  return undefined;
-}
-
-function selectedDaysToApiInts(days: string[]): number[] {
-  const map: Record<string, number> = {
-    MONDAY: 0,
-    MON: 0,
-    TUESDAY: 1,
-    TUE: 1,
-    WEDNESDAY: 2,
-    WED: 2,
-    THURSDAY: 3,
-    THU: 3,
-    FRIDAY: 4,
-    FRI: 4,
-    SATURDAY: 5,
-    SAT: 5,
-    SUNDAY: 6,
-    SUN: 6,
-  };
-  const out: number[] = [];
-  for (const d of days) {
-    const key = String(d).trim().toUpperCase().replace(/\.$/, "");
-    const n = map[key] ?? dayStringToApiInt(d);
-    if (n != null) out.push(n);
-  }
-  return [...new Set(out)].sort((a, b) => a - b);
-}
-
-function getDeliveryDayInts(subscription: Subscription): number[] {
-  if (subscription.deliveryDayInts?.length) {
-    return subscription.deliveryDayInts;
-  }
-  const fromSelected = selectedDaysToApiInts(subscription.selectedDays || []);
-  if (fromSelected.length) return fromSelected;
-  if (
-    subscription.deliveryPreference === "DAILY" ||
-    subscription.type === "DAILY"
-  ) {
-    return [0, 1, 2, 3, 4, 5, 6];
-  }
-  return [];
-}
-
-/** JS `Date.getDay()`: 0 Sun … 6 Sat → delivery int 0 Mon … 6 Sun (same as `WEEK_SHORT` index). */
-function jsWeekdayToDeliveryInt(jsDay: number): number {
-  return jsDay === 0 ? 6 : jsDay - 1;
-}
-
-/**
- * Local hour (0–23) after which today's subscribed day no longer counts as "next delivery"
- * (same-day ordering / morning route is assumed closed).
- */
-const SAME_DAY_NEXT_DELIVERY_CUTOFF_HOUR = 12;
-
-/**
- * Next calendar day on a subscribed weekday (`getDeliveryDayInts`), from today onward.
- * If today is a delivery day but {@link SAME_DAY_NEXT_DELIVERY_CUTOFF_HOUR} has passed, today is skipped.
- */
-function computeNextDeliveryFromSubscribedDays(
-  subscription: Subscription,
-): Date | null {
-  if (
-    subscription.status === "PAUSED" ||
-    subscription.status === "INACTIVE" ||
-    subscription.status === "CANCELLED"
-  ) {
-    return null;
-  }
-  const ints = getDeliveryDayInts(subscription);
-  if (!ints.length) return null;
-
-  const allowed = new Set(ints);
-  const now = new Date();
-  const todayMidnight = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  );
-  const cutoffToday = new Date(todayMidnight);
-  cutoffToday.setHours(SAME_DAY_NEXT_DELIVERY_CUTOFF_HOUR, 0, 0, 0);
-  const skipTodayBecauseSlotPassed = now.getTime() >= cutoffToday.getTime();
-
-  for (let add = 0; add <= 28; add++) {
-    const d = new Date(todayMidnight);
-    d.setDate(todayMidnight.getDate() + add);
-    const ui = jsWeekdayToDeliveryInt(d.getDay());
-    if (!allowed.has(ui)) continue;
-    if (add === 0 && skipTodayBecauseSlotPassed) continue;
-    return d;
-  }
-  return null;
-}
-
+import {
+  WEEK_SHORT,
+  computeNextDeliveryFromSubscribedDays,
+  formatPausedDeliveryLine,
+  getDeliveryDayInts,
+} from "../../utils/subscriptionNextDelivery";
+import {
+  getCustomerOrderStatusHistoryPillClass,
+  getCustomerOrderStatusLabel,
+} from "../../utils/customerOrderStatus";
+import {
+  cleanSubscriptionProductDisplayName,
+  extractFirstItemNameFromOrderRaw,
+  extractPrimaryImageFromOrderRaw,
+  extractSecondItemImageFromOrderRaw,
+  formatOrderListProductLabel,
+  resolveOrderItemsCount,
+  resolveOrderListHistoryTitle,
+} from "../../utils/orderListDisplay";
 const GP_DAILY_BASE = "/gp-daily";
-
-function subscriptionOrderListTitle(o: Record<string, unknown>): string {
-  const items = o.items as unknown[] | undefined;
-  if (Array.isArray(items) && items.length > 0) {
-    const p = (items[0] as Record<string, unknown>)?.product as
-      | Record<string, unknown>
-      | undefined;
-    const name = p?.name;
-    if (typeof name === "string" && name.trim()) return name;
-  }
-  const num = o.order_number;
-  if (typeof num === "string" && num.trim()) return num;
-  return "Subscription order";
-}
 
 /** Delivery history row — time line aligned with mobile `mapDeliveryHistoryFromOrders`. */
 function subscriptionOrderListTimeLabel(o: Record<string, unknown>): string {
@@ -187,6 +88,16 @@ function historyOrderCancelled(o: Record<string, unknown>): boolean {
   return st === "cancelled" || st === "canceled";
 }
 
+function historyOrderUndelivered(o: Record<string, unknown>): boolean {
+  const st = String(o.status ?? "").toLowerCase();
+  return (
+    historyOrderCancelled(o) ||
+    st === "failed" ||
+    st === "undelivered" ||
+    st === "rejected"
+  );
+}
+
 const DELIVERY_HISTORY_PAGE_SIZE = 6;
 /** Show Support link only within 12h of `delivered_at` (match mobile `SubscriptionsScreen`). */
 const SUPPORT_TICKET_WINDOW_MS = 12 * 60 * 60 * 1000;
@@ -201,54 +112,6 @@ function isSupportAvailableForDelivery(
   return Date.now() < deliveredMs + SUPPORT_TICKET_WINDOW_MS;
 }
 
-function normalizeApiStatusKey(raw: string): string {
-  return String(raw || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_")
-    .replace(/-/g, "_");
-}
-
-function isOutForDeliveryApiStatus(raw: string): boolean {
-  const k = normalizeApiStatusKey(raw);
-  return (
-    k === "out_for_delivery" ||
-    k === "outfordelivery" ||
-    k.startsWith("out_for_delivery") ||
-    k === "shipping" ||
-    k === "shipped" ||
-    k === "in_transit" ||
-    k === "intransit"
-  );
-}
-
-function isConfirmedPipelineApiStatus(raw: string): boolean {
-  const k = normalizeApiStatusKey(raw);
-  if (!k) return false;
-  if (k === "delivered") return false;
-  if (k.includes("cancel")) return false;
-  if (isOutForDeliveryApiStatus(raw)) return false;
-  return (
-    k === "confirmed" ||
-    k === "pending" ||
-    k === "processing" ||
-    k === "scheduled" ||
-    k === "placed" ||
-    k === "accepted"
-  );
-}
-
-/** Match API `status` (snake_case) for delivery history rows — not a binary “undelivered”. */
-function formatHistoryOrderStatusFromApi(o: Record<string, unknown>): string {
-  const raw = String(o.status ?? "").trim();
-  if (!raw) return "Pending";
-  return raw
-    .toLowerCase()
-    .split("_")
-    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : ""))
-    .filter(Boolean)
-    .join(" ");
-}
 
 function isSubscriptionOrderType(o: Record<string, unknown>): boolean {
   const t = String(o.order_type ?? o.orderType ?? "")
@@ -318,6 +181,9 @@ const ManageMySubscription: React.FC = () => {
     Record<string, boolean>
   >({});
   const [resumingSubId, setResumingSubId] = useState<string | null>(null);
+  const [highlightedSubId, setHighlightedSubId] = useState<string | null>(null);
+  const [refreshingSubscriptions, setRefreshingSubscriptions] =
+    useState(false);
 
   // Days of the week
   // const daysOfWeek = ['Mon', 'Tues', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'];
@@ -369,8 +235,14 @@ const ManageMySubscription: React.FC = () => {
             ? (o as Record<string, unknown>)
             : {},
         );
+        const subscriptionOnly = asRecords.filter((row) =>
+          isSubscriptionOrderType(row),
+        );
+        const enriched = await orderService.enrichOrderListProductLabels(
+          subscriptionOnly,
+        );
         /** API may still return mixed types — keep only subscription orders */
-        setHistoryOrders(asRecords.filter((row) => isSubscriptionOrderType(row)));
+        setHistoryOrders(enriched);
         setHistoryVisibleCount(DELIVERY_HISTORY_PAGE_SIZE);
       } catch {
         if (!cancelled) setHistoryOrders([]);
@@ -395,7 +267,7 @@ const ManageMySubscription: React.FC = () => {
       subscription.status === "PAUSED" ||
       subscription.status === "INACTIVE"
     ) {
-      return "Next Delivery: Paused";
+      return formatPausedDeliveryLine(subscription);
     }
     const fromSchedule = computeNextDeliveryFromSubscribedDays(subscription);
     if (fromSchedule) {
@@ -408,14 +280,28 @@ const ManageMySubscription: React.FC = () => {
     return "Next delivery: —";
   };
 
-  const fetchSubscriptionDetails = async () => {
+  const flashSubscriptionUpdated = (subId: string) => {
+    setHighlightedSubId(subId);
+    window.setTimeout(() => {
+      setHighlightedSubId((current) => (current === subId ? null : current));
+    }, 2200);
+  };
+
+  const fetchSubscriptionDetails = async (options?: {
+    silent?: boolean;
+    highlightSubId?: string;
+  }) => {
+    const silent = options?.silent === true;
     try {
-      setIsLoading(true);
+      if (!silent) {
+        setIsLoading(true);
+      } else {
+        setRefreshingSubscriptions(true);
+      }
       const fetchedSubscriptions =
         await subscriptionService.getCustomerSubscriptions();
 
       if (fetchedSubscriptions && fetchedSubscriptions.length > 0) {
-        // Sort subscriptions: active first, then paused, then cancelled
         const sortedSubscriptions = fetchedSubscriptions.sort((a, b) => {
           if (a.status === "ACTIVE" && b.status !== "ACTIVE") return -1;
           if (a.status !== "ACTIVE" && b.status === "ACTIVE") return 1;
@@ -423,24 +309,32 @@ const ManageMySubscription: React.FC = () => {
           if (a.status === "CANCELLED" && b.status === "PAUSED") return 1;
           return (
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          ); // Newest first
+          );
         });
         setSubscriptions(sortedSubscriptions);
         setSelectedSubscription(sortedSubscriptions[0]);
+        if (options?.highlightSubId) {
+          flashSubscriptionUpdated(options.highlightSubId);
+        }
       } else {
         setSubscriptions([]);
         setSelectedSubscription(null);
-        toast.success("You don't have any subscriptions");
+        if (!silent) {
+          toast.success("You don't have any subscriptions");
+        }
       }
     } catch (error: any) {
       toast.error(
         error.message ||
         "Failed to fetch subscription details. Please try again later."
       );
-      setSubscriptions([]);
-      setSelectedSubscription(null);
+      if (!silent) {
+        setSubscriptions([]);
+        setSelectedSubscription(null);
+      }
     } finally {
       setIsLoading(false);
+      setRefreshingSubscriptions(false);
     }
   };
 
@@ -454,7 +348,7 @@ const ManageMySubscription: React.FC = () => {
       setResumingSubId(subId);
       await subscriptionService.toggleSubscriptionStatus(subId);
       toast.success("Subscription resumed");
-      await fetchSubscriptionDetails();
+      await fetchSubscriptionDetails({ silent: true, highlightSubId: subId });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Could not resume";
       toast.error(msg);
@@ -501,7 +395,10 @@ const ManageMySubscription: React.FC = () => {
       });
 
       // Refresh subscriptions
-      await fetchSubscriptionDetails();
+      await fetchSubscriptionDetails({
+        silent: true,
+        highlightSubId: String(selectedSubscription.id),
+      });
       setShowEditModal(false);
       setValidationError("");
       toast.success("Subscription updated successfully!");
@@ -588,15 +485,11 @@ const ManageMySubscription: React.FC = () => {
     const deliveryInts = getDeliveryDayInts(subscription);
 
     const primaryLine = lineItems[0];
-    const headline =
+    const headline = cleanSubscriptionProductDisplayName(
       primaryLine?.name ||
-      subscription.productDetails?.name ||
-      "Subscription";
-    const freqLabel =
-      subscription.deliveryPreference === "DAILY" ||
-      subscription.type === "DAILY"
-        ? "Daily"
-        : "Custom";
+        subscription.productDetails?.name ||
+        "Subscription",
+    );
     const totalPackQty = lineItems.reduce(
       (s, li) => s + (Number(li.quantity) || 1),
       0
@@ -625,10 +518,18 @@ const ManageMySubscription: React.FC = () => {
       </span>
     );
 
+    const isHighlighted = highlightedSubId === String(subscription.id);
+    const isCardBusy =
+      refreshingSubscriptions || resumingSubId === String(subscription.id);
+
     return (
       <div
         key={subscription.id}
-        className="relative mb-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+        className={`relative mb-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-[box-shadow,transform] duration-500 ${
+          isHighlighted
+            ? "animate-subscription-card-highlight ring-2 ring-[#FFB043] ring-offset-1"
+            : ""
+        } ${isCardBusy && !isHighlighted ? "opacity-95" : ""}`}
       >
         {/* Card header — summary row + status / edit (design ref) */}
         <div className="flex gap-3">
@@ -650,8 +551,6 @@ const ManageMySubscription: React.FC = () => {
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-[15px] font-bold text-[#1A1A1A]">
                   {headline}
-                  <span className="font-semibold text-gray-500"> · </span>
-                  <span className="font-semibold text-[#1A1A1A]">{freqLabel}</span>
                 </h3>
                 <p className="mt-0.5 text-sm text-[#6B7280]">
                   {totalPackQty} pack{totalPackQty === 1 ? "" : "s"} in subscription
@@ -659,7 +558,7 @@ const ManageMySubscription: React.FC = () => {
               </div>
               <div className="flex shrink-0 flex-col items-end gap-2">
                 {statusBadge}
-                {isActive ? (
+                {isActive || isPaused ? (
                   <div
                     className="relative"
                     data-subscription-actions={subscription.id}
@@ -706,6 +605,7 @@ const ManageMySubscription: React.FC = () => {
                           />
                           Modify
                         </button>
+                        {isActive ? (
                         <button
                           type="button"
                           role="menuitem"
@@ -728,6 +628,7 @@ const ManageMySubscription: React.FC = () => {
                           />
                           Pause
                         </button>
+                        ) : null}
                         <button
                           type="button"
                           role="menuitem"
@@ -863,21 +764,12 @@ const ManageMySubscription: React.FC = () => {
               {nextDeliveryLabel}
             </p>
             {isPaused ? (
-              <button
-                type="button"
-                onClick={(ev) => void handleResumeSubscription(ev, String(subscription.id))}
-                disabled={resumingSubId === String(subscription.id)}
-                className="inline-flex min-w-[5.5rem] shrink-0 items-center justify-center gap-1 rounded-lg border-[1.5px] border-[#2563EB] bg-white px-2.5 py-1.5 text-[13px] font-semibold text-[#2563EB] transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {resumingSubId === String(subscription.id) ? (
-                  <Spinner size={18} variant="default" className="!inline-flex" />
-                ) : (
-                  <>
-                    Resume
-                    <IoPlay className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  </>
-                )}
-              </button>
+              <SubscriptionResumeButton
+                onClick={(ev) =>
+                  void handleResumeSubscription(ev, String(subscription.id))
+                }
+                loading={resumingSubId === String(subscription.id)}
+              />
             ) : null}
           </div>
         ) : null}
@@ -937,7 +829,7 @@ const ManageMySubscription: React.FC = () => {
               <IoArrowBack className="text-xl md:text-2xl" />
             </button>
             <h1 className="font-ibm-plex-serif min-w-0 truncate whitespace-nowrap text-xl font-bold text-gray-900 md:text-2xl">
-              Your Flower Subscriptions
+              Your Subscriptions
             </h1>
           </div>
 
@@ -982,38 +874,61 @@ const ManageMySubscription: React.FC = () => {
 
         <div className="px-4 pb-2">
           {activeTab === "subscriptions" && (
-            <div className="mb-8">
+            <div className="relative mb-8">
+              {refreshingSubscriptions ? (
+                <div
+                  className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2"
+                  aria-hidden
+                >
+                  <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-[#6B7280] shadow-sm">
+                    Updating…
+                  </span>
+                </div>
+              ) : null}
               {subscriptions.map(renderSubscriptionCard)}
             </div>
           )}
 
           {activeTab === 'history' && (
-            <div className="space-y-4 pb-4">
+            <div className="pb-4">
               {historyLoading ? (
-                <div className="rounded-2xl bg-white py-10 text-center text-sm text-gray-500 shadow-sm">
+                <div className="py-10 text-center text-sm text-[#6B7280]">
                   Loading orders…
                 </div>
               ) : historyOrders.length > 0 ? (
                 <>
+                <div className="divide-y divide-[#E5E7EB]/80">
                 {visibleHistoryOrders.map((order, index) => {
                   const orderNumber =
                     typeof order.order_number === "string"
                       ? order.order_number
                       : "";
                   const delivered = historyOrderDelivered(order);
-                  const cancelled = historyOrderCancelled(order);
+                  const undelivered = historyOrderUndelivered(order);
                   const apiSt = String(order.status ?? "");
-                  const outbound =
-                    !delivered &&
-                    !cancelled &&
-                    isOutForDeliveryApiStatus(apiSt);
-                  const confirmedPipe =
-                    !delivered &&
-                    !cancelled &&
-                    isConfirmedPipelineApiStatus(apiSt);
                   const statusLabel = delivered
                     ? "Delivered"
-                    : formatHistoryOrderStatusFromApi(order);
+                    : undelivered
+                      ? "Undelivered"
+                      : getCustomerOrderStatusLabel(apiSt);
+                  const showSupport =
+                    delivered &&
+                    isSupportAvailableForDelivery(true, order.delivered_at);
+                  const itemsCount = resolveOrderItemsCount(order);
+                  const productImg = extractPrimaryImageFromOrderRaw(order);
+                  const secondImg = extractSecondItemImageFromOrderRaw(order);
+                  const firstItemName = extractFirstItemNameFromOrderRaw(order);
+                  const rowTitle =
+                    formatOrderListProductLabel(
+                      firstItemName
+                        ? cleanSubscriptionProductDisplayName(firstItemName)
+                        : null,
+                      itemsCount,
+                    ) ||
+                    (typeof order.product_list_label === "string"
+                      ? order.product_list_label.trim()
+                      : "") ||
+                    resolveOrderListHistoryTitle(order);
 
                   return (
                     <div
@@ -1022,7 +937,7 @@ const ManageMySubscription: React.FC = () => {
                         orderNumber ||
                         index
                       }
-                      className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white p-3 sm:gap-2.5"
+                      className="relative flex items-center gap-4 px-1 py-4 first:pt-2"
                     >
                       <button
                         type="button"
@@ -1035,71 +950,63 @@ const ManageMySubscription: React.FC = () => {
                             );
                           }
                         }}
-                        className={`flex min-w-0 flex-1 items-center gap-2.5 text-left sm:gap-2.5 ${
+                        className={`flex min-w-0 flex-1 items-center gap-3 text-left ${
                           orderNumber?.trim()
-                            ? "cursor-pointer rounded-lg hover:bg-gray-50/80"
+                            ? "cursor-pointer"
                             : "cursor-default opacity-90"
                         }`}
                       >
-                        <IoCubeOutline
-                          className="h-[22px] w-[22px] shrink-0"
-                          style={{
-                            color: delivered
-                              ? "#16A34A"
-                              : cancelled
-                                ? "#DC2626"
-                                : outbound
-                                  ? "#2563EB"
-                                  : confirmedPipe
-                                    ? "#B45309"
-                                    : "#6B7280",
-                          }}
-                          aria-hidden
+                        <OrderListThumb
+                          primaryImageUrl={productImg}
+                          itemsCount={itemsCount}
+                          secondImageUrl={secondImg}
                         />
-                        <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 text-[15px] font-bold leading-snug text-[#111827]">
-                            {subscriptionOrderListTitle(order)}
-                          </p>
-                          <p className="mt-0.5 text-xs leading-snug text-[#6B7280]">
+                        <div className="relative min-w-0 flex-1 pr-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p
+                              className="mb-1 min-w-0 flex-1 text-base font-medium leading-snug text-gray-900"
+                              style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
+                            >
+                              {rowTitle}
+                            </p>
+                            <span
+                              className={`shrink-0 rounded-full px-2.5 py-0.5 text-sm font-semibold ${
+                                delivered
+                                  ? "bg-[#DCFCE7] text-[#166534]"
+                                  : undelivered
+                                    ? "bg-[#FEE2E2] text-[#991B1B]"
+                                    : getCustomerOrderStatusHistoryPillClass(apiSt)
+                              }`}
+                            >
+                              {statusLabel}
+                            </span>
+                          </div>
+                          <p className="text-sm leading-snug text-gray-600">
                             {subscriptionOrderListTimeLabel(order)}
                           </p>
+                          {showSupport ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`${GP_DAILY_BASE}/customer-support`);
+                              }}
+                              className="mt-1 text-sm font-medium text-[#6B7280] underline decoration-1 underline-offset-2 hover:text-[#111827]"
+                            >
+                              Support
+                            </button>
+                          ) : null}
                         </div>
+                        <FaChevronRight
+                          className="shrink-0 text-gray-400"
+                          size={14}
+                          aria-hidden
+                        />
                       </button>
-                      <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
-                        <span
-                          className={`whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-bold ${
-                            delivered
-                              ? "bg-[#DCFCE7] text-[#166534]"
-                              : cancelled
-                                ? "bg-[#FEE2E2] text-[#991B1B]"
-                                : outbound
-                                  ? "bg-[#DBEAFE] text-[#1D4ED8]"
-                                  : confirmedPipe
-                                    ? "bg-[#FEF3C7] text-[#92400E]"
-                                    : "bg-[#F3F4F6] text-[#374151]"
-                          }`}
-                        >
-                          {statusLabel}
-                        </span>
-                        {delivered &&
-                        isSupportAvailableForDelivery(
-                          true,
-                          order.delivered_at,
-                        ) ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              navigate(`${GP_DAILY_BASE}/customer-support`)
-                            }
-                            className="text-xs font-semibold text-[#2563EB] underline decoration-1 underline-offset-2 hover:text-gray-900"
-                          >
-                            Support
-                          </button>
-                        ) : null}
-                      </div>
                     </div>
                   );
                 })}
+                </div>
                 {hasMoreHistoryRows ? (
                   <button
                     type="button"

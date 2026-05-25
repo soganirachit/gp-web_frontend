@@ -44,9 +44,12 @@ const FALLBACK_GRADIENTS_GP_DAILY = [
   'linear-gradient(145deg, #e8931f 0%, #FAA222 100%)',
 ];
 
-/** Same height for every slide so banners do not jump by image aspect ratio. */
+/**
+ * Match Sajawat card visual height on /home (Sajawat uses min-h 8.75rem/9.5rem but
+ * grows with logo + copy + CTA; fixed banner height aligns to that rendered size).
+ */
 const OFFERS_BANNER_HEIGHT =
-  'h-[130px] min-h-[130px] sm:h-[118px] sm:min-h-[118px] md:h-[128px] md:min-h-[128px]';
+  'h-[10.75rem] min-h-[10.75rem] sm:h-[11.75rem] sm:min-h-[11.75rem]';
 
 export function OffersBannerCarousel({ storeId }: Props) {
   const { theme } = useFeatureTheme();
@@ -148,7 +151,7 @@ export function OffersBannerCarousel({ storeId }: Props) {
     return (
       <div className="mb-6 sm:mb-8 relative z-0">
         <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">
-          Offers for You
+          OFFERS FOR YOU
         </h2>
         <div
           className={`relative w-full ${OFFERS_BANNER_HEIGHT} rounded-xl sm:rounded-2xl overflow-hidden shadow-md border border-gray-200/60 flex items-end`}
@@ -171,7 +174,7 @@ export function OffersBannerCarousel({ storeId }: Props) {
     <div className="mb-6 sm:mb-8 relative z-0">
       {/* Section heading — matches home page sections */}
       <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">
-        Offers for You
+        OFFERS FOR YOU
       </h2>
 
       {/* Banner card — theme-aligned, responsive (4/3 mobile, 16/9 tablet+), key triggers animation */}

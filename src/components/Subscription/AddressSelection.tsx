@@ -27,7 +27,16 @@ import othersIcon from "../../assets/svg/adressbook/others.svg";
 import defaultIcon from "../../assets/svg/adressbook/default.svg";
 
 /** Synthetic id — device GPS selection (not a saved server address). */
-const LIVE_DEVICE_ADDRESS_ID = "__gf_live_device__";
+import {
+  LIVE_DEVICE_ADDRESS_ID,
+  resolveLiveDeviceToSavedAddress,
+} from "../../utils/addressCoordinates";
+import { walletService } from "../../services/wallet.service";
+import {
+  InsufficientWalletModal,
+  type InsufficientWalletDetails,
+} from "../daily/InsufficientWalletModal";
+import { setGpDailyPendingSubscriptionCheckout } from "../../utils/gpDailyPendingSubscriptionCheckout";
 
 const AddressSelection: React.FC = () => {
   const navigate = useNavigate();
@@ -69,6 +78,9 @@ const AddressSelection: React.FC = () => {
     message: string;
   } | null>(null);
   const [confirmingDailyCartStoreChange, setConfirmingDailyCartStoreChange] = useState(false);
+  const [showInsufficientWalletModal, setShowInsufficientWalletModal] = useState(false);
+  const [insufficientWalletDetails, setInsufficientWalletDetails] =
+    useState<InsufficientWalletDetails | null>(null);
 
   /** Browser geolocation + reverse geocode — shown as first card when available. */
   const [liveDeviceLocation, setLiveDeviceLocation] = useState<{
@@ -251,11 +263,21 @@ const AddressSelection: React.FC = () => {
       if (storedAddress) {
         try {
           const parsedAddress = JSON.parse(storedAddress);
+          const resolvedStored = resolveLiveDeviceToSavedAddress(
+            parsedAddress,
+            savedAddresses,
+          );
           const addressExists =
-            String(parsedAddress.id) === LIVE_DEVICE_ADDRESS_ID ||
-            savedAddresses.some((addr) => addr.id === parsedAddress.id);
+            String(resolvedStored.id) === LIVE_DEVICE_ADDRESS_ID ||
+            savedAddresses.some((addr) => addr.id === resolvedStored.id);
           if (addressExists) {
-            setSelectedAddress(parsedAddress);
+            if (resolvedStored.id !== parsedAddress.id) {
+              localStorage.setItem(
+                "selectedDeliveryAddress",
+                JSON.stringify(resolvedStored),
+              );
+            }
+            setSelectedAddress(resolvedStored);
           } else {
             localStorage.removeItem("selectedDeliveryAddress");
             setSelectedAddress(sorted[0] ?? null);
@@ -473,7 +495,12 @@ const AddressSelection: React.FC = () => {
   };
 
   const handleAddressSelect = async (address: Address) => {
-    if (String(address.id) === LIVE_DEVICE_ADDRESS_ID && !location.state?.fromHome) {
+    const addressToUse = resolveLiveDeviceToSavedAddress(address, addresses);
+
+    if (
+      String(addressToUse.id) === LIVE_DEVICE_ADDRESS_ID &&
+      !location.state?.fromHome
+    ) {
       toast.error(
         location.state?.fromCart
           ? "Save your current location as an address to use it for checkout."
@@ -483,22 +510,22 @@ const AddressSelection: React.FC = () => {
     }
 
     // Validate address before selecting
-    const isAddressValid = await validateAddressInDeliveryArea(address);
+    const isAddressValid = await validateAddressInDeliveryArea(addressToUse);
     if (!isAddressValid) {
       return;
     }
 
-    setSelectedAddress(address);
-    localStorage.setItem("selectedDeliveryAddress", JSON.stringify(address));
+    setSelectedAddress(addressToUse);
+    localStorage.setItem("selectedDeliveryAddress", JSON.stringify(addressToUse));
 
     if (location.state?.fromHome) {
-      if (String(address.id) === LIVE_DEVICE_ADDRESS_ID) {
+      if (String(addressToUse.id) === LIVE_DEVICE_ADDRESS_ID) {
         toast.success("Using your current location for delivery");
         navigate(basePath, { replace: true });
         return;
       }
       try {
-        await addressService.setDefaultAddress(String(address.id));
+        await addressService.setDefaultAddress(String(addressToUse.id));
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Could not set default address";
         toast.error(msg);
@@ -531,7 +558,7 @@ const AddressSelection: React.FC = () => {
       return;
     }
 
-    await proceedWithValidatedAddress(address);
+    await proceedWithValidatedAddress(addressToUse);
   };
 
   const createStoreOrder = () => { };
@@ -929,6 +956,42 @@ const AddressSelection: React.FC = () => {
           quantity: qty,
         };
 
+        const pricePerPack =
+          Number(parsedData.pricePerPack) || Number(parsedData.amount) || 0;
+        const deliveryCount = Number(parsedData.deliveryCount) || 7;
+        const totalRequired = pricePerPack * deliveryCount * qty;
+        const { balance: walletBalance } = await walletService.getWalletBalance();
+
+        if (Number.isFinite(totalRequired) && walletBalance < totalRequired) {
+          const shortage = totalRequired - walletBalance;
+          setGpDailyPendingSubscriptionCheckout({
+            kind: "address_confirm",
+            requiredAmount: totalRequired,
+            returnPath: `${basePath}/address-selection`,
+            confirmPayload: {
+              basePackId: String(parsedData.basePackId),
+              deliveryAddressId: String(address.id),
+              type: parsedData.type.toUpperCase() as "DAILY" | "CUSTOM",
+              startDate: startDate.toISOString(),
+              selectedDays,
+              quantity: qty,
+            },
+            packDetails: parsedData.packDetails,
+            subscriptionType: parsedData.type,
+            deliveryCount: parsedData.deliveryCount,
+            sellingPrice: parsedData.sellingPrice,
+          });
+          setInsufficientWalletDetails({
+            currentBalance: walletBalance,
+            requiredAmount: totalRequired,
+            shortageAmount: shortage,
+            contextLabel: "Recharge your wallet to confirm your subscription.",
+          });
+          setShowInsufficientWalletModal(true);
+          setLoading(false);
+          return;
+        }
+
         // Then confirm the subscription
         const confirmResponse = await subscriptionService.confirmSubscription(
           confirmData
@@ -989,12 +1052,52 @@ const AddressSelection: React.FC = () => {
             state: { returnUrl: `${basePath}/subscription/confirm` },
           });
         } else if (errorMessage.includes("Insufficient wallet balance")) {
-          toast.error("Insufficient wallet balance");
-          navigate(`${basePath}/wallet`, {
-            state: {
-              returnUrl: `${basePath}/subscription/confirm`,
-              requiredAmount: parsedData.amount,
+          const pricePerPack =
+            Number(parsedData.pricePerPack) || Number(parsedData.amount) || 0;
+          const deliveryCount = Number(parsedData.deliveryCount) || 7;
+          const qty =
+            typeof parsedData.quantity === "number" && parsedData.quantity > 0
+              ? Math.floor(parsedData.quantity)
+              : 1;
+          const totalRequired = pricePerPack * deliveryCount * qty;
+          const selectedDaysErr =
+            parsedData.selectedDays ||
+            (parsedData.type?.toUpperCase() === "DAILY"
+              ? [
+                  "MONDAY",
+                  "TUESDAY",
+                  "WEDNESDAY",
+                  "THURSDAY",
+                  "FRIDAY",
+                  "SATURDAY",
+                  "SUNDAY",
+                ]
+              : []);
+          setGpDailyPendingSubscriptionCheckout({
+            kind: "address_confirm",
+            requiredAmount: totalRequired,
+            returnPath: `${basePath}/address-selection`,
+            confirmPayload: {
+              basePackId: String(parsedData.basePackId),
+              deliveryAddressId: String(address.id),
+              type: parsedData.type.toUpperCase() as "DAILY" | "CUSTOM",
+              startDate: new Date(parsedData.startDate).toISOString(),
+              selectedDays: selectedDaysErr,
+              quantity: qty,
             },
+            packDetails: parsedData.packDetails,
+            subscriptionType: parsedData.type,
+            deliveryCount: parsedData.deliveryCount,
+            sellingPrice: parsedData.sellingPrice,
+          });
+          void walletService.getWalletBalance().then(({ balance }) => {
+            setInsufficientWalletDetails({
+              currentBalance: balance,
+              requiredAmount: totalRequired,
+              shortageAmount: Math.max(0, totalRequired - balance),
+              contextLabel: "Recharge your wallet to confirm your subscription.",
+            });
+            setShowInsufficientWalletModal(true);
           });
         } else {
           console.error("Detailed error:", {
@@ -1191,7 +1294,7 @@ const AddressSelection: React.FC = () => {
       </div> */}
 
       {/* Main Content — bottom padding clears fixed bottom nav when scrolling */}
-      <div className="mx-auto max-w-[800px] p-4 pb-6">
+      <div className="mx-auto max-w-[800px] p-4 pb-nav-bottom">
         {showAddForm ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Map Section */}
@@ -1402,8 +1505,8 @@ const AddressSelection: React.FC = () => {
                   }}
                   className={`cursor-pointer rounded-3xl p-5 shadow-sm transition-all ${
                     selectedAddress?.id === LIVE_DEVICE_ADDRESS_ID
-                      ? "border-2 border-[#19411F] bg-[#F2FEF4]"
-                      : "border-2 border-[#19411F]/35 bg-[#E6F4EA]"
+                      ? "border-2 border-[#19411F] bg-[#F2FEF4] ring-1 ring-[#19411F]/20"
+                      : "border border-gray-200 bg-white"
                   }`}
                 >
                   <div className="flex justify-between gap-3">
@@ -1413,16 +1516,16 @@ const AddressSelection: React.FC = () => {
                           <MdMyLocation className="h-5 w-5 text-[#166534]" aria-hidden />
                         </div>
                         <h3 className="text-lg font-semibold text-gray-900">Current Location</h3>
-                        {/* {selectedAddress?.id === LIVE_DEVICE_ADDRESS_ID ? (
+                        {selectedAddress?.id === LIVE_DEVICE_ADDRESS_ID ? (
                           <span className="flex-shrink-0 rounded-2xl bg-[#DCFCE7] px-2 py-1 text-xs font-semibold text-[#166534]">
-                            Active
+                            Selected
                           </span>
-                        ) : null} */}
+                        ) : null}
                       </div>
                       <p className="mb-1 min-w-0 max-w-full text-sm leading-relaxed text-gray-700 [overflow-wrap:anywhere]">
                         {liveDeviceLocation.formattedAddress}
                       </p>
-                      <p className="text-xs text-gray-500">Based on this device&apos;s location</p>
+                    
                     </div>
                     <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
                       {isLoaded ? (
@@ -1451,8 +1554,8 @@ const AddressSelection: React.FC = () => {
                     key={address.id}
                     className={`rounded-3xl p-5 shadow-sm transition-all ${
                       isSelected
-                        ? "border-2 border-[#19411F] bg-[#F2FEF4]"
-                        : "border border-transparent bg-white"
+                        ? "border-2 border-[#19411F] bg-[#F2FEF4] ring-1 ring-[#19411F]/20"
+                        : "border border-gray-200 bg-white"
                     }`}
                   >
                     <div
@@ -1478,11 +1581,11 @@ const AddressSelection: React.FC = () => {
                             <h3 className="text-lg font-semibold capitalize text-gray-800">
                               {address.type || "Home"}
                             </h3>
-                            {/* {isSelected ? (
+                            {isSelected ? (
                               <span className="flex-shrink-0 rounded-2xl bg-[#DCFCE7] px-2 py-1 text-xs font-semibold text-[#166534]">
-                                Active
+                                Selected
                               </span>
-                            ) : null} */}
+                            ) : null}
                           </div>
                           <p className="mb-1 min-w-0 max-w-full break-words pr-2 text-sm leading-relaxed text-gray-500 line-clamp-2 [overflow-wrap:anywhere]">
                             {formatCartDeliveryAddress({
@@ -1687,6 +1790,27 @@ const AddressSelection: React.FC = () => {
           </div>
         </div>
       ) : null}
+
+      <InsufficientWalletModal
+        open={showInsufficientWalletModal}
+        details={insufficientWalletDetails}
+        onClose={() => {
+          setShowInsufficientWalletModal(false);
+          setInsufficientWalletDetails(null);
+        }}
+        onRecharge={() => {
+          if (!insufficientWalletDetails) return;
+          setShowInsufficientWalletModal(false);
+          navigate(`${basePath}/wallet`, {
+            state: {
+              returnUrl: `${basePath}/address-selection`,
+              requiredAmount: insufficientWalletDetails.shortageAmount,
+              currentBalance: insufficientWalletDetails.currentBalance,
+              totalRequired: insufficientWalletDetails.requiredAmount,
+            },
+          });
+        }}
+      />
     </div>
   );
 };

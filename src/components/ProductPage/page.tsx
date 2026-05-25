@@ -10,9 +10,12 @@ import {
   getBasePrice,
   showStrikeBaseOnCard,
   resolveProductImageUrl,
-  PRODUCT_AVAILABILITY_GP_DAILY_LIST,
+  availabilityTypeForChannel,
   mapGpDailyCatalogRowToProduct,
+  parseProductAvailabilityChannel,
+  type ProductAvailabilityChannel,
 } from "../../services/product.service";
+import { ProductAvailabilityFilterChips } from "../common/ProductAvailabilityFilterChips";
 import { storeService } from "../../services/store.service";
 import { getApiUrl } from "../../config/api.config";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
@@ -22,8 +25,6 @@ import { SearchBar } from "../common/SearchBar";
 import scooterIcon from "../../assets/svg/gp_daily svg/scooter.svg";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
 import { resolveGpDailyCatalogStoreId } from "../../utils/gpDailyCatalogStore";
-
-const DAILY_AVAILABILITY = PRODUCT_AVAILABILITY_GP_DAILY_LIST;
 
 function dailySortByToApiOrdering(sortType: string): string | undefined {
   switch (sortType) {
@@ -42,6 +43,10 @@ const ProductBrowsePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const categorySlug = useMemo(() => searchParams.get("category"), [searchParams]);
+  const availabilityChannel = useMemo(
+    () => parseProductAvailabilityChannel(searchParams.get("channel"), "daily"),
+    [searchParams],
+  );
   const stateCategoryName = useMemo(
     () => (location.state as { categoryName?: string } | null)?.categoryName,
     [location.state],
@@ -68,9 +73,9 @@ const ProductBrowsePage: React.FC = () => {
         const catalogSid = await resolveGpDailyCatalogStoreId();
         let fetched = await productService.getCategories(
           catalogSid || undefined,
-          DAILY_AVAILABILITY,
+          availabilityTypeForChannel(availabilityChannel),
         );
-        if (!fetched.length) {
+        if (!fetched.length && availabilityChannel === "daily") {
           fetched = await productService.getCategories(catalogSid || undefined, "store");
         }
         const active = fetched
@@ -85,7 +90,7 @@ const ProductBrowsePage: React.FC = () => {
       }
     };
     fetchCategories();
-  }, []);
+  }, [availabilityChannel]);
 
   useEffect(() => {
     const run = async () => {
@@ -134,19 +139,21 @@ const ProductBrowsePage: React.FC = () => {
             categorySlug: apiCategorySlug,
             ordering,
             storeId,
-            availabilityType: DAILY_AVAILABILITY,
+            availabilityType: availabilityTypeForChannel(availabilityChannel),
           });
 
-        let mapped = (firstBatch || [])
-          .filter((p: any) => p?.is_active !== false && p?.isActive !== false)
-          .map((p: any) =>
+        let mapped = (firstBatch || []).filter(
+          (p: any) => p?.is_active !== false && p?.isActive !== false,
+        );
+        if (availabilityChannel === "daily") {
+          mapped = mapped.map((p: any) =>
             mapGpDailyCatalogRowToProduct(p as Record<string, unknown>),
           );
-
-        if (categorySlug === "puja" || categorySlug === "pujaflowers") {
-          mapped = mapped.filter((p) => p.category?.toUpperCase() === "PUJA");
-        } else if (categorySlug === "exotic") {
-          mapped = mapped.filter((p) => p.category?.toUpperCase() === "EXOTIC");
+          if (categorySlug === "puja" || categorySlug === "pujaflowers") {
+            mapped = mapped.filter((p) => p.category?.toUpperCase() === "PUJA");
+          } else if (categorySlug === "exotic") {
+            mapped = mapped.filter((p) => p.category?.toUpperCase() === "EXOTIC");
+          }
         }
 
         setProducts(mapped);
@@ -162,7 +169,7 @@ const ProductBrowsePage: React.FC = () => {
     };
 
     run();
-  }, [categorySlug, stateCategoryName, sortBy]);
+  }, [categorySlug, stateCategoryName, sortBy, availabilityChannel]);
 
   useEffect(() => {
     if (!categorySlug || stateCategoryName) return;
@@ -194,15 +201,30 @@ const ProductBrowsePage: React.FC = () => {
   const handleProductClick = (product: any) => {
     const pathSlug = product?.slug ?? product?.id;
     if (pathSlug == null || pathSlug === "") return;
-    navigate(`${basePath}/product/${encodeURIComponent(String(pathSlug))}`, { state: { product } });
+    const productBase =
+      availabilityChannel === "store" ? "/gp-store/product" : "/gp-daily/product";
+    navigate(`${productBase}/${encodeURIComponent(String(pathSlug))}`, {
+      state: { product },
+    });
+  };
+
+  const updateBrowseSearchParams = (patch: (next: URLSearchParams) => void) => {
+    const next = new URLSearchParams(searchParams);
+    patch(next);
+    setSearchParams(next);
+  };
+
+  const handleAvailabilityChannelClick = (channel: ProductAvailabilityChannel) => {
+    updateBrowseSearchParams((next) => {
+      next.set("channel", channel);
+    });
   };
 
   const handleCategoryClick = (slug: string | null) => {
-    if (slug) {
-      setSearchParams({ category: slug });
-    } else {
-      setSearchParams({});
-    }
+    updateBrowseSearchParams((next) => {
+      if (slug) next.set("category", slug);
+      else next.delete("category");
+    });
   };
 
   const loadNextProductPageRef = useRef<() => void>(() => {});
@@ -216,15 +238,18 @@ const ProductBrowsePage: React.FC = () => {
       try {
         const { products: batch, nextUrl } =
           await productService.getStoreProductListNextPage(url);
-        let mapped = (batch || [])
-          .filter((p: any) => p?.is_active !== false && p?.isActive !== false)
-          .map((p: any) =>
+        let mapped = (batch || []).filter(
+          (p: any) => p?.is_active !== false && p?.isActive !== false,
+        );
+        if (availabilityChannel === "daily") {
+          mapped = mapped.map((p: any) =>
             mapGpDailyCatalogRowToProduct(p as Record<string, unknown>),
           );
-        if (categorySlug === "puja" || categorySlug === "pujaflowers") {
-          mapped = mapped.filter((p) => p.category?.toUpperCase() === "PUJA");
-        } else if (categorySlug === "exotic") {
-          mapped = mapped.filter((p) => p.category?.toUpperCase() === "EXOTIC");
+          if (categorySlug === "puja" || categorySlug === "pujaflowers") {
+            mapped = mapped.filter((p) => p.category?.toUpperCase() === "PUJA");
+          } else if (categorySlug === "exotic") {
+            mapped = mapped.filter((p) => p.category?.toUpperCase() === "EXOTIC");
+          }
         }
         setProducts((prev) => [...prev, ...mapped]);
         setNextProductPageUrl(nextUrl);
@@ -235,7 +260,7 @@ const ProductBrowsePage: React.FC = () => {
         setLoadingMoreProducts(false);
       }
     })();
-  }, [nextProductPageUrl, categorySlug]);
+  }, [nextProductPageUrl, categorySlug, availabilityChannel]);
 
   loadNextProductPageRef.current = loadNextProductPage;
 
@@ -315,7 +340,9 @@ const ProductBrowsePage: React.FC = () => {
             <SearchBar
               mode="product"
               storeId={storeService.getStoreIdForProducts() ?? undefined}
-              productBasePath={basePath}
+              productBasePath={
+                availabilityChannel === "store" ? "/gp-store" : "/gp-daily"
+              }
               value={searchQuery}
               onChange={setSearchQuery}
             />
@@ -323,6 +350,12 @@ const ProductBrowsePage: React.FC = () => {
 
           <div className="px-4 pb-3 relative">
             <div className="flex gap-2.5 overflow-x-auto no-scrollbar">
+              <ProductAvailabilityFilterChips
+                value={availabilityChannel}
+                onChange={handleAvailabilityChannelClick}
+                chipActiveClass={chipActive}
+                chipInactiveClass={chipInactive}
+              />
               <button
                 type="button"
                 onClick={() => handleCategoryClick(null)}
@@ -527,7 +560,12 @@ const ProductBrowsePage: React.FC = () => {
                         onClick={() => handleProductClick(item)}
                       >
                         <div className="aspect-square bg-white overflow-hidden relative">
-                          <ProductImageTag labels={labels ?? undefined} variant="daily" />
+                          <ProductImageTag
+                            labels={labels ?? undefined}
+                            variant={
+                              availabilityChannel === "daily" ? "daily" : "store"
+                            }
+                          />
                           <img
                             src={resolveProductImageUrl(row)}
                             alt={String(row.name ?? "Product")}

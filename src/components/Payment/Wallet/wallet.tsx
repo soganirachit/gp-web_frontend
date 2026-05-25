@@ -30,6 +30,7 @@ import {
   computeGpDailyOrderOnHold,
 } from "../../../utils/gpDailyWalletHold";
 import { UniformPageHeader } from "../../layout/UniformPageHeader";
+import { tryCompleteGpDailyPendingSubscriptionAfterRecharge } from "../../../utils/resumeGpDailySubscriptionCheckout";
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
 const MIN_AMOUNT = 1;
@@ -215,22 +216,61 @@ const Wallet = () => {
     return computeGpDailyOrderOnHold(true, false, balance, unit);
   }, [feature, isLoggedIn, balance, gpDailyActiveSubs, gpDailySubExtra]);
 
-  // Fetch wallet balance on component mount and when fetchWalletBalance changes
+  /** Recharge shortcut from subscribe / basket — prefill amount and return path. */
   useEffect(() => {
+    const st = location.state as {
+      returnUrl?: string;
+      requiredAmount?: number;
+      shortageAmount?: number;
+      currentBalance?: number;
+      totalRequired?: number;
+    } | null;
+    if (!st) return;
+
+    if (typeof st.returnUrl === "string" && st.returnUrl.trim()) {
+      setReturnUrl(st.returnUrl.trim());
+    }
+
+    const shortage =
+      typeof st.requiredAmount === "number" && st.requiredAmount > 0
+        ? st.requiredAmount
+        : typeof st.shortageAmount === "number" && st.shortageAmount > 0
+          ? st.shortageAmount
+          : typeof st.totalRequired === "number" &&
+              typeof st.currentBalance === "number" &&
+              st.totalRequired > st.currentBalance
+            ? st.totalRequired - st.currentBalance
+            : null;
+
+    if (shortage != null && Number.isFinite(shortage)) {
+      setCustomAmount(String(Math.max(MIN_AMOUNT, Math.ceil(shortage))));
+    }
+  }, [location.state]);
+
+  // Fetch wallet balance on mount (auth is enforced by ProtectedRoute + BottomNav)
+  useEffect(() => {
+    if (!isLoggedIn || !localStorage.getItem("access_token")) {
+      return;
+    }
     if (!localStorage.getItem("phoneNumber")) {
-      toast.error("Please login to access your wallet");
-      navigate("/login", {
+      navigate(`${basePath}/login`, {
         state: {
           returnUrl: location.pathname,
           ...location.state,
         },
+        replace: true,
       });
       return;
     }
-
-    // Fetch wallet balance if we have a token
     fetchWalletBalance();
-  }, [fetchWalletBalance, navigate, location.pathname, location.state]);
+  }, [
+    fetchWalletBalance,
+    navigate,
+    location.pathname,
+    location.state,
+    isLoggedIn,
+    basePath,
+  ]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -326,6 +366,10 @@ const Wallet = () => {
         `${recoveredCount} pending payment(s) recovered successfully!`
       );
       await fetchWalletBalance();
+      await tryCompleteGpDailyPendingSubscriptionAfterRecharge(
+        (path, opts) => navigate(path, opts),
+        feature,
+      );
     }
   };
 
@@ -374,8 +418,7 @@ const Wallet = () => {
     return <WalletPageSkeleton />;
   }
 
-  /** Match mobile `WalletScreen` `headerBlock` (paddingHorizontal: 12). */
-  const pagePad = "px-3 sm:px-3";
+  const pagePad = "px-4";
 
   return (
     <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom overflow-x-clip">
@@ -402,29 +445,20 @@ const Wallet = () => {
           className="sticky top-0 z-10"
         />
 
-        <div className={`${pagePad} space-y-0 pb-20`}>
-        {/* Stack balance + alerts with `gap` so spacing never collapses (margin alone looked flush on device). */}
-        <div className="flex flex-col gap-6">
+        <div className={`${pagePad} flex flex-col gap-6 pb-20`}>
+        <div className="flex w-full flex-col gap-4">
         {/* Balance card — match mobile `WalletScreen` gradient, radius, type scale */}
         <div
-          className="w-full shrink-0 text-white rounded-[30px] p-[22px] shadow-sm relative overflow-hidden"
+          className="w-full shrink-0 text-white rounded-[34px] p-[22px] shadow-sm relative overflow-hidden"
           style={{
             background:
               "linear-gradient(280.14deg, rgba(2, 133, 50, 0.85) 5.56%, rgba(22, 163, 74, 0.85) 129.06%)",
           }}
         >
-          <div className="mb-0 flex min-h-0 items-center justify-between gap-2">
+          <div className="mb-0 flex min-h-0 items-center">
             <span className="text-[10px] font-serif font-bold tracking-wide text-white uppercase leading-none">
               Available Balance
             </span>
-            <button
-              type="button"
-              onClick={() => setShowDepositHistoryOnly((p) => !p)}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-[20px] border border-white px-2.5 py-1.5 text-[10px] font-sans font-semibold text-white"
-            >
-              <DepositHistoryGlyph />
-              {showDepositHistoryOnly ? "All Transactions" : "Deposit History"}
-            </button>
           </div>
 
           <div className="mt-2 text-[42px] font-serif font-bold leading-[1.1] text-white">
@@ -456,7 +490,7 @@ const Wallet = () => {
           isLoggedIn &&
           gpDailyHasSubscription &&
           gpDailyOrderHold.show && (
-            <div className="w-full shrink-0 rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white mb-5">
+            <div className="w-full shrink-0 rounded-[24px] bg-[#ff4d4f] px-3 py-2.5 text-white">
               <div className="flex items-start gap-2">
                 <img
                   src={lowbalanceIcon}
@@ -465,8 +499,8 @@ const Wallet = () => {
                   aria-hidden
                 />
                 <div className="min-w-0 flex-1">
-                  <h3 className="mb-1 font-serif text-base font-bold text-white">Order in hold</h3>
-                  <p className="font-sans text-sm leading-snug text-white/90">
+                  <h3 className="mb-1 font-serif text-sm font-bold leading-5 text-white">Order in hold</h3>
+                  <p className="font-sans text-sm leading-5 text-white/90">
                     {gpDailyOrderHold.lowBalanceForSubscription
                       ? `Your wallet balance is below 3-day subscription amount (₹${gpDailyOrderHold.threshold3Day}). Recharge now to continue deliveries.`
                       : "Your wallet balance is low. Recharge now to continue your daily deliveries."}
@@ -481,11 +515,11 @@ const Wallet = () => {
           isLoggedIn &&
           !gpDailyOrderHold.show &&
           balance < 500 && (
-            <div className="w-full shrink-0 flex flex-row items-start gap-2 rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white">
+            <div className="w-full shrink-0 flex flex-row items-start gap-2 rounded-[40px] bg-[#ff4d4f] px-3 py-2.5 text-white">
               <IoAlertCircle className="h-[18px] w-[18px] shrink-0 text-white" style={{ marginTop: 1 }} aria-hidden />
               <div className="min-w-0 flex-1">
-                <h3 className="font-serif text-[13px] font-bold leading-[18px] text-white">Low Balance</h3>
-                <p className="mt-1 font-serif text-xs leading-4 text-white">
+                <h3 className="font-serif text-sm font-bold leading-5 text-white">Low Balance</h3>
+                <p className="mt-1 font-sans text-sm leading-5 text-white/90">
                   Your wallet balance is low. Recharge now
                 </p>
               </div>
@@ -493,7 +527,7 @@ const Wallet = () => {
           )}
 
         {!isLoadingBalance && feature === "gpStore" && balance < 500 && (
-          <div className="w-full shrink-0 flex flex-row items-start gap-2 rounded-[12px] bg-[#ff4d4f] px-3 py-2.5 text-white">
+          <div className="w-full shrink-0 flex flex-row items-start gap-2 rounded-[40px] bg-[#ff4d4f] px-3 py-2.5 text-white">
             <IoAlertCircle className="h-[18px] w-[18px] shrink-0 text-white" style={{ marginTop: 1 }} aria-hidden />
             <div className="min-w-0 flex-1">
               <h3 className="font-serif text-[13px] font-bold leading-[18px] text-white">Low Balance</h3>
@@ -506,12 +540,12 @@ const Wallet = () => {
         </div>
 
         {/* Add Money — match mobile `WalletScreen` chips, labels, field, CTA */}
-        <div className="mt-3 w-full">
-          <h2 className="mb-2 text-[22px] font-serif font-bold text-[#222222]">
+        <section className="w-full">
+          <h2 className="mb-3 text-[22px] font-serif font-bold text-[#222222]">
             Add Money to Wallet
           </h2>
 
-          <div className="mb-2 flex flex-wrap gap-2">
+          <div className="mb-3 flex flex-wrap gap-2">
             {QUICK_AMOUNTS.map((amount) => (
               <button
                 key={amount}
@@ -593,6 +627,11 @@ const Wallet = () => {
                   "Payment successful! Your wallet has been updated."
                 );
                 await fetchWalletBalance();
+                const completed = await tryCompleteGpDailyPendingSubscriptionAfterRecharge(
+                  (path, opts) => navigate(path, opts),
+                  feature,
+                );
+                if (completed) return;
                 if (returnUrl) {
                   navigate(returnUrl);
                 }
@@ -697,7 +736,7 @@ const Wallet = () => {
             >
               {isProcessingPayment ? "Processing..." : "Proceed to Pay"}
             </button> */}
-        </div>
+        </section>
 
         {/* Enable Auto-Pay — single row (reference): icon | copy | Disable, same width as sections above */}
         {/* <div className="w-full rounded-2xl border border-gray-200 bg-white p-3.5 sm:p-4 shadow-sm">
@@ -726,10 +765,20 @@ const Wallet = () => {
         </div> */}
 
         {/* Combined Transactions & Payment History */}
-        <div className="w-full pt-0">
-          <h2 className="mb-2 mt-3 text-[22px] font-serif font-bold text-[#222222]">
-            Recent Transactions
-          </h2>
+        <section className="w-full">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-[22px] font-serif font-bold text-[#222222]">
+              Recent Transactions
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowDepositHistoryOnly((p) => !p)}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-[20px] border border-[#d1d5db] bg-white px-2.5 py-1.5 text-[10px] font-sans font-semibold text-[#374151] hover:bg-gray-50"
+            >
+              <DepositHistoryGlyph className="text-[#374151]" />
+              {showDepositHistoryOnly ? "All Transactions" : "Deposit History"}
+            </button>
+          </div>
 
           {/* Show loading state */}
           {isLoadingBalance ? (
@@ -795,17 +844,11 @@ const Wallet = () => {
                   return (
                     <div
                       key={`txn-${idx}`}
-                      className={`mb-2 flex w-full items-center gap-2 rounded-[12px] border border-[#f3f4f6] bg-white last:mb-0 ${
-                        isDailyWallet
-                          ? "min-h-[76px] px-3 py-4"
-                          : "px-2.5 py-2.5"
-                      }`}
+                      className="mb-2 flex min-h-[64px] w-full items-center gap-2 rounded-[12px] border border-[#f3f4f6] bg-white px-3 py-2.5 last:mb-0"
                     >
                       <div className="flex min-w-0 flex-1 items-center gap-2">
                         <div
-                          className={`flex shrink-0 items-center justify-center rounded-full ${
-                            isDailyWallet ? "h-8 w-8" : "h-6 w-6"
-                          } ${
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                             isPending
                               ? "bg-yellow-50"
                               : isCredit
@@ -814,27 +857,15 @@ const Wallet = () => {
                           }`}
                         >
                           {isPending ? (
-                            <IoWarningOutline
-                              className={`text-yellow-500 ${
-                                isDailyWallet ? "h-3.5 w-3.5" : "h-3 w-3"
-                              }`}
-                            />
+                            <IoWarningOutline className="h-3.5 w-3.5 text-yellow-500" />
                           ) : isCredit ? (
-                            <IoMdArrowUp
-                              className={`-rotate-[135deg] text-[#16a34a] ${
-                                isDailyWallet ? "h-3.5 w-3.5" : "h-3 w-3"
-                              }`}
-                            />
+                            <IoMdArrowUp className="-rotate-[135deg] h-3.5 w-3.5 text-[#16a34a]" />
                           ) : (
-                            <IoMdArrowDown
-                              className={`-rotate-[135deg] text-[#ef4444] ${
-                                isDailyWallet ? "h-3.5 w-3.5" : "h-3 w-3"
-                              }`}
-                            />
+                            <IoMdArrowDown className="-rotate-[135deg] h-3.5 w-3.5 text-[#ef4444]" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1 overflow-hidden">
-                          <p className="line-clamp-2 break-words text-sm font-sans font-normal leading-5 text-[#222222]">
+                          <p className="line-clamp-2 break-words text-xs font-sans font-medium leading-4 text-[#222222]">
                             {titleLine}
                           </p>
                           {feature !== "gpDaily" &&
@@ -845,14 +876,14 @@ const Wallet = () => {
                                 {(item as { razorpayOrderId?: string }).razorpayOrderId}
                               </div>
                             )}
-                          <div className="mt-0.5 text-xs font-sans font-normal text-[#808080]">
+                          <div className="mt-0.5 text-[11px] font-sans font-normal text-[#808080]">
                             {formatTxnTimeAppStyle(createdRaw)}
                           </div>
                         </div>
                       </div>
                       <div className="shrink-0 whitespace-nowrap text-right">
                         <div
-                          className={`text-base font-sans font-medium ${
+                          className={`text-xs font-sans font-semibold ${
                             isPending
                               ? "text-yellow-600"
                               : isCredit
@@ -885,7 +916,7 @@ const Wallet = () => {
                 })}
             </div>
           )}
-        </div>
+        </section>
         </div>
 
         {/* Coupon Modal */}

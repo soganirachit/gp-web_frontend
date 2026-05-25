@@ -190,10 +190,10 @@ const ChooseLocation: React.FC = () => {
         <div className="mb-3 space-y-4">
           {/* Current location (GPS) — no override = active, matches app browse mode */}
           <div
-            className={`cursor-pointer rounded-3xl border-2 bg-white p-5 shadow-sm transition ${
+            className={`cursor-pointer rounded-3xl bg-white p-5 shadow-sm transition ${
               browseOverrideId == null
-                ? "border-[#19411f] ring-1 ring-[#19411f]/20"
-                : "border-transparent"
+                ? "border-2 border-[#19411f] ring-1 ring-[#19411f]/20"
+                : "border border-gray-200"
             }`}
             onClick={() => void handleUseCurrentGps()}
             onKeyDown={(e) => {
@@ -254,10 +254,10 @@ const ChooseLocation: React.FC = () => {
               return (
                 <div
                   key={address.id}
-                  className={`rounded-3xl bg-white p-5 shadow-sm ${
+                  className={`rounded-3xl bg-white p-5 shadow-sm transition ${
                     isSelected
-                      ? "ring-2 ring-[#19411f] ring-offset-0"
-                      : ""
+                      ? "border-2 border-[#19411f] ring-1 ring-[#19411f]/20"
+                      : "border border-gray-200"
                   }`}
                 >
                   <div

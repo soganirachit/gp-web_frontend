@@ -10,6 +10,8 @@ import { format } from 'date-fns';
 import { subscriptionService } from '../../../services/subscription.service';
 import pausebell from '../../../assets/svg/cancelpage/pausebell.svg';
 
+const MAX_PAUSE_DAYS = 30;
+
 const PauseSubscription: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -47,6 +49,14 @@ const PauseSubscription: React.FC = () => {
                 return;
             }
 
+            if (diffDays > MAX_PAUSE_DAYS) {
+                toast.error(
+                    `You can pause your subscription for up to ${MAX_PAUSE_DAYS} days only`,
+                );
+                setIsSubmitting(false);
+                return;
+            }
+
             // Call API
             const response = await subscriptionService.pauseSubscription(subscription.id, diffDays);
 
@@ -69,8 +79,16 @@ const PauseSubscription: React.FC = () => {
 
     if (!subscription) return null;
 
+    const tomorrow = new Date();
+    tomorrow.setHours(0, 0, 0, 0);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const maxPauseDate = new Date();
+    maxPauseDate.setHours(0, 0, 0, 0);
+    maxPauseDate.setDate(maxPauseDate.getDate() + MAX_PAUSE_DAYS);
+
     return (
-        <div className="min-h-screen bg-[#f8f6f1] flex flex-col pb-20 font-sans">
+        <div className="min-h-screen bg-[#f8f6f1] flex flex-col pb-nav-bottom font-sans">
             <div className="max-w-[800px] mx-auto px-4">
                 {/* Header */}
                 <div className="pt-4 px-4 flex items-center gap-3 mb-6">
@@ -102,7 +120,8 @@ const PauseSubscription: React.FC = () => {
                             <DatePicker
                                 selected={resumeDate}
                                 onChange={(date) => setResumeDate(date)}
-                                minDate={new Date(new Date().setDate(new Date().getDate() + 1))} // Min date tomorrow
+                                minDate={tomorrow}
+                                maxDate={maxPauseDate}
                                 placeholderText="mm/dd/yyyy"
                                 dateFormat="MM/dd/yyyy"
                                 className="w-full bg-white border border-gray-200 rounded-[16px] py-3.5 pl-4 pr-10 text-gray-700 outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-100 transition-all font-medium"
@@ -128,7 +147,10 @@ const PauseSubscription: React.FC = () => {
                         <ul className="space-y-3">
                             <li className="flex items-start gap-2 text-gray-500 text-sm">
                                 <span className="mt-1.5 w-1 h-1 rounded-full bg-gray-400 flex-shrink-0" />
-                                <span>You can pause your subscription for up to 30 days</span>
+                                <span>
+                                    You can pause your subscription for up to{" "}
+                                    {MAX_PAUSE_DAYS} days only
+                                </span>
                             </li>
                             <li className="flex items-start gap-2 text-gray-500 text-sm">
                                 <span className="mt-1.5 w-1 h-1 rounded-full bg-gray-400 flex-shrink-0" />

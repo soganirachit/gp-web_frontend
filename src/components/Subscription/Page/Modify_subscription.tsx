@@ -26,35 +26,72 @@ const ModifySubscription: React.FC = () => {
   const { theme } = useFeatureTheme();
   const primary = theme.colors.primary;
 
-  const subscription = (location.state as { subscription?: Subscription } | null)?.subscription ?? null;
+  const subscriptionFromNav =
+    (location.state as { subscription?: Subscription } | null)?.subscription ?? null;
 
+  const [subscription, setSubscription] = useState<Subscription | null>(
+    subscriptionFromNav,
+  );
   const [quantity, setQuantity] = useState(1);
   const [deliveryType, setDeliveryType] = useState<"daily" | "custom">("daily");
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const firstLine = subscription?.lineItems?.[0];
+  const lineItems = useMemo(() => {
+    if (!subscription) return [];
+    if (subscription.lineItems && subscription.lineItems.length > 0) {
+      return subscription.lineItems;
+    }
+    return [
+      {
+        name: subscription.productDetails?.name || "Subscription Pack",
+        imageUrl: subscription.productDetails?.imagesUrl?.[0],
+        quantity: 1,
+        unitPrice: subscription.amount ?? 0,
+        subtotal:
+          subscription.totalAmount ?? subscription.amount ?? 0,
+      },
+    ];
+  }, [subscription]);
 
-  const productName = useMemo(() => {
-    if (!subscription) return "Subscription Pack";
-    return firstLine?.name ?? subscription.productDetails?.name ?? "Subscription Pack";
-  }, [subscription, firstLine?.name]);
-
-  const productImage = useMemo(() => {
-    if (!subscription) return "";
-    return (
-      firstLine?.imageUrl ??
-      subscription.productDetails?.imagesUrl?.[0] ??
-      ""
-    );
-  }, [subscription, firstLine?.imageUrl]);
+  const firstLine = lineItems[0];
 
   const packUnitPrice = useMemo(() => {
     if (!subscription) return 0;
     const u = firstLine?.unitPrice ?? subscription.amount;
     return typeof u === "number" && u > 0 ? Math.round(u) : 0;
   }, [subscription, firstLine?.unitPrice]);
+
+  const formatRupees = (n: number) =>
+    Number.isFinite(n) ? Math.round(n).toLocaleString("en-IN") : "0";
+
+  const formatQty = (q: number) =>
+    Number.isFinite(q) ? (Number.isInteger(q) ? String(q) : String(q)) : "1";
+
+  useEffect(() => {
+    if (!subscriptionFromNav?.id) {
+      setIsLoading(false);
+      return;
+    }
+    const id = subscriptionFromNav.id;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const full = await subscriptionService.getCustomerSubscriptionById(id);
+        if (!cancelled && full) {
+          setSubscription(full);
+        }
+      } catch {
+        /* keep navigation state subscription */
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [subscriptionFromNav?.id]);
 
   // Initialize state from subscription data
   useEffect(() => {
@@ -113,11 +150,12 @@ const ModifySubscription: React.FC = () => {
     } else {
       setSelectedDays(shorts.length ? shorts : [...WEEK_SHORT]);
     }
-  }, [subscription]);
 
-  useEffect(() => {
-    setIsLoading(false);
-  }, []);
+    const qty = firstLine?.quantity;
+    if (typeof qty === "number" && qty >= 1) {
+      setQuantity(Math.round(qty));
+    }
+  }, [subscription, lineItems, firstLine?.quantity]);
 
   const subscribedDaysDisplay = useMemo(() => {
     if (deliveryType === "daily") {
@@ -229,49 +267,72 @@ const ModifySubscription: React.FC = () => {
           </h1>
         </header>
 
-        {/* Product — image + name only */}
+        {/* Packs in this subscription */}
         <section className="mb-8">
-          <div className="flex items-center gap-3">
-            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-100">
-              {productImage ? (
-                <img src={productImage} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-base font-semibold text-gray-400">
-                  {productName.charAt(0)}
+          <h2 className="text-sm font-bold tracking-wide text-[#1A1A1A]">
+            PACKS ({lineItems.length})
+          </h2>
+          <div className="mt-3 space-y-2">
+            {lineItems.map((li, idx) => (
+              <div
+                key={`modify-pack-${idx}-${li.name}`}
+                className="flex gap-3 rounded-xl bg-[#F3F4F6] p-3"
+              >
+                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-white">
+                  {li.imageUrl ? (
+                    <img
+                      src={li.imageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-base font-semibold text-gray-400">
+                      {li.name.charAt(0)}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <h2 className="min-w-0 flex-1 truncate text-base font-bold leading-snug text-black">
-              {productName}
-            </h2>
+                <div className="min-w-0 flex-1">
+                  <p className="text-base font-bold leading-snug text-black">
+                    {li.name}
+                  </p>
+                  <p className="mt-0.5 text-xs text-[#6B7280]">
+                    Qty: {formatQty(li.quantity)} × ₹{formatRupees(li.unitPrice)}
+                  </p>
+                </div>
+                <div className="shrink-0 self-center text-sm font-bold text-[#1A1A1A]">
+                  ₹{formatRupees(li.subtotal)}
+                </div>
+              </div>
+            ))}
           </div>
 
-          {/* Quantity — label left, compact circular stepper right; icons black */}
-          <div className="mt-5 flex items-center justify-between gap-4">
-            <span className="shrink-0 text-base font-semibold text-black">Quantity</span>
-            <div className="flex shrink-0 items-center gap-4">
-              <button
-                type="button"
-                onClick={() => handleQuantityChange(-1)}
-                className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full border-0 bg-gray-100 p-0 transition-colors hover:bg-gray-200 disabled:opacity-50"
-                aria-label="Decrease quantity"
-              >
-                <span className="text-[18px] font-normal leading-none text-black">−</span>
-              </button>
-              <span className="min-w-[1.25rem] text-center text-sm font-bold tabular-nums text-black">
-                {quantity}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleQuantityChange(1)}
-                className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full border-0 p-0 transition-opacity hover:opacity-90"
-                style={{ backgroundColor: primary }}
-                aria-label="Increase quantity"
-              >
-                <span className="text-[18px] font-normal leading-none text-black">+</span>
-              </button>
+          {lineItems.length === 1 ? (
+            <div className="mt-5 flex items-center justify-between gap-4">
+              <span className="shrink-0 text-base font-semibold text-black">Quantity</span>
+              <div className="flex shrink-0 items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => handleQuantityChange(-1)}
+                  className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full border-0 bg-gray-100 p-0 transition-colors hover:bg-gray-200 disabled:opacity-50"
+                  aria-label="Decrease quantity"
+                >
+                  <span className="text-[18px] font-normal leading-none text-black">−</span>
+                </button>
+                <span className="min-w-[1.25rem] text-center text-sm font-bold tabular-nums text-black">
+                  {quantity}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleQuantityChange(1)}
+                  className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full border-0 p-0 transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: primary }}
+                  aria-label="Increase quantity"
+                >
+                  <span className="text-[18px] font-normal leading-none text-black">+</span>
+                </button>
+              </div>
             </div>
-          </div>
+          ) : null}
         </section>
 
         {/* Delivery schedule — heading first, then subscribed-days card, then options */}
@@ -386,7 +447,7 @@ const ModifySubscription: React.FC = () => {
         ) : null}
 
         {/* Footer — ~12px radius */}
-        <div className="mt-11 flex gap-3 pb-8">
+        <div className="mt-11 flex gap-3 pb-nav-bottom">
           <button
             type="button"
             onClick={() => navigate(-1)}

@@ -6,6 +6,10 @@ import { motion } from "framer-motion";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import { addressService } from "../../services/address.service";
 import { validateGpDailyDeliveryAreaFromCoordinates } from "../../services/subscriptionZone.service";
+import {
+  storeService,
+  type CityOption,
+} from "../../services/store.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import {
   GEO_MSG_GEOCODE_EMPTY,
@@ -15,6 +19,7 @@ import {
   messageFromGeolocationPositionError,
 } from "../../utils/geolocationMessages";
 import Spinner from "../../components/common/Spinner";
+import { GP_SEARCH_ICON_CLASSES } from "../../components/common/SearchBar";
 import {
   MapLoadingPlaceholder,
   MapPanelSkeleton,
@@ -24,28 +29,6 @@ import {
   attachPlacesAutocompleteToMapBounds,
   panMapToPlaceResult,
 } from "../../utils/googlePlacesAutocompleteConfig";
-
-// List of cities where delivery is available
-const SERVICED_CITIES = [
-  "Delhi",
-  "New Delhi",
-  "Bengaluru",
-  "Mumbai",
-  "Pune",
-  "Jaipur",
-  "Chennai",
-  "Hyderabad",
-  "Chandigarh",
-  "Surat",
-  "Nashik",
-  "Mysore",
-  "Kolkata",
-  "Coimbatore",
-  "Lucknow",
-  "Warangal",
-  "Vijayawada",
-  "Guntur",
-];
 
 // interface PlacePrediction {
 //   place_id: string;
@@ -105,6 +88,29 @@ const HomePageLocation: React.FC = () => {
   const [selectedLocationType, setSelectedLocationType] = useState<string>("");
   const [otherLocationName, setOtherLocationName] = useState<string>("");
 
+  const [servicedCities, setServicedCities] = useState<CityOption[]>([]);
+  const [citiesLoading, setCitiesLoading] = useState(false);
+
+  const LOCATE_ME_MAP_ZOOM = 16;
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      setCitiesLoading(true);
+      try {
+        const list = await storeService.getUniqueCitiesFromOnlineStores();
+        if (!cancelled) setServicedCities(list);
+      } catch {
+        if (!cancelled) setServicedCities([]);
+      } finally {
+        if (!cancelled) setCitiesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     // Since we're now using the delivery zone validation API directly,
     // we don't need to fetch polygon data anymore
@@ -157,6 +163,18 @@ const HomePageLocation: React.FC = () => {
     mapRef.current = null;
   }, []);
 
+  const panMapToPosition = useCallback(
+    (position: { lat: number; lng: number }, zoom = LOCATE_ME_MAP_ZOOM) => {
+      if (!isLoaded || !mapRef.current) return;
+      mapRef.current.panTo(position);
+      const currentZoom = mapRef.current.getZoom();
+      if (currentZoom == null || currentZoom < zoom) {
+        mapRef.current.setZoom(zoom);
+      }
+    },
+    [isLoaded],
+  );
+
   const getCurrentLocation = () => {
     setIsLoadingLocation(true);
     setError(null);
@@ -164,8 +182,9 @@ const HomePageLocation: React.FC = () => {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
-          setSelectedPosition({ lat: latitude, lng: longitude });
-          updateMarkerPosition({ lat: latitude, lng: longitude });
+          const coords = { lat: latitude, lng: longitude };
+          setSelectedPosition(coords);
+          panMapToPosition(coords, LOCATE_ME_MAP_ZOOM);
 
           try {
             const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -222,8 +241,7 @@ const HomePageLocation: React.FC = () => {
   };
 
   const updateMarkerPosition = (position: { lat: number; lng: number }) => {
-    if (!isLoaded || !window.google?.maps || !mapRef.current) return;
-    mapRef.current.panTo(position);
+    panMapToPosition(position);
   };
 
   const updateAddressDetails = async (lat: number, lng: number) => {
@@ -310,14 +328,7 @@ const HomePageLocation: React.FC = () => {
         setIsLocationServiced(validation.isValid);
       } catch (error) {
         console.error("Error validating delivery zone:", error);
-        // Fallback to city-based check if API fails
-        const isServiced = SERVICED_CITIES.some(
-          (servicedCity) =>
-            city.toLowerCase().includes(servicedCity.toLowerCase()) ||
-            state.toLowerCase().includes(servicedCity.toLowerCase()) ||
-            district.toLowerCase().includes(servicedCity.toLowerCase())
-        );
-        setIsLocationServiced(isServiced);
+        setIsLocationServiced(false);
       } finally {
         setIsValidatingDeliveryZone(false);
       }
@@ -442,18 +453,24 @@ const HomePageLocation: React.FC = () => {
 
           <div className="text-center mb-6">
             <p className="text-gray-600">
-              We are currently delivering in select parts of
+              We are currently delivering in selected parts of
             </p>
-            <div className="flex flex-wrap justify-center gap-1 mt-2 text-green-600">
-              {SERVICED_CITIES.map((city, index) => (
-                <React.Fragment key={city}>
-                  <span>
-                    {city}
-                    {index < SERVICED_CITIES.length - 1 ? "," : ""}
-                  </span>
-                </React.Fragment>
-              ))}
-            </div>
+            {citiesLoading ? (
+              <div className="mt-3 flex justify-center">
+                <Spinner size={24} />
+              </div>
+            ) : servicedCities.length > 0 ? (
+              <p
+                className="mt-2 text-base font-medium leading-relaxed"
+                style={{ color: theme.colors.primary }}
+              >
+                {servicedCities.map((city) => city.name).join(", ")}
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-gray-500">
+                Check back soon as we expand to more areas.
+              </p>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -463,9 +480,9 @@ const HomePageLocation: React.FC = () => {
             >
               Change Location
             </button>
-            <div className="w-full py-3 border border-gray-300 text-gray-600 rounded-lg font-medium text-center bg-gray-100 cursor-not-allowed">
+            {/* <div className="w-full py-3 border border-gray-300 text-gray-600 rounded-lg font-medium text-center bg-gray-100 cursor-not-allowed">
               You cannot view products outside our service area.
-            </div>
+            </div> */}
           </div>
         </motion.div>
       </motion.div>
@@ -578,15 +595,13 @@ const HomePageLocation: React.FC = () => {
                     type="text"
                     placeholder="Search for a location..."
                     defaultValue=""
-                    className="w-full p-3 pl-4 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent text-left"
+                    className="w-full rounded-xl border border-[#808080] bg-transparent p-3 pl-4 pr-10 text-left text-gray-900 placeholder:text-[#808080] focus:border-[#808080] focus:outline-none focus:ring-2"
                     style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
-                    onFocus={(e) => e.target.style.borderColor = theme.colors.primary}
-                    onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
                   />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                  <div className={`absolute right-3 top-1/2 -translate-y-1/2 ${GP_SEARCH_ICON_CLASSES}`}>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
+                      className="h-full w-full"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -607,12 +622,12 @@ const HomePageLocation: React.FC = () => {
                   type="text"
                   placeholder="Loading map..."
                   disabled
-                  className="w-full p-3 pl-4 pr-10 border border-gray-300 rounded-lg bg-gray-100 text-left"
+                  className="w-full rounded-xl border border-[#808080] bg-transparent p-3 pl-4 pr-10 text-left text-gray-400"
                 />
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                <div className={`absolute right-3 top-1/2 -translate-y-1/2 ${GP_SEARCH_ICON_CLASSES}`}>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
+                    className="h-full w-full"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"

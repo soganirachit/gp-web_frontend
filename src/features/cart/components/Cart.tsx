@@ -35,6 +35,10 @@ import {
   isCartStockOrAvailabilityInlineError,
 } from '../../../utils/cartStockInlineMessage';
 import { DELIVERY_DATE_MAX_DAYS_FROM_TODAY } from '../../../constants/deliveryBooking';
+import {
+  getSlotWindowMinutes,
+  isDeliverySlotSelectableForDate,
+} from '../../../utils/deliverySlotSelection';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
 
 /**
@@ -73,46 +77,12 @@ const getSlotDisplayLabel = (slot: DeliverySlot): string => {
   return formatSlotTimeRange(minutesToTimeStr(start), minutesToTimeStr(end));
 };
 
-// Parse "HH:mm:ss" / "HH:mm" into minutes from midnight
-const toMinutes = (timeStr: string): number => {
-  const [h = '0', m = '0'] = (timeStr || '').split(':');
-  return Number(h) * 60 + Number(m);
-};
-
 /** For formatSlotTimeRange after normalizing minutes. */
 const minutesToTimeStr = (mins: number): string => {
   const h = Math.floor(mins / 60) % 24;
   const m = mins % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
 };
-
-/**
- * Same-day slot window in minutes from midnight.
- * Fixes common backend typo: 1 PM stored as "01:00:00" for Afternoon (e.g. 13:00–16:00).
- */
-function getSlotWindowMinutes(slot: DeliverySlot): { start: number; end: number } {
-  const rawStart = toMinutes(slot.start_time);
-  const end = toMinutes(slot.end_time);
-  let start = rawStart;
-  if (end <= start) return { start, end };
-
-  const name = (slot.slot_name || '').toLowerCase();
-  const startsVeryEarly = rawStart < 7 * 60;
-  const endsAfternoon = end >= 13 * 60;
-  const afternoonLike =
-    name.includes('afternoon') || name.includes('evening') || name.includes('noon');
-
-  if (startsVeryEarly && endsAfternoon && (afternoonLike || rawStart <= 2 * 60)) {
-    const parts = (slot.start_time || '').split(':');
-    const h = Number(parts[0] ?? 0);
-    const mi = Number(parts[1] ?? 0);
-    if (Number.isFinite(h) && h >= 0 && h <= 6) {
-      const shifted = (h + 12) * 60 + (Number.isFinite(mi) ? mi : 0);
-      if (shifted < end) start = shifted;
-    }
-  }
-  return { start, end };
-}
 
 interface ApplyCouponResponse {
   message?: string;
@@ -642,15 +612,8 @@ const Cart: React.FC = () => {
     navigate(`${basePath}/product/${encodeURIComponent(String(item.productId))}`);
   };
 
-  const isSlotSelectable = (slot: DeliverySlot, date: Date) => {
-    // For non-today dates, all API-available slots stay selectable.
-    if (!isToday(date)) return true;
-    // For today: bookable until normalized window ends (handles 01:00→13:00 afternoon typo).
-    const now = new Date();
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const { end } = getSlotWindowMinutes(slot);
-    return end > nowMinutes;
-  };
+  const isSlotSelectable = (slot: DeliverySlot, date: Date) =>
+    isDeliverySlotSelectableForDate(slot, date);
 
   const sortSlotsByStart = (slots: DeliverySlot[]) =>
     [...slots].sort(
@@ -668,6 +631,25 @@ const Cart: React.FC = () => {
     const day = startOfDay(raw);
     return sortSlotsByStart(availableSlots.filter((slot) => isSlotSelectable(slot, day)));
   }, [availableSlots, deliveryInfo?.selectedDate, slotsNowTick]);
+
+  // If the clock passes a slot start (e.g. 5–8pm after 5:00 PM), drop stale selection.
+  useEffect(() => {
+    if (isLoadingSlots || slotsToShow.length === 0) return;
+    if (selectedSlotId != null && slotsToShow.some((s) => s.id === selectedSlotId)) {
+      return;
+    }
+    const first = slotsToShow[0];
+    const label = getSlotDisplayLabel(first);
+    setSelectedSlotId(first.id);
+    setSelectedTimeSlot(label);
+    if (!deliveryInfo?.deliveryDate) return;
+    updateDeliveryInfo({
+      ...deliveryInfo,
+      timeSlot: label,
+      slotId: first.id,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to slot list + selection only
+  }, [slotsToShow, selectedSlotId, isLoadingSlots]);
 
   /** True when at least one slot can still be booked for today (after load). */
   const hasSelectableTodaySlots = useMemo(() => {
@@ -1805,8 +1787,7 @@ const Cart: React.FC = () => {
     cartTotals?.total ??
     subtotal + deliveryFee + tax + surcharge - discount;
 
-  const displayStoreName =
-    cartStoreName.trim() || (isLoadingCartTotals ? '' : 'Selected store');
+  const displayStoreName = cartStoreName.trim();
   const deliveryBlockedByCoverage = addressOutsideDelivery === true;
   const deliveryBlockedByStoreMismatch = suggestedStoreForAddress != null;
 
@@ -2220,7 +2201,7 @@ const Cart: React.FC = () => {
                         <span className="truncate text-sm font-medium text-gray-900">From</span>
                       </div>
                       <p className="line-clamp-3 pl-7 text-sm leading-snug text-gray-600">
-                        {isLoadingCartTotals && !cartStoreName.trim() ? (
+                        {!displayStoreName ? (
                           <span className="text-gray-400">Loading store…</span>
                         ) : (
                           displayStoreName

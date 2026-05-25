@@ -35,6 +35,12 @@ import storeWhiteLogo from "../assets/svg/gp_store_svg/whitelogo.svg";
 import locationhomeIcon from "../assets/svg/gp_daily svg/locationhome.svg";
 import profilehomeIcon from "../assets/svg/gp_daily svg/profilehome.svg";
 import profilelogoIcon from "../assets/svg/gp_daily svg/profilelogo.svg";
+import {
+  ProfileAvatarButton,
+  PROFILE_HEADER_AVATAR_CLASS,
+  PROFILE_HEADER_FALLBACK_HOME_CLASS,
+  PROFILE_HEADER_LOGO_CLASS,
+} from "../components/common/ProfileAvatarButton";
 import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
 // Large banner served from public/ for better caching
 const bannerSvg = '/gp_store_banner.svg';
@@ -44,6 +50,17 @@ import {
   GUEST_HEADER_LOCATION_TITLE,
   GUEST_LOCATION_UNAVAILABLE_HINT,
 } from "../utils/guestHeaderLocation";
+import {
+  formatHomeHeaderAddressDisplay,
+  HOME_HEADER_ADDRESS_LINE,
+  HOME_HEADER_ADDRESS_PROFILE_ROW,
+  HOME_HEADER_ADDRESS_TYPE,
+  HOME_HEADER_CHEVRON,
+  HOME_HEADER_LOCATION_CLICK,
+  HOME_HEADER_LOCATION_ICON,
+  HOME_HEADER_LOCATION_ROW,
+  HOME_HEADER_PROFILE_OFFSET,
+} from "../constants/homeHeaderLayout";
 import { ProductImageTag } from "../components/common/ProductImageTag";
 import namasteSvg from '../assets/svg/namaste.svg';
 
@@ -384,102 +401,95 @@ const GpStore_Homepage: React.FC = () => {
                         {/* Content Overlay */}
                         <div className="relative z-10 pt-0">
                             {/* Location and Profile */}
-                            <div className="flex items-center justify-between mb-3">
+                            <div className={HOME_HEADER_ADDRESS_PROFILE_ROW}>
                                 {/* Location Section */}
-                                <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+                                <div className={HOME_HEADER_LOCATION_ROW}>
                                     <img
                                         src={locationhomeIcon}
                                         alt="Location"
-                                        className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0"
+                                        className={HOME_HEADER_LOCATION_ICON}
                                     />
                                     <div
-                                        className="flex items-center gap-1 cursor-pointer min-w-0 flex-1"
+                                        className={HOME_HEADER_LOCATION_CLICK}
                                         onClick={handleLocationClick}
                                     >
                                         <div className="flex flex-col min-w-0">
-                                            <span className="text-sm sm:text-base font-bold text-gray-800">{addressType}</span>
-                                            <span className="text-xs sm:text-sm text-gray-700 truncate font-medium">
+                                            <span className={`${HOME_HEADER_ADDRESS_TYPE} text-gray-800`}>{addressType}</span>
+                                            <span className={`${HOME_HEADER_ADDRESS_LINE} text-gray-700`}>
                                                 {isLoadingAddress
                                                   ? 'Loading...'
-                                                  : deliveryLocation ||
-                                                    (!isLoggedIn
+                                                  : deliveryLocation
+                                                    ? formatHomeHeaderAddressDisplay(deliveryLocation)
+                                                    : !isLoggedIn
                                                       ? GUEST_LOCATION_UNAVAILABLE_HINT
-                                                      : "Tap to set address")}
+                                                      : "Tap to set address"}
                                             </span>
                                         </div>
-                                        <MdKeyboardArrowDown className="text-gray-600 flex-shrink-0 text-lg sm:text-xl" />
+                                        <MdKeyboardArrowDown className={HOME_HEADER_CHEVRON} />
                                     </div>
                                 </div>
 
                                 {/* Right Side Icons - Only Profile */}
-                                <div className="relative w-14 h-14 xs:w-16 xs:h-16 sm:w-20 sm:h-20 flex-shrink-0 flex translate-x-1 sm:translate-x-2 items-center justify-center">
-                                    <img
-                                        src={profilehomeIcon}
-                                        alt="Profile"
-                                        className="absolute inset-0 w-12 h-12 object-contain cursor-pointer self-center justify-self-center"
-                                        onClick={() => navigate(`${basePath}/account`)}
-                                    />
-                                    <img
-                                        src={profilelogoIcon}
-                                        alt="Profile Logo"
-                                        className="relative z-10 w-5 h-5 object-contain"
-                                    />
-                                </div>
+                                <ProfileAvatarButton
+                                    className={`${PROFILE_HEADER_AVATAR_CLASS} ${HOME_HEADER_PROFILE_OFFSET}`}
+                                    profileHomeSrc={profilehomeIcon}
+                                    profileLogoSrc={profilelogoIcon}
+                                    fallbackHomeClassName={PROFILE_HEADER_FALLBACK_HOME_CLASS}
+                                    logoClassName={PROFILE_HEADER_LOGO_CLASS}
+                                    onClick={() => navigate(`${basePath}/account`)}
+                                    ariaLabel="Account"
+                                />
                             </div>
 
                             {/* Search Bar — unified styling, product suggestions as you type */}
                             <div className="mt-4 sm:mt-5">
                                 <SearchBar
                                     mode="product"
+                                    variant="homepage"
                                     storeId={storeId}
                                     productBasePath="/gp-store"
                                 />
                             </div>
 
-                            {/* Delivery Banner - Inside the green header */}
-                            <div className="mt-4 sm:mt-5">
-                                <div className="flex flex-col gap-3 xs:flex-row xs:items-center xs:justify-between">
-                                    <div className="flex-1 min-w-0 pr-0 xs:pr-3">
-                                        <p className="text-gray-800 text-sm xs:text-base md:text-lg lg:text-xl font-medium leading-snug [overflow-wrap:anywhere]">
+                            {/* Namaste + delivery truck — single row (design ref) */}
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
+                                className="mt-10"
+                            >
+                                <div className="relative min-h-[5.5rem] sm:min-h-[6rem]">
+                                    <img
+                                        src={truckStoreIcon}
+                                        alt=""
+                                        aria-hidden
+                                        className="pointer-events-none absolute -right-3 top-1/2 z-0 h-[5.5rem] w-[11rem] -translate-y-1/2 translate-x-1 object-contain object-right sm:-right-4 sm:h-[6rem] sm:w-[11.75rem] sm:translate-x-2"
+                                    />
+                                    <div className="relative z-10">
+                                        <img
+                                            src={namasteSvg}
+                                            alt="Namaste"
+                                            className="mb-1.5 h-9 w-auto max-w-[calc(100%-9.5rem)]"
+                                        />
+                                        <p className="mb-1.5 max-w-[calc(100%-9.5rem)] text-[13px] font-normal leading-[1.35] text-[#19411F] [overflow-wrap:anywhere]">
+                                            We are Genda Phool! Your partner for everyday floral needs.
+                                        </p>
+                                        <p className="whitespace-nowrap text-[12px] font-medium leading-none text-[#19411F]">
                                             Order in <span className="font-bold">2hrs</span> and get it by tomorrow <span className="font-bold">12PM!</span>
                                         </p>
                                     </div>
-                                    <img
-                                        src={truckStoreIcon}
-                                        alt="Delivery Truck"
-                                        className="w-36 h-20 xs:w-40 xs:h-24 md:w-48 md:h-28 object-contain flex-shrink-0 self-center xs:self-auto"
-                                    />
                                 </div>
-                            </div>
+                            </motion.div>
                         </div>
                     </div>
 
-                    {/* Welcome Section */}
-                    <div className="px-4 pb-4">
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.5 }}
-                            className="pt-6 sm:pt-8 pb-3 sm:pb-4"
-                        >
-                            <div className="text-left">
-                                <img
-                                    src={namasteSvg}
-                                    alt="Namaste"
-                                    className="h-8 sm:h-14 w-auto mb-2 sm:mb-3"
-                                />
-                                <p className="text-gray-600 text-sm sm:text-base leading-snug [overflow-wrap:anywhere]">
-                                    We are Genda Phool! Your partner for everyday floral needs.
-                                </p>
-                            </div>
-                        </motion.div>
-                    </div>
-
-                    {/* Pick your Blooms — 4 columns; square tiles = same aspect ratio at every phone width (360–420px+) */}
+                    {/* Pick your Blooms — equal vertical gaps: heading → row 1 → row 2 */}
                     <div className="px-4 py-4">
-                        <h2 className="font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-gray-800 mb-4">Pick your Blooms</h2>
-                        <div className="grid grid-cols-4 gap-x-2 gap-y-5 xs:gap-x-2.5 sm:gap-x-3">
-                            {categories.map((category) => (
+                        <div className="flex flex-col gap-3">
+                        <h2 className="font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-gray-800">Pick your Blooms</h2>
+                        {[categories.slice(0, 4), categories.slice(4)].filter((row) => row.length > 0).map((row, rowIdx) => (
+                        <div key={rowIdx} className="grid grid-cols-4 gap-x-2 xs:gap-x-2.5 sm:gap-x-3">
+                            {row.map((category) => (
                                 <div
                                     key={category.id}
                                     className="flex min-w-0 flex-col items-stretch cursor-pointer"
@@ -515,11 +525,13 @@ const GpStore_Homepage: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
-                                    <span className="block w-full min-h-[2.75rem] px-0.5 text-center text-[10px] xs:text-xs text-gray-700 font-medium leading-snug line-clamp-2 [overflow-wrap:anywhere]">
+                                    <span className="block w-full min-h-[2.25rem] px-0.5 text-center text-[10px] xs:text-xs text-gray-700 font-medium leading-snug line-clamp-2 [overflow-wrap:anywhere]">
                                         {category.name}
                                     </span>
                                 </div>
                             ))}
+                        </div>
+                        ))}
                         </div>
                     </div>
 
