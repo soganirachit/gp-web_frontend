@@ -811,7 +811,7 @@ const Settings: React.FC = () => {
           </div>
 
           {/* Login/Logout Button */}
-          <div className="mt-6 mb-3">
+          <div className="mt-6 mb-2">
             {isLoggedIn ? (
               <button
                 onClick={handleLogoutClick}
@@ -837,6 +837,11 @@ const Settings: React.FC = () => {
                 <span className="text-[15px]">Login</span>
               </button>
             )}
+          </div>
+
+          {/* App version — bump on every customer-app deploy so devs can verify the running build. */}
+          <div className="mb-3 text-center">
+            <p className="text-xs font-medium text-gray-400">Version 1.2</p>
           </div>
 
           {/* Delete Account Link - Show only when logged in */}

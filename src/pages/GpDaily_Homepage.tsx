@@ -82,6 +82,10 @@ interface DayInfo {
 /** Matches app `GpDailyHomeScreen` namaste autoplay interval. */
 const NAMASTE_CAROUSEL_AUTOPLAY_MS = 5000;
 const NAMASTE_SCROLL_SETTLE_MS = 280;
+/** Brief snooze after a user touch/swipe — autoplay resumes once this elapses. */
+const NAMASTE_AUTOPLAY_SNOOZE_MS = 3500;
+/** Hard cap on `scrollend` wait so the in-flight flag never gets stuck. */
+const NAMASTE_AUTOPLAY_SCROLL_TIMEOUT_MS = 900;
 
 function readNamasteCarouselPosition(el: HTMLDivElement): {
   slideWidth: number;
@@ -131,10 +135,18 @@ const Home2: React.FC = () => {
   const namasteVirtualIndexRef = useRef(1);
   const namasteScrollRafRef = useRef<number | null>(null);
   const namasteScrollSettleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Pause autoplay while user holds / hovers the carousel. */
-  const [namasteCarouselAutoplayPaused, setNamasteCarouselAutoplayPaused] =
-    useState(false);
+  /**
+   * Epoch (ms) until which autoplay is snoozed because the user is touching /
+   * swiping the carousel. Using a ref instead of state keeps the autoplay
+   * interval mounted — we just skip individual ticks while the user is busy,
+   * which always recovers even if a `pointerup` event is missed on mobile.
+   */
+  const namasteAutoplaySnoozeUntilRef = useRef(0);
   const namasteAutoplayInFlightRef = useRef(false);
+
+  const snoozeNamasteAutoplay = useCallback((ms: number = NAMASTE_AUTOPLAY_SNOOZE_MS) => {
+    namasteAutoplaySnoozeUntilRef.current = Date.now() + ms;
+  }, []);
   const [allPackProducts, setAllPackProducts] = useState<ProductType[]>([]);
   const [pujaPackProducts, setPujaPackProducts] = useState<ProductType[]>([]);
   const [exoticPackProducts, setExoticPackProducts] = useState<ProductType[]>([]);
@@ -747,14 +759,15 @@ const Home2: React.FC = () => {
   );
 
   useEffect(() => {
-    if (activeSubscriptions.length <= 1 || namasteCarouselAutoplayPaused) {
+    if (activeSubscriptions.length <= 1) {
       return;
     }
     const tick = () => {
       if (
         document.visibilityState !== "visible" ||
         namasteJumpingRef.current ||
-        namasteAutoplayInFlightRef.current
+        namasteAutoplayInFlightRef.current ||
+        Date.now() < namasteAutoplaySnoozeUntilRef.current
       ) {
         return;
       }
@@ -772,24 +785,28 @@ const Home2: React.FC = () => {
       applyNamasteCarouselState(nextVirtual);
       el.scrollTo({ left: nextVirtual * w, behavior: "smooth" });
 
+      let settled = false;
       const finishAutoplay = () => {
+        if (settled) return;
+        settled = true;
         if (!namasteJumpingRef.current) {
           runNamasteBoundaryJump();
           syncNamasteCarouselFromScroll();
         }
         namasteAutoplayInFlightRef.current = false;
       };
+      // Always arm a safety timeout in case `scrollend` is unsupported (Safari)
+      // or never fires because the user interrupts the smooth scroll — we must
+      // not leave `namasteAutoplayInFlightRef` stuck on `true`.
+      window.setTimeout(finishAutoplay, NAMASTE_AUTOPLAY_SCROLL_TIMEOUT_MS);
       if ("onscrollend" in el) {
         el.addEventListener("scrollend", finishAutoplay, { once: true });
-      } else {
-        window.setTimeout(finishAutoplay, 550);
       }
     };
     const id = window.setInterval(tick, NAMASTE_CAROUSEL_AUTOPLAY_MS);
     return () => window.clearInterval(id);
   }, [
     activeSubscriptions,
-    namasteCarouselAutoplayPaused,
     subscriptionCarouselKey,
     applyNamasteCarouselState,
     getNamasteRealIndexFromVirtual,
@@ -1005,30 +1022,25 @@ const Home2: React.FC = () => {
                 ) : (
                   <>
                     <div
-                      className={`relative min-h-[8rem] transition-opacity duration-300 ${
+                      className={`relative transition-opacity duration-300 ${
                         isLoadingSubscriptions ? "opacity-70" : ""
                       }`}
-                      onMouseEnter={() => setNamasteCarouselAutoplayPaused(true)}
-                      onMouseLeave={() => setNamasteCarouselAutoplayPaused(false)}
-                      onPointerDown={() => setNamasteCarouselAutoplayPaused(true)}
+                      onPointerDown={() => snoozeNamasteAutoplay()}
                       onPointerUp={() => {
                         syncNamasteCarouselFromScroll();
-                        setNamasteCarouselAutoplayPaused(false);
+                        snoozeNamasteAutoplay();
                       }}
-                      onPointerCancel={() => {
-                        syncNamasteCarouselFromScroll();
-                        setNamasteCarouselAutoplayPaused(false);
-                      }}
-                      onPointerLeave={() => setNamasteCarouselAutoplayPaused(false)}
-                      onTouchStart={() => setNamasteCarouselAutoplayPaused(true)}
+                      onPointerCancel={() => snoozeNamasteAutoplay()}
+                      onTouchStart={() => snoozeNamasteAutoplay()}
+                      onTouchMove={() => snoozeNamasteAutoplay()}
                       onTouchEnd={() => {
                         syncNamasteCarouselFromScroll();
-                        setNamasteCarouselAutoplayPaused(false);
+                        snoozeNamasteAutoplay();
                       }}
                     >
                     <div
                       ref={subscriptionCarouselRef}
-                      className="flex min-h-[6rem] snap-x snap-mandatory overflow-x-auto overscroll-x-contain no-scrollbar touch-pan-x [scroll-snap-stop:always]"
+                      className="relative z-10 flex min-h-[5.25rem] snap-x snap-mandatory overflow-x-auto overscroll-x-contain no-scrollbar touch-pan-x [scroll-snap-stop:always]"
                     >
                       {namasteLoopSlides.map((sub, loopIdx) => (
                         <div
@@ -1036,67 +1048,61 @@ const Home2: React.FC = () => {
                           data-namaste-slide
                           className="box-border w-full min-w-0 shrink-0 grow-0 basis-full snap-center snap-always"
                         >
-                          <div className="flex min-h-[6rem] flex-col justify-start gap-2">
-                            <div className="flex min-h-6 items-center gap-3 text-[#222222]">
+                          {/* `pr-[3.5rem]` keeps text/product label clear of the corner flower decoration. */}
+                          <div className="flex flex-col justify-start gap-1 pr-[3.5rem]">
+                            {/* Row 1 — next delivery day/date (resume date when paused). */}
+                            <div className="flex min-h-7 items-center gap-3 text-[#222222]">
                               <img
                                 src={scooterIcon}
                                 alt=""
                                 className="h-5 w-5 shrink-0"
                                 aria-hidden
                               />
-                              <span className="min-w-0 flex-1 text-base font-medium leading-6 [overflow-wrap:anywhere]">
+                              <span className="min-w-0 flex-1 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
                                 {formatNamasteDeliveryLine(sub)}
                               </span>
-                              {/* Status badge — hidden per design
-                              {sub.status === "PAUSED" ? (
-                                <span className="inline-flex shrink-0 items-center rounded-md border-2 border-[#664D03] px-2 py-0.5 text-[11px] font-semibold text-[#664D03]">
-                                  Paused
-                                </span>
-                              ) : (
-                                <span className="inline-flex shrink-0 items-center rounded-md border-2 border-[#166534] px-2 py-0.5 text-[11px] font-semibold text-[#166534]">
-                                  Active
-                                </span>
-                              )}
-                              */}
                             </div>
-                            <div className="flex min-h-6 items-center gap-3 text-[#222222]">
-                              {sub.status === "PAUSED" ? (
-                                <img
-                                  src={pauseSubIcon}
-                                  alt=""
-                                  className="h-5 w-5 shrink-0"
-                                  aria-hidden
-                                />
-                              ) : (
-                                <IoPlay
-                                  className="h-5 w-5 shrink-0 text-[#222222]"
-                                  aria-hidden
-                                />
-                              )}
-                              <span className="text-base font-medium leading-6 text-[#222222]">
-                                {formatNamasteSubscriptionStatusLine(sub)}
-                              </span>
-                            </div>
-                            <div className="flex min-h-9 items-center justify-between gap-2 text-[#222222]">
+                            {/* Row 2 — subscription status, with the Resume CTA inline for paused subs. */}
+                            <div className="flex min-h-7 items-center justify-between gap-2 text-[#222222]">
                               <div className="flex min-w-0 flex-1 items-center gap-3">
-                                <img
-                                  src={flowerIcon}
-                                  alt=""
-                                  className="h-5 w-5 shrink-0"
-                                  aria-hidden
-                                />
-                                <span className="min-w-0 text-base font-medium leading-6 [overflow-wrap:anywhere]">
-                                  {subscriptionProductLabel(sub)}
+                                {sub.status === "PAUSED" ? (
+                                  <img
+                                    src={pauseSubIcon}
+                                    alt=""
+                                    className="h-5 w-5 shrink-0"
+                                    aria-hidden
+                                  />
+                                ) : (
+                                  <IoPlay
+                                    className="h-5 w-5 shrink-0 text-[#222222]"
+                                    aria-hidden
+                                  />
+                                )}
+                                <span className="min-w-0 text-[15px] font-medium leading-5 text-[#222222]">
+                                  {formatNamasteSubscriptionStatusLine(sub)}
                                 </span>
                               </div>
-                              <div className="flex h-9 w-[5.5rem] shrink-0 items-center justify-end">
+                              <div className="flex shrink-0 items-center justify-end">
                                 {sub.status === "PAUSED" ? (
                                   <SubscriptionResumeButton
                                     onClick={(e) => void handleNamasteResume(e, sub.id)}
                                     loading={resumingSubId === sub.id}
+                                    className="!min-w-[4.75rem] !px-2.5 !py-1 !text-[12px] !rounded-lg"
                                   />
                                 ) : null}
                               </div>
+                            </div>
+                            {/* Row 3 — product. */}
+                            <div className="flex min-h-7 items-center gap-3 text-[#222222]">
+                              <img
+                                src={flowerIcon}
+                                alt=""
+                                className="h-5 w-5 shrink-0"
+                                aria-hidden
+                              />
+                              <span className="min-w-0 flex-1 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
+                                {subscriptionProductLabel(sub)}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -1104,16 +1110,19 @@ const Home2: React.FC = () => {
                     </div>
                     {activeSubscriptions.length > 1 ? (
                       <p
-                        className="pointer-events-none absolute bottom-2 left-4 z-[2] text-xs font-semibold tabular-nums text-[#6B7280]"
+                        className="pointer-events-none relative z-[2] mt-1 text-xs font-semibold tabular-nums text-[#6B7280]"
                         aria-live="polite"
                       >
                         {subscriptionCarouselIndex + 1} / {activeSubscriptions.length}
                       </p>
                     ) : null}
+                    {/* Offsets push the flower past the inner container's padding
+                        so its edges hug the outer card (overflow-hidden + rounded
+                        corners clip the excess). */}
                     <img
                       src={smallgendaIcon}
                       alt=""
-                      className="pointer-events-none absolute bottom-0 right-0 z-[1] h-[2.75rem] w-[2.75rem] translate-x-1 translate-y-1 object-contain object-bottom-right select-none"
+                      className="pointer-events-none absolute -bottom-2 -right-4 z-[1] h-[4rem] w-[4rem] object-contain object-bottom-right select-none"
                       aria-hidden
                     />
                     </div>

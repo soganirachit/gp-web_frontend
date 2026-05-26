@@ -171,7 +171,8 @@ export function formatNamasteSubscriptionStatusLine(
   subscription: Subscription,
 ): string {
   if (subscription.status === "PAUSED") {
-    return formatPausedDeliveryLine(subscription);
+    /** Date moved to the delivery-day row above; status row is intentionally bare. */
+    return "Paused subscription";
   }
   if (subscription.status === "ACTIVE") {
     return "Active subscription";
@@ -187,7 +188,12 @@ export function formatNamasteSubscriptionStatusLine(
 /** GP Daily home Namaste row — schedule-first, then API fallback. */
 export function formatNamasteDeliveryLine(subscription: Subscription): string {
   if (subscription.status === "PAUSED") {
-    return formatPausedDeliveryLine(subscription);
+    /** For paused subs the resume date IS the next delivery (API: `next_delivery_date`). */
+    const resume = getPausedResumeDate(subscription);
+    if (resume) {
+      return formatNextDeliveryDateLine(resume);
+    }
+    return "No upcoming delivery scheduled";
   }
 
   const fromSchedule = computeNextDeliveryFromSubscribedDays(subscription);

@@ -616,12 +616,28 @@ class SubscriptionService {
 
   /**
    * Resume: POST /subscriptions/{id}/resume/
-   * Pause (scheduled resume): POST /subscriptions/{id}/pause/ with resume_date
+   * Pause (scheduled auto-resume):
+   *   POST /subscriptions/{id}/pause/ with `paused_until_date`
+   *
+   * Backend semantic: `paused_until_date` is the **last day the subscription
+   * stays paused**. The Celery task at 00:15 IST auto-resumes the next day
+   * (`paused_until_date < today`).
+   *
+   * The UI collects a "Resume delivery from" date (the day the user wants
+   * deliveries to start again). We convert by subtracting one day so the
+   * auto-resume fires on the morning of the picked date and that day's order
+   * generates as expected.
    */
   async toggleSubscriptionStatus(subscriptionId: string, resumeDate?: Date) {
     if (resumeDate) {
+      const pausedUntil = new Date(resumeDate);
+      pausedUntil.setHours(0, 0, 0, 0);
+      pausedUntil.setDate(pausedUntil.getDate() - 1);
+      const pausedUntilYmd = `${pausedUntil.getFullYear()}-${String(
+        pausedUntil.getMonth() + 1,
+      ).padStart(2, "0")}-${String(pausedUntil.getDate()).padStart(2, "0")}`;
       const { data } = await api.post(`${base()}/${subscriptionId}/pause/`, {
-        resume_date: resumeDate.toISOString().split("T")[0],
+        paused_until_date: pausedUntilYmd,
       });
       return data;
     }

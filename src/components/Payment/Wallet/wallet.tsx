@@ -20,6 +20,11 @@ import enableIcon from "../../../assets/svg/gp_daily svg/enable.svg";
 import Spinner from "../../common/Spinner";
 import { WalletPageSkeleton } from "../../common/PageSkeletons";
 import { orderService } from "../../../services/order.service";
+import {
+  extractFirstItemNameFromOrderRaw,
+  formatOrderListProductLabel,
+  resolveOrderItemsCount,
+} from "../../../utils/orderListDisplay";
 import { addressService, Address } from "../../../services/address.service";
 import {
   subscriptionService,
@@ -90,6 +95,22 @@ function rowCreatedMs(item: unknown): number {
   return Number.isFinite(t) ? t : 0;
 }
 
+/**
+ * Backend writes order-related wallet transactions with descriptions like:
+ *   "Payment for order GP-20260513-53027"
+ *   "Refund for order GP_IPU-20260518-DLY0000001"
+ *   "Refund for cancelled order GP-20260513-53027"
+ *   "Subscription delivery — Order GP-20260513-53027"
+ * Non-order rows (e.g. "Wallet recharge", "Wallet top-up") return null.
+ */
+function extractOrderNumberFromTxnDescription(
+  description: string | null | undefined,
+): string | null {
+  if (!description) return null;
+  const m = description.match(/[Oo]rder\s+([A-Z0-9][A-Z0-9_\-]+)/);
+  return m && m[1] ? m[1].trim() : null;
+}
+
 interface CouponType {
   code: string;
   discount: number;
@@ -133,6 +154,16 @@ const Wallet = () => {
   > | null>(null);
   /** Same as app `WalletScreen`: toggle between all txns and credits-only. */
   const [showDepositHistoryOnly, setShowDepositHistoryOnly] = useState(false);
+
+  /**
+   * Cache of fetched order details keyed by `order_number`. Recent Transactions
+   * card titles use the first product name instead of the bare order ID, and
+   * the whole row links to the corresponding order details page. `null` means
+   * we tried but the order lookup failed — used to avoid retry loops.
+   */
+  const [orderLabelByNumber, setOrderLabelByNumber] = useState<
+    Record<string, string | null>
+  >({});
 
   const {
     isOnline,
@@ -307,6 +338,55 @@ const Wallet = () => {
     setShowCoupons(false);
     toast.success(`Coupon ${coupon.code} applied successfully!`);
   };
+
+  /**
+   * For every order-linked wallet transaction we have not seen yet, fetch the
+   * order detail once and remember the first product label. Listed under
+   * “Recent Transactions” instead of the raw order ID. We tolerate failures so
+   * the wallet keeps rendering even if the orders API is unavailable.
+   */
+  useEffect(() => {
+    const orderNumbers = new Set<string>();
+    transactions.forEach((t) => {
+      const orderNumber = extractOrderNumberFromTxnDescription(t.description);
+      if (orderNumber && !(orderNumber in orderLabelByNumber)) {
+        orderNumbers.add(orderNumber);
+      }
+    });
+    if (orderNumbers.size === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      const entries = await Promise.all(
+        Array.from(orderNumbers).map(async (num) => {
+          try {
+            const detail = await orderService.getOrderByOrderNumber(num);
+            if (!detail || typeof detail !== "object") {
+              return [num, null] as const;
+            }
+            const rec = detail as Record<string, unknown>;
+            const firstItem = extractFirstItemNameFromOrderRaw(rec);
+            const count = resolveOrderItemsCount(rec);
+            const label = formatOrderListProductLabel(firstItem, count);
+            return [num, label || null] as const;
+          } catch {
+            return [num, null] as const;
+          }
+        }),
+      );
+      if (cancelled) return;
+      setOrderLabelByNumber((prev) => {
+        const next = { ...prev };
+        for (const [num, label] of entries) {
+          next[num] = label;
+        }
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [transactions, orderLabelByNumber]);
 
   const filteredWalletRows = useMemo(() => {
     const all = [...transactions, ...(transactionLogs || [])];
@@ -836,15 +916,69 @@ const Wallet = () => {
                     (item as { created_at?: string }).created_at ??
                     new Date().toISOString();
 
-                  const titleLine = isTransaction
-                    ? item.description ||
-                      `${item.type === "CREDIT" ? "Credit" : "Debit"} - Transaction`
-                    : "Wallet Recharge";
+                  const orderNumber = isTransaction
+                    ? extractOrderNumberFromTxnDescription(item.description)
+                    : null;
+                  const orderProductLabel = orderNumber
+                    ? orderLabelByNumber[orderNumber] ?? null
+                    : null;
+
+                  // Show the product (e.g. "Premium Marigold + 2 more") in place
+                  // of the raw order number; fall back to the description prefix
+                  // ("Payment for order", "Refund for order", etc.) when the
+                  // order lookup is still loading or unavailable.
+                  let titleLine: string;
+                  if (isTransaction) {
+                    if (orderNumber) {
+                      if (orderProductLabel) {
+                        titleLine = orderProductLabel;
+                      } else {
+                        const cleaned = (item.description || "")
+                          .replace(orderNumber, "")
+                          .replace(/\s*[—-]?\s*$/, "")
+                          .trim();
+                        titleLine =
+                          cleaned ||
+                          (item.type === "CREDIT"
+                            ? "Refund"
+                            : "Order payment");
+                      }
+                    } else {
+                      titleLine =
+                        item.description ||
+                        `${item.type === "CREDIT" ? "Credit" : "Debit"} - Transaction`;
+                    }
+                  } else {
+                    titleLine = "Wallet Recharge";
+                  }
+
+                  const isClickable = Boolean(orderNumber);
+                  const handleRowClick = () => {
+                    if (!orderNumber) return;
+                    navigate(`${basePath}/orders/${orderNumber}`);
+                  };
 
                   return (
                     <div
                       key={`txn-${idx}`}
-                      className="mb-2 flex min-h-[64px] w-full items-center gap-2 rounded-[12px] border border-[#f3f4f6] bg-white px-3 py-2.5 last:mb-0"
+                      role={isClickable ? "button" : undefined}
+                      tabIndex={isClickable ? 0 : undefined}
+                      onClick={isClickable ? handleRowClick : undefined}
+                      onKeyDown={
+                        isClickable
+                          ? (e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleRowClick();
+                              }
+                            }
+                          : undefined
+                      }
+                      className={`mb-2 flex min-h-[64px] w-full items-center gap-2 rounded-[12px] border border-[#f3f4f6] bg-white px-3 py-2.5 last:mb-0 ${
+                        isClickable
+                          ? "cursor-pointer transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FAA222]/50"
+                          : ""
+                      }`}
                     >
                       <div className="flex min-w-0 flex-1 items-center gap-2">
                         <div
@@ -868,14 +1002,6 @@ const Wallet = () => {
                           <p className="line-clamp-2 break-words text-xs font-sans font-medium leading-4 text-[#222222]">
                             {titleLine}
                           </p>
-                          {feature !== "gpDaily" &&
-                            !isTransaction &&
-                            (item as { razorpayOrderId?: string }).razorpayOrderId && (
-                              <div className="mt-0.5 truncate text-xs text-gray-400">
-                                Order ID:{" "}
-                                {(item as { razorpayOrderId?: string }).razorpayOrderId}
-                              </div>
-                            )}
                           <div className="mt-0.5 text-[11px] font-sans font-normal text-[#808080]">
                             {formatTxnTimeAppStyle(createdRaw)}
                           </div>
