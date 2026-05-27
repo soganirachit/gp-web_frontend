@@ -169,7 +169,7 @@ export function supportTicketEligibilityMessage(rawStatus: string): string {
   const k = normalizeOrderStatusKey(rawStatus);
   const key = toCustomerOrderStatusKey(rawStatus);
   if (k === "ready" || key === "preparing" || key === "out_for_delivery") {
-    return "Need help with this order? You can raise a support ticket while it is being prepared, ready for delivery, or out for delivery.";
+    return "Need help with this order? You can raise a support ticket anytime.";
   }
   return "Support requests can only be raised within 12 hours after delivery.";
 }
