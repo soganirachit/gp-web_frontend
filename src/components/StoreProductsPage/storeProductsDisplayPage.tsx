@@ -417,7 +417,7 @@ const StorePage: React.FC = () => {
           : undefined,
       });
 
-      toast.success("Product added to basket!", { id: "Product added to basket!" });
+      toast.success("Added to basket", { id: "Added to basket", duration: 3000 });
       trackAddToCart({ id: product.id, name: product.name, price, quantity: 1 });
     } catch (error: unknown) {
       console.error("Error adding to cart:", error);

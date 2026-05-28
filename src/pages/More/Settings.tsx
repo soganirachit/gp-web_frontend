@@ -63,6 +63,7 @@ const Settings: React.FC = () => {
   const [isStoreDropdownOpen, setIsStoreDropdownOpen] = useState(false);
   const [isLoadingStores, setIsLoadingStores] = useState(false);
   const [showStoreSwitchWarning, setShowStoreSwitchWarning] = useState(false);
+  const [storeSelectionError, setStoreSelectionError] = useState<string | null>(null);
   const [pendingStoreId, setPendingStoreId] = useState<number | null>(null);
   const [pendingStoreName, setPendingStoreName] = useState<string>('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -677,16 +678,17 @@ const Settings: React.FC = () => {
                           type="button"
                           aria-disabled={!selectable && selectedStoreId !== store.id}
                           onClick={() => {
+                            setStoreSelectionError(null);
                             if (selectedStoreId === store.id) {
                               setIsStoreDropdownOpen(false);
                               return;
                             }
                             if (!online) {
-                              toast.error('This store is offline. Please choose another store.');
+                              setStoreSelectionError('This store is offline. Please choose another store.');
                               return;
                             }
                             if (!withinRadius) {
-                              toast.error(
+                              setStoreSelectionError(
                                 'This store is outside the delivery range for your address. Update your address or choose a closer store.'
                               );
                               return;
@@ -758,6 +760,11 @@ const Settings: React.FC = () => {
                   </>
                 )}
               </div>
+              {storeSelectionError ? (
+                <p className="mt-2 text-xs font-medium text-red-600">
+                  {storeSelectionError}
+                </p>
+              ) : null}
             </div>
           )}
 

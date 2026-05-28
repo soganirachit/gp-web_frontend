@@ -44,7 +44,7 @@ const Layout: React.FC = () => {
   const isAuthRoute = authRoutes.includes(location.pathname);
 
   // Routes that should not show BottomNav (landing, location pages)
-  const routesWithoutBottomNav = ["/home", "/location"];
+  const routesWithoutBottomNav = ["/home", "/location", "/sajawat"];
   const shouldHideBottomNav = routesWithoutBottomNav.includes(location.pathname);
 
   // Routes that should not have top padding.

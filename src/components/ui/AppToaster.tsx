@@ -1,6 +1,8 @@
-import { Toaster, ToastBar, toast, type Toast } from 'react-hot-toast';
+import { useEffect } from 'react';
+import { Toaster, ToastBar, toast, type Toast, type ToastOptions } from 'react-hot-toast';
 import { IoClose } from 'react-icons/io5';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
+import { isApprovedGlobalToastMessage } from '../../utils/toastReviewPolicy';
 
 const DAILY_TOAST_MS = 5000;
 const STORE_DEFAULT_MS = 2800;
@@ -20,6 +22,33 @@ export function AppToaster() {
   const { feature } = useFeatureTheme();
   const isDaily = feature === 'gpDaily';
   const position = 'bottom-center' as const;
+
+  useEffect(() => {
+    const bag = toast as typeof toast & {
+      __reviewPolicyPatched?: boolean;
+      __origSuccess?: typeof toast.success;
+      __origError?: typeof toast.error;
+    };
+    if (bag.__reviewPolicyPatched) return;
+
+    bag.__origSuccess = toast.success.bind(toast);
+    bag.__origError = toast.error.bind(toast);
+
+    toast.success = (message: any, options?: ToastOptions) => {
+      if (typeof message === 'string' && !isApprovedGlobalToastMessage(message)) {
+        return '' as any;
+      }
+      return bag.__origSuccess!(message, options);
+    };
+    toast.error = (message: any, options?: ToastOptions) => {
+      if (typeof message === 'string' && !isApprovedGlobalToastMessage(message)) {
+        return '' as any;
+      }
+      return bag.__origError!(message, options);
+    };
+
+    bag.__reviewPolicyPatched = true;
+  }, []);
 
   const dailyNeutral = {
     borderRadius: '16px' as const,

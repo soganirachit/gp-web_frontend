@@ -14,6 +14,7 @@ const Unsubscribed_User_Home = lazy(() => import('../pages/Unsubscribed_User_Hom
 const Gp_daily_Homepage = lazy(() => import('../pages/GpDaily_Homepage'));
 const GpStore_Homepage = lazy(() => import('../pages/GpStore_Homepage'));
 const HomePage = lazy(() => import('../pages/home_page'));
+const Sajawat = lazy(() => import('../pages/Sajawat'));
 const Products = lazy(() => import('../components/ProductPage/page'));
 const ProductPage = lazy(() => import('../components/ProductPage/ProductDisplaypage'));
 const ExploreMore = lazy(() => import('../components/ProductPage/ExploreMore'));
@@ -75,6 +76,7 @@ const router = createBrowserRouter(
       { path: '/search', element: <Navigate to="/home" replace /> },
       { path: '/explore-more', element: <ExploreMore /> },
       { path: '/home', element: <HomePage /> },
+      { path: '/sajawat', element: <Sajawat /> },
       {
         path: '/gp-daily',
         element: <Gp_daily_Homepage />

@@ -123,6 +123,7 @@ const AddEditAddress: React.FC = () => {
     isValid: boolean;
     message?: string;
   } | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     // Prevent double execution in StrictMode
@@ -239,20 +240,21 @@ const AddEditAddress: React.FC = () => {
   }, []);
 
   const validateForm = () => {
+    setFormError(null);
     if (!name.trim()) {
-      toast.error('Please enter your full name');
+      setFormError('Please enter your full name');
       return false;
     }
     if (!phone.trim()) {
-      toast.error('Please enter your phone number');
+      setFormError('Please enter your phone number');
       return false;
     }
     if (!formData.completeAddress.trim()) {
-      toast.error('Please enter a complete address');
+      setFormError('Please enter a complete address');
       return false;
     }
     if (!pincode.trim()) {
-      toast.error('Please enter a zip code');
+      setFormError('Please enter a zip code');
       return false;
     }
     return true;
@@ -283,7 +285,6 @@ const AddEditAddress: React.FC = () => {
           isValid: false,
           message: validation.message || 'Address is outside delivery area',
         });
-        toast.error(validation.message || 'Address is outside delivery area');
         return false;
       }
 
@@ -294,7 +295,6 @@ const AddEditAddress: React.FC = () => {
       return true;
     } catch (error) {
       console.error('Error validating location:', error);
-      toast.error('Failed to validate address location');
       setLocationValidation({ isValid: false, message: 'Failed to validate address location' });
       return false;
     } finally {
@@ -313,6 +313,7 @@ const AddEditAddress: React.FC = () => {
 
     try {
       setIsSubmitting(true);
+      setFormError(null);
 
       // Parse completeAddress to extract components
       const addressParts = formData.completeAddress.split(',').map(s => s.trim());
@@ -354,7 +355,7 @@ const AddEditAddress: React.FC = () => {
       navigate(`${basePath}/addresses`);
     } catch (error) {
       console.error('Failed to save address:', error);
-      toast.error(isEdit ? 'Failed to update address' : 'Failed to add address');
+      setFormError(isEdit ? 'Failed to update address' : 'Failed to add address');
     } finally {
       setIsSubmitting(false);
     }
@@ -777,6 +778,11 @@ const AddEditAddress: React.FC = () => {
             </div>
           </div>
         )}
+        {formError ? (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {formError}
+          </div>
+        ) : null}
 
         {/* Form Fields - Updated Layout */}
         <div className="space-y-4">

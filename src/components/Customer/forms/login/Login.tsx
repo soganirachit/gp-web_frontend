@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import toast from "react-hot-toast";
 import {
     authService,
     checkNotOnWhatsappBeforeOtpRoute,
@@ -16,6 +15,7 @@ import { errorMessageFromCatch } from "../../../../utils/apiErrorMessage";
 const Login = () => {
     const [phoneNumber, setPhoneNumber] = useState("");
     const [error, setError] = useState("");
+    const [fieldNote, setFieldNote] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const navigate = useNavigate();
@@ -46,6 +46,7 @@ const Login = () => {
         try {
             setIsLoading(true);
             setError("");
+            setFieldNote("");
             const result = await authService.sendOTP(phoneNumber);
             if (!result.success) {
                 setError(result.message || "Failed to send OTP");
@@ -67,28 +68,19 @@ const Login = () => {
             }
 
             if (shouldBlockEntry) {
-                toast.error(
-                    blockMessage
-                );
                 setError(blockMessage);
                 return;
             }
 
-            const warnStyle = { background: "#fffbeb", color: "#92400e" } as const;
             if (result.whatsapp_status === "failed") {
-                toast(result.message || "OTP delivery failed. Please tap “Resend” in a moment.", {
-                    icon: "⚠️",
-                    duration: 5000,
-                    style: warnStyle,
-                });
+                setError(result.message || "OTP delivery failed. Please tap Resend in a moment.");
             } else if (result.whatsapp_status === "not_configured") {
-                toast(
+                setError(
                     result.message ||
-                        "WhatsApp is not configured. If you do not receive a code, tap “Resend” or try another number.",
-                    { icon: "⚠️", duration: 5000, style: warnStyle }
+                        "WhatsApp is not configured. If you do not receive a code, tap Resend or try another number.",
                 );
             } else {
-                toast.success(result.message || "OTP sent to your WhatsApp");
+                setFieldNote(result.message || "OTP sent to your WhatsApp");
             }
 
             const otpPath = `${basePath}/otp-verification`;
@@ -191,6 +183,15 @@ const Login = () => {
                             {error}
                         </motion.div>
                     )}
+                    {fieldNote && !error ? (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="text-green-600 text-xs sm:text-sm mb-4 sm:mb-6 text-center"
+                        >
+                            {fieldNote}
+                        </motion.div>
+                    ) : null}
 
                     <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">
                         <div>

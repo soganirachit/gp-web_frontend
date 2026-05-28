@@ -20,6 +20,7 @@ import { formatCartDeliveryAddress } from "../../utils/formatCartDeliveryAddress
 import { formatDeliveryAddressOrFallback } from "../../utils/formatDeliveryAddress";
 import { formatNextDeliveryDateLine } from "../../utils/subscriptionNextDelivery";
 import { computeFirstSubscriptionDeliveryDateFromWeekdayInts } from "../../utils/subscriptionFirstDeliveryDate";
+import { navigateToGpDailyWalletForRecharge } from "../../utils/gpDailyWalletRechargeRedirect";
 
 interface SubscriptionDetails {
   basePackId: string;
@@ -719,12 +720,15 @@ const ConfirmSubscription: React.FC = () => {
             state: { returnUrl: `${basePath}/subscription/confirm` },
           });
         } else if (errorMessage.includes("Insufficient wallet balance")) {
-          toast.error("Insufficient wallet balance");
-          navigate(`${basePath}/wallet`, {
-            state: {
-              returnUrl: `${basePath}/subscription/confirm`,
-              requiredAmount: subscriptionDetails.amount,
-            },
+          const totalRequired =
+            Number(subscriptionDetails.sellingPrice || subscriptionDetails.amount) *
+            Number(subscriptionDetails.deliveryCount || 7);
+          const currentBalance = Number(subscriptionDetails.walletBalance) || 0;
+          navigateToGpDailyWalletForRecharge(navigate, basePath, {
+            shortageAmount: Math.max(0, totalRequired - currentBalance),
+            currentBalance,
+            totalRequired,
+            returnUrl: `${basePath}/subscription/confirm`,
           });
         } else {
           console.error("Detailed error:", {

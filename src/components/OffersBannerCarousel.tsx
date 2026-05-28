@@ -2,10 +2,18 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getStoreBanners, Banner } from '../services/store.service';
 import { useFeatureTheme } from '../context/FeatureThemeContext';
+import {
+  BANNER_PLACEMENT_LANDING_HOME,
+  BANNER_PLACEMENT_STORE_HOME,
+  filterBannersByPlacement,
+  type BannerPlacement,
+} from '../utils/bannerPlacement';
 
 interface Props {
   /** Resolved store (guest temp / logged-in selected). Omit or null = no banners request. */
   storeId?: number | string | null;
+  /** Which banner slot to show (`store_home` on GP Store home, `landing_home` on /home). */
+  placement?: BannerPlacement;
 }
 
 function parseStoreIdForBanners(raw: Props['storeId']): number | null {
@@ -51,7 +59,10 @@ const FALLBACK_GRADIENTS_GP_DAILY = [
 const OFFERS_BANNER_HEIGHT =
   'h-[10.75rem] min-h-[10.75rem] sm:h-[11.75rem] sm:min-h-[11.75rem]';
 
-export function OffersBannerCarousel({ storeId }: Props) {
+export function OffersBannerCarousel({
+  storeId,
+  placement = BANNER_PLACEMENT_LANDING_HOME,
+}: Props) {
   const { theme } = useFeatureTheme();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -76,9 +87,17 @@ export function OffersBannerCarousel({ storeId }: Props) {
     }
     setLoading(true);
     let cancelled = false;
-    getStoreBanners(id)
+    getStoreBanners(id, {
+      placement:
+        placement === BANNER_PLACEMENT_STORE_HOME
+          ? BANNER_PLACEMENT_STORE_HOME
+          : undefined,
+    })
       .then(res => {
-        if (!cancelled) setBanners(normalizeBannersFromResponse(res.data));
+        if (!cancelled) {
+          const rows = normalizeBannersFromResponse(res.data);
+          setBanners(filterBannersByPlacement(rows, placement));
+        }
       })
       .catch(() => {
         if (!cancelled) setBanners([]);
@@ -89,7 +108,7 @@ export function OffersBannerCarousel({ storeId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [storeId]);
+  }, [storeId, placement]);
 
   const startAutoSlide = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);

@@ -42,8 +42,6 @@ import {
   PROFILE_HEADER_LOGO_CLASS,
 } from "../components/common/ProfileAvatarButton";
 import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
-// Large banner served from public/ for better caching
-const bannerSvg = '/gp_store_banner.svg';
 import { formatProductTitleCase } from "../lib/formatProductTitleCase";
 import {
   fetchGuestDeviceLocationLabel,
@@ -63,8 +61,8 @@ import {
 } from "../constants/homeHeaderLayout";
 import { ProductImageTag } from "../components/common/ProductImageTag";
 import namasteSvg from '../assets/svg/namaste.svg';
-
-
+import { OffersBannerCarousel } from "../components/OffersBannerCarousel";
+import { BANNER_PLACEMENT_STORE_HOME } from "../utils/bannerPlacement";
 
 const GpStore_Homepage: React.FC = () => {
     const navigate = useNavigate();
@@ -536,26 +534,10 @@ const GpStore_Homepage: React.FC = () => {
                     </div>
 
                     <div className="px-4 py-3 xs:py-4">
-                        {/* Single mint panel: copy left, art merged on right — no empty white strip */}
-                        <div className="relative isolate min-h-[9.5rem] overflow-hidden rounded-2xl bg-[#F2FEF4] sm:min-h-[11rem] lg:min-h-[12.5rem]">
-                            <img
-                                src={bannerSvg}
-                                alt="Wedding Bliss"
-                                className="pointer-events-none absolute -right-4 bottom-0 top-0 z-0 h-full w-[min(58%,200px)] object-cover object-right sm:-right-2 sm:w-[min(52%,240px)] md:w-[min(48%,280px)] lg:right-0 lg:w-[42%] lg:max-w-[320px]"
-                            />
-                            <div className="relative z-10 flex min-h-[9.5rem] max-w-[min(100%,20rem)] flex-col justify-center px-4 py-4 pr-[min(42%,9rem)] xs:min-h-[10rem] xs:max-w-[22rem] xs:pr-[min(40%,10rem)] sm:min-h-[11rem] sm:px-6 sm:py-5 sm:pr-[38%] lg:max-w-[55%] lg:px-10 lg:py-8 lg:pr-6">
-                                <h2 className="font-ibm-plex-serif text-[1.4rem] font-medium leading-tight text-[#1A1A1A] xs:text-[1.55rem] sm:text-xl md:text-2xl">
-                                    Wedding Bliss, Wrapped in Gifts
-                                </h2>
-                                <button
-                                    type="button"
-                                    onClick={() => navigate("/gp-store/products")}
-                                    className="gp-cta-pill-dark relative z-20 mt-3 w-fit"
-                                >
-                                    SHOP NOW
-                                </button>
-                            </div>
-                        </div>
+                        <OffersBannerCarousel
+                            storeId={storeId}
+                            placement={BANNER_PLACEMENT_STORE_HOME}
+                        />
                     </div>
 
                     {/* all Packs Section */}

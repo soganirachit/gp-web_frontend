@@ -146,6 +146,7 @@ const Wallet = () => {
   const [, setSelectedCoupon] = useState<CouponType | null>(null);
   const [returnUrl, setReturnUrl] = useState<string | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentFieldMessage, setPaymentFieldMessage] = useState<string | null>(null);
   const [gpDailyActiveSubs, setGpDailyActiveSubs] = useState<Subscription[]>([]);
   const [gpDailyHasSubscription, setGpDailyHasSubscription] = useState(false);
   const [gpDailySubExtra, setGpDailySubExtra] = useState<Record<
@@ -458,29 +459,7 @@ const Wallet = () => {
     if (isOnline && !isRecovering) {
       const pendingPayments = getPendingPayments();
       if (pendingPayments.length > 0) {
-        toast(
-          (t) => (
-            <div>
-              <p>
-                Network restored! Found {pendingPayments.length} pending
-                payment(s).
-              </p>
-              <button
-                onClick={() => {
-                  toast.dismiss(t.id);
-                  recoverPendingPayments();
-                }}
-                className="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-sm"
-              >
-                Recover Now
-              </button>
-            </div>
-          ),
-          {
-            duration: 10000,
-            icon: "🔄",
-          }
-        );
+        void recoverPendingPayments();
       }
     }
   }, [isOnline]);
@@ -693,6 +672,7 @@ const Wallet = () => {
               });
 
               try {
+                setPaymentFieldMessage(null);
                 await walletService.verifyPayment({
                   razorpay_payment_id: data.razorpay_payment_id,
                   razorpay_order_id: data.razorpay_order_id,
@@ -703,9 +683,7 @@ const Wallet = () => {
                 // Payment verified successfully, remove from pending
                 removePendingPayment(pendingPaymentId);
 
-                toast.success(
-                  "Payment successful! Your wallet has been updated."
-                );
+                setPaymentFieldMessage("Payment successful");
                 await fetchWalletBalance();
                 const completed = await tryCompleteGpDailyPendingSubscriptionAfterRecharge(
                   (path, opts) => navigate(path, opts),
@@ -770,6 +748,11 @@ const Wallet = () => {
               parseInt(customAmount) < MIN_AMOUNT
             }
           />
+          {paymentFieldMessage ? (
+            <p className="mt-2 text-xs font-medium text-green-700">
+              {paymentFieldMessage}
+            </p>
+          ) : null}
           {/* <button
               className="w-full py-3.5 md:py-4 bg-[#FF5722] text-white rounded-full font-medium md:text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
               disabled={

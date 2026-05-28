@@ -349,14 +349,12 @@ const HomePage: React.FC = () => {
             className="relative mb-6 min-h-[8.75rem] cursor-pointer overflow-hidden rounded-2xl bg-[#FDE2D9] p-4 shadow-sm transition-shadow hover:shadow-md sm:min-h-[9.5rem] sm:p-5"
             role="link"
             tabIndex={0}
-            aria-label="Sajawat by Genda Phool on Instagram"
-            onClick={() =>
-              window.open(SOCIAL_URLS.instagramSajawat, '_blank', 'noopener,noreferrer')
-            }
+            aria-label="Sajawat by Genda Phool"
+            onClick={() => navigate('/sajawat')}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                window.open(SOCIAL_URLS.instagramSajawat, '_blank', 'noopener,noreferrer');
+                navigate('/sajawat');
               }
             }}
           >
@@ -375,7 +373,7 @@ const HomePage: React.FC = () => {
                   className="inline-flex items-center gap-1.5 rounded-full bg-[#9B2226] px-4 py-2 text-xs font-semibold text-white hover:bg-[#7A1B1E] sm:px-5 sm:py-2.5 sm:text-sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    window.open(SOCIAL_URLS.instagramSajawat, '_blank', 'noopener,noreferrer');
+                    navigate('/sajawat');
                   }}
                 >
                   <span>Free Consultation</span>

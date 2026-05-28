@@ -63,6 +63,7 @@ export interface AddressInput {
 }
 
 const API_URL = `${getApiUrl()}/users/addresses`;
+const ADDRESS_UPDATE_FAILED_MESSAGE = "Failed to update address";
 
 // Helper: Convert API address to frontend format
 const mapApiToFrontend = (apiAddr: ApiAddress): Address => {
@@ -257,11 +258,13 @@ class AddressService {
       if (response.data.success && response.data.data) {
         return mapApiToFrontend(response.data.data);
       }
-      throw new Error(response.data.message || "Failed to update address");
+      throw new Error(response.data.message || ADDRESS_UPDATE_FAILED_MESSAGE);
     } catch (error) {
       console.error("Error updating address:", error);
       if (error instanceof AxiosError) {
-        throw new Error(error.response?.data?.message || error.message || "Failed to update address");
+        throw new Error(
+          error.response?.data?.message || error.message || ADDRESS_UPDATE_FAILED_MESSAGE,
+        );
       }
       throw error;
     }

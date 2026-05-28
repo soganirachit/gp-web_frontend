@@ -32,11 +32,8 @@ import {
   resolveLiveDeviceToSavedAddress,
 } from "../../utils/addressCoordinates";
 import { walletService } from "../../services/wallet.service";
-import {
-  InsufficientWalletModal,
-  type InsufficientWalletDetails,
-} from "../daily/InsufficientWalletModal";
 import { setGpDailyPendingSubscriptionCheckout } from "../../utils/gpDailyPendingSubscriptionCheckout";
+import { navigateToGpDailyWalletForRecharge } from "../../utils/gpDailyWalletRechargeRedirect";
 
 const AddressSelection: React.FC = () => {
   const navigate = useNavigate();
@@ -78,10 +75,6 @@ const AddressSelection: React.FC = () => {
     message: string;
   } | null>(null);
   const [confirmingDailyCartStoreChange, setConfirmingDailyCartStoreChange] = useState(false);
-  const [showInsufficientWalletModal, setShowInsufficientWalletModal] = useState(false);
-  const [insufficientWalletDetails, setInsufficientWalletDetails] =
-    useState<InsufficientWalletDetails | null>(null);
-
   /** Browser geolocation + reverse geocode — shown as first card when available. */
   const [liveDeviceLocation, setLiveDeviceLocation] = useState<{
     lat: number;
@@ -372,7 +365,10 @@ const AddressSelection: React.FC = () => {
       }
 
       if (!validation.isValid && feature === "gpStore") {
-        toast.error(validation.message || "Address is outside delivery area");
+        setLocationValidation({
+          isValid: false,
+          message: validation.message || "Address is outside delivery area",
+        });
         return;
       }
 
@@ -475,7 +471,6 @@ const AddressSelection: React.FC = () => {
           message:
             validation.message || "Address is outside delivery area",
         });
-        toast.error(validation.message || "Address is outside delivery area");
         return false;
       }
       setAddressValidation({
@@ -486,7 +481,6 @@ const AddressSelection: React.FC = () => {
       return true;
     } catch (error) {
       console.error('Error validating address:', error);
-      toast.error('Failed to validate address location');
       setAddressValidation({ isValid: false, message: 'Failed to validate address location' });
       return false;
     } finally {
@@ -981,14 +975,13 @@ const AddressSelection: React.FC = () => {
             deliveryCount: parsedData.deliveryCount,
             sellingPrice: parsedData.sellingPrice,
           });
-          setInsufficientWalletDetails({
-            currentBalance: walletBalance,
-            requiredAmount: totalRequired,
-            shortageAmount: shortage,
-            contextLabel: "Recharge your wallet to confirm your subscription.",
-          });
-          setShowInsufficientWalletModal(true);
           setLoading(false);
+          navigateToGpDailyWalletForRecharge(navigate, basePath, {
+            shortageAmount: shortage,
+            currentBalance: walletBalance,
+            totalRequired,
+            returnUrl: `${basePath}/address-selection`,
+          });
           return;
         }
 
@@ -1091,13 +1084,12 @@ const AddressSelection: React.FC = () => {
             sellingPrice: parsedData.sellingPrice,
           });
           void walletService.getWalletBalance().then(({ balance }) => {
-            setInsufficientWalletDetails({
-              currentBalance: balance,
-              requiredAmount: totalRequired,
+            navigateToGpDailyWalletForRecharge(navigate, basePath, {
               shortageAmount: Math.max(0, totalRequired - balance),
-              contextLabel: "Recharge your wallet to confirm your subscription.",
+              currentBalance: balance,
+              totalRequired,
+              returnUrl: `${basePath}/address-selection`,
             });
-            setShowInsufficientWalletModal(true);
           });
         } else {
           console.error("Detailed error:", {
@@ -1791,26 +1783,6 @@ const AddressSelection: React.FC = () => {
         </div>
       ) : null}
 
-      <InsufficientWalletModal
-        open={showInsufficientWalletModal}
-        details={insufficientWalletDetails}
-        onClose={() => {
-          setShowInsufficientWalletModal(false);
-          setInsufficientWalletDetails(null);
-        }}
-        onRecharge={() => {
-          if (!insufficientWalletDetails) return;
-          setShowInsufficientWalletModal(false);
-          navigate(`${basePath}/wallet`, {
-            state: {
-              returnUrl: `${basePath}/address-selection`,
-              requiredAmount: insufficientWalletDetails.shortageAmount,
-              currentBalance: insufficientWalletDetails.currentBalance,
-              totalRequired: insufficientWalletDetails.requiredAmount,
-            },
-          });
-        }}
-      />
     </div>
   );
 };

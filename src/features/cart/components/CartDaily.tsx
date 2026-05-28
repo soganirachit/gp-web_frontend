@@ -63,11 +63,8 @@ import { pickPrimaryImageUrl } from '../../../utils/pickPrimaryImageUrl';
 import { computeFirstSubscriptionDeliveryDateFromWeekdayInts } from '../../../utils/subscriptionFirstDeliveryDate';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
 import deliveryTruckIcon from "../../../assets/svg/gp_daily svg/delivery_truck.svg";
-import {
-  InsufficientWalletModal,
-  type InsufficientWalletDetails,
-} from '../../../components/daily/InsufficientWalletModal';
 import { setGpDailyPendingSubscriptionCheckout } from '../../../utils/gpDailyPendingSubscriptionCheckout';
+import { navigateToGpDailyWalletForRecharge } from '../../../utils/gpDailyWalletRechargeRedirect';
 
 
 /**
@@ -210,6 +207,9 @@ interface Coupon {
   /** GP Daily cart — must match mobile `eligible_for_gp_daily`. */
   eligible_for_gp_daily?: boolean;
 }
+
+const DAILY_PROMO_INVALID_MESSAGE = "This promo is not valid on Genda Phool Daily.";
+const DAILY_PROMO_INVALID_CODE = "PROMO_NOT_VALID_DAILY";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
@@ -752,9 +752,6 @@ const Cart: React.FC = () => {
   const [subscriptionZoneEligible, setSubscriptionZoneEligible] = useState<boolean | null>(null);
   const [subscriptionDeliveryFee, setSubscriptionDeliveryFee] = useState<number | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [showInsufficientWalletModal, setShowInsufficientWalletModal] = useState(false);
-  const [insufficientWalletDetails, setInsufficientWalletDetails] =
-    useState<InsufficientWalletDetails | null>(null);
   const [isConfirmingOrder, setIsConfirmingOrder] = useState(false);
   const [shouldTriggerPayment, setShouldTriggerPayment] = useState(false);
   const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
@@ -768,6 +765,11 @@ const Cart: React.FC = () => {
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState<number>(0);
+  const [promoInlineMessage, setPromoInlineMessage] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [checkoutInlineError, setCheckoutInlineError] = useState<string | null>(null);
 
   const [cartTotals, setCartTotals] = useState<CartTotalsState | null>(null);
   /** Fulfilment store label for basket (from GET /cart/ `store_name`). */
@@ -1056,6 +1058,7 @@ const Cart: React.FC = () => {
   const handleApplyPromoCode = async (code: string): Promise<{ successMessage?: string } | void> => {
     if (!code) return;
     try {
+      setPromoInlineMessage(null);
       setIsApplyingPromo(true);
       const upper = code.trim().toUpperCase();
       const list = await fetchCoupons();
@@ -1063,7 +1066,7 @@ const Cart: React.FC = () => {
         (c) => String(c.code).trim().toUpperCase() === upper,
       );
       if (match && match.eligible_for_gp_daily !== true) {
-        throw new Error("This promo is not valid on Genda Phool Daily.");
+        throw new Error(DAILY_PROMO_INVALID_CODE);
       }
       const response = await applyCouponAPI(code);
 
@@ -1087,6 +1090,9 @@ const Cart: React.FC = () => {
         successMessage: typeof response.message === 'string' ? response.message.trim() : undefined,
       };
     } catch (error: any) {
+      if (error?.message === DAILY_PROMO_INVALID_CODE) {
+        throw new Error(DAILY_PROMO_INVALID_MESSAGE);
+      }
       throw new Error(error?.message || 'Failed to apply promo code');
     } finally {
       setIsApplyingPromo(false);
@@ -1095,6 +1101,7 @@ const Cart: React.FC = () => {
 
   const handleRemovePromoCode = async () => {
     try {
+      setPromoInlineMessage(null);
       setIsApplyingPromo(true);
       await removeCouponAPI();
       setAppliedPromoCode(null);
@@ -1102,9 +1109,12 @@ const Cart: React.FC = () => {
       const raw = await cartService.getCartData();
       const cartData = await reconcileCartStoreWithAccountSelection(raw);
       applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
-      toast.success('Promo code removed');
+      setPromoInlineMessage({ kind: "success", text: "Coupon removed" });
     } catch (error: any) {
-      toast.error(error.message || 'Failed to remove promo code');
+      setPromoInlineMessage({
+        kind: "error",
+        text: error.message || "Failed to remove promo code.",
+      });
     } finally {
       setIsApplyingPromo(false);
     }
@@ -1750,6 +1760,7 @@ const Cart: React.FC = () => {
   };
 
   const handleCheckout = async () => {
+    setCheckoutInlineError(null);
     if (items.length === 0) { toast.error('Your cart is empty'); return; }
     if (hasStaleDailyLine) {
       toast.error('Remove unavailable items from your basket before checkout.');
@@ -1757,7 +1768,7 @@ const Cart: React.FC = () => {
     }
     if (activeDeliveryDayInts.length === 0) { toast.error('Please select delivery days'); return; }
     if (deliveryFrequency === 'Customize' && activeDeliveryDayInts.length < 3) {
-      toast.error('Please select at least 3 days for a 1-week subscription');
+      setCheckoutInlineError('Please select at least 3 delivery days.');
       return;
     }
     if (!isLoggedIn) {
@@ -1765,7 +1776,11 @@ const Cart: React.FC = () => {
       return;
     }
 
-    if (!defaultAddress) { toast.error('Please add a delivery address'); navigate(`${basePath}/addresses`); return; }
+    if (!defaultAddress) {
+      setCheckoutInlineError('Please add a delivery address from Address Book.');
+      navigate(`${basePath}/addresses`);
+      return;
+    }
 
     if (addressOutsideDelivery === true) {
       return;
@@ -1779,23 +1794,22 @@ const Cart: React.FC = () => {
       const cartAmount = Number(total);
       if (Number.isFinite(cartAmount) && walletBalance < cartAmount) {
         const shortage = cartAmount - walletBalance;
-        setInsufficientWalletDetails({
-          currentBalance: walletBalance,
-          requiredAmount: cartAmount,
-          shortageAmount: shortage,
-          contextLabel: 'Recharge your wallet to complete your subscription.',
-        });
         setGpDailyPendingSubscriptionCheckout({
           kind: 'subscription_cart_checkout',
-          requiredAmount: shortage,
+          requiredAmount: cartAmount,
           cartAmount,
           addressId: Number(defaultAddress.id),
           deliveryDayInts: activeDeliveryDayInts,
           deliveryFrequency,
           activeDeliveryDays: [...activeDeliveryDays],
         });
-        setShowInsufficientWalletModal(true);
         setIsProcessingPayment(false);
+        navigateToGpDailyWalletForRecharge(navigate, basePath, {
+          shortageAmount: shortage,
+          currentBalance: walletBalance,
+          totalRequired: cartAmount,
+          returnUrl: `${basePath}/basket`,
+        });
         return;
       }
       const addrOk = await applySubscriptionCartDeliveryAddress(Number(defaultAddress.id));
@@ -1863,7 +1877,7 @@ const Cart: React.FC = () => {
         toast.error('Remove unavailable items from your basket before checkout.');
         void refreshDailyCart();
       } else {
-        toast.error(msg);
+        setCheckoutInlineError(msg);
       }
       return;
     } finally {
@@ -2453,6 +2467,17 @@ const Cart: React.FC = () => {
                   </button>
                 )}
               </div>
+              {promoInlineMessage ? (
+                <p
+                  className={`mt-2 text-xs font-medium ${
+                    promoInlineMessage.kind === "success"
+                      ? "text-green-700"
+                      : "text-red-600"
+                  }`}
+                >
+                  {promoInlineMessage.text}
+                </p>
+              ) : null}
 
               {/* Order Summary */}
               <div className="bg-white rounded-[25px] p-4 shadow-sm">
@@ -2551,6 +2576,11 @@ const Cart: React.FC = () => {
                     ? 'Preparing payment…'
                     : 'Subscribe'}
               </button>
+              {checkoutInlineError ? (
+                <p className="mt-2 text-center text-xs font-medium text-red-600">
+                  {checkoutInlineError}
+                </p>
+              ) : null}
             </>
           </div>
         )}
@@ -2636,27 +2666,6 @@ const Cart: React.FC = () => {
           isDailyMode
         />
       )}
-
-      <InsufficientWalletModal
-        open={showInsufficientWalletModal}
-        details={insufficientWalletDetails}
-        onClose={() => {
-          setShowInsufficientWalletModal(false);
-          setInsufficientWalletDetails(null);
-        }}
-        onRecharge={() => {
-          if (!insufficientWalletDetails) return;
-          setShowInsufficientWalletModal(false);
-          navigate(`${basePath}/wallet`, {
-            state: {
-              returnUrl: `${basePath}/basket`,
-              requiredAmount: insufficientWalletDetails.shortageAmount,
-              currentBalance: insufficientWalletDetails.currentBalance,
-              totalRequired: insufficientWalletDetails.requiredAmount,
-            },
-          });
-        }}
-      />
 
     </div>
   );

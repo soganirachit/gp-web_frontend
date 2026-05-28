@@ -11,7 +11,6 @@ import {
 import { addressService } from '../../../../services/address.service';
 import { useAuth } from '../../../../context/AuthContext';
 import { useCart } from '../../../../context/CartContext';
-import { toast } from 'react-hot-toast';
 import { FaWhatsapp } from 'react-icons/fa';
 import { MdEdit } from 'react-icons/md';
 import { useFeatureTheme } from '../../../../context/FeatureThemeContext';
@@ -43,6 +42,8 @@ const OTPVerification: React.FC = () => {
   const [otp, setOtp] = useState<string[]>(new Array(6).fill(""));
   const [countdown, setCountdown] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [inlineError, setInlineError] = useState<string>("");
+  const [inlineInfo, setInlineInfo] = useState<string>("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [whatsappDeliveryOk, setWhatsappDeliveryOk] = useState(
     locState.whatsappOtpLikelyDelivered !== false
@@ -142,12 +143,14 @@ const OTPVerification: React.FC = () => {
     if (otpString.length !== 6 || !phoneNumber) return;
 
     try {
+      setInlineError("");
+      setInlineInfo("");
       setIsSubmitting(true);
       const response = await authService.verifyOTP(phoneNumber, otpString);
 
       // Handle new Django API response structure
       if (response.success && response.message) {
-        toast.success(response.message || 'OTP verified successfully!');
+        setInlineInfo(response.message || 'OTP verified successfully!');
 
         // Login — tokens are in HttpOnly cookies set by server
         login(phoneNumber);
@@ -212,7 +215,7 @@ const OTPVerification: React.FC = () => {
     } catch (err: unknown) {
       const errorMessage = errorMessageFromCatch(err, 'Invalid OTP');
       setOtp(new Array(6).fill(""));
-      toast.error(errorMessage);
+      setInlineError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -224,7 +227,7 @@ const OTPVerification: React.FC = () => {
     try {
       const result = await authService.sendOTP(phoneNumber);
       if (!result.success) {
-        toast.error(result.message || 'Failed to resend OTP');
+        setInlineError(result.message || 'Failed to resend OTP');
         return;
       }
       const pollPhone = result.phone ?? phoneNumber;
@@ -241,28 +244,20 @@ const OTPVerification: React.FC = () => {
         }
       }
       if (shouldBlockEntry) {
-        toast.error(
-          blockMessage
-        );
+        setInlineError(blockMessage);
         navigate(`${basePath}/login`, { state: { returnUrl, fromCart } });
         return;
       }
 
-      const warnStyle = { background: '#fffbeb', color: '#92400e' } as const;
       if (result.whatsapp_status === 'failed') {
-        toast(result.message || 'OTP delivery failed. Please try again in a moment.', {
-          icon: '⚠️',
-          duration: 5000,
-          style: warnStyle,
-        });
+        setInlineError(result.message || "OTP delivery failed. Please tap Resend in a moment.");
       } else if (result.whatsapp_status === 'not_configured') {
-        toast(
+        setInlineError(
           result.message ||
-            'WhatsApp is not configured. If you still do not receive a code, edit your number and try again.',
-          { icon: '⚠️', duration: 5000, style: warnStyle }
+            "WhatsApp is not configured. If you still do not receive a code, edit your number and try again.",
         );
       } else {
-        toast.success(result.message || 'OTP sent to your WhatsApp');
+        setInlineInfo(result.message || 'OTP sent to your WhatsApp');
       }
 
       setWhatsappDeliveryOk(whatsappOtpLikelyDelivered(result));
@@ -282,7 +277,7 @@ const OTPVerification: React.FC = () => {
         }
       }
 
-      toast.error(errorMessage);
+      setInlineError(errorMessage);
     }
   };
 
@@ -397,6 +392,12 @@ const OTPVerification: React.FC = () => {
           </form>
 
           <div className="text-center mt-4 sm:mt-6">
+            {inlineError ? (
+              <p className="mb-2 text-xs sm:text-sm text-red-600">{inlineError}</p>
+            ) : null}
+            {inlineInfo && !inlineError ? (
+              <p className="mb-2 text-xs sm:text-sm text-green-600">{inlineInfo}</p>
+            ) : null}
             <button
               onClick={handleResendOTP}
               disabled={countdown > 0}

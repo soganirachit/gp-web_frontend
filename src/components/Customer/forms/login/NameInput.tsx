@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { authService } from "../../../../services/auth.service";
-import { toast } from "react-hot-toast";
 import { FaStar, FaRedo, FaHeadset, FaTag } from "react-icons/fa";
 import { useFeatureTheme } from "../../../../context/FeatureThemeContext";
 
@@ -28,32 +27,32 @@ const NameInput: React.FC = () => {
     console.log("handleSubmit called");
 
     if (!firstName.trim()) {
-      toast.error("Please enter your first name");
+      setError("Please enter your first name");
       return;
     }
 
     if (!lastName.trim()) {
-      toast.error("Please enter your last name");
+      setError("Please enter your last name");
       return;
     }
 
     if (!email.trim()) {
-      toast.error("Please enter your email");
+      setError("Please enter your email");
       return;
     }
 
     if (!isValidEmail(email)) {
-      toast.error("Enter valid email");
+      setError("Enter valid email");
       return;
     }
 
     if (!gender) {
-      toast.error("Please select your gender");
+      setError("Please select your gender");
       return;
     }
 
     if (gender === "other" && !customGender.trim()) {
-      toast.error("Please specify your gender");
+      setError("Please specify your gender");
       return;
     }
 
@@ -65,7 +64,7 @@ const NameInput: React.FC = () => {
       const phoneNumber = localStorage.getItem("phoneNumber");
 
       if (!phoneNumber) {
-        toast.error("Authentication required. Please login again.");
+        setError("Authentication required. Please login again.");
         navigate(`${basePath}/login`);
         return;
       }
@@ -90,8 +89,6 @@ const NameInput: React.FC = () => {
         localStorage.setItem("userEmail", email.trim());
         localStorage.setItem("needLocation", "true");
 
-        toast.success("Profile details saved!");
-
         navigate(`${basePath}/location`, {
           state: {
             fromNameInput: true,
@@ -111,7 +108,6 @@ const NameInput: React.FC = () => {
         errorMessage = "Enter valid email";
       }
       setError(errorMessage);
-      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

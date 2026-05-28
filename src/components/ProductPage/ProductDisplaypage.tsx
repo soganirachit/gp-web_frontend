@@ -46,6 +46,7 @@ import { notifyDailyCartUpdated } from "../../utils/dailyCartEvents";
 import { GP_DAILY_ZONE_STALE_TOAST } from "../../utils/gpDailyCustomerMessages";
 import { resolveGpDailyCatalogStoreId } from "../../utils/gpDailyCatalogStore";
 import { setGpDailyPendingSubscriptionCheckout } from "../../utils/gpDailyPendingSubscriptionCheckout";
+import { navigateToGpDailyWalletForRecharge } from "../../utils/gpDailyWalletRechargeRedirect";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
 
 // Add interface for content items
@@ -273,21 +274,6 @@ const ProductPage: React.FC = () => {
   const pdpGallerySwipeStartX = useRef<number | null>(null);
   const pdpImageIndexRef = useRef(0);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
-  const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
-    useState(false);
-  const [balanceDetails, setBalanceDetails] = useState<{
-    currentBalance: number;
-    requiredAmount: number;
-    shortageAmount: number;
-    subscriptionType: SubscriptionType;
-    days: number;
-  }>({
-    currentBalance: 0,
-    requiredAmount: 0,
-    shortageAmount: 0,
-    subscriptionType: "DAILY",
-    days: 7,
-  });
   // const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
   // const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(null);
   const [showExistingSubscriptionModal, setShowExistingSubscriptionModal] =
@@ -851,17 +837,14 @@ const ProductPage: React.FC = () => {
       const { balance } = walletResponse || {};
 
       if (balance < totalPrice) {
-
-        // Update balance details and show modal
-        setBalanceDetails({
+        setIsCheckingBalance(false);
+        redirectToWalletForSubscription({
           currentBalance: balance,
           requiredAmount: totalPrice,
           shortageAmount: totalPrice - balance,
           subscriptionType: selectedType,
           days: minDays,
         });
-        setShowInsufficientBalanceModal(true);
-        setIsCheckingBalance(false);
         return;
       }
 
@@ -1028,10 +1011,15 @@ const ProductPage: React.FC = () => {
     }
   };
 
-  const handleRechargeWallet = () => {
+  const redirectToWalletForSubscription = (details: {
+    currentBalance: number;
+    requiredAmount: number;
+    shortageAmount: number;
+    subscriptionType: SubscriptionType;
+    days: number;
+  }) => {
     const currentProduct = product || basePack;
     if (!currentProduct || !slug) {
-      setShowInsufficientBalanceModal(false);
       navigate(`${basePath}/wallet`);
       return;
     }
@@ -1059,7 +1047,7 @@ const ProductPage: React.FC = () => {
         selectedType === "DAILY"
           ? "Every day"
           : `Custom (${selectedDays.join(", ")})`,
-      walletBalance: balanceDetails.currentBalance,
+      walletBalance: details.currentBalance,
       selectedDays:
         selectedType === "CUSTOM"
           ? selectedDays.map((day) => day.toUpperCase())
@@ -1076,22 +1064,16 @@ const ProductPage: React.FC = () => {
 
     setGpDailyPendingSubscriptionCheckout({
       kind: "product_address_flow",
-      requiredAmount: balanceDetails.requiredAmount,
+      requiredAmount: details.requiredAmount,
       returnPath: `${basePath}/product/${encodeURIComponent(slug)}`,
       subscriptionDetails,
     });
 
-    setShowInsufficientBalanceModal(false);
-    navigate(`${basePath}/wallet`, {
-      state: {
-        requiredAmount: balanceDetails.shortageAmount,
-        currentBalance: balanceDetails.currentBalance,
-        returnUrl: `${basePath}/address-selection`,
-        subscriptionType: balanceDetails.subscriptionType,
-        minimumDays: 7,
-        maximumDays: selectedType === "DAILY" ? 30 : 14,
-        totalRequired: balanceDetails.requiredAmount,
-      },
+    navigateToGpDailyWalletForRecharge(navigate, basePath, {
+      shortageAmount: details.shortageAmount,
+      currentBalance: details.currentBalance,
+      totalRequired: details.requiredAmount,
+      returnUrl: `${basePath}/address-selection`,
     });
   };
 
@@ -1754,74 +1736,6 @@ const ProductPage: React.FC = () => {
             </div>
           )}
         </div>
-
-        {/* Existing modals */}
-        <AnimatePresence>
-          {showInsufficientBalanceModal && (
-            <motion.div
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowInsufficientBalanceModal(false)}
-            >
-              <motion.div
-                className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl"
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="text-center mb-6">
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                    Insufficient Balance
-                  </h3>
-                  <p className="text-gray-600">
-                    You need additional balance to subscribe for{" "}
-                    {balanceDetails.days} days of{" "}
-                    {balanceDetails.subscriptionType.toLowerCase()} delivery
-                  </p>
-                </div>
-
-                <div className="space-y-4 mb-6">
-                  <div className="flex justify-between items-center py-2 border-b">
-                    <span className="text-gray-600">Current Balance</span>
-                    <span className="font-semibold">
-                      ₹{balanceDetails.currentBalance}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b">
-                    <span className="text-gray-600">Required Amount</span>
-                    <span className="font-semibold">
-                      ₹{balanceDetails.requiredAmount}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b bg-red-50 px-2 rounded">
-                    <span className="text-red-600">Shortage Amount</span>
-                    <span className="font-semibold text-red-600">
-                      ₹{balanceDetails.shortageAmount}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowInsufficientBalanceModal(false)}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleRechargeWallet}
-                    className={`flex-1 rounded-lg px-4 py-2 font-semibold transition-colors ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
-                  >
-                    Recharge Wallet
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <ExistingSubscriptionModal
           isOpen={showExistingSubscriptionModal}

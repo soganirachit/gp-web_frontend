@@ -611,6 +611,7 @@ export interface Banner {
   title_bg_color: string;
   cta_bg_color: string;
   sort_order: number;
+  placement?: string | null;
 }
 
 type BannersApiResponse = { success: boolean; data: Banner[] };
@@ -622,12 +623,18 @@ const bannersRequestByStoreKey = new Map<
 >();
 
 // Uses raw axios (no JWT) — banners are public; sending a stale token can cause 401
-export function getStoreBanners(storeId: number | string) {
-  const key = String(storeId);
+export function getStoreBanners(
+  storeId: number | string,
+  options?: { placement?: string },
+) {
+  const placement = options?.placement?.trim();
+  const key = placement ? `${storeId}:${placement}` : String(storeId);
   const existing = bannersRequestByStoreKey.get(key);
   if (existing) return existing;
   const req = axios
-    .get<BannersApiResponse>(`${getApiUrl()}/stores/${storeId}/banners/`)
+    .get<BannersApiResponse>(`${getApiUrl()}/stores/${storeId}/banners/`, {
+      params: placement ? { placement } : undefined,
+    })
     .finally(() => {
       bannersRequestByStoreKey.delete(key);
     });

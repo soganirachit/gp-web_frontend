@@ -46,6 +46,8 @@ import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
  * navigation that includes `addressUpdated`, then still clear location.state.
  */
 let addressUpdatedToastConsumed = false;
+const DELIVERY_DATE_LIMIT_MESSAGE_TEMPLATE =
+  'Please choose a delivery date within the next {N} days.';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -513,6 +515,7 @@ const Cart: React.FC = () => {
   const [editMessage, setEditMessage] = useState<string>('');
   const datePickerRef = useRef<HTMLDivElement>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [checkoutInlineError, setCheckoutInlineError] = useState<string | null>(null);
   /** After Razorpay succeeds — verify / poll order (avoid “Preparing payment” copy here). */
   const [isConfirmingOrder, setIsConfirmingOrder] = useState(false);
   const [shouldTriggerPayment, setShouldTriggerPayment] = useState(false);
@@ -527,6 +530,16 @@ const Cart: React.FC = () => {
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState<number>(0);
+  const [promoInlineMessage, setPromoInlineMessage] = useState<{
+    kind: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!promoInlineMessage) return;
+    const id = window.setTimeout(() => setPromoInlineMessage(null), 3000);
+    return () => window.clearTimeout(id);
+  }, [promoInlineMessage]);
 
   const [cartTotals, setCartTotals] = useState<CartTotalsState | null>(null);
   /** Fulfilment store label for basket (from GET /cart/ `store_name`). */
@@ -709,6 +722,7 @@ const Cart: React.FC = () => {
   const handleApplyPromoCode = async (code: string): Promise<{ successMessage?: string } | void> => {
     if (!code) return;
     try {
+      setPromoInlineMessage(null);
       setIsApplyingPromo(true);
       const response = await applyCouponAPI(code);
 
@@ -728,10 +742,15 @@ const Cart: React.FC = () => {
       }
 
       setAppliedPromoCode(code);
+      setPromoInlineMessage({ kind: 'success', text: 'Coupon applied successfully' });
       return {
         successMessage: typeof response.message === 'string' ? response.message.trim() : undefined,
       };
     } catch (error: any) {
+      setPromoInlineMessage({
+        kind: 'error',
+        text: error?.message || 'Failed to apply promo code',
+      });
       throw new Error(error?.message || 'Failed to apply promo code');
     } finally {
       setIsApplyingPromo(false);
@@ -740,6 +759,7 @@ const Cart: React.FC = () => {
 
   const handleRemovePromoCode = async () => {
     try {
+      setPromoInlineMessage(null);
       setIsApplyingPromo(true);
       await removeCouponAPI();
       setAppliedPromoCode(null);
@@ -747,9 +767,12 @@ const Cart: React.FC = () => {
       const raw = await cartService.getCartData();
       const cartData = await reconcileCartStoreWithAccountSelection(raw);
       applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
-      toast.success('Promo code removed');
+      setPromoInlineMessage({ kind: 'success', text: 'Coupon removed' });
     } catch (error: any) {
-      toast.error(error.message || 'Failed to remove promo code');
+      setPromoInlineMessage({
+        kind: 'error',
+        text: error.message || 'Failed to remove promo code',
+      });
     } finally {
       setIsApplyingPromo(false);
     }
@@ -1232,6 +1255,7 @@ const Cart: React.FC = () => {
   );
 
   const handleDateOptionSelect = (option: 'today' | 'tomorrow' | 'pickDate') => {
+    setCheckoutInlineError(null);
     setSelectedDateOption(option);
     if (option === 'pickDate') {
       setDatePickerRangeMessage(null);
@@ -1246,6 +1270,7 @@ const Cart: React.FC = () => {
 
   const handleDatePickerChange = (date: Date | null) => {
     if (date) {
+      setCheckoutInlineError(null);
       const pickedDate = startOfDay(date);
       if (isBefore(pickedDate, datePickerMinStart)) {
         setDatePickerRangeMessage("That date isn’t available for delivery.");
@@ -1297,6 +1322,7 @@ const Cart: React.FC = () => {
         ? new Date(deliveryInfo.selectedDate)
         : new Date();
     if (!isSlotSelectable(slot, selectedDate)) return;
+    setCheckoutInlineError(null);
     setSelectedSlotId(slot.id);
     setSelectedTimeSlot(getSlotDisplayLabel(slot));
     if (deliveryInfo) updateDeliveryInfo({ ...deliveryInfo, timeSlot: getSlotDisplayLabel(slot), slotId: slot.id });
@@ -1456,6 +1482,7 @@ const Cart: React.FC = () => {
   };
 
   const handleCheckout = async () => {
+    setCheckoutInlineError(null);
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
     if (items.length === 0) { toast.error('Your cart is empty'); return; }
     if (hasStaleCartLine) {
@@ -1507,7 +1534,7 @@ const Cart: React.FC = () => {
     }
 
     if (!selectedSlotId) {
-      toast.error('Please select a delivery time slot');
+      setCheckoutInlineError('Please choose an available delivery time slot.');
       return;
     }
 
@@ -1522,8 +1549,11 @@ const Cart: React.FC = () => {
       selectedDeliveryDay &&
       isAfter(selectedDeliveryDay, deliveryDateMaxStart)
     ) {
-      toast.error(
-        `Please choose a delivery date within the next ${DELIVERY_DATE_MAX_DAYS_FROM_TODAY} days.`,
+      setCheckoutInlineError(
+        DELIVERY_DATE_LIMIT_MESSAGE_TEMPLATE.replace(
+          '{N}',
+          String(DELIVERY_DATE_MAX_DAYS_FROM_TODAY),
+        ),
       );
       return;
     }
@@ -2297,6 +2327,18 @@ const Cart: React.FC = () => {
                   </button>
                 )}
               </div>
+              {promoInlineMessage ? (
+                <div
+                  className={[
+                    'mt-2 rounded-lg border px-3 py-2 text-xs font-medium',
+                    promoInlineMessage.kind === 'success'
+                      ? 'border-green-200 bg-green-50 text-green-700'
+                      : 'border-red-200 bg-red-50 text-red-700',
+                  ].join(' ')}
+                >
+                  {promoInlineMessage.text}
+                </div>
+              ) : null}
 
               {/* Order Summary */}
               <div className="bg-white rounded-[25px] p-4 shadow-sm">
@@ -2366,6 +2408,11 @@ const Cart: React.FC = () => {
               )}
 
               {/* Checkout */}
+              {checkoutInlineError ? (
+                <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+                  {checkoutInlineError}
+                </div>
+              ) : null}
               <button
                 onClick={handleCheckout}
                 disabled={
