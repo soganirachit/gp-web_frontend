@@ -15,6 +15,7 @@ const Gp_daily_Homepage = lazy(() => import('../pages/GpDaily_Homepage'));
 const GpStore_Homepage = lazy(() => import('../pages/GpStore_Homepage'));
 const HomePage = lazy(() => import('../pages/home_page'));
 const Sajawat = lazy(() => import('../pages/Sajawat'));
+const SajawatSignatureGallery = lazy(() => import('../pages/SajawatSignatureGallery'));
 const Products = lazy(() => import('../components/ProductPage/page'));
 const ProductPage = lazy(() => import('../components/ProductPage/ProductDisplaypage'));
 const ExploreMore = lazy(() => import('../components/ProductPage/ExploreMore'));
@@ -54,6 +55,8 @@ const CustomerSupport = lazy(() => import('../pages/More/CustomerSupport'));
 const SupportTicketChat = lazy(() => import('../pages/More/SupportTicketChat'));
 const TicketQuestionForm = lazy(() => import('../pages/More/TicketQuestionForm'));
 const FAQ = lazy(() => import('../pages/More/FAQ'));
+const Notifications = lazy(() => import('../pages/More/Notifications'));
+const NotificationPreferences = lazy(() => import('../pages/More/NotificationPreferences'));
 const StoreProductsPages = lazy(() => import('../components/StoreProductsPage/page'));
 const StorePage = lazy(() => import('../components/StoreProductsPage/storeProductsDisplayPage'));
 const ManageMyStoreProducts = lazy(() => import('../components/StoreProductsPage/manageMyStoreProducts'));
@@ -61,6 +64,7 @@ const Cart = lazy(() => import('../features/cart/components/Cart'));
 const CartDaily = lazy(() => import('../features/cart/components/CartDaily'));
 const Terms = lazy(() => import('../pages/Terms'));
 const Privacy = lazy(() => import('../pages/Privacy'));
+const ProductDeepLinkPage = lazy(() => import('../pages/ProductDeepLinkPage'));
 
 const PageLoader = () => <PageFadeFallback />;
 
@@ -77,6 +81,7 @@ const router = createBrowserRouter(
       { path: '/explore-more', element: <ExploreMore /> },
       { path: '/home', element: <HomePage /> },
       { path: '/sajawat', element: <Sajawat /> },
+      { path: '/sajawat/gallery', element: <SajawatSignatureGallery /> },
       {
         path: '/gp-daily',
         element: <Gp_daily_Homepage />
@@ -103,6 +108,8 @@ const router = createBrowserRouter(
       { path: '/gp-daily/address-selection', element: <ProtectedRoute><AddressSelection /></ProtectedRoute> },
       { path: '/gp-daily/location', element: <ProtectedRoute><Location /></ProtectedRoute> },
       { path: '/gp-daily/faq', element: <ProtectedRoute><FAQ /></ProtectedRoute> },
+      { path: '/gp-daily/notifications', element: <ProtectedRoute><Notifications /></ProtectedRoute> },
+      { path: '/gp-daily/notification-preferences', element: <ProtectedRoute><NotificationPreferences /></ProtectedRoute> },
       { path: '/gp-daily/Products', element: <Products /> },
       { path: '/gp-daily/product/:slug', element: <ProductPage /> },
       { path: '/gp-daily/refer', element: <ProtectedRoute><Refer /></ProtectedRoute> },
@@ -139,6 +146,8 @@ const router = createBrowserRouter(
       { path: '/gp-store/address-selection', element: <ProtectedRoute><AddressSelection /></ProtectedRoute> },
       { path: '/gp-store/location', element: <ProtectedRoute><Location /></ProtectedRoute> },
       { path: '/gp-store/faq', element: <ProtectedRoute><FAQ /></ProtectedRoute> },
+      { path: '/gp-store/notifications', element: <ProtectedRoute><Notifications /></ProtectedRoute> },
+      { path: '/gp-store/notification-preferences', element: <ProtectedRoute><NotificationPreferences /></ProtectedRoute> },
       { path: '/gp-store/refer', element: <ProtectedRoute><Refer /></ProtectedRoute> },
       { path: '/gp-store/customer-support', element: <ProtectedRoute><CustomerSupport /></ProtectedRoute> },
       { path: '/gp-store/customer-support/chat', element: <ProtectedRoute><SupportTicketChat /></ProtectedRoute> },
@@ -166,6 +175,7 @@ const router = createBrowserRouter(
       { path: '/customer-support', element: <ProtectedRoute><CustomerSupport /></ProtectedRoute> },
       { path: '/customer-support/chat', element: <ProtectedRoute><SupportTicketChat /></ProtectedRoute> },
       { path: '/faq', element: <ProtectedRoute><FAQ /></ProtectedRoute> },
+      { path: '/products/:slug', element: <ProductDeepLinkPage /> },
       { path: '/terms', element: <Terms /> },
       { path: '/privacy', element: <Privacy /> },
     ],

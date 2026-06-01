@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { MdKeyboardArrowDown } from "react-icons/md";
+import { MdKeyboardArrowDown, MdChevronLeft, MdChevronRight } from "react-icons/md";
 import { IoPlay } from "react-icons/io5";
 import pauseSubIcon from "../assets/svg/cancelpage/pause.svg";
 
@@ -20,9 +20,17 @@ import {
   mapGpDailyCatalogRowToProduct,
 } from "../services/product.service";
 import {
-  pickActiveSubscriptionDailyUnitRupees,
-  computeGpDailyOrderOnHold,
+  computeGpDailyWalletBanner,
+  PAUSE_REASON_INSUFFICIENT_WALLET,
+  shouldShowGpDailyWalletAlertCard,
+  shouldShowGpDailyOrderInHoldCard,
+  shouldShowGpDailyRunningLowCard,
 } from "../utils/gpDailyWalletHold";
+import {
+  readWalletPauseScheduleYmd,
+  writeWalletPauseScheduleYmd,
+} from "../utils/gpDailyWalletPauseSchedule";
+import { subscriptionsDueForAutoResume } from "../utils/subscriptionAutoResume";
 import { storeService } from "../services/store.service";
 import { resolveGpDailyCatalogStoreId } from "../utils/gpDailyCatalogStore";
 import type { Product as ProductType } from "../services/product.service";
@@ -38,6 +46,8 @@ import scooterIcon from "../assets/svg/gp_daily svg/scooter.svg";
 import flowerIcon from "../assets/svg/gp_daily svg/flower.svg";
 import bannerPng from "../assets/svg/gp_daily svg/banner.png";
 import dailyOfferImage from "../assets/svg/gp_daily svg/offer.png";
+import { OffersBannerCarousel } from "../components/OffersBannerCarousel";
+import { BANNER_PLACEMENT_DAILY_HOME } from "../utils/bannerPlacement";
 import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
 import locationhomeIcon from "../assets/svg/gp_daily svg/locationhome.svg";
 import profilehomeIcon from "../assets/svg/gp_daily svg/profilehome.svg";
@@ -50,15 +60,38 @@ import {
 } from "../components/common/ProfileAvatarButton";
 import alertIcon from "../assets/svg/gp_daily svg/lowbalance.svg";
 import {
+  buildNamasteTodayOrderSlides,
+  type NamasteTodayOrderSlide,
+} from "../utils/namasteTodayOrderSlides";
+import {
+  InsufficientWalletModal,
+  type InsufficientWalletDetails,
+} from "../components/daily/InsufficientWalletModal";
+import { navigateToGpDailyWalletForRecharge } from "../utils/gpDailyWalletRechargeRedirect";
+import { guestHasSavedBrowseAddress } from "../utils/guestAddressEntry";
+import {
   formatNamasteDeliveryLine,
   formatNamasteSubscriptionStatusLine,
   subscriptionProductLabel,
 } from "../utils/subscriptionNextDelivery";
+
+type NamasteWebCarouselSlide =
+  | { kind: "today_order"; slide: NamasteTodayOrderSlide }
+  | { kind: "subscription"; sub: Subscription };
 import {
   fetchGuestDeviceLocationLabel,
   GUEST_HEADER_LOCATION_TITLE,
   GUEST_LOCATION_UNAVAILABLE_HINT,
 } from "../utils/guestHeaderLocation";
+import {
+  GP_OPEN_GUEST_AREA_MODAL_EVENT,
+} from "../config/guestAreaModalCopy";
+import { HomeHeroStatusBanner } from "../components/home/HomeHeroStatusBanner";
+import { SleepingZzzBadge } from "../components/home/SleepingZzzBadge";
+import {
+  resolveHomeHeroStatus,
+  type HomeHeroStatus,
+} from "../utils/homeLocationHeroState";
 import {
   formatHomeHeaderAddressDisplay,
   HOME_HEADER_ADDRESS_LINE,
@@ -86,6 +119,29 @@ const NAMASTE_SCROLL_SETTLE_MS = 280;
 const NAMASTE_AUTOPLAY_SNOOZE_MS = 3500;
 /** Hard cap on `scrollend` wait so the in-flight flag never gets stuck. */
 const NAMASTE_AUTOPLAY_SCROLL_TIMEOUT_MS = 900;
+const dailyScooterHeroSvg = "/daily_scooter.svg";
+const dailyScooterHeroInlineClass =
+  "pointer-events-none absolute -right-3.5 top-0 z-[1] flex flex-col items-center sm:-right-4";
+const dailyScooterHeroImgClass =
+  "h-[5.5rem] w-[11rem] object-contain object-right sm:h-[6rem] sm:w-[11.75rem]";
+const NAMASTE_MAX_VISIBLE_DOTS = 3;
+
+function getNamasteVisibleDotIndices(
+  total: number,
+  current: number,
+): number[] {
+  if (total <= NAMASTE_MAX_VISIBLE_DOTS) {
+    return Array.from({ length: total }, (_, i) => i);
+  }
+  const start = Math.max(
+    0,
+    Math.min(current - 1, total - NAMASTE_MAX_VISIBLE_DOTS),
+  );
+  return Array.from(
+    { length: NAMASTE_MAX_VISIBLE_DOTS },
+    (_, i) => start + i,
+  );
+}
 
 function readNamasteCarouselPosition(el: HTMLDivElement): {
   slideWidth: number;
@@ -114,12 +170,17 @@ const Home2: React.FC = () => {
   );
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
+  const [insufficientWalletModal, setInsufficientWalletModal] =
+    useState<InsufficientWalletDetails | null>(null);
   const [productsFetchError, setProductsFetchError] = useState<string | null>(null);
   const [activeSubscriptions, setActiveSubscriptions] = useState<
     Subscription[]
   >([]);
   const [hasCustomerSubscription, setHasCustomerSubscription] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
+  const [todayOrderSlides, setTodayOrderSlides] = useState<
+    NamasteTodayOrderSlide[]
+  >([]);
   const [isLoadingSubscriptions, setIsLoadingSubscriptions] = useState(true);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [selectedSubscription, setSelectedSubscription] =
@@ -165,6 +226,44 @@ const Home2: React.FC = () => {
   } | null>(null);
   const [isValidatingDeliveryZone, setIsValidatingDeliveryZone] =
     useState(false);
+  const [homeHeroStatus, setHomeHeroStatus] = useState<HomeHeroStatus>("default");
+
+  const refreshHomeHeroStatus = useCallback(async () => {
+    const storeId =
+      storeService.getStoreIdForProducts() ??
+      (await resolveGpDailyCatalogStoreId()) ??
+      null;
+    const guestTempId = storeService.getTemporaryStoreId();
+    const inServiceArea =
+      deliveryZoneStatus?.isValid === true ||
+      guestTempId != null ||
+      storeId != null;
+    let deviceLat: number | null = null;
+    let deviceLng: number | null = null;
+    try {
+      const raw = localStorage.getItem("userCoordinates");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { lat?: number; lng?: number };
+        if (typeof parsed.lat === "number" && typeof parsed.lng === "number") {
+          deviceLat = parsed.lat;
+          deviceLng = parsed.lng;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    const status = await resolveHomeHeroStatus({
+      storeId,
+      inServiceArea,
+      deviceLat,
+      deviceLng,
+    });
+    setHomeHeroStatus(status);
+  }, [deliveryZoneStatus?.isValid]);
+
+  useEffect(() => {
+    void refreshHomeHeroStatus();
+  }, [refreshHomeHeroStatus, deliveryLocation, isLoggedIn]);
 
   useGoogleMaps();
 
@@ -269,13 +368,23 @@ const Home2: React.FC = () => {
   const fetchOrdersByCustomerId = async () => {
     try {
       setIsLoadingOrders(true);
-      const orders = await orderService.getOrders({
+      const { orders: raw } = await orderService.getOrdersFirstPage({
         order_type: "subscription",
       });
-      setOrders(orders);
+      const list = [...(raw || [])];
+      setOrders(list);
+      const asRecords = list
+        .filter((o) => o && typeof o === "object")
+        .map((o) => o as Record<string, unknown>);
+      await orderService.enrichOrderListProductLabels(asRecords, {
+        concurrency: 4,
+        maxFetches: Math.max(asRecords.length, 12),
+      });
+      setTodayOrderSlides(buildNamasteTodayOrderSlides(asRecords));
     } catch (error) {
-      console.error("Error fetching subscriptions:", error);
+      console.error("Error fetching subscription orders:", error);
       setOrders([]);
+      setTodayOrderSlides([]);
     } finally {
       setIsLoadingOrders(false);
     }
@@ -468,6 +577,13 @@ const Home2: React.FC = () => {
     if (localStorage.getItem("access_token")) {
       fetchLatestAddress();
     } else if (!isLoggedIn) {
+      const guestAddr = storeService.getGuestBrowseAddress();
+      if (guestAddr) {
+        setAddressType(guestAddr.label || GUEST_HEADER_LOCATION_TITLE);
+        setDeliveryLocation(guestAddr.formattedLine);
+        setIsLoadingAddress(false);
+        return;
+      }
       setAddressType(GUEST_HEADER_LOCATION_TITLE);
       setDeliveryLocation("");
       setIsLoadingAddress(true);
@@ -556,9 +672,21 @@ const Home2: React.FC = () => {
 
   const handleLocationClick = () => {
     if (!isLoggedIn) {
-      navigate(`${basePath}/login`, {
-        state: { returnUrl: `${basePath}/address-selection` },
-      });
+      if (guestHasSavedBrowseAddress()) {
+        navigate(`${basePath}/login`, {
+          state: { from: location.pathname, returnUrl: `${basePath}/address-selection` },
+        });
+        return;
+      }
+      window.dispatchEvent(
+        new CustomEvent(GP_OPEN_GUEST_AREA_MODAL_EVENT, {
+          detail: {
+            dismissible: true,
+            variant: "need_location",
+            redirectToAddressAfterPick: true,
+          },
+        }),
+      );
       return;
     }
     navigate(`${basePath}/address-selection`, { state: { fromHome: true } });
@@ -574,28 +702,71 @@ const Home2: React.FC = () => {
   };
 
   const subscriptionCarouselKey = useMemo(
-    () => activeSubscriptions.map((s) => s.id).join("|"),
-    [activeSubscriptions]
+    () =>
+      [
+        todayOrderSlides.map((s) => s.id).join("|"),
+        activeSubscriptions.map((s) => s.id).join("|"),
+      ].join("::"),
+    [todayOrderSlides, activeSubscriptions],
   );
 
-  const namasteLoopSlides = useMemo((): Subscription[] => {
-    if (activeSubscriptions.length <= 1) return activeSubscriptions;
+  const namasteCarouselSlides = useMemo((): NamasteWebCarouselSlide[] => {
+    const orderSlides: NamasteWebCarouselSlide[] = todayOrderSlides.map(
+      (slide) => ({
+        kind: "today_order" as const,
+        slide,
+      }),
+    );
+    const subSlides: NamasteWebCarouselSlide[] = activeSubscriptions.map(
+      (sub) => ({
+        kind: "subscription" as const,
+        sub,
+      }),
+    );
+    return [...orderSlides, ...subSlides];
+  }, [todayOrderSlides, activeSubscriptions]);
+
+  const namasteSlideCount = namasteCarouselSlides.length;
+
+  const namasteLoopSlides = useMemo((): NamasteWebCarouselSlide[] => {
+    if (namasteSlideCount <= 1) return namasteCarouselSlides;
     return [
-      activeSubscriptions[activeSubscriptions.length - 1],
-      ...activeSubscriptions,
-      activeSubscriptions[0],
+      namasteCarouselSlides[namasteSlideCount - 1],
+      ...namasteCarouselSlides,
+      namasteCarouselSlides[0],
     ];
-  }, [activeSubscriptions]);
+  }, [namasteCarouselSlides, namasteSlideCount]);
+
+  const namasteCarouselLoading =
+    isLoggedIn && (isLoadingSubscriptions || isLoadingOrders);
+  const hasNamasteSubs =
+    isLoggedIn && !namasteCarouselLoading && namasteSlideCount > 0;
+  const showNamasteMarketing =
+    !isLoggedIn ||
+    (!namasteCarouselLoading && namasteSlideCount === 0);
+
+  const namasteVisibleDotIndices = useMemo(
+    () =>
+      getNamasteVisibleDotIndices(namasteSlideCount, subscriptionCarouselIndex),
+    [namasteSlideCount, subscriptionCarouselIndex],
+  );
+  const currentNamasteCarouselSlide =
+    namasteCarouselSlides[subscriptionCarouselIndex] ?? null;
+  const currentNamasteSub =
+    currentNamasteCarouselSlide?.kind === "subscription"
+      ? currentNamasteCarouselSlide.sub
+      : null;
+  const currentNamasteSubPaused = currentNamasteSub?.status === "PAUSED";
 
   const getNamasteRealIndexFromVirtual = useCallback(
     (virtualIdx: number) => {
-      const n = activeSubscriptions.length;
+      const n = namasteSlideCount;
       if (n <= 1) return 0;
       if (virtualIdx <= 0) return n - 1;
       if (virtualIdx >= n + 1) return 0;
       return Math.max(0, Math.min(virtualIdx - 1, n - 1));
     },
-    [activeSubscriptions]
+    [namasteSlideCount],
   );
 
   const applyNamasteCarouselState = useCallback(
@@ -604,25 +775,28 @@ const Home2: React.FC = () => {
       setNamasteVirtualIndex(virtualIndex);
       const dot = getNamasteRealIndexFromVirtual(virtualIndex);
       setSubscriptionCarouselIndex(dot);
-      const s = activeSubscriptions[dot];
-      if (s) setSelectedSubscription(s);
+      const item = namasteCarouselSlides[dot];
+      if (item?.kind === "subscription") {
+        setSelectedSubscription(item.sub);
+      }
     },
-    [activeSubscriptions, getNamasteRealIndexFromVirtual],
+    [namasteCarouselSlides, getNamasteRealIndexFromVirtual],
   );
 
   /** Init scroll to first real slide (virtual index 1) when loop, or 0 when single. */
   useEffect(() => {
     const el = subscriptionCarouselRef.current;
     if (!el) return;
-    const n = activeSubscriptions.length;
+    const n = namasteSlideCount;
     if (n === 0) return;
     if (n <= 1) {
       el.scrollTo({ left: 0, behavior: "auto" });
       namasteVirtualIndexRef.current = 0;
       setNamasteVirtualIndex(0);
       setSubscriptionCarouselIndex(0);
-      if (activeSubscriptions[0]) {
-        setSelectedSubscription(activeSubscriptions[0]);
+      const first = namasteCarouselSlides[0];
+      if (first?.kind === "subscription") {
+        setSelectedSubscription(first.sub);
       }
       return;
     }
@@ -639,14 +813,14 @@ const Home2: React.FC = () => {
       }, 0);
     };
     requestAnimationFrame(() => requestAnimationFrame(apply));
-  }, [subscriptionCarouselKey, activeSubscriptions, applyNamasteCarouselState]);
+  }, [subscriptionCarouselKey, namasteCarouselSlides, namasteSlideCount, applyNamasteCarouselState]);
 
   const runNamasteBoundaryJump = useCallback(() => {
     const el = subscriptionCarouselRef.current;
-    if (!el || activeSubscriptions.length <= 1) return;
+    if (!el || namasteSlideCount <= 1) return;
     const { slideWidth, virtualIndex: rawIdx } = readNamasteCarouselPosition(el);
     const w = slideWidth || 1;
-    const n = activeSubscriptions.length;
+    const n = namasteSlideCount;
     const lastRealVirtual = n;
     const firstCloneVirtual = n + 1;
     if (rawIdx === 0) {
@@ -666,19 +840,19 @@ const Home2: React.FC = () => {
         namasteJumpingRef.current = false;
       });
     }
-  }, [activeSubscriptions, applyNamasteCarouselState]);
+  }, [namasteSlideCount, applyNamasteCarouselState]);
 
   /** Pagination dots + virtual index from live scroll (always runs on manual swipe). */
   const syncNamasteCarouselFromScroll = useCallback(() => {
     const el = subscriptionCarouselRef.current;
-    if (!el || activeSubscriptions.length <= 1) return;
+    if (!el || namasteSlideCount <= 1) return;
     const { virtualIndex } = readNamasteCarouselPosition(el);
     applyNamasteCarouselState(virtualIndex);
-  }, [activeSubscriptions.length, applyNamasteCarouselState]);
+  }, [namasteSlideCount, applyNamasteCarouselState]);
 
   const snapNamasteCarouselToNearest = useCallback(() => {
     const el = subscriptionCarouselRef.current;
-    if (!el || namasteJumpingRef.current || activeSubscriptions.length <= 1) {
+    if (!el || namasteJumpingRef.current || namasteSlideCount <= 1) {
       return;
     }
     const { slideWidth, virtualIndex: nearest } = readNamasteCarouselPosition(el);
@@ -694,7 +868,7 @@ const Home2: React.FC = () => {
     }
     applyNamasteCarouselState(nearest);
     runNamasteBoundaryJump();
-  }, [activeSubscriptions.length, applyNamasteCarouselState, runNamasteBoundaryJump]);
+  }, [namasteSlideCount, applyNamasteCarouselState, runNamasteBoundaryJump]);
 
   /**
    * After scroll settles, jump off clone slides (same as app `onMomentumScrollEnd`).
@@ -702,7 +876,7 @@ const Home2: React.FC = () => {
   useEffect(() => {
     const el = subscriptionCarouselRef.current;
     if (!el) return;
-    if (activeSubscriptions.length <= 1) return;
+    if (namasteSlideCount <= 1) return;
     const onSettle = () => {
       if (namasteJumpingRef.current) return;
       snapNamasteCarouselToNearest();
@@ -735,7 +909,7 @@ const Home2: React.FC = () => {
       el.removeEventListener("scrollend", onScrollEnd);
     };
   }, [
-    activeSubscriptions,
+    namasteSlideCount,
     subscriptionCarouselKey,
     snapNamasteCarouselToNearest,
     syncNamasteCarouselFromScroll,
@@ -744,8 +918,8 @@ const Home2: React.FC = () => {
   const scrollSubscriptionCarouselTo = useCallback(
     (index: number) => {
       const el = subscriptionCarouselRef.current;
-      if (!el || activeSubscriptions.length === 0) return;
-      if (activeSubscriptions.length <= 1) {
+      if (!el || namasteSlideCount === 0) return;
+      if (namasteSlideCount <= 1) {
         el.scrollTo({ left: 0, behavior: "smooth" });
         return;
       }
@@ -755,11 +929,11 @@ const Home2: React.FC = () => {
       applyNamasteCarouselState(virtual);
       el.scrollTo({ left: virtual * w, behavior: "smooth" });
     },
-    [activeSubscriptions, applyNamasteCarouselState]
+    [namasteSlideCount, applyNamasteCarouselState],
   );
 
   useEffect(() => {
-    if (activeSubscriptions.length <= 1) {
+    if (namasteSlideCount <= 1) {
       return;
     }
     const tick = () => {
@@ -773,7 +947,7 @@ const Home2: React.FC = () => {
       }
       const el = subscriptionCarouselRef.current;
       if (!el) return;
-      const n = activeSubscriptions.length;
+      const n = namasteSlideCount;
       if (n <= 1) return;
 
       const { slideWidth, virtualIndex: currentVirtual } =
@@ -806,7 +980,7 @@ const Home2: React.FC = () => {
     const id = window.setInterval(tick, NAMASTE_CAROUSEL_AUTOPLAY_MS);
     return () => window.clearInterval(id);
   }, [
-    activeSubscriptions,
+    namasteSlideCount,
     subscriptionCarouselKey,
     applyNamasteCarouselState,
     getNamasteRealIndexFromVirtual,
@@ -814,26 +988,54 @@ const Home2: React.FC = () => {
     syncNamasteCarouselFromScroll,
   ]);
 
-  const isPageLoading =
-    isLoadingAddress || isLoadingBalance || isLoadingProducts;
+  const goNamasteCarouselPrev = () => {
+    const n = namasteSlideCount;
+    if (n <= 1) return;
+    const next = (subscriptionCarouselIndex - 1 + n) % n;
+    scrollSubscriptionCarouselTo(next);
+  };
 
-  /** Wallet “order on hold” uses first active subscription’s daily unit (not a paused card). */
-  const primarySubscriptionForWallet = useMemo(
-    () =>
-      activeSubscriptions.find((s) => s.status === "ACTIVE") ??
-      activeSubscriptions[0] ??
-      null,
-    [activeSubscriptions],
-  );
+  const goNamasteCarouselNext = () => {
+    const n = namasteSlideCount;
+    if (n <= 1) return;
+    const next = (subscriptionCarouselIndex + 1) % n;
+    scrollSubscriptionCarouselTo(next);
+  };
 
-  const dailySubscriptionUnitRupees = useMemo(
-    () =>
-      pickActiveSubscriptionDailyUnitRupees(
-        primarySubscriptionForWallet,
-        activeSubscriptionExtra,
-      ),
-    [primarySubscriptionForWallet, activeSubscriptionExtra],
-  );
+  const renderNamastePagination = () =>
+    namasteSlideCount > 1 ? (
+      <div className="mt-1 flex items-center justify-center gap-2.5">
+        <button
+          type="button"
+          onClick={goNamasteCarouselPrev}
+          className="hidden h-6 w-6 shrink-0 items-center justify-center text-[#9CA3AF] hover:text-[#6B7280] lg:flex"
+          aria-label="Previous subscription"
+        >
+          <MdChevronLeft className="h-4 w-4" />
+        </button>
+        <div className="flex items-center gap-1.5">
+          {namasteVisibleDotIndices.map((dotIdx) => (
+            <span
+              key={`namaste-dot-${dotIdx}`}
+              className={`h-1.5 w-1.5 rounded-full ${
+                dotIdx === subscriptionCarouselIndex
+                  ? "bg-[#E1522D]"
+                  : "bg-[#D1D5DB]"
+              }`}
+              aria-hidden
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={goNamasteCarouselNext}
+          className="hidden h-6 w-6 shrink-0 items-center justify-center text-[#9CA3AF] hover:text-[#6B7280] lg:flex"
+          aria-label="Next subscription"
+        >
+          <MdChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    ) : null;
 
   const handleNamasteResume = async (e: React.MouseEvent, subId: string) => {
     e.preventDefault();
@@ -851,15 +1053,214 @@ const Home2: React.FC = () => {
     }
   };
 
-  const orderOnHold = useMemo(
+  const renderNamasteTodayOrderSlide = (
+    slide: NamasteTodayOrderSlide,
+    keySuffix: string,
+  ) => (
+    <div key={keySuffix} className="min-w-0 flex-1">
+      <div className="flex flex-col justify-start gap-1 pl-2.5 pr-1 lg:pr-2">
+        <div className="flex min-h-7 items-center gap-3 text-[#222222]">
+          <img
+            src={scooterIcon}
+            alt=""
+            className="h-4 w-4 shrink-0"
+            aria-hidden
+          />
+          <span className="min-w-0 flex-1 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
+            {slide.heading}
+          </span>
+        </div>
+        {slide.packNames.map((packName, packIdx) => (
+          <div
+            key={`${keySuffix}-pack-${packIdx}`}
+            className="flex min-h-7 items-center gap-3 text-[#222222]"
+          >
+            <img
+              src={flowerIcon}
+              alt=""
+              className="h-4 w-4 shrink-0"
+              aria-hidden
+            />
+            <span className="min-w-0 flex-1 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
+              {packName}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderNamasteCarouselSlide = (
+    item: NamasteWebCarouselSlide,
+    keySuffix: string,
+  ) => {
+    if (item.kind === "today_order") {
+      return renderNamasteTodayOrderSlide(item.slide, keySuffix);
+    }
+    return renderNamasteSubSlide(item.sub, keySuffix);
+  };
+
+  const renderNamasteSubSlide = (sub: Subscription, keySuffix: string) => (
+    <div key={keySuffix} className="min-w-0 flex-1">
+      <div className="flex flex-col justify-start gap-1 pl-2.5 pr-1 lg:pr-2">
+        <div className="flex min-h-7 items-center gap-3 text-[#222222]">
+          <img
+            src={flowerIcon}
+            alt=""
+            className="h-4 w-4 shrink-0"
+            aria-hidden
+          />
+          <span className="min-w-0 flex-1 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
+            {subscriptionProductLabel(sub)}
+          </span>
+        </div>
+        <div className="flex min-h-7 items-center gap-3 text-[#222222]">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            {sub.status === "PAUSED" ? (
+              <img
+                src={pauseSubIcon}
+                alt=""
+                className="h-4 w-4 shrink-0"
+                aria-hidden
+              />
+            ) : (
+              <IoPlay
+                className="h-5 w-5 shrink-0 text-[#222222]"
+                aria-hidden
+              />
+            )}
+            <span className="min-w-0 text-[15px] font-medium leading-5 text-[#222222]">
+              {formatNamasteSubscriptionStatusLine(sub)}
+            </span>
+          </div>
+          {sub.status === "PAUSED" ? (
+            <SubscriptionResumeButton
+              compact
+              variant="bottleGreen"
+              loading={resumingSubId === sub.id}
+              disabled={resumingSubId != null}
+              onClick={(e) => void handleNamasteResume(e, sub.id)}
+            />
+          ) : null}
+        </div>
+        <div className="flex min-h-7 items-center gap-3 text-[#222222]">
+          <img
+            src={scooterIcon}
+            alt=""
+            className="h-4 w-4 shrink-0"
+            aria-hidden
+          />
+          <span className="min-w-0 flex-1 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
+            {formatNamasteDeliveryLine(sub)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
+  const isPageLoading =
+    isLoadingAddress || isLoadingBalance || isLoadingProducts;
+
+  const [walletPauseScheduleYmd, setWalletPauseScheduleYmd] = useState<string | null>(
+    () => readWalletPauseScheduleYmd(),
+  );
+  const walletAutoPauseInFlightRef = useRef(false);
+  const walletAutoResumeInFlightRef = useRef(false);
+
+  const walletBanner = useMemo(
     () =>
-      computeGpDailyOrderOnHold(
+      computeGpDailyWalletBanner({
         isLoggedIn,
-        isLoadingBalance,
+        walletLoading: isLoadingBalance,
         walletBalance,
-        dailySubscriptionUnitRupees,
-      ),
-    [isLoggedIn, isLoadingBalance, walletBalance, dailySubscriptionUnitRupees],
+        subscriptions: activeSubscriptions,
+        storedPauseScheduleYmd: walletPauseScheduleYmd,
+      }),
+    [
+      isLoggedIn,
+      isLoadingBalance,
+      walletBalance,
+      activeSubscriptions,
+      walletPauseScheduleYmd,
+    ],
+  );
+
+  useEffect(() => {
+    if (!isLoggedIn || isLoadingBalance) return;
+    const next = walletBanner.nextStoredPauseScheduleYmd;
+    if (next === walletPauseScheduleYmd) return;
+    setWalletPauseScheduleYmd(next);
+    writeWalletPauseScheduleYmd(next);
+  }, [
+    isLoggedIn,
+    isLoadingBalance,
+    walletBanner.nextStoredPauseScheduleYmd,
+    walletPauseScheduleYmd,
+  ]);
+
+  useEffect(() => {
+    if (!isLoggedIn || walletAutoPauseInFlightRef.current) return;
+    if (!walletBanner.shouldAutoPauseActiveSubs) return;
+    const activeIds = activeSubscriptions
+      .filter((s) => String(s.status ?? "").toUpperCase() === "ACTIVE")
+      .map((s) => String(s.id).trim())
+      .filter(Boolean);
+    if (activeIds.length === 0) return;
+
+    walletAutoPauseInFlightRef.current = true;
+    void (async () => {
+      try {
+        await Promise.all(
+          activeIds.map((id) =>
+            subscriptionService.pauseSubscriptionWithPayload(id, {
+              pause_reason: PAUSE_REASON_INSUFFICIENT_WALLET,
+            }),
+          ),
+        );
+        await fetchSubscriptions({ silent: true });
+      } catch {
+        /* backend cron should also handle */
+      } finally {
+        walletAutoPauseInFlightRef.current = false;
+      }
+    })();
+  }, [isLoggedIn, walletBanner.shouldAutoPauseActiveSubs, activeSubscriptions]);
+
+  useEffect(() => {
+    if (!isLoggedIn || walletAutoResumeInFlightRef.current) return;
+    const due = subscriptionsDueForAutoResume(activeSubscriptions);
+    if (due.length === 0) return;
+
+    walletAutoResumeInFlightRef.current = true;
+    void (async () => {
+      try {
+        for (const sub of due) {
+          const id = String(sub.id ?? sub.subscription_id ?? "").trim();
+          if (!id) continue;
+          await subscriptionService.resumeSubscription(id);
+        }
+        await fetchSubscriptions({ silent: true });
+      } catch {
+        /* backend Celery should resume + notify */
+      } finally {
+        walletAutoResumeInFlightRef.current = false;
+      }
+    })();
+  }, [isLoggedIn, activeSubscriptions]);
+
+  const orderOnHold = useMemo(
+    () => ({
+      show: shouldShowGpDailyWalletAlertCard(walletBanner),
+      showOrderInHold: shouldShowGpDailyOrderInHoldCard(walletBanner),
+      showRunningLow: shouldShowGpDailyRunningLowCard(walletBanner),
+      kind: walletBanner.kind,
+      pauseDateLabel: walletBanner.pauseDateLabel,
+      threshold3Day: walletBanner.threeDayTotal,
+      requiredRecharge: walletBanner.requiredRecharge,
+      hasWalletHoldPause: walletBanner.hasWalletHoldPause,
+      lowBalanceForSubscription: walletBanner.threeDayTotal > 0,
+    }),
+    [walletBanner],
   );
 
   if (isPageLoading) {
@@ -875,7 +1276,6 @@ const Home2: React.FC = () => {
             style={{
               background:
                 "linear-gradient(90deg, rgba(250, 193, 20, 0.4) 0%, rgba(250, 193, 20, 0.2) 100%)",
-              minHeight: "clamp(200px, 38vw, 260px)",
             }}
           >
             {/* <img
@@ -926,7 +1326,7 @@ const Home2: React.FC = () => {
               </div>
 
               {/* Search Bar — unified styling, product suggestions as you type */}
-              <div className="mt-2">
+              <div className="mt-1.5">
                 <SearchBar
                   mode="product"
                   variant="homepage"
@@ -935,7 +1335,8 @@ const Home2: React.FC = () => {
                 />
               </div>
 
-              {/* Special Festival Offers — matches app `GpDailyHomeScreen` offerCard + offer.png (no extra image opacity). */}
+              {/* Legacy curated offer hero — replaced by Namaste hero block below. */}
+              {/*
               <div className="relative mt-[14px] min-h-[160px] overflow-hidden bg-transparent">
                 <p className="relative z-10 ml-[10px] mt-[30px] max-w-[14rem] whitespace-pre-line font-serif text-[18px] font-normal leading-7 text-[#222222]">
                   Special Festival Offers{"\n"}Available
@@ -957,40 +1358,161 @@ const Home2: React.FC = () => {
                   aria-hidden
                 />
               </div>
-            </div>
-          </div>
+              */}
 
-          <div className="px-4 py-4 space-y-4">
-              {/* Order in Hold Banner - Only show after balance is loaded */}
-              {!isLoadingBalance &&
-                isLoggedIn &&
-                hasCustomerSubscription &&
-                orderOnHold.show && (
-                <div className="rounded-[40px] p-4 text-white" style={{ backgroundColor: "rgba(255, 38, 41, 0.8)" }}>
-                  <div className="flex items-start gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <img src={alertIcon} alt="" className="w-[18px] h-[18px]" aria-hidden />
+              {/* Namaste hero — store-home truck pattern with landing-page scooter. */}
+              {homeHeroStatus === "store_offline" ? (
+                <div className="relative mt-3 min-h-[5.5rem] sm:mt-4 sm:min-h-[6rem]">
+                  <div className="relative z-10 max-w-[calc(100%-9.5rem)]">
+                    <HomeHeroStatusBanner
+                      variant="store_offline"
+                      typography="daily"
+                    />
+                  </div>
+                  <div className="pointer-events-none absolute -right-3 top-1/2 z-0 -translate-y-1/2 translate-x-1 sm:-right-4 sm:translate-x-2">
+                    <img
+                      src={dailyScooterHeroSvg}
+                      alt=""
+                      aria-hidden
+                      className={`relative ${dailyScooterHeroImgClass}`}
+                    />
+                    <SleepingZzzBadge
+                      tone="scooter"
+                      className="left-[2.75rem] top-2 right-auto"
+                    />
+                  </div>
+                </div>
+              ) : homeHeroStatus !== "default" ? (
+                <HomeHeroStatusBanner
+                  variant={homeHeroStatus}
+                  typography="daily"
+                  onChangeLocation={
+                    homeHeroStatus === "area_coming_soon"
+                      ? handleLocationClick
+                      : undefined
+                  }
+                />
+              ) : (
+              <div className="relative mt-3 sm:mt-4">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <h2 className="min-w-0 flex-1 font-serif text-[1.625rem] font-semibold leading-8 text-[#222222] [overflow-wrap:anywhere]">
+                    {isLoggedIn
+                      ? `Namaste, ${userFirstName || "User"}!`
+                      : "Namaste!"}
+                  </h2>
+                  {isLoggedIn ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(`${basePath}/manage-my-subscription`)
+                      }
+                      className="shrink-0 rounded-full bg-[#E1522D]/15 px-3 py-1 text-sm font-medium text-[#E1522D] hover:bg-[#E1522D]/25"
+                    >
+                      Manage
+                    </button>
+                  ) : null}
+                </div>
+
+                {isLoggedIn && namasteCarouselLoading ? (
+                  <div className="relative mt-0.5 -mr-1 pb-1">
+                    <div className="min-w-0 pr-[46%] space-y-3 pl-1 animate-pulse">
+                      <div className="h-5 w-[85%] rounded bg-gray-200/80" />
+                      <div className="h-5 w-[55%] rounded bg-gray-200/80" />
+                      <div className="h-5 w-[70%] rounded bg-gray-200/80" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-[17px] mb-1.5">Order in hold</h3>
-                      <p className="text-sm text-white/90">
-                        {orderOnHold.lowBalanceForSubscription
-                          ? `Your wallet balance is below 3-day subscription amount (₹${orderOnHold.threshold3Day}). Recharge now to continue deliveries.`
-                          : "Your wallet balance is low. Recharge now to continue your daily deliveries."}
+                    <div className={dailyScooterHeroInlineClass}>
+                      <img
+                        src={dailyScooterHeroSvg}
+                        alt=""
+                        aria-hidden
+                        className={dailyScooterHeroImgClass}
+                      />
+                    </div>
+                  </div>
+                ) : hasNamasteSubs ? (
+                  <div
+                    className={`relative mt-0.5 -mr-1 pb-1`}
+                  >
+                    <div className="min-w-0 pr-[46%]">
+                      <div
+                        className="relative transition-opacity duration-300"
+                        onPointerDown={() => snoozeNamasteAutoplay()}
+                        onPointerUp={() => {
+                          syncNamasteCarouselFromScroll();
+                          snoozeNamasteAutoplay();
+                        }}
+                        onPointerCancel={() => snoozeNamasteAutoplay()}
+                        onTouchStart={() => snoozeNamasteAutoplay()}
+                        onTouchMove={() => snoozeNamasteAutoplay()}
+                        onTouchEnd={() => {
+                          syncNamasteCarouselFromScroll();
+                          snoozeNamasteAutoplay();
+                        }}
+                      >
+                        <div
+                          ref={subscriptionCarouselRef}
+                          className="relative z-10 flex min-h-[5.25rem] snap-x snap-mandatory overflow-x-auto overscroll-x-contain no-scrollbar touch-pan-x [scroll-snap-stop:always]"
+                        >
+                          {namasteLoopSlides.map((item, loopIdx) => (
+                            <div
+                              key={`${
+                                item.kind === "today_order"
+                                  ? item.slide.id
+                                  : String(item.sub.id)
+                              }-namaste-loop-${loopIdx}`}
+                              data-namaste-slide
+                              className="box-border w-full min-w-0 shrink-0 grow-0 basis-full snap-center snap-always"
+                            >
+                              {renderNamasteCarouselSlide(
+                                item,
+                                `${
+                                  item.kind === "today_order"
+                                    ? item.slide.id
+                                    : String(item.sub.id)
+                                }-hero-${loopIdx}`,
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {renderNamastePagination()}
+                      </div>
+                    </div>
+                    <div className={dailyScooterHeroInlineClass}>
+                      <img
+                        src={dailyScooterHeroSvg}
+                        alt=""
+                        aria-hidden
+                        className={dailyScooterHeroImgClass}
+                      />
+                    </div>
+                  </div>
+                ) : showNamasteMarketing ? (
+                  <div className="relative min-h-[5.5rem] sm:min-h-[6rem]">
+                    <img
+                      src={dailyScooterHeroSvg}
+                      alt=""
+                      aria-hidden
+                      className={`pointer-events-none absolute -right-3 top-1/2 z-0 -translate-y-1/2 translate-x-1 object-contain object-right sm:-right-4 sm:translate-x-2 ${dailyScooterHeroImgClass}`}
+                    />
+                    <div className="relative z-10 max-w-[calc(100%-9.5rem)]">
+                      <p className="mb-1.5 text-[13px] font-normal leading-[1.35] text-[#19411F] [overflow-wrap:anywhere]">
+                        We are Genda Phool! Your partner for everyday floral
+                        needs.
+                      </p>
+                      <p className="text-[12px] font-medium leading-snug text-[#19411F]">
+                        Order in <span className="font-bold">2hrs</span> and get
+                      </p>
+                      <p className="text-[12px] font-medium leading-snug text-[#19411F]">
+                        it by tomorrow <span className="font-bold">12PM!</span>
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`${basePath}/wallet`)}
-                    className="ml-10 inline-flex min-w-[130px] items-center justify-center self-start rounded-xl border-2 border-white px-[18px] py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
-                  >
-                    Recharge Now
-                  </button>
-                </div>
+                ) : null}
+              </div>
               )}
 
-              {/* Namaste + active subscriptions carousel */}
+              {/* Legacy Namaste subscription card — moved into hero; see commented block below. */}
+              {false ? (
               <div className="relative overflow-hidden rounded-[40px] border border-[#F2E9D7] bg-[#f3e8d5] px-4 pt-3 pb-2">
                 <div className="mb-2.5 flex items-center justify-between gap-3">
                   <h2 className="min-w-0 flex-1 font-serif text-xl font-semibold leading-6 text-[#222222] [overflow-wrap:anywhere]">
@@ -1048,28 +1570,25 @@ const Home2: React.FC = () => {
                           data-namaste-slide
                           className="box-border w-full min-w-0 shrink-0 grow-0 basis-full snap-center snap-always"
                         >
-                          {/* `pr-[3.5rem]` keeps text/product label clear of the corner flower decoration. */}
                           <div className="flex flex-col justify-start gap-1 pr-[3.5rem]">
-                            {/* Row 1 — next delivery day/date (resume date when paused). */}
                             <div className="flex min-h-7 items-center gap-3 text-[#222222]">
                               <img
                                 src={scooterIcon}
                                 alt=""
-                                className="h-5 w-5 shrink-0"
+                                className="h-4 w-4 shrink-0"
                                 aria-hidden
                               />
                               <span className="min-w-0 flex-1 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
                                 {formatNamasteDeliveryLine(sub)}
                               </span>
                             </div>
-                            {/* Row 2 — subscription status, with the Resume CTA inline for paused subs. */}
                             <div className="flex min-h-7 items-center justify-between gap-2 text-[#222222]">
                               <div className="flex min-w-0 flex-1 items-center gap-3">
                                 {sub.status === "PAUSED" ? (
                                   <img
                                     src={pauseSubIcon}
                                     alt=""
-                                    className="h-5 w-5 shrink-0"
+                                    className="h-4 w-4 shrink-0"
                                     aria-hidden
                                   />
                                 ) : (
@@ -1092,12 +1611,11 @@ const Home2: React.FC = () => {
                                 ) : null}
                               </div>
                             </div>
-                            {/* Row 3 — product. */}
                             <div className="flex min-h-7 items-center gap-3 text-[#222222]">
                               <img
                                 src={flowerIcon}
                                 alt=""
-                                className="h-5 w-5 shrink-0"
+                                className="h-4 w-4 shrink-0"
                                 aria-hidden
                               />
                               <span className="min-w-0 flex-1 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
@@ -1116,9 +1634,6 @@ const Home2: React.FC = () => {
                         {subscriptionCarouselIndex + 1} / {activeSubscriptions.length}
                       </p>
                     ) : null}
-                    {/* Offsets push the flower past the inner container's padding
-                        so its edges hug the outer card (overflow-hidden + rounded
-                        corners clip the excess). */}
                     <img
                       src={smallgendaIcon}
                       alt=""
@@ -1129,10 +1644,63 @@ const Home2: React.FC = () => {
                   </>
                 )}
               </div>
+              ) : null}
+
             </div>
+          </div>
+
+          <div className="bg-[#f8f6f1] px-4 pt-2">
+            <OffersBannerCarousel
+              storeId={storeService.getStoreIdForProducts() ?? undefined}
+              placement={BANNER_PLACEMENT_DAILY_HOME}
+              compactSpacing
+            />
+          </div>
 
           {/* Main Content */}
-          <div className="px-4 py-4 space-y-6">
+          <div className="px-4 pt-2 pb-4 space-y-3">
+            {!isLoadingBalance &&
+              isLoggedIn &&
+              hasCustomerSubscription &&
+              homeHeroStatus !== "store_offline" &&
+              orderOnHold.show && (
+              <div className="rounded-[40px] p-4 text-white" style={{ backgroundColor: "rgba(255, 38, 41, 0.8)" }}>
+                <div className="flex items-start gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <img src={alertIcon} alt="" className="w-[18px] h-[18px]" aria-hidden />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-[17px] mb-1.5">
+                      {orderOnHold.showOrderInHold
+                        ? "Order in hold"
+                        : "Wallet running low"}
+                    </h3>
+                    <p className="text-sm text-white/90">
+                      {orderOnHold.showRunningLow
+                        ? `Your wallet balance will only last until ${orderOnHold.pauseDateLabel}. Please recharge to keep your deliveries running.`
+                        : "Order in hold — please recharge your wallet to resume deliveries."}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigateToGpDailyWalletForRecharge(navigate, basePath, {
+                      shortageAmount: Math.max(
+                        0,
+                        orderOnHold.requiredRecharge - walletBalance,
+                      ),
+                      currentBalance: walletBalance,
+                      totalRequired: orderOnHold.requiredRecharge,
+                      returnUrl: `${basePath}/home`,
+                    })
+                  }
+                  className="ml-10 inline-flex min-w-[130px] items-center justify-center self-start rounded-xl border-2 border-white px-[18px] py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+                >
+                  Recharge Now
+                </button>
+              </div>
+            )}
             {productsFetchError ? (
               <div className="text-red-500 text-center py-4 text-sm">{productsFetchError}</div>
             ) : null}
@@ -1303,7 +1871,24 @@ const Home2: React.FC = () => {
         </div>
 
       </div>
-    </ErrorBoundary >
+
+      <InsufficientWalletModal
+        open={insufficientWalletModal != null}
+        details={insufficientWalletModal}
+        onClose={() => setInsufficientWalletModal(null)}
+        onRecharge={() => {
+          const details = insufficientWalletModal;
+          setInsufficientWalletModal(null);
+          if (!details) return;
+          navigateToGpDailyWalletForRecharge(navigate, basePath, {
+            shortageAmount: details.shortageAmount,
+            currentBalance: details.currentBalance,
+            totalRequired: details.requiredAmount,
+            returnUrl: `${basePath}/home`,
+          });
+        }}
+      />
+    </ErrorBoundary>
   );
 };
 

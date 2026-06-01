@@ -12,8 +12,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const location = useLocation();
 
   const isAuthenticated = isLoggedIn && !!localStorage.getItem('access_token');
+  const guestAddressEntryAllowed =
+    /\/address-selection\/?$/.test(location.pathname) ||
+    /\/addresses\/add\/?$/.test(location.pathname);
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !guestAddressEntryAllowed) {
     // Detect feature from the attempted URL path
     const feature = getFeatureFromPath(location.pathname);
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';

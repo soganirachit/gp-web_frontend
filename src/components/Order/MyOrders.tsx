@@ -124,10 +124,14 @@ const MyOrders: React.FC = () => {
       const { orders: raw, nextUrl } = await orderService.getOrdersFirstPage(
         subscriptionListOnly ? { order_type: "subscription" } : undefined,
       );
-      const enrichedRaw = await orderService.enrichOrderListProductLabels(
-        (raw || []) as Record<string, unknown>[],
-      );
-      const transformedOrders = mapRawToOrders(enrichedRaw);
+      const rawRecords = ((raw || []) as Record<string, unknown>[]);
+      if (rawRecords.length > 0) {
+        await orderService.enrichOrderListProductLabels(rawRecords, {
+          concurrency: 4,
+          maxFetches: Math.max(rawRecords.length, ORDER_LIST_PAGE_SIZE),
+        });
+      }
+      const transformedOrders = mapRawToOrders(rawRecords);
       const sortedOrders = transformedOrders.sort(
         (a: Order, b: Order) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -146,16 +150,21 @@ const MyOrders: React.FC = () => {
           subscriptionListOnly,
         );
         url = n;
-        const enrichedBatch = await orderService.enrichOrderListProductLabels(
-          (raw2 || []) as Record<string, unknown>[],
-        );
-        const batch = filterOrdersForFeature(
-          mapRawToOrders(enrichedBatch).sort(
+        const batchRaw = (raw2 || []) as Record<string, unknown>[];
+        if (batchRaw.length > 0) {
+          await orderService.enrichOrderListProductLabels(batchRaw, {
+            concurrency: 4,
+            maxFetches: Math.max(batchRaw.length, ORDER_LIST_PAGE_SIZE),
+          });
+        }
+        const batch = mapRawToOrders(batchRaw);
+        const filteredBatch = filterOrdersForFeature(
+          batch.sort(
             (a: Order, b: Order) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
           ),
         );
-        merged = [...merged, ...batch].sort(
+        merged = [...merged, ...filteredBatch].sort(
           (a: Order, b: Order) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         );
@@ -210,11 +219,15 @@ const MyOrders: React.FC = () => {
           subscriptionListOnly,
         );
         url = nextUrl;
-        const enrichedMore = await orderService.enrichOrderListProductLabels(
-          (raw || []) as Record<string, unknown>[],
-        );
+        const batchRaw = (raw || []) as Record<string, unknown>[];
+        if (batchRaw.length > 0) {
+          await orderService.enrichOrderListProductLabels(batchRaw, {
+            concurrency: 4,
+            maxFetches: Math.max(batchRaw.length, ORDER_LIST_PAGE_SIZE),
+          });
+        }
         const batch = filterOrdersForFeature(
-          mapRawToOrders(enrichedMore).sort(
+          mapRawToOrders(batchRaw).sort(
             (a: Order, b: Order) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
           ),

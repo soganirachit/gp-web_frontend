@@ -38,12 +38,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
   return (
     <div
-      className={`bg-white overflow-hidden cursor-pointer transition-transform hover:scale-[1.01] h-full flex flex-col rounded-2xl shadow-[0_2px_6px_rgba(0,0,0,0.08)] ${className}`}
+      className={`bg-white overflow-hidden cursor-pointer h-full flex flex-col rounded-2xl shadow-[0_2px_6px_rgba(0,0,0,0.08)] ${className}`}
       onClick={onClick}
     >
       {/* Image Section */}
       <div
-        className={`relative w-full aspect-square sm:aspect-auto sm:h-40 md:h-48 lg:h-52 overflow-hidden ${
+        className={`relative isolate w-full aspect-square sm:aspect-auto sm:h-40 md:h-48 lg:h-52 overflow-hidden ${
           showDailyButton ? "bg-[#f8f6f1]" : "bg-[#8B4513]"
         }`}
       >

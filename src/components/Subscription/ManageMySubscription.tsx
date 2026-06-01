@@ -48,30 +48,11 @@ import {
   resolveOrderItemsCount,
   resolveOrderListHistoryTitle,
 } from "../../utils/orderListDisplay";
+import {
+  formatOrderListStatusTimeLabel,
+  resolveOrderStatusUpdatedAt,
+} from "../../utils/orderStatusUpdatedAt";
 const GP_DAILY_BASE = "/gp-daily";
-
-/** Delivery history row — time line aligned with mobile `mapDeliveryHistoryFromOrders`. */
-function subscriptionOrderListTimeLabel(o: Record<string, unknown>): string {
-  const raw =
-    (o.delivery_date as string) ||
-    (o.deliveryDate as string) ||
-    (o.delivered_at as string) ||
-    (o.created_at as string) ||
-    (o.createdAt as string);
-  if (!raw || typeof raw !== "string") return "—";
-  try {
-    const dt = new Date(raw);
-    if (Number.isNaN(dt.getTime())) return "—";
-    const now = new Date();
-    const isToday = now.toDateString() === dt.toDateString();
-    if (isToday) {
-      return `Today, ${dt.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}`;
-    }
-    return `${dt.toLocaleDateString("en-IN", { weekday: "short", month: "short", day: "numeric" })}, ${dt.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}`;
-  } catch {
-    return "—";
-  }
-}
 
 function historyOrderDelivered(o: Record<string, unknown>): boolean {
   const st = String(o.status ?? "").toLowerCase();
@@ -93,25 +74,13 @@ function historyOrderUndelivered(o: Record<string, unknown>): boolean {
   return (
     historyOrderCancelled(o) ||
     st === "failed" ||
+    st === "missed" ||
     st === "undelivered" ||
     st === "rejected"
   );
 }
 
 const DELIVERY_HISTORY_PAGE_SIZE = 6;
-/** Show Support link only within 12h of `delivered_at` (match mobile `SubscriptionsScreen`). */
-const SUPPORT_TICKET_WINDOW_MS = 12 * 60 * 60 * 1000;
-
-function isSupportAvailableForDelivery(
-  delivered: boolean,
-  deliveredAtRaw: unknown,
-): boolean {
-  if (!delivered || !deliveredAtRaw) return false;
-  const deliveredMs = new Date(String(deliveredAtRaw)).getTime();
-  if (!Number.isFinite(deliveredMs) || deliveredMs <= 0) return false;
-  return Date.now() < deliveredMs + SUPPORT_TICKET_WINDOW_MS;
-}
-
 
 function isSubscriptionOrderType(o: Record<string, unknown>): boolean {
   const t = String(o.order_type ?? o.orderType ?? "")
@@ -141,6 +110,10 @@ const ManageMySubscription: React.FC = () => {
   const [historyOrders, setHistoryOrders] = useState<Record<string, unknown>[]>(
     [],
   );
+  const [historyOrdersNextUrl, setHistoryOrdersNextUrl] = useState<string | null>(
+    null,
+  );
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
   const [historyVisibleCount, setHistoryVisibleCount] = useState(
     DELIVERY_HISTORY_PAGE_SIZE,
   );
@@ -151,6 +124,7 @@ const ManageMySubscription: React.FC = () => {
     [historyOrders, historyVisibleCount],
   );
   const hasMoreHistoryRows = historyVisibleCount < historyOrders.length;
+  const hasMoreHistoryFromApi = Boolean(historyOrdersNextUrl);
 
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
 
@@ -220,14 +194,23 @@ const ManageMySubscription: React.FC = () => {
     void (async () => {
       setHistoryLoading(true);
       try {
-        const list = await orderService.getOrders({
+        const { orders: raw, nextUrl } = await orderService.getOrdersFirstPage({
           order_type: "subscription",
         });
         if (cancelled) return;
-        const arr = Array.isArray(list) ? list : [];
-        const sorted = [...arr].sort((a: any, b: any) => {
-          const ta = new Date(a.created_at || a.createdAt || 0).getTime();
-          const tb = new Date(b.created_at || b.createdAt || 0).getTime();
+        const sorted = [...(raw || [])].sort((a: any, b: any) => {
+          const ta = new Date(
+            resolveOrderStatusUpdatedAt(a as Record<string, unknown>) ||
+              a.created_at ||
+              a.createdAt ||
+              0,
+          ).getTime();
+          const tb = new Date(
+            resolveOrderStatusUpdatedAt(b as Record<string, unknown>) ||
+              b.created_at ||
+              b.createdAt ||
+              0,
+          ).getTime();
           return tb - ta;
         });
         const asRecords = sorted.map((o) =>
@@ -238,14 +221,21 @@ const ManageMySubscription: React.FC = () => {
         const subscriptionOnly = asRecords.filter((row) =>
           isSubscriptionOrderType(row),
         );
-        const enriched = await orderService.enrichOrderListProductLabels(
-          subscriptionOnly,
-        );
-        /** API may still return mixed types — keep only subscription orders */
-        setHistoryOrders(enriched);
+        await orderService.enrichOrderListProductLabels(subscriptionOnly, {
+          concurrency: 4,
+          maxFetches: Math.max(
+            subscriptionOnly.length,
+            DELIVERY_HISTORY_PAGE_SIZE,
+          ),
+        });
+        setHistoryOrders(subscriptionOnly);
+        setHistoryOrdersNextUrl(nextUrl);
         setHistoryVisibleCount(DELIVERY_HISTORY_PAGE_SIZE);
       } catch {
-        if (!cancelled) setHistoryOrders([]);
+        if (!cancelled) {
+          setHistoryOrders([]);
+          setHistoryOrdersNextUrl(null);
+        }
       } finally {
         if (!cancelled) setHistoryLoading(false);
       }
@@ -866,7 +856,7 @@ const ManageMySubscription: React.FC = () => {
                     : "border-transparent bg-white text-[#6B7280]"
                 }`}
               >
-                Delivery History
+                Deliveries
               </button>
             </div>
           </div>
@@ -911,9 +901,6 @@ const ManageMySubscription: React.FC = () => {
                     : undelivered
                       ? "Undelivered"
                       : getCustomerOrderStatusLabel(apiSt);
-                  const showSupport =
-                    delivered &&
-                    isSupportAvailableForDelivery(true, order.delivered_at);
                   const itemsCount = resolveOrderItemsCount(order);
                   const productImg = extractPrimaryImageFromOrderRaw(order);
                   const secondImg = extractSecondItemImageFromOrderRaw(order);
@@ -982,20 +969,8 @@ const ManageMySubscription: React.FC = () => {
                             </span>
                           </div>
                           <p className="text-sm leading-snug text-gray-600">
-                            {subscriptionOrderListTimeLabel(order)}
+                            {formatOrderListStatusTimeLabel(order)}
                           </p>
-                          {showSupport ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`${GP_DAILY_BASE}/customer-support`);
-                              }}
-                              className="mt-1 text-sm font-medium text-[#6B7280] underline decoration-1 underline-offset-2 hover:text-[#111827]"
-                            >
-                              Support
-                            </button>
-                          ) : null}
                         </div>
                         <FaChevronRight
                           className="shrink-0 text-gray-400"
@@ -1007,17 +982,72 @@ const ManageMySubscription: React.FC = () => {
                   );
                 })}
                 </div>
-                {hasMoreHistoryRows ? (
+                {hasMoreHistoryRows || hasMoreHistoryFromApi ? (
                   <button
                     type="button"
                     className="w-full py-4 text-center text-sm font-medium text-gray-500 underline"
-                    onClick={() =>
-                      setHistoryVisibleCount(
-                        (c) => c + DELIVERY_HISTORY_PAGE_SIZE,
-                      )
-                    }
+                    disabled={historyLoadingMore}
+                    onClick={() => {
+                      if (hasMoreHistoryRows) {
+                        setHistoryVisibleCount(
+                          (c) => c + DELIVERY_HISTORY_PAGE_SIZE,
+                        );
+                        return;
+                      }
+                      if (!historyOrdersNextUrl || historyLoadingMore) return;
+                      void (async () => {
+                        try {
+                          setHistoryLoadingMore(true);
+                          const { orders: raw, nextUrl } =
+                            await orderService.getOrdersNextPage(
+                              historyOrdersNextUrl,
+                              true,
+                            );
+                          const sorted = [...(raw || [])].sort((a: any, b: any) => {
+                            const ta = new Date(
+                              resolveOrderStatusUpdatedAt(
+                                a as Record<string, unknown>,
+                              ) ||
+                                a.created_at ||
+                                a.createdAt ||
+                                0,
+                            ).getTime();
+                            const tb = new Date(
+                              resolveOrderStatusUpdatedAt(
+                                b as Record<string, unknown>,
+                              ) ||
+                                b.created_at ||
+                                b.createdAt ||
+                                0,
+                            ).getTime();
+                            return tb - ta;
+                          });
+                          const asRecords = sorted
+                            .filter((o) => o && typeof o === "object")
+                            .map((o) => o as Record<string, unknown>)
+                            .filter((row) => isSubscriptionOrderType(row));
+                          await orderService.enrichOrderListProductLabels(
+                            asRecords,
+                            {
+                              concurrency: 4,
+                              maxFetches: Math.max(
+                                asRecords.length,
+                                DELIVERY_HISTORY_PAGE_SIZE,
+                              ),
+                            },
+                          );
+                          setHistoryOrders((prev) => [...prev, ...asRecords]);
+                          setHistoryOrdersNextUrl(nextUrl);
+                          setHistoryVisibleCount(
+                            (c) => c + DELIVERY_HISTORY_PAGE_SIZE,
+                          );
+                        } finally {
+                          setHistoryLoadingMore(false);
+                        }
+                      })();
+                    }}
                   >
-                    Load more
+                    {historyLoadingMore ? "Loading…" : "Load more"}
                   </button>
                 ) : null}
                 </>

@@ -35,6 +35,8 @@ export const GuestStoreLocationBootstrap: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [variant, setVariant] = useState<GuestAreaModalVariant>("outside_service");
   const [dismissible, setDismissible] = useState(false);
+  const [redirectToAddressAfterPick, setRedirectToAddressAfterPick] =
+    useState(false);
   const inFlightRef = useRef(false);
 
   useEffect(() => {
@@ -64,6 +66,7 @@ export const GuestStoreLocationBootstrap: React.FC = () => {
         if (!storeService.getStoreIdForProducts()) {
           setVariant("outside_service");
           setDismissible(false);
+          setRedirectToAddressAfterPick(true);
           setOpen(true);
         }
       } catch (e: unknown) {
@@ -82,6 +85,7 @@ export const GuestStoreLocationBootstrap: React.FC = () => {
           setVariant("outside_service");
         }
         setDismissible(false);
+        setRedirectToAddressAfterPick(true);
         setOpen(true);
       } finally {
         inFlightRef.current = false;
@@ -100,6 +104,7 @@ export const GuestStoreLocationBootstrap: React.FC = () => {
       const d = ce.detail;
       setVariant(d?.variant ?? "need_location");
       setDismissible(d?.dismissible !== false);
+      setRedirectToAddressAfterPick(d?.redirectToAddressAfterPick === true);
       setOpen(true);
     };
     window.addEventListener(GP_OPEN_GUEST_AREA_MODAL_EVENT, onManualOpen);
@@ -117,6 +122,7 @@ export const GuestStoreLocationBootstrap: React.FC = () => {
       onClose={handleClose}
       variant={variant}
       dismissible={dismissible}
+      redirectToAddressAfterPick={redirectToAddressAfterPick}
     />
   );
 };

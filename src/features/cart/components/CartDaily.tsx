@@ -8,7 +8,15 @@ import { useCart } from '../../../context/CartContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useFeatureTheme } from '../../../context/FeatureThemeContext';
 import { addressService, Address } from '../../../services/address.service';
-import { storeService, storeIsWithinDeliveryRadius } from '../../../services/store.service';
+import {
+  storeService,
+  storeIsWithinDeliveryRadius,
+  isCartStoreOffline,
+} from '../../../services/store.service';
+import {
+  STORE_OFFLINE_CART_BODY,
+  STORE_OFFLINE_CART_TITLE,
+} from '../../../config/homeHeroStatusCopy';
 import {
   subscriptionCartService,
   isSubscriptionCartStoreChangeConfirmation,
@@ -63,8 +71,12 @@ import { pickPrimaryImageUrl } from '../../../utils/pickPrimaryImageUrl';
 import { computeFirstSubscriptionDeliveryDateFromWeekdayInts } from '../../../utils/subscriptionFirstDeliveryDate';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
 import deliveryTruckIcon from "../../../assets/svg/gp_daily svg/delivery_truck.svg";
+import { rechargeWalletInApp } from '../../../utils/walletRechargeCheckout';
 import { setGpDailyPendingSubscriptionCheckout } from '../../../utils/gpDailyPendingSubscriptionCheckout';
-import { navigateToGpDailyWalletForRecharge } from '../../../utils/gpDailyWalletRechargeRedirect';
+import {
+  InsufficientWalletModal,
+  type InsufficientWalletDetails,
+} from '../../../components/daily/InsufficientWalletModal';
 
 
 /**
@@ -564,6 +576,9 @@ const Cart: React.FC = () => {
     addressId: number;
     message: string;
   } | null>(null);
+  const [insufficientWalletModal, setInsufficientWalletModal] =
+    useState<InsufficientWalletDetails | null>(null);
+  const [walletRecharging, setWalletRecharging] = useState(false);
   const pendingSubscriptionAddressResolveRef = useRef<((ok: boolean) => void) | null>(null);
   const prevDailyCartStoreIdRef = useRef<number | null | undefined>(undefined);
 
@@ -1272,12 +1287,21 @@ const Cart: React.FC = () => {
     let cancelled = false;
     void (async () => {
       try {
+        const storesList = await storeService.getAllStores(coords.lat, coords.lng);
+        if (cancelled) return;
+
+        if (cartStoreId != null && isCartStoreOffline(cartStoreId, storesList)) {
+          setDeliveryStoreOffline(true);
+          setSuggestedStoreForAddress(null);
+          deliveryStoreSyncKey.current = key;
+          return;
+        }
+
         const operational = await storeService.getNearestStore(coords.lat, coords.lng);
         if (cancelled) return;
         if (operational) {
           setDeliveryStoreOffline(false);
           if (cartStoreId != null && operational.id !== cartStoreId) {
-            const storesList = await storeService.getAllStores(coords.lat, coords.lng);
             const currentRow = storesList.find((s) => s.id === cartStoreId);
             if (currentRow && storeIsWithinDeliveryRadius(currentRow)) {
               setSuggestedStoreForAddress(null);
@@ -1292,7 +1316,7 @@ const Cart: React.FC = () => {
         }
 
         setSuggestedStoreForAddress(null);
-        const stores = await storeService.getAllStores(coords.lat, coords.lng);
+        const stores = storesList;
         if (cancelled) return;
         const sorted = [...stores].sort((a, b) => {
           const da = Number(a.distance_km);
@@ -1786,6 +1810,12 @@ const Cart: React.FC = () => {
       return;
     }
 
+    if (deliveryStoreOffline) {
+      toast.error(STORE_OFFLINE_CART_BODY);
+      setCheckoutInlineError(STORE_OFFLINE_CART_BODY);
+      return;
+    }
+
     // Daily cart checkout should use subscriptions/cart/checkout/
     // Prereq: set address on daily cart first.
     try {
@@ -1804,11 +1834,10 @@ const Cart: React.FC = () => {
           activeDeliveryDays: [...activeDeliveryDays],
         });
         setIsProcessingPayment(false);
-        navigateToGpDailyWalletForRecharge(navigate, basePath, {
-          shortageAmount: shortage,
+        setInsufficientWalletModal({
           currentBalance: walletBalance,
-          totalRequired: cartAmount,
-          returnUrl: `${basePath}/basket`,
+          requiredAmount: cartAmount,
+          shortageAmount: shortage,
         });
         return;
       }
@@ -2399,11 +2428,14 @@ const Cart: React.FC = () => {
               {showUnifiedDeliveryAlert ? (
                 deliveryStoreOffline ? (
                   <div
-                    className="min-w-0 rounded-[12px] border border-red-600 bg-red-50 px-3 py-2.5 shadow-sm"
+                    className="min-w-0 rounded-[12px] border border-amber-500 bg-amber-50 px-3 py-2.5 shadow-sm"
                     role="alert"
                   >
-                    <p className="text-[13px] font-semibold leading-snug text-red-900">
-                      The nearest store for this area is offline — try another address.
+                    <p className="text-[15px] font-bold leading-snug text-amber-900">
+                      {STORE_OFFLINE_CART_TITLE}
+                    </p>
+                    <p className="mt-1 text-[13px] font-medium leading-snug text-amber-800">
+                      {STORE_OFFLINE_CART_BODY}
                     </p>
                   </div>
                 ) : deliveryBlockedByCoverage ? (
@@ -2666,6 +2698,28 @@ const Cart: React.FC = () => {
           isDailyMode
         />
       )}
+
+      <InsufficientWalletModal
+        open={insufficientWalletModal != null}
+        details={insufficientWalletModal}
+        recharging={walletRecharging}
+        onClose={() => setInsufficientWalletModal(null)}
+        onRecharge={async (amount) => {
+          try {
+            setWalletRecharging(true);
+            await rechargeWalletInApp(amount);
+            toast.success('Wallet recharged successfully');
+            setInsufficientWalletModal(null);
+            await handleCheckout();
+          } catch (e: unknown) {
+            const msg =
+              e instanceof Error ? e.message : 'Recharge failed. Please try again.';
+            toast.error(msg);
+          } finally {
+            setWalletRecharging(false);
+          }
+        }}
+      />
 
     </div>
   );

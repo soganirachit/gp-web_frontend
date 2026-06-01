@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getStoreBanners, Banner } from '../services/store.service';
 import { useFeatureTheme } from '../context/FeatureThemeContext';
 import {
+  BANNER_PLACEMENT_DAILY_HOME,
   BANNER_PLACEMENT_LANDING_HOME,
   BANNER_PLACEMENT_STORE_HOME,
   filterBannersByPlacement,
@@ -14,6 +15,8 @@ interface Props {
   storeId?: number | string | null;
   /** Which banner slot to show (`store_home` on GP Store home, `landing_home` on /home). */
   placement?: BannerPlacement;
+  /** Tighter gap before the next homepage section (e.g. All Packs on GP Daily home). */
+  compactSpacing?: boolean;
 }
 
 function parseStoreIdForBanners(raw: Props['storeId']): number | null {
@@ -62,7 +65,9 @@ const OFFERS_BANNER_HEIGHT =
 export function OffersBannerCarousel({
   storeId,
   placement = BANNER_PLACEMENT_LANDING_HOME,
+  compactSpacing = false,
 }: Props) {
+  const sectionMarginClass = compactSpacing ? "mb-2 sm:mb-3" : "mb-6 sm:mb-8";
   const { theme } = useFeatureTheme();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -75,6 +80,10 @@ export function OffersBannerCarousel({
 
   const primaryColor = theme.colors.primary ?? '#19411f';
   const fallbackGradients = theme.feature === 'gpDaily' ? FALLBACK_GRADIENTS_GP_DAILY : FALLBACK_GRADIENTS_GP_STORE;
+  const cardRadiusClass =
+    placement === BANNER_PLACEMENT_LANDING_HOME
+      ? "rounded-xl sm:rounded-3xl"
+      : "rounded-[40px]";
 
   useEffect(() => {
     const id = parseStoreIdForBanners(storeId);
@@ -91,7 +100,9 @@ export function OffersBannerCarousel({
       placement:
         placement === BANNER_PLACEMENT_STORE_HOME
           ? BANNER_PLACEMENT_STORE_HOME
-          : undefined,
+          : placement === BANNER_PLACEMENT_DAILY_HOME
+            ? BANNER_PLACEMENT_DAILY_HOME
+            : undefined,
     })
       .then(res => {
         if (!cancelled) {
@@ -159,21 +170,21 @@ export function OffersBannerCarousel({
 
   if (loading) {
     return (
-      <div className="mb-6 sm:mb-8">
+      <div className={`${sectionMarginClass}`}>
         <div className="h-5 w-32 bg-gray-200 rounded animate-pulse mb-3 sm:mb-4" />
-        <div className={`w-full ${OFFERS_BANNER_HEIGHT} rounded-xl sm:rounded-2xl bg-gray-200 animate-pulse`} />
+        <div className={`w-full ${OFFERS_BANNER_HEIGHT} ${cardRadiusClass} bg-gray-200 animate-pulse`} />
       </div>
     );
   }
 
   if (banners.length === 0) {
     return (
-      <div className="mb-6 sm:mb-8 relative z-0">
+      <div className={`${sectionMarginClass} relative z-0`}>
         <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">
-          OFFERS FOR YOU
+          OFFERS FOR YOU!
         </h2>
         <div
-          className={`relative w-full ${OFFERS_BANNER_HEIGHT} rounded-xl sm:rounded-2xl overflow-hidden shadow-md border border-gray-200/60 flex items-end`}
+          className={`relative w-full ${OFFERS_BANNER_HEIGHT} ${cardRadiusClass} overflow-hidden shadow-md border border-gray-200/60 flex items-end`}
           style={{ background: fallbackGradients[0] }}
         >
           <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent" />
@@ -190,7 +201,7 @@ export function OffersBannerCarousel({
   const fallbackGradient = fallbackGradients[banner.id % fallbackGradients.length];
 
   return (
-    <div className="mb-6 sm:mb-8 relative z-0">
+    <div className={`${sectionMarginClass} relative z-0`}>
       {/* Section heading — matches home page sections */}
       <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">
         OFFERS FOR YOU
@@ -199,7 +210,7 @@ export function OffersBannerCarousel({
       {/* Banner card — theme-aligned, responsive (4/3 mobile, 16/9 tablet+), key triggers animation */}
       <div
         key={banner.id}
-        className={`relative w-full ${OFFERS_BANNER_HEIGHT} rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer select-none shadow-md border border-gray-200/60`}
+        className={`relative w-full ${OFFERS_BANNER_HEIGHT} ${cardRadiusClass} overflow-hidden cursor-pointer select-none shadow-md border border-gray-200/60`}
         style={{ animation: 'bannerFadeIn 0.4s ease-out' }}
         onClick={() => handleNavigate(banner.cta_link)}
         role="button"

@@ -25,6 +25,7 @@ import ProfileImage from "../../assets/icon/Profile.png";
 import logo from "../../assets/All/logo.png";
 import { ProductDetailSkeleton } from "../common/PageSkeletons";
 import { IoCartOutline } from "react-icons/io5";
+import { ShareNodesIcon } from "../common/ShareNodesIcon";
 import { FaChevronRight } from "react-icons/fa";
 import { ProductImageTag } from "../common/ProductImageTag";
 import cautionIcon from "../../assets/svg/gp_daily svg/caution.svg";
@@ -47,7 +48,16 @@ import { GP_DAILY_ZONE_STALE_TOAST } from "../../utils/gpDailyCustomerMessages";
 import { resolveGpDailyCatalogStoreId } from "../../utils/gpDailyCatalogStore";
 import { setGpDailyPendingSubscriptionCheckout } from "../../utils/gpDailyPendingSubscriptionCheckout";
 import { navigateToGpDailyWalletForRecharge } from "../../utils/gpDailyWalletRechargeRedirect";
+import {
+  setPendingProductAddAfterLogin,
+  consumePendingProductAddAfterLogin,
+} from "../../utils/pendingProductAddAfterLogin";
+import {
+  InsufficientWalletModal,
+  type InsufficientWalletDetails,
+} from "../daily/InsufficientWalletModal";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
+import { resolveProductShareUrl, shareProductLink } from "../../utils/productShare";
 
 // Add interface for content items
 // interface ContentItem {
@@ -278,6 +288,8 @@ const ProductPage: React.FC = () => {
   // const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(null);
   const [showExistingSubscriptionModal, setShowExistingSubscriptionModal] =
     useState(false);
+  const [insufficientWalletModal, setInsufficientWalletModal] =
+    useState<InsufficientWalletDetails | null>(null);
   const [existingSubscription] = useState<any>(null);
   const [otherBasePacks, setOtherBasePacks] = useState<BasePack[]>([]);
   const [, setExoticFlowers] = useState<Product[]>([]);
@@ -929,6 +941,7 @@ const ProductPage: React.FC = () => {
     }
     if (feature === "gpStore") return;
     if (!localStorage.getItem("phoneNumber")) {
+      setPendingProductAddAfterLogin(String(slug ?? ""));
       toast.error("Please log in to add items to your basket", {
         id: "Please log in to add items to your basket",
       });
@@ -960,6 +973,21 @@ const ProductPage: React.FC = () => {
       setAddingToBasket(false);
     }
   };
+
+  const autoAddAttemptedRef = useRef(false);
+  useEffect(() => {
+    autoAddAttemptedRef.current = false;
+  }, [slug]);
+
+  useEffect(() => {
+    if (feature === "gpStore" || !isLoggedIn || !product || autoAddAttemptedRef.current) {
+      return;
+    }
+    const pending = consumePendingProductAddAfterLogin(String(slug ?? ""));
+    if (!pending) return;
+    autoAddAttemptedRef.current = true;
+    void handleAddToBasket();
+  }, [feature, isLoggedIn, product, slug]);
 
   const handleAdjustBasketQuantity = async (nextQty: number) => {
     if (!activeCartLine || isUpdatingBasket) return;
@@ -1069,11 +1097,10 @@ const ProductPage: React.FC = () => {
       subscriptionDetails,
     });
 
-    navigateToGpDailyWalletForRecharge(navigate, basePath, {
-      shortageAmount: details.shortageAmount,
+    setInsufficientWalletModal({
       currentBalance: details.currentBalance,
-      totalRequired: details.requiredAmount,
-      returnUrl: `${basePath}/address-selection`,
+      requiredAmount: details.requiredAmount,
+      shortageAmount: details.shortageAmount,
     });
   };
 
@@ -1185,7 +1212,7 @@ const ProductPage: React.FC = () => {
             {product && catalogGallerySlides.length > 1 ? (
               <>
                 <div
-                  className="relative aspect-square w-full cursor-grab touch-none overflow-hidden rounded-xl border-0 outline-none ring-0 bg-[#f8f6f1] active:cursor-grabbing"
+                  className="relative isolate aspect-square w-full cursor-grab touch-none overflow-hidden rounded-xl border-0 outline-none ring-0 bg-[#f8f6f1] active:cursor-grabbing"
                   onPointerDown={handlePdpGalleryPointerDown}
                   onPointerUp={handlePdpGalleryPointerUp}
                   onPointerCancel={handlePdpGalleryPointerCancel}
@@ -1265,7 +1292,7 @@ const ProductPage: React.FC = () => {
                 </div>
               </>
             ) : (
-              <div className="relative aspect-square w-full overflow-hidden rounded-xl border-0 outline-none ring-0 bg-[#f8f6f1]">
+              <div className="relative isolate aspect-square w-full overflow-hidden rounded-xl border-0 outline-none ring-0 bg-[#f8f6f1]">
                 {product && (product as any).labels?.length ? (
                   <ProductImageTag
                     labels={(product as any).labels}
@@ -1292,11 +1319,35 @@ const ProductPage: React.FC = () => {
                 <h1 className="m-0 min-w-0 flex-1 font-sans text-[22px] font-semibold leading-snug text-[#111827] [overflow-wrap:anywhere]">
                   {formatProductTitleCase(getProductName())}
                 </h1>
-                {showPdpSaveBadge ? (
-                  <span className="shrink-0 rounded-lg bg-[#FAA222] px-3 py-1.5 text-sm font-semibold text-[#111827]">
-                    Save {pdp.discountPercentage}%
-                  </span>
-                ) : null}
+                <div className="flex shrink-0 items-center gap-2">
+                  {showPdpSaveBadge ? (
+                    <span className="rounded-lg bg-[#FAA222] px-3 py-1.5 text-sm font-semibold text-[#111827]">
+                      Save {pdp.discountPercentage}%
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const shareUrl = resolveProductShareUrl(
+                        (product ?? basePack) as { share_url?: string; slug?: string },
+                        slug,
+                      );
+                      if (!shareUrl) return;
+                      void shareProductLink({
+                        name: getProductName(),
+                        shareUrl,
+                        description:
+                          (product as { short_description?: string } | null)
+                            ?.short_description ||
+                          (product as { description?: string } | null)?.description,
+                      });
+                    }}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center text-[#374151] hover:bg-black/5 rounded-full"
+                    aria-label="Share product"
+                  >
+                    <ShareNodesIcon className="text-xl text-[#374151]" size={20} />
+                  </button>
+                </div>
               </div>
               <p className="mt-1 text-sm text-gray-600">{getProductWeight()}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2.5">
@@ -1395,11 +1446,35 @@ const ProductPage: React.FC = () => {
                 <h1 className="m-0 min-w-0 flex-1 font-ibm-plex-serif text-2xl font-bold leading-snug text-gray-900 [overflow-wrap:anywhere]">
                   {formatProductTitleCase(getProductName())}
                 </h1>
-                {showPdpSaveBadge ? (
-                  <span className="shrink-0 rounded-lg bg-[#19411F] px-3 py-1.5 text-sm font-semibold text-white">
-                    Save {pdp.discountPercentage}%
-                  </span>
-                ) : null}
+                <div className="flex shrink-0 items-center gap-2">
+                  {showPdpSaveBadge ? (
+                    <span className="rounded-lg bg-[#19411F] px-3 py-1.5 text-sm font-semibold text-white">
+                      Save {pdp.discountPercentage}%
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const shareUrl = resolveProductShareUrl(
+                        (product ?? basePack) as { share_url?: string; slug?: string },
+                        slug,
+                      );
+                      if (!shareUrl) return;
+                      void shareProductLink({
+                        name: getProductName(),
+                        shareUrl,
+                        description:
+                          (product as { short_description?: string } | null)
+                            ?.short_description ||
+                          (product as { description?: string } | null)?.description,
+                      });
+                    }}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center text-[#374151] hover:bg-black/5 rounded-full"
+                    aria-label="Share product"
+                  >
+                    <ShareNodesIcon className="text-xl text-[#374151]" size={20} />
+                  </button>
+                </div>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <span className="text-2xl font-bold text-gray-900">₹{formatRupeePdpAmount(pdp.price)}</span>
@@ -1743,6 +1818,25 @@ const ProductPage: React.FC = () => {
           onViewSubscription={handleViewSubscription}
           subscription={existingSubscription}
         />
+
+        {isGpDaily ? (
+          <InsufficientWalletModal
+            open={insufficientWalletModal != null}
+            details={insufficientWalletModal}
+            onClose={() => setInsufficientWalletModal(null)}
+            onRecharge={() => {
+              const details = insufficientWalletModal;
+              setInsufficientWalletModal(null);
+              if (!details) return;
+              navigateToGpDailyWalletForRecharge(navigate, basePath, {
+                shortageAmount: details.shortageAmount,
+                currentBalance: details.currentBalance,
+                totalRequired: details.requiredAmount,
+                returnUrl: `${basePath}/address-selection`,
+              });
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );

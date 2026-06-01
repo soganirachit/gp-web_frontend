@@ -149,27 +149,25 @@ export const CUSTOMER_HIDDEN_TIMELINE_STATUSES = new Set([
 
 const SUPPORT_TICKET_DELIVERED_WINDOW_MS = 12 * 60 * 60 * 1000;
 
-/** Preparing / ready / out for delivery anytime; delivered only within 12h of delivery. */
+/** Preparing / ready / out for delivery anytime; delivered only within 12h; all other statuses always. */
 export function canRaiseSupportTicketForOrder(
   rawStatus: string,
   deliveredAtIso?: string | null,
 ): boolean {
   const k = normalizeOrderStatusKey(rawStatus);
-  if (k === "ready") return true;
-  const key = toCustomerOrderStatusKey(rawStatus);
-  if (key === "preparing" || key === "out_for_delivery") return true;
-  if (key !== "delivered") return false;
-  if (!deliveredAtIso) return false;
-  const deliveredMs = new Date(String(deliveredAtIso)).getTime();
-  if (!Number.isFinite(deliveredMs) || deliveredMs <= 0) return false;
-  return Date.now() - deliveredMs < SUPPORT_TICKET_DELIVERED_WINDOW_MS;
+  if (k === "delivered") {
+    if (!deliveredAtIso) return false;
+    const deliveredMs = new Date(String(deliveredAtIso)).getTime();
+    if (!Number.isFinite(deliveredMs) || deliveredMs <= 0) return false;
+    return Date.now() - deliveredMs < SUPPORT_TICKET_DELIVERED_WINDOW_MS;
+  }
+  return true;
 }
 
 export function supportTicketEligibilityMessage(rawStatus: string): string {
   const k = normalizeOrderStatusKey(rawStatus);
-  const key = toCustomerOrderStatusKey(rawStatus);
-  if (k === "ready" || key === "preparing" || key === "out_for_delivery") {
-    return "Need help with this order? You can raise a support ticket anytime.";
+  if (k === "delivered") {
+    return "Support requests can only be raised within 12 hours after delivery.";
   }
-  return "Support requests can only be raised within 12 hours after delivery.";
+  return "Need help with this order? You can raise a support ticket anytime.";
 }

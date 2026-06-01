@@ -12,10 +12,8 @@ import {
   resolveProductImageUrl,
   availabilityTypeForChannel,
   mapGpDailyCatalogRowToProduct,
-  parseProductAvailabilityChannel,
   type ProductAvailabilityChannel,
 } from "../../services/product.service";
-import { ProductAvailabilityFilterChips } from "../common/ProductAvailabilityFilterChips";
 import { storeService } from "../../services/store.service";
 import { getApiUrl } from "../../config/api.config";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
@@ -43,10 +41,7 @@ const ProductBrowsePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const categorySlug = useMemo(() => searchParams.get("category"), [searchParams]);
-  const availabilityChannel = useMemo(
-    () => parseProductAvailabilityChannel(searchParams.get("channel"), "daily"),
-    [searchParams],
-  );
+  const availabilityChannel: ProductAvailabilityChannel = "daily";
   const stateCategoryName = useMemo(
     () => (location.state as { categoryName?: string } | null)?.categoryName,
     [location.state],
@@ -201,8 +196,7 @@ const ProductBrowsePage: React.FC = () => {
   const handleProductClick = (product: any) => {
     const pathSlug = product?.slug ?? product?.id;
     if (pathSlug == null || pathSlug === "") return;
-    const productBase =
-      availabilityChannel === "store" ? "/gp-store/product" : "/gp-daily/product";
+    const productBase = "/gp-daily/product";
     navigate(`${productBase}/${encodeURIComponent(String(pathSlug))}`, {
       state: { product },
     });
@@ -212,12 +206,6 @@ const ProductBrowsePage: React.FC = () => {
     const next = new URLSearchParams(searchParams);
     patch(next);
     setSearchParams(next);
-  };
-
-  const handleAvailabilityChannelClick = (channel: ProductAvailabilityChannel) => {
-    updateBrowseSearchParams((next) => {
-      next.set("channel", channel);
-    });
   };
 
   const handleCategoryClick = (slug: string | null) => {
@@ -340,9 +328,7 @@ const ProductBrowsePage: React.FC = () => {
             <SearchBar
               mode="product"
               storeId={storeService.getStoreIdForProducts() ?? undefined}
-              productBasePath={
-                availabilityChannel === "store" ? "/gp-store" : "/gp-daily"
-              }
+              productBasePath="/gp-daily"
               value={searchQuery}
               onChange={setSearchQuery}
             />
@@ -350,12 +336,6 @@ const ProductBrowsePage: React.FC = () => {
 
           <div className="px-4 pb-3 relative">
             <div className="flex gap-2.5 overflow-x-auto no-scrollbar">
-              <ProductAvailabilityFilterChips
-                value={availabilityChannel}
-                onChange={handleAvailabilityChannelClick}
-                chipActiveClass={chipActive}
-                chipInactiveClass={chipInactive}
-              />
               <button
                 type="button"
                 onClick={() => handleCategoryClick(null)}

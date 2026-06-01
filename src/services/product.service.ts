@@ -149,6 +149,8 @@ export interface Product {
   id: string;
   /** URL segment for GET /products/{slug}/ (customer API); numeric id alone is not valid for that endpoint. */
   slug?: string;
+  /** Canonical share link from API — use for Share actions (do not construct manually). */
+  share_url?: string;
   productId?: string;
   name: string;
   sku?: string;
@@ -248,6 +250,10 @@ export function mapGpDailyCatalogRowToProduct(
     availability_type: avail || undefined,
     labels,
     isActive: row.is_active !== false,
+    share_url:
+      row.share_url != null && String(row.share_url).trim()
+        ? String(row.share_url).trim()
+        : undefined,
   };
 }
 

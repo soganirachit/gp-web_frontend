@@ -6,6 +6,7 @@ import { cartService } from "./cart.service";
 import {
   resolveGpDailyZoneAtLatLng,
 } from "./subscriptionZone.service";
+import { GUEST_NOT_SERVICEABLE_BODY } from "../config/guestBrowseAddressCopy";
 import {
   GEO_MSG_UNSUPPORTED,
   messageFromGeolocationPositionError,
@@ -18,6 +19,19 @@ export const GUEST_STORE_UPDATED_EVENT = "gp-guest-temporary-store-updated";
 export const GPS_CATALOG_LOCATION_UPDATED_EVENT = "gp-gps-catalog-location-updated";
 
 const GP_STORE_CATALOG_ADDRESS_OVERRIDE_ID_KEY = "gp_store_catalog_address_override_id";
+const GUEST_BROWSE_ADDRESS_KEY = "gp_guest_browse_address";
+
+export type GuestBrowseAddressSnapshot = {
+  formattedLine: string;
+  coordinates: string;
+  label?: string;
+};
+
+export type GuestBrowseApplyResult = {
+  serviceable: boolean;
+  storeName?: string;
+  message?: string;
+};
 
 export function notifyGuestTemporaryStoreUpdated(): void {
   if (typeof window !== "undefined") {
@@ -43,6 +57,21 @@ export interface CityOption {
 function storeIsOperationalWeb(s: Store): boolean {
   if (typeof s.is_online === "boolean") return s.is_online;
   return true;
+}
+
+export function isStoreOffline(store: Store): boolean {
+  return store.is_online === false;
+}
+
+export function isCartStoreOffline(
+  cartStoreId: number | null | undefined,
+  stores: Store[],
+): boolean {
+  if (cartStoreId == null || !Number.isFinite(Number(cartStoreId))) {
+    return false;
+  }
+  const row = stores.find((s) => s.id === Number(cartStoreId));
+  return !!row && isStoreOffline(row);
 }
 
 function parseMaxDeliveryRadiusKm(s: Store): number | null {
@@ -359,6 +388,88 @@ class StoreService {
    */
   clearTemporaryStoreId(): void {
     localStorage.removeItem("temporaryStoreId");
+  }
+
+  getGuestBrowseAddress(): GuestBrowseAddressSnapshot | null {
+    if (typeof localStorage === "undefined") return null;
+    try {
+      const raw = localStorage.getItem(GUEST_BROWSE_ADDRESS_KEY);
+      if (!raw?.trim()) return null;
+      const parsed = JSON.parse(raw) as GuestBrowseAddressSnapshot;
+      if (!parsed?.coordinates?.trim() || !parsed?.formattedLine?.trim()) {
+        return null;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  setGuestBrowseAddress(snapshot: GuestBrowseAddressSnapshot): void {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(GUEST_BROWSE_ADDRESS_KEY, JSON.stringify(snapshot));
+  }
+
+  clearGuestBrowseAddress(): void {
+    if (typeof localStorage === "undefined") return;
+    localStorage.removeItem(GUEST_BROWSE_ADDRESS_KEY);
+  }
+
+  async applyGuestBrowseAddress(
+    snapshot: GuestBrowseAddressSnapshot,
+    catalog: "store" | "daily",
+  ): Promise<GuestBrowseApplyResult> {
+    this.setGuestBrowseAddress(snapshot);
+    const parts = snapshot.coordinates.split(",").map((s) => parseFloat(s.trim()));
+    const lat = parts[0];
+    const lng = parts[1];
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return { serviceable: false, message: GUEST_NOT_SERVICEABLE_BODY };
+    }
+
+    if (catalog === "daily") {
+      try {
+        const zone = await resolveGpDailyZoneAtLatLng(lat, lng);
+        if (!zone.eligible || zone.storeId == null) {
+          this.clearTemporaryStoreId();
+          return {
+            serviceable: false,
+            message: zone.message?.trim() || GUEST_NOT_SERVICEABLE_BODY,
+          };
+        }
+        this.setTemporaryStoreId(zone.storeId);
+        notifyGuestTemporaryStoreUpdated();
+        notifyGpsCatalogLocationUpdated();
+        return {
+          serviceable: true,
+          storeName:
+            zone.storeName?.trim() ||
+            (zone.storeId != null ? `Store ${zone.storeId}` : undefined),
+        };
+      } catch {
+        this.clearTemporaryStoreId();
+        return { serviceable: false, message: GUEST_NOT_SERVICEABLE_BODY };
+      }
+    }
+
+    try {
+      await this.resolveGuestStoreFromCoordinates(lat, lng);
+      notifyGuestTemporaryStoreUpdated();
+      notifyGpsCatalogLocationUpdated();
+      const storeId = this.getTemporaryStoreId();
+      if (storeId == null) {
+        return { serviceable: false, message: GUEST_NOT_SERVICEABLE_BODY };
+      }
+      const stores = await this.getAllStores(lat, lng, { includeOffline: true });
+      const row = stores.find((s) => s.id === storeId);
+      return {
+        serviceable: true,
+        storeName: row?.name?.trim() || `Store ${storeId}`,
+      };
+    } catch {
+      this.clearTemporaryStoreId();
+      return { serviceable: false, message: GUEST_NOT_SERVICEABLE_BODY };
+    }
   }
 
   /**

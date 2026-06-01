@@ -22,6 +22,10 @@ import { editCustomerService } from '../../services/editcustomer.service';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
 import { ProfileAvatarDisplay } from '../../components/common/ProfileAvatarButton';
+import {
+  GENDA_PHOOL_PRIVACY_POLICY_URL,
+  GENDA_PHOOL_TERMS_OF_SERVICE_URL,
+} from '../../config/legalUrls';
 
 // Import SVG icons
 import subscriptionIcon from '../../assets/icon/subscription.svg';
@@ -319,14 +323,8 @@ const Settings: React.FC = () => {
     },
     {
       icon: pujaIcon,
-      title: 'Puja Flower',
-      path: `${basePath}/Products?category=puja`,
-      isSvg: true
-    },
-    {
-      icon: exoticIcon,
-      title: 'Exotic Flower',
-      path: `${basePath}/Products?category=exotic`,
+      title: 'Products',
+      path: `${basePath}/Products`,
       isSvg: true
     },
     {
@@ -515,6 +513,10 @@ const Settings: React.FC = () => {
     }
   };
 
+  const openLegalLink = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   const formatPhoneNumber = (phone: string) => {
     const local = formatPhoneForDisplay(phone);
     if (!local || local.length < 10) return phone || local;
@@ -542,8 +544,21 @@ const Settings: React.FC = () => {
             <div className="mt-8 text-center pb-0">
               <p className="text-xs text-gray-400 leading-snug px-1">
                 By continuing, you agree to our{' '}
-                <span className="text-gray-500 underline">Terms of Service</span> and{' '}
-                <span className="text-gray-500 underline">Privacy Policy</span>
+                <button
+                  type="button"
+                  className="text-gray-500 underline"
+                  onClick={() => openLegalLink(GENDA_PHOOL_TERMS_OF_SERVICE_URL)}
+                >
+                  Terms of Service
+                </button>{' '}
+                and{' '}
+                <button
+                  type="button"
+                  className="text-gray-500 underline"
+                  onClick={() => openLegalLink(GENDA_PHOOL_PRIVACY_POLICY_URL)}
+                >
+                  Privacy Policy
+                </button>
               </p>
             </div>
           </div>
@@ -863,12 +878,24 @@ const Settings: React.FC = () => {
             </div>
           )}
 
-          {/* Legal disclaimer — text only; spans keep link styling without navigation */}
           <div className="mt-1 text-center pb-0">
             <p className="text-xs text-gray-400 leading-snug px-1">
               By continuing, you agree to our{' '}
-              <span className="text-gray-500 underline">Terms of Service</span> and{' '}
-              <span className="text-gray-500 underline">Privacy Policy</span>
+              <button
+                type="button"
+                className="text-gray-500 underline"
+                onClick={() => openLegalLink(GENDA_PHOOL_TERMS_OF_SERVICE_URL)}
+              >
+                Terms of Service
+              </button>{' '}
+              and{' '}
+              <button
+                type="button"
+                className="text-gray-500 underline"
+                onClick={() => openLegalLink(GENDA_PHOOL_PRIVACY_POLICY_URL)}
+              >
+                Privacy Policy
+              </button>
             </p>
           </div>
         </div>

@@ -8,7 +8,15 @@ import { useCart } from '../../../context/CartContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useFeatureTheme } from '../../../context/FeatureThemeContext';
 import { addressService, Address } from '../../../services/address.service';
-import { storeService, storeIsWithinDeliveryRadius } from '../../../services/store.service';
+import {
+  storeService,
+  storeIsWithinDeliveryRadius,
+  isCartStoreOffline,
+} from '../../../services/store.service';
+import {
+  STORE_OFFLINE_CART_BODY,
+  STORE_OFFLINE_CART_TITLE,
+} from '../../../config/homeHeroStatusCopy';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow, startOfDay } from 'date-fns';
@@ -993,12 +1001,26 @@ const Cart: React.FC = () => {
     let cancelled = false;
     void (async () => {
       try {
+        const storesList = await storeService.getAllStores(coords.lat, coords.lng);
+        if (cancelled) return;
+
+        if (cartStoreId != null && isCartStoreOffline(cartStoreId, storesList)) {
+          setDeliveryStoreOffline(true);
+          const operational = await storeService.getNearestStore(coords.lat, coords.lng);
+          if (operational && operational.id !== cartStoreId) {
+            setSuggestedStoreForAddress({ id: operational.id, name: operational.name });
+          } else {
+            setSuggestedStoreForAddress(null);
+          }
+          deliveryStoreSyncKey.current = key;
+          return;
+        }
+
         const operational = await storeService.getNearestStore(coords.lat, coords.lng);
         if (cancelled) return;
         if (operational) {
           setDeliveryStoreOffline(false);
           if (cartStoreId != null && operational.id !== cartStoreId) {
-            const storesList = await storeService.getAllStores(coords.lat, coords.lng);
             const currentRow = storesList.find((s) => s.id === cartStoreId);
             if (currentRow && storeIsWithinDeliveryRadius(currentRow)) {
               setSuggestedStoreForAddress(null);
@@ -1013,7 +1035,7 @@ const Cart: React.FC = () => {
         }
 
         setSuggestedStoreForAddress(null);
-        const stores = await storeService.getAllStores(coords.lat, coords.lng);
+        const stores = storesList;
         if (cancelled) return;
         const sorted = [...stores].sort((a, b) => {
           const da = Number(a.distance_km);
@@ -1527,9 +1549,8 @@ const Cart: React.FC = () => {
       return;
     }
     if (deliveryStoreOffline) {
-      toast.error(
-        'The store for your delivery address is offline. Open Account to choose another store.',
-      );
+      toast.error(STORE_OFFLINE_CART_BODY);
+      setCheckoutInlineError(STORE_OFFLINE_CART_BODY);
       return;
     }
 
@@ -2266,13 +2287,22 @@ const Cart: React.FC = () => {
 
               {showUnifiedDeliveryAlert ? (
                 <div
-                  className="min-w-0 rounded-[12px] border border-red-600 bg-red-50 px-3 py-2.5 shadow-sm"
+                  className={`min-w-0 rounded-[12px] border px-3 py-2.5 shadow-sm ${
+                    deliveryStoreOffline
+                      ? "border-amber-500 bg-amber-50"
+                      : "border-red-600 bg-red-50"
+                  }`}
                   role="alert"
                 >
                   {deliveryStoreOffline ? (
-                    <p className="text-[13px] font-semibold leading-snug text-red-900">
-                      The nearest store for this area is offline — try another address.
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-[15px] font-bold leading-snug text-amber-900">
+                        {STORE_OFFLINE_CART_TITLE}
+                      </p>
+                      <p className="text-[13px] font-medium leading-snug text-amber-800">
+                        {STORE_OFFLINE_CART_BODY}
+                      </p>
+                    </div>
                   ) : suggestedStoreForAddress ? (
                     <p className="m-0 text-[13px] font-semibold leading-snug text-red-900">
                       This store doesn&apos;t deliver to your address—try the nearest store:{' '}

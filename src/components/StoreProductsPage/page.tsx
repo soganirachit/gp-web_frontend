@@ -10,10 +10,8 @@ import {
   getBasePrice,
   showStrikeBaseOnCard,
   availabilityTypeForChannel,
-  parseProductAvailabilityChannel,
   type ProductAvailabilityChannel,
 } from "../../services/product.service";
-import { ProductAvailabilityFilterChips } from "../common/ProductAvailabilityFilterChips";
 import { ProductBrowseSkeleton } from "../common/PageSkeletons";
 import { SearchBar } from "../common/SearchBar";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
@@ -60,8 +58,8 @@ const StoreProductsPages: React.FC = () => {
   // Memoize the category slug from URL
   const categorySlug = useMemo(() => searchParams.get('category'), [searchParams]);
   const availabilityChannel = useMemo(
-    () => parseProductAvailabilityChannel(searchParams.get("channel"), "store"),
-    [searchParams],
+    (): ProductAvailabilityChannel => (feature === "gpDaily" ? "daily" : "store"),
+    [feature],
   );
   const stateCategoryName = useMemo(() => location.state?.categoryName, [location.state?.categoryName]);
   const chipActive = "bg-[#19411f] text-white";
@@ -182,12 +180,6 @@ const StoreProductsPages: React.FC = () => {
     const next = new URLSearchParams(searchParams);
     patch(next);
     setSearchParams(next);
-  };
-
-  const handleAvailabilityChannelClick = (channel: ProductAvailabilityChannel) => {
-    updateBrowseSearchParams((next) => {
-      next.set("channel", channel);
-    });
   };
 
   const handleCategoryClick = (slug: string | null) => {
@@ -369,12 +361,6 @@ const StoreProductsPages: React.FC = () => {
           {/* Category chips — sizing matches Sort/Filter below */}
           <div className="px-4 pb-3">
             <div className="flex gap-2.5 overflow-x-auto no-scrollbar">
-              <ProductAvailabilityFilterChips
-                value={availabilityChannel}
-                onChange={handleAvailabilityChannelClick}
-                chipActiveClass={chipActive}
-                chipInactiveClass={chipInactive}
-              />
               <button
                 type="button"
                 onClick={() => handleCategoryClick(null)}

@@ -171,18 +171,17 @@ export function formatNamasteSubscriptionStatusLine(
   subscription: Subscription,
 ): string {
   if (subscription.status === "PAUSED") {
-    /** Date moved to the delivery-day row above; status row is intentionally bare. */
-    return "Paused subscription";
+    return "Paused";
   }
   if (subscription.status === "ACTIVE") {
-    return "Active subscription";
+    return "Active";
   }
   if (subscription.status === "CANCELLED") {
     return "Cancelled";
   }
   const raw = String(subscription.status ?? "").trim();
   if (!raw) return "—";
-  return raw.charAt(0) + raw.slice(1).toLowerCase();
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
 }
 
 /** GP Daily home Namaste row — schedule-first, then API fallback. */

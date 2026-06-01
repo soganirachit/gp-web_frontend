@@ -3,6 +3,7 @@ import Router from './routes/Router';
 import './App.css';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { NotificationInboxProvider } from './context/NotificationInboxContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import { initMetaPixel } from './lib/metaPixel';
 
@@ -15,9 +16,11 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
+        <NotificationInboxProvider>
         <CartProvider>
           <Router />
         </CartProvider>
+        </NotificationInboxProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

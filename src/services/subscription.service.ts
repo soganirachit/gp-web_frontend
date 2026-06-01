@@ -671,6 +671,17 @@ class SubscriptionService {
     }
   }
 
+  async pauseSubscriptionWithPayload(
+    subscriptionId: string,
+    payload?: { pause_reason?: string; paused_until_date?: string },
+  ): Promise<void> {
+    await api.post(`${base()}/${subscriptionId}/pause/`, payload ?? {});
+  }
+
+  async resumeSubscription(subscriptionId: string): Promise<void> {
+    await api.post(`${base()}/${subscriptionId}/resume/`);
+  }
+
   /**
    * PATCH /subscriptions/{id}/update/
    */

@@ -174,6 +174,12 @@ const OTPVerification: React.FC = () => {
           return;
         }
 
+        // Return to the page user came from (e.g. product detail after "login to add")
+        if (returnUrl && returnUrl.trim() && returnUrl !== basePath) {
+          navigate(returnUrl.trim(), { replace: true });
+          return;
+        }
+
         // Check if user is new or existing
         const isNewUser = response.is_new_user || !response.userExists;
 
@@ -207,7 +213,9 @@ const OTPVerification: React.FC = () => {
           }
         } else {
           // New user - go to name input page
-          navigate(`${basePath}/name-input`);
+          navigate(`${basePath}/name-input`, {
+            state: { returnUrl, fromCart },
+          });
         }
       } else {
         throw new Error(response.message || 'OTP verification failed');

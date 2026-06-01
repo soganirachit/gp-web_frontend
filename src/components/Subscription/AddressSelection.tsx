@@ -18,6 +18,15 @@ import {
 import { messageFromGeolocationPositionError } from "../../utils/geolocationMessages";
 import { customerService } from "../../services/getcustomer.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import { useAuth } from "../../context/AuthContext";
+import { storeService } from "../../services/store.service";
+import {
+  GUEST_NEAREST_STORE_PREFIX,
+  GUEST_NOT_SERVICEABLE_BODY,
+  GUEST_NOT_SERVICEABLE_TITLE,
+  GUEST_ORDERING_FOR_SOMEONE_SUBTITLE,
+  GUEST_ORDERING_FOR_SOMEONE_TITLE,
+} from "../../config/guestBrowseAddressCopy";
 import { AddressSelectionSkeleton } from "../common/PageSkeletons";
 import { formatPhoneForDisplay } from "../../utils/phoneDisplay";
 import { formatCartDeliveryAddress } from "../../utils/formatCartDeliveryAddress";
@@ -34,16 +43,30 @@ import {
 import { walletService } from "../../services/wallet.service";
 import { setGpDailyPendingSubscriptionCheckout } from "../../utils/gpDailyPendingSubscriptionCheckout";
 import { navigateToGpDailyWalletForRecharge } from "../../utils/gpDailyWalletRechargeRedirect";
+import {
+  InsufficientWalletModal,
+  type InsufficientWalletDetails,
+} from "../daily/InsufficientWalletModal";
+import { guestHasSavedBrowseAddress } from "../../utils/guestAddressEntry";
+import { UniformPageHeader } from "../layout/UniformPageHeader";
 
 const AddressSelection: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { feature, theme } = useFeatureTheme();
+  const { isLoggedIn } = useAuth();
+  const isGuestBrowse =
+    (location.state as { guestBrowse?: boolean } | null)?.guestBrowse === true;
+  const guestAlreadySavedAddress =
+    !isLoggedIn && guestHasSavedBrowseAddress();
+  const isGuestEntry = !isLoggedIn && !guestAlreadySavedAddress;
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const [loading, setLoading] = useState(true);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [insufficientWalletModal, setInsufficientWalletModal] =
+    useState<InsufficientWalletDetails | null>(null);
   const [isValidatingAddress, setIsValidatingAddress] = useState(false);
   const [addressValidation, setAddressValidation] = useState<{
     isValid: boolean;
@@ -146,6 +169,12 @@ const AddressSelection: React.FC = () => {
     if (hasInitialized.current) return;
     hasInitialized.current = true;
 
+    if (isGuestEntry) {
+      setLoading(false);
+      setShowAddForm(true);
+      return;
+    }
+
     if (!localStorage.getItem("phoneNumber")) {
       handleAuthError(
         new Error("Authentication required. Please login to continue.")
@@ -166,7 +195,7 @@ const AddressSelection: React.FC = () => {
     };
 
     loadUserData();
-  }, []);
+  }, [isGuestEntry]);
 
   useEffect(() => {
     if (!isLoaded || showAddForm || loadError) return;
@@ -333,16 +362,58 @@ const AddressSelection: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const coordinates =
+      formData.coordinates ||
+      `${selectedPosition.lat},${selectedPosition.lng}`;
+
     // Validate location before saving
-    if (!formData.coordinates) {
+    if (!coordinates) {
       toast.error('Please select a location on the map');
       return;
     }
 
     // First validate coordinates format
-    if (!addressService.validateCoordinatesFormat(formData.coordinates)) {
+    if (!addressService.validateCoordinatesFormat(coordinates)) {
       toast.error('Invalid coordinates format');
       setLocationValidation({ isValid: false, message: 'Invalid coordinates format' });
+      return;
+    }
+
+    if (isGuestEntry) {
+      try {
+        setIsValidatingAddress(true);
+        const line = [formData.houseNo, formData.streetName, formData.area, formData.landmark]
+          .map((s) => String(s || "").trim())
+          .filter(Boolean)
+          .join(", ");
+        const catalog = feature === "gpStore" ? "store" : "daily";
+        const result = await storeService.applyGuestBrowseAddress(
+          {
+            formattedLine: line || "Delivery address",
+            coordinates,
+            label: "Delivery address",
+          },
+          catalog,
+        );
+        if (result.serviceable) {
+          const msg = result.storeName
+            ? `${GUEST_NEAREST_STORE_PREFIX} ${result.storeName}`
+            : "Delivery area confirmed";
+          toast.success(msg);
+          window.dispatchEvent(new Event("addressUpdated"));
+          navigate(basePath, { replace: true });
+          return;
+        }
+        setLocationValidation({
+          isValid: false,
+          message: result.message || GUEST_NOT_SERVICEABLE_BODY,
+        });
+        toast.error(GUEST_NOT_SERVICEABLE_TITLE);
+      } catch {
+        toast.error(GUEST_NOT_SERVICEABLE_TITLE);
+      } finally {
+        setIsValidatingAddress(false);
+      }
       return;
     }
 
@@ -351,8 +422,8 @@ const AddressSelection: React.FC = () => {
       setIsValidatingAddress(true);
       const validation =
         feature === "gpStore"
-          ? await addressService.validateAddressInDeliveryArea(formData.coordinates)
-          : await validateGpDailyDeliveryAreaFromCoordinates(formData.coordinates);
+          ? await addressService.validateAddressInDeliveryArea(coordinates)
+          : await validateGpDailyDeliveryAreaFromCoordinates(coordinates);
       if (feature !== "gpStore") {
         // No out-of-zone copy on address screens; basket shows eligibility if needed.
         setLocationValidation(
@@ -976,11 +1047,10 @@ const AddressSelection: React.FC = () => {
             sellingPrice: parsedData.sellingPrice,
           });
           setLoading(false);
-          navigateToGpDailyWalletForRecharge(navigate, basePath, {
-            shortageAmount: shortage,
+          setInsufficientWalletModal({
             currentBalance: walletBalance,
-            totalRequired,
-            returnUrl: `${basePath}/address-selection`,
+            requiredAmount: totalRequired,
+            shortageAmount: shortage,
           });
           return;
         }
@@ -1084,11 +1154,10 @@ const AddressSelection: React.FC = () => {
             sellingPrice: parsedData.sellingPrice,
           });
           void walletService.getWalletBalance().then(({ balance }) => {
-            navigateToGpDailyWalletForRecharge(navigate, basePath, {
-              shortageAmount: Math.max(0, totalRequired - balance),
+            setInsufficientWalletModal({
               currentBalance: balance,
-              totalRequired,
-              returnUrl: `${basePath}/address-selection`,
+              requiredAmount: totalRequired,
+              shortageAmount: Math.max(0, totalRequired - balance),
             });
           });
         } else {
@@ -1255,40 +1324,30 @@ const AddressSelection: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
-      {/* Header */}
-      {/* <div className="bg-[#f8f6f1] sticky top-0 z-10 border-b">
-        <div className="max-w-[800px] mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button onClick={() => showAddForm ? setShowAddForm(false) : navigate(-1)} className="text-gray-600">
-                <FaArrowLeft className="text-xl" />
-              </button>
-              <span className="text-lg font-medium">
-                {showAddForm ? "Add New Address" : "Select Delivery Address"}
-              </span>
-            </div>
-            {!showAddForm && (
-              <div className="flex gap-2">
-                <Link to="/wallet">
-                <button className="w-8 h-8 flex items-center justify-center text-[#015D3A]">
-                  <img src={WalletIcon} alt="Wallet" className="w-6 h-6" />
-                </button>
-                </Link>
-                <Link to="/gp-store/account">
-                <button className="w-8 h-8 flex items-center justify-center text-[#015D3A]">
-                  <img src={ProfileIcon} alt="Profile" className="w-6 h-6" />
-                </button>
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-      </div> */}
-
       {/* Main Content — bottom padding clears fixed bottom nav when scrolling */}
       <div className="mx-auto max-w-[800px] p-4 pb-nav-bottom">
         {showAddForm ? (
+          <>
+            <UniformPageHeader
+              title={
+                isGuestEntry ? "Add delivery address" : "Add New Address"
+              }
+              onBack={() =>
+                isGuestEntry ? navigate(-1) : setShowAddForm(false)
+              }
+              className="-mx-4 mb-2 sticky top-0 z-20"
+            />
           <form onSubmit={handleSubmit} className="space-y-4">
+            {isGuestEntry ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p className="text-sm font-semibold text-gray-900">
+                  {GUEST_ORDERING_FOR_SOMEONE_TITLE}
+                </p>
+                <p className="mt-1 text-sm text-gray-600">
+                  {GUEST_ORDERING_FOR_SOMEONE_SUBTITLE}
+                </p>
+              </div>
+            ) : null}
             {/* Map Section */}
             <div className="w-full h-[200px] md:h-[300px] relative rounded-lg overflow-hidden mb-4">
               {isLoaded ? (
@@ -1394,45 +1453,59 @@ const AddressSelection: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <h3 className="text-gray-700 mb-1 text-sm">Phone Number</h3>
-                <div className="flex">
-                  <span className="bg-white border border-gray-200 rounded-lg px-3 py-3 text-gray-500 text-sm">+91</span>
-                  <input
-                    type="tel"
-                    name="associatedPhoneNumber"
-                    placeholder="Enter your WhatsApp number"
-                    value={formData.associatedPhoneNumber}
-                    onChange={handleInputChange}
-                    className="flex-1 p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm ml-2"
+              {!isGuestEntry ? (
+                <>
+                  <div>
+                    <h3 className="text-gray-700 mb-1 text-sm">Phone Number</h3>
+                    <div className="flex">
+                      <span className="bg-white border border-gray-200 rounded-lg px-3 py-3 text-gray-500 text-sm">+91</span>
+                      <input
+                        type="tel"
+                        name="associatedPhoneNumber"
+                        placeholder="Enter your WhatsApp number"
+                        value={formData.associatedPhoneNumber}
+                        onChange={handleInputChange}
+                        className="flex-1 p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm ml-2"
+                      />
+                    </div>
+                  </div>
 
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="setAsDefault"
-                  name="setAsDefault"
-                  checked={formData.setAsDefault}
-                  onChange={handleInputChange}
-                  className="h-4 w-4 text-[#015D3A] rounded border-gray-300 focus:ring-[#015D3A]"
-                />
-                <label htmlFor="setAsDefault" className="ml-2 text-sm text-gray-700">
-                  Set as default address
-                </label>
-              </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="setAsDefault"
+                      name="setAsDefault"
+                      checked={formData.setAsDefault}
+                      onChange={handleInputChange}
+                      className="h-4 w-4 text-[#015D3A] rounded border-gray-300 focus:ring-[#015D3A]"
+                    />
+                    <label htmlFor="setAsDefault" className="ml-2 text-sm text-gray-700">
+                      Set as default address
+                    </label>
+                  </div>
+                </>
+              ) : null}
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-[#015D3A] text-white py-3 rounded-lg font-medium text-sm disabled:opacity-50"
+                disabled={loading || isValidatingAddress}
+                className="w-full py-3 rounded-lg font-medium text-sm disabled:opacity-50"
+                style={{
+                  backgroundColor: theme.colors.primary,
+                  color: feature === "gpDaily" ? "#111827" : "#ffffff",
+                }}
               >
-                {loading ? 'Saving...' : 'Save Address'}
+                {isValidatingAddress
+                  ? 'Checking delivery area...'
+                  : loading
+                    ? 'Saving...'
+                    : isGuestEntry
+                      ? 'Confirm address'
+                      : 'Save Address'}
               </button>
             </div>
           </form>
+          </>
         ) : (
           <div className="flex flex-col">
             {/* Header — aligned with My Addresses / reference */}
@@ -1782,6 +1855,23 @@ const AddressSelection: React.FC = () => {
           </div>
         </div>
       ) : null}
+
+      <InsufficientWalletModal
+        open={insufficientWalletModal != null}
+        details={insufficientWalletModal}
+        onClose={() => setInsufficientWalletModal(null)}
+        onRecharge={() => {
+          const details = insufficientWalletModal;
+          setInsufficientWalletModal(null);
+          if (!details) return;
+          navigateToGpDailyWalletForRecharge(navigate, basePath, {
+            shortageAmount: details.shortageAmount,
+            currentBalance: details.currentBalance,
+            totalRequired: details.requiredAmount,
+            returnUrl: `${basePath}/address-selection`,
+          });
+        }}
+      />
 
     </div>
   );

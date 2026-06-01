@@ -5,6 +5,23 @@ export const GUEST_HEADER_LOCATION_TITLE = "Current location";
 export const GUEST_LOCATION_UNAVAILABLE_HINT =
   "We could not detect your city. Check connection or location permissions, then tap to set your area.";
 
+export async function reverseGeocodeCityOnlyForGuest(
+  lat: number,
+  lng: number,
+): Promise<string> {
+  try {
+    if (typeof window !== "undefined" && window.google?.maps) {
+      const geocoder = new google.maps.Geocoder();
+      const { results } = await geocoder.geocode({ location: { lat, lng } });
+      const city = pickCityFromGoogleResults(results);
+      if (city) return city;
+    }
+  } catch {
+    /* fall through */
+  }
+  return reverseGeocodeOsm(lat, lng);
+}
+
 async function reverseGeocodeOsm(lat: number, lng: number): Promise<string> {
   const params = new URLSearchParams({
     format: "json",

@@ -15,6 +15,7 @@ import {
 } from "../../config/guestAreaModalCopy";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { resolveGpDailyZoneAtLatLng } from "../../services/subscriptionZone.service";
+import { guestHasSavedBrowseAddress } from "../../utils/guestAddressEntry";
 
 function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace("#", "").trim();
@@ -64,6 +65,8 @@ export interface GuestServiceAreaModalProps {
   variant?: GuestAreaModalVariant;
   /** If false, overlay and close button do not dismiss (city pick still calls onClose). */
   dismissible?: boolean;
+  /** Navigate to address entry after a city is chosen (guest flows). */
+  redirectToAddressAfterPick?: boolean;
 }
 
 const overlayVariants = {
@@ -105,6 +108,7 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
   primaryColor: primaryColorProp,
   variant = "outside_service",
   dismissible = true,
+  redirectToAddressAfterPick = false,
 }) => {
   const { theme, feature } = useFeatureTheme();
   const primary = primaryColorProp ?? theme.colors.primary;
@@ -175,6 +179,22 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
     storeService.setTemporaryStoreId(storeId);
     notifyGuestTemporaryStoreUpdated();
     completeWithStore();
+    const addressPath =
+      feature === "gpDaily"
+        ? "/gp-daily/address-selection"
+        : "/gp-store/address-selection";
+    if (redirectToAddressAfterPick) {
+      const loginPath =
+        feature === "gpDaily" ? "/gp-daily/login" : "/gp-store/login";
+      if (guestHasSavedBrowseAddress()) {
+        navigate(loginPath, {
+          state: { returnUrl: addressPath },
+        });
+        return;
+      }
+      navigate(addressPath, { state: { fromHome: true, guestBrowse: true } });
+      return;
+    }
     if (feature === "gpDaily") {
       if (!pathname.startsWith("/gp-daily")) {
         navigate("/gp-daily", { replace: true });

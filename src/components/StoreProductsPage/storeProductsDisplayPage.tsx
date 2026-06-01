@@ -11,6 +11,8 @@ import ProfileImage from "../../assets/icon/Profile.png";
 import logo from "../../assets/All/logo.png";
 import { ProductDetailSkeleton } from "../common/PageSkeletons";
 import { IoArrowBack, IoCartOutline } from "react-icons/io5";
+import { ShareNodesIcon } from "../common/ShareNodesIcon";
+import { resolveProductShareUrl, shareProductLink } from "../../utils/productShare";
 import { FaChevronRight, FaMinus, FaPlus } from "react-icons/fa";
 import {
   productService,
@@ -790,7 +792,9 @@ const StorePage: React.FC = () => {
             >
               <IoArrowBack size={24} />
             </button>
-            <h1 className="text-2xl font-bold font-serif text-gray-900">{categoryName}</h1>
+            <h1 className="min-w-0 flex-1 text-2xl font-bold font-serif text-gray-900 truncate">
+              {categoryName}
+            </h1>
           </div>
         </div>
 
@@ -891,14 +895,32 @@ const StorePage: React.FC = () => {
 
           {/* Product Name and Badge */}
           <div className="mt-4 flex items-start justify-between gap-3">
-            <h1 className="font-ibm-plex-serif text-2xl font-bold text-gray-900 flex-1">
+            <h1 className="font-ibm-plex-serif text-2xl font-bold text-gray-900 flex-1 min-w-0 [overflow-wrap:anywhere]">
               {formatProductTitleCase(product.name)}
             </h1>
-            {getPriceDisplay().showStrike && getPriceDisplay().discountPercentage > 0 && (
-              <span className="bg-[#19411F] text-white text-sm font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap">
-                Save {getPriceDisplay().discountPercentage}%
-              </span>
-            )}
+            <div className="flex shrink-0 items-center gap-2">
+              {getPriceDisplay().showStrike && getPriceDisplay().discountPercentage > 0 && (
+                <span className="bg-[#19411F] text-white text-sm font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap">
+                  Save {getPriceDisplay().discountPercentage}%
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  const shareUrl = resolveProductShareUrl(product, product.slug);
+                  if (!shareUrl) return;
+                  void shareProductLink({
+                    name: product.name,
+                    shareUrl,
+                    description: product.short_description || product.description,
+                  });
+                }}
+                className="flex h-8 w-8 shrink-0 items-center justify-center text-[#374151] hover:bg-black/5 rounded-full"
+                aria-label="Share product"
+              >
+                <ShareNodesIcon className="text-xl text-[#374151]" size={20} />
+              </button>
+            </div>
           </div>
 
           {/* Offer price first, then struck MRP when discounted */}

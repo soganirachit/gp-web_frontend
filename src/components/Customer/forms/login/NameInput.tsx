@@ -10,6 +10,8 @@ const NameInput: React.FC = () => {
   const location = useLocation();
   const { theme } = useFeatureTheme();
   const basePath = location.pathname.startsWith("/gp-store") ? "/gp-store" : "/gp-daily";
+  const locState = (location.state ?? {}) as { returnUrl?: string; fromCart?: boolean };
+  const returnUrl = locState.returnUrl;
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -92,7 +94,7 @@ const NameInput: React.FC = () => {
         navigate(`${basePath}/location`, {
           state: {
             fromNameInput: true,
-            returnUrl: basePath,
+            returnUrl: returnUrl ?? basePath,
           },
         });
       } else {

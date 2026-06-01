@@ -28,7 +28,13 @@ import ErrorBoundary from "../components/ErrorBoundary";
 import SearchIcon from "../assets/icon/Search.png";
 import { useAuth } from "../context/AuthContext";
 import { GP_OPEN_GUEST_AREA_MODAL_EVENT } from "../config/guestAreaModalCopy";
-// Note: If truckstore.svg doesn't exist, rename truckhome.svg to truckstore.svg
+import { guestHasSavedBrowseAddress } from "../utils/guestAddressEntry";
+import { HomeHeroStatusBanner } from "../components/home/HomeHeroStatusBanner";
+import { SleepingZzzBadge } from "../components/home/SleepingZzzBadge";
+import {
+  resolveHomeHeroStatus,
+  type HomeHeroStatus,
+} from "../utils/homeLocationHeroState";
 import truckStoreIcon from "../assets/svg/gp_store_svg/truckhome.svg";
 import storeGreenBanner from "../assets/svg/gp_store_svg/greenbanner.svg";
 import storeWhiteLogo from "../assets/svg/gp_store_svg/whitelogo.svg";
@@ -64,6 +70,8 @@ import namasteSvg from '../assets/svg/namaste.svg';
 import { OffersBannerCarousel } from "../components/OffersBannerCarousel";
 import { BANNER_PLACEMENT_STORE_HOME } from "../utils/bannerPlacement";
 
+// Note: If truckstore.svg doesn't exist, rename truckhome.svg to truckstore.svg
+
 const GpStore_Homepage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -85,6 +93,39 @@ const GpStore_Homepage: React.FC = () => {
     const [bestSellers, setBestSellers] = useState<BestSeller[]>([]);
     const [isLoadingBestSellers, setIsLoadingBestSellers] = useState(true);
     const [storeId, setStoreId] = useState<number | null>(null);
+    const [homeHeroStatus, setHomeHeroStatus] = useState<HomeHeroStatus>("default");
+
+    const refreshHomeHeroStatus = useCallback(async () => {
+        const sid = storeService.getStoreIdForProducts() ?? storeId;
+        const guestTempId = storeService.getTemporaryStoreId();
+        const inServiceArea =
+            guestTempId != null || (!!localStorage.getItem("access_token") && sid != null);
+        let deviceLat: number | null = null;
+        let deviceLng: number | null = null;
+        try {
+            const raw = localStorage.getItem("userCoordinates");
+            if (raw) {
+                const parsed = JSON.parse(raw) as { lat?: number; lng?: number };
+                if (typeof parsed.lat === "number" && typeof parsed.lng === "number") {
+                    deviceLat = parsed.lat;
+                    deviceLng = parsed.lng;
+                }
+            }
+        } catch {
+            /* ignore */
+        }
+        const status = await resolveHomeHeroStatus({
+            storeId: sid ?? null,
+            inServiceArea,
+            deviceLat,
+            deviceLng,
+        });
+        setHomeHeroStatus(status);
+    }, [storeId]);
+
+    useEffect(() => {
+        void refreshHomeHeroStatus();
+    }, [refreshHomeHeroStatus, deliveryLocation, isLoggedIn]);
 
     const fetchCustomerName = async () => {
         try {
@@ -213,6 +254,13 @@ const GpStore_Homepage: React.FC = () => {
         try {
             setIsLoadingAddress(true);
             if (!isLoggedIn) {
+                const guestAddr = storeService.getGuestBrowseAddress();
+                if (guestAddr) {
+                    setAddressType(guestAddr.label || GUEST_HEADER_LOCATION_TITLE);
+                    setDeliveryLocation(guestAddr.formattedLine);
+                    setIsLoadingAddress(false);
+                    return;
+                }
                 setAddressType(GUEST_HEADER_LOCATION_TITLE);
                 setDeliveryLocation("");
                 setIsLoadingAddress(true);
@@ -347,9 +395,22 @@ const GpStore_Homepage: React.FC = () => {
 
     const handleLocationClick = () => {
         if (!isLoggedIn) {
+            if (guestHasSavedBrowseAddress()) {
+                navigate(`${basePath}/login`, {
+                    state: {
+                        from: location.pathname,
+                        returnUrl: `${basePath}/address-selection`,
+                    },
+                });
+                return;
+            }
             window.dispatchEvent(
                 new CustomEvent(GP_OPEN_GUEST_AREA_MODAL_EVENT, {
-                    detail: { dismissible: true, variant: "need_location" },
+                    detail: {
+                        dismissible: true,
+                        variant: "need_location",
+                        redirectToAddressAfterPick: true,
+                    },
                 }),
             );
             return;
@@ -450,6 +511,31 @@ const GpStore_Homepage: React.FC = () => {
                             </div>
 
                             {/* Namaste + delivery truck — single row (design ref) */}
+                            {homeHeroStatus === "store_offline" ? (
+                                <div className="relative min-h-[5.5rem] sm:min-h-[6rem]">
+                                    <div className="relative z-10 max-w-[calc(100%-9.5rem)]">
+                                        <HomeHeroStatusBanner variant="store_offline" />
+                                    </div>
+                                    <div className="pointer-events-none absolute -right-3 top-1/2 z-0 -translate-y-1/2 translate-x-1 sm:-right-4 sm:translate-x-2">
+                                        <img
+                                            src={truckStoreIcon}
+                                            alt=""
+                                            aria-hidden
+                                            className="relative h-[5.5rem] w-[11rem] object-contain object-right sm:h-[6rem] sm:w-[11.75rem]"
+                                        />
+                                        <SleepingZzzBadge className="right-6 top-3" />
+                                    </div>
+                                </div>
+                            ) : homeHeroStatus !== "default" ? (
+                                <HomeHeroStatusBanner
+                                    variant={homeHeroStatus}
+                                    onChangeLocation={
+                                        homeHeroStatus === "area_coming_soon"
+                                            ? handleLocationClick
+                                            : undefined
+                                    }
+                                />
+                            ) : (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -478,6 +564,7 @@ const GpStore_Homepage: React.FC = () => {
                                     </div>
                                 </div>
                             </motion.div>
+                            )}
                         </div>
                     </div>
 

@@ -4,6 +4,7 @@ import { IoWalletOutline, IoTimeOutline, IoRefresh } from "react-icons/io5";
 
 import { motion, AnimatePresence } from "framer-motion";
 import { walletService } from "../../../services/wallet.service";
+import { GP_DAILY_SUBSCRIPTION_WALLET_RECHARGE_HINT } from "../../../utils/gpDailyWalletRechargeRedirect";
 import { toast } from "react-hot-toast";
 import { useAuth } from "../../../context/AuthContext";
 import { useFeatureTheme } from "../../../context/FeatureThemeContext";
@@ -31,9 +32,15 @@ import {
   type Subscription,
 } from "../../../services/subscription.service";
 import {
-  pickActiveSubscriptionDailyUnitRupees,
-  computeGpDailyOrderOnHold,
+  computeGpDailyWalletBanner,
+  shouldShowGpDailyWalletAlertCard,
+  shouldShowGpDailyOrderInHoldCard,
+  shouldShowGpDailyRunningLowCard,
 } from "../../../utils/gpDailyWalletHold";
+import {
+  readWalletPauseScheduleYmd,
+  writeWalletPauseScheduleYmd,
+} from "../../../utils/gpDailyWalletPauseSchedule";
 import { UniformPageHeader } from "../../layout/UniformPageHeader";
 import { tryCompleteGpDailyPendingSubscriptionAfterRecharge } from "../../../utils/resumeGpDailySubscriptionCheckout";
 
@@ -147,14 +154,15 @@ const Wallet = () => {
   const [returnUrl, setReturnUrl] = useState<string | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentFieldMessage, setPaymentFieldMessage] = useState<string | null>(null);
-  const [gpDailyActiveSubs, setGpDailyActiveSubs] = useState<Subscription[]>([]);
+  const [gpDailyAllSubs, setGpDailyAllSubs] = useState<Subscription[]>([]);
   const [gpDailyHasSubscription, setGpDailyHasSubscription] = useState(false);
-  const [gpDailySubExtra, setGpDailySubExtra] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
+  const [walletPauseScheduleYmd, setWalletPauseScheduleYmd] = useState<string | null>(
+    () => readWalletPauseScheduleYmd(),
+  );
   /** Same as app `WalletScreen`: toggle between all txns and credits-only. */
   const [showDepositHistoryOnly, setShowDepositHistoryOnly] = useState(false);
+  const [subscriptionRechargePrompt, setSubscriptionRechargePrompt] =
+    useState(false);
 
   /**
    * Cache of fetched order details keyed by `order_number`. Recent Transactions
@@ -200,9 +208,8 @@ const Wallet = () => {
 
   useEffect(() => {
     if (feature !== "gpDaily" || !isLoggedIn) {
-      setGpDailyActiveSubs([]);
+      setGpDailyAllSubs([]);
       setGpDailyHasSubscription(false);
-      setGpDailySubExtra(null);
       return;
     }
     let cancelled = false;
@@ -210,25 +217,12 @@ const Wallet = () => {
       try {
         const list = await subscriptionService.getCustomerSubscriptions();
         if (cancelled) return;
+        setGpDailyAllSubs(list || []);
         setGpDailyHasSubscription((list || []).length > 0);
-        const active = (list || []).filter((s) => s.status === "ACTIVE");
-        setGpDailyActiveSubs(active);
-        const first = active[0];
-        if (first?.id) {
-          const detail = await subscriptionService.getSubscriptionById(first.id);
-          if (!cancelled) {
-            setGpDailySubExtra(
-              detail && Object.keys(detail).length > 0 ? detail : null,
-            );
-          }
-        } else if (!cancelled) {
-          setGpDailySubExtra(null);
-        }
       } catch {
         if (!cancelled) {
-          setGpDailyActiveSubs([]);
+          setGpDailyAllSubs([]);
           setGpDailyHasSubscription(false);
-          setGpDailySubExtra(null);
         }
       }
     })();
@@ -239,14 +233,58 @@ const Wallet = () => {
 
   const gpDailyOrderHold = useMemo(() => {
     if (feature !== "gpDaily" || !isLoggedIn) {
-      return { show: false, lowBalanceForSubscription: false, threshold3Day: 0 };
+      return {
+        show: false,
+        showOrderInHold: false,
+        showRunningLow: false,
+        lowBalanceForSubscription: false,
+        threshold3Day: 0,
+        kind: "none" as const,
+        pauseDateLabel: "",
+        requiredRecharge: 0,
+        hasWalletHoldPause: false,
+      };
     }
-    const unit = pickActiveSubscriptionDailyUnitRupees(
-      gpDailyActiveSubs[0] ?? null,
-      gpDailySubExtra,
-    );
-    return computeGpDailyOrderOnHold(true, false, balance, unit);
-  }, [feature, isLoggedIn, balance, gpDailyActiveSubs, gpDailySubExtra]);
+    const banner = computeGpDailyWalletBanner({
+      isLoggedIn: true,
+      walletLoading: false,
+      walletBalance: balance,
+      subscriptions: gpDailyAllSubs,
+      storedPauseScheduleYmd: walletPauseScheduleYmd,
+    });
+    return {
+      show: shouldShowGpDailyWalletAlertCard(banner),
+      showOrderInHold: shouldShowGpDailyOrderInHoldCard(banner),
+      showRunningLow: shouldShowGpDailyRunningLowCard(banner),
+      lowBalanceForSubscription: banner.threeDayTotal > 0,
+      threshold3Day: banner.threeDayTotal,
+      kind: banner.kind,
+      pauseDateLabel: banner.pauseDateLabel,
+      requiredRecharge: banner.requiredRecharge,
+      hasWalletHoldPause: banner.hasWalletHoldPause,
+    };
+  }, [feature, isLoggedIn, balance, gpDailyAllSubs, walletPauseScheduleYmd]);
+
+  useEffect(() => {
+    if (feature !== "gpDaily" || !isLoggedIn) return;
+    const banner = computeGpDailyWalletBanner({
+      isLoggedIn: true,
+      walletLoading: false,
+      walletBalance: balance,
+      subscriptions: gpDailyAllSubs,
+      storedPauseScheduleYmd: walletPauseScheduleYmd,
+    });
+    const next = banner.nextStoredPauseScheduleYmd;
+    if (next === walletPauseScheduleYmd) return;
+    setWalletPauseScheduleYmd(next);
+    writeWalletPauseScheduleYmd(next);
+  }, [
+    feature,
+    isLoggedIn,
+    balance,
+    gpDailyAllSubs,
+    walletPauseScheduleYmd,
+  ]);
 
   /** Recharge shortcut from subscribe / basket — prefill amount and return path. */
   useEffect(() => {
@@ -256,6 +294,7 @@ const Wallet = () => {
       shortageAmount?: number;
       currentBalance?: number;
       totalRequired?: number;
+      subscriptionRechargePrompt?: boolean;
     } | null;
     if (!st) return;
 
@@ -276,6 +315,10 @@ const Wallet = () => {
 
     if (shortage != null && Number.isFinite(shortage)) {
       setCustomAmount(String(Math.max(MIN_AMOUNT, Math.ceil(shortage))));
+    }
+
+    if (st.subscriptionRechargePrompt === true) {
+      setSubscriptionRechargePrompt(true);
     }
   }, [location.state]);
 
@@ -558,11 +601,15 @@ const Wallet = () => {
                   aria-hidden
                 />
                 <div className="min-w-0 flex-1">
-                  <h3 className="mb-1 font-serif text-sm font-bold leading-5 text-white">Order in hold</h3>
+                  <h3 className="mb-1 font-serif text-sm font-bold leading-5 text-white">
+                    {gpDailyOrderHold.showOrderInHold
+                      ? "Order in hold"
+                      : "Wallet running low"}
+                  </h3>
                   <p className="font-sans text-sm leading-5 text-white/90">
-                    {gpDailyOrderHold.lowBalanceForSubscription
-                      ? `Your wallet balance is below 3-day subscription amount (₹${gpDailyOrderHold.threshold3Day}). Recharge now to continue deliveries.`
-                      : "Your wallet balance is low. Recharge now to continue your daily deliveries."}
+                    {gpDailyOrderHold.showRunningLow
+                      ? `Your wallet balance will only last until ${gpDailyOrderHold.pauseDateLabel}. Please recharge to keep your deliveries running.`
+                      : "Order in hold — please recharge your wallet to resume deliveries."}
                   </p>
                 </div>
               </div>
@@ -573,7 +620,8 @@ const Wallet = () => {
           feature === "gpDaily" &&
           isLoggedIn &&
           !gpDailyOrderHold.show &&
-          balance < 500 && (
+          balance < 500 &&
+          gpDailyOrderHold.kind === "none" && (
             <div className="w-full shrink-0 flex flex-row items-start gap-2 rounded-[40px] bg-[#ff4d4f] px-3 py-2.5 text-white">
               <IoAlertCircle className="h-[18px] w-[18px] shrink-0 text-white" style={{ marginTop: 1 }} aria-hidden />
               <div className="min-w-0 flex-1">
@@ -753,6 +801,11 @@ const Wallet = () => {
               {paymentFieldMessage}
             </p>
           ) : null}
+          {feature === "gpDaily" && subscriptionRechargePrompt ? (
+            <p className="mt-2 text-center text-xs text-gray-600">
+              {GP_DAILY_SUBSCRIPTION_WALLET_RECHARGE_HINT}
+            </p>
+          ) : null}
           {/* <button
               className="w-full py-3.5 md:py-4 bg-[#FF5722] text-white rounded-full font-medium md:text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
               disabled={
@@ -836,7 +889,7 @@ const Wallet = () => {
             <button
               type="button"
               onClick={() => setShowDepositHistoryOnly((p) => !p)}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-[20px] border border-[#d1d5db] bg-white px-2.5 py-1.5 text-[10px] font-sans font-semibold text-[#374151] hover:bg-gray-50"
+              className="inline-flex shrink-0 items-center gap-1.5 text-[10px] font-sans font-semibold text-[#374151] underline underline-offset-2 hover:text-gray-900"
             >
               <DepositHistoryGlyph className="text-[#374151]" />
               {showDepositHistoryOnly ? "All Transactions" : "Deposit History"}

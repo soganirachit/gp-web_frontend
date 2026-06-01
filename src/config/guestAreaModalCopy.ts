@@ -28,4 +28,6 @@ export const GP_OPEN_GUEST_AREA_MODAL_EVENT = "gp-open-guest-area-modal";
 export type GpOpenGuestAreaModalDetail = {
   dismissible?: boolean;
   variant?: GuestAreaModalVariant;
+  /** After picking a city, navigate to the address entry page (guest ordering for someone else). */
+  redirectToAddressAfterPick?: boolean;
 };

@@ -280,13 +280,13 @@ const HomePage: React.FC = () => {
               <span className="absolute right-1 top-0.5 z-20 text-[#DD7600] text-base sm:text-2xl font-bold leading-none pointer-events-none" aria-hidden>
                 ›
               </span>
-              <div className="relative w-full shrink-0 h-[4.25rem] overflow-hidden rounded-[10px] bg-[#FFF5E6]/40 sm:h-[6.5rem] sm:rounded-xl md:h-[6rem]">
+              <div className="relative w-full shrink-0 h-[4.25rem] overflow-hidden rounded-[10px] bg-[#FFF5E6]/40 sm:h-[6.5rem] sm:rounded-xl md:h-[6rem] xl:overflow-visible xl:h-[6.75rem]">
                 <img
                   src={dailyScooterSvg}
                   alt=""
                   className="pointer-events-none absolute top-4.5 inset-x-0 bottom-0 mx-auto mt-[-22px] h-[92%] w-[118%] max-w-none object-contain object-bottom sm:mt-[-24px] sm:h-[94%] sm:w-[108%]"
                 />
-                <div className="absolute right-0 top-0.5 z-10 w-[45%] max-w-[4.25rem] sm:top-1.5 sm:max-w-[6rem] md:max-w-[8rem]">
+                <div className="absolute right-0 top-0.5 z-10 w-[45%] max-w-[4.25rem] sm:top-1.5 sm:max-w-[6rem] md:max-w-[8rem] xl:top-1 xl:max-w-[9.5rem] xl:w-[52%]">
                   <span
                     aria-hidden
                     className="block aspect-square w-full shrink-0 bg-[#DD7600] drop-shadow-sm"
@@ -325,14 +325,14 @@ const HomePage: React.FC = () => {
               <span className="absolute right-1 top-0.5 z-20 text-[#19411F] text-base sm:text-2xl font-bold leading-none pointer-events-none" aria-hidden>
                 ›
               </span>
-              <div className="relative w-full shrink-0 h-[4.25rem] overflow-hidden rounded-[10px] bg-[#E8F5E9]/40 sm:h-[6.5rem] sm:rounded-xl md:h-[6rem]">
+              <div className="relative w-full shrink-0 h-[4.25rem] overflow-hidden rounded-[10px] bg-[#E8F5E9]/40 sm:h-[6.5rem] sm:rounded-xl md:h-[6rem] lg:overflow-visible lg:h-[6.75rem]">
                 <img
                   src={truckSvg}
                   alt=""
                   className="pointer-events-none absolute top-4.5 inset-x-0 bottom-0 mx-auto mt-[-22px] h-[92%] w-[118%] max-w-none object-contain object-bottom sm:mt-[-24px] sm:h-[94%] sm:w-[108%]"
                 />
-                <div className="absolute right-0 top-0.5 z-10 w-[45%] max-w-[4.25rem] sm:top-1.5 sm:max-w-[6rem] md:max-w-[8rem]">
-                  <img src={storeLogoSvg} alt="Genda Phool Store" className="h-auto w-full object-contain object-right drop-shadow-sm" />
+                <div className="absolute right-0 top-0.5 z-10 w-[45%] max-w-[4.25rem] sm:top-1.5 sm:max-w-[6rem] md:max-w-[8rem] xl:top-1 xl:max-w-[9.5rem] xl:w-[52%]">
+                  <img src={storeLogoSvg} alt="Genda Phool Store" className="h-auto w-full object-contain object-right drop-shadow-sm xl:scale-[0.98] xl:origin-right" />
                 </div>
               </div>
               <p className="mt-1 min-h-[2.25rem] flex-1 min-w-0 px-0.5 text-left text-[10px] font-medium leading-snug text-[#19411F] [overflow-wrap:anywhere] sm:mt-1.5 sm:min-h-[2.5rem] sm:px-1 sm:text-[11px] md:min-h-[2.75rem] md:text-xs md:leading-snug">
@@ -349,12 +349,14 @@ const HomePage: React.FC = () => {
             className="relative mb-6 min-h-[8.75rem] cursor-pointer overflow-hidden rounded-2xl bg-[#FDE2D9] p-4 shadow-sm transition-shadow hover:shadow-md sm:min-h-[9.5rem] sm:p-5"
             role="link"
             tabIndex={0}
-            aria-label="Sajawat by Genda Phool"
-            onClick={() => navigate('/sajawat')}
+            aria-label="Sajawat by Genda Phool on Instagram"
+            onClick={() =>
+              window.open(SOCIAL_URLS.instagramSajawat, '_blank', 'noopener,noreferrer')
+            }
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                navigate('/sajawat');
+                window.open(SOCIAL_URLS.instagramSajawat, '_blank', 'noopener,noreferrer');
               }
             }}
           >
@@ -373,7 +375,7 @@ const HomePage: React.FC = () => {
                   className="inline-flex items-center gap-1.5 rounded-full bg-[#9B2226] px-4 py-2 text-xs font-semibold text-white hover:bg-[#7A1B1E] sm:px-5 sm:py-2.5 sm:text-sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate('/sajawat');
+                    window.open(SOCIAL_URLS.instagramSajawat, '_blank', 'noopener,noreferrer');
                   }}
                 >
                   <span>Free Consultation</span>

@@ -13,7 +13,8 @@ type Props = {
   open: boolean;
   details: InsufficientWalletDetails | null;
   onClose: () => void;
-  onRecharge: () => void;
+  onRecharge: (amount: number) => void | Promise<void>;
+  recharging?: boolean;
 };
 
 export function InsufficientWalletModal({
@@ -21,6 +22,7 @@ export function InsufficientWalletModal({
   details,
   onClose,
   onRecharge,
+  recharging = false,
 }: Props) {
   const { theme, feature } = useFeatureTheme();
   if (!details) return null;
@@ -59,7 +61,7 @@ export function InsufficientWalletModal({
               </h3>
               <p className="text-sm text-gray-600">
                 {details.contextLabel ??
-                  "Recharge your wallet to complete your subscription."}
+                  "Please recharge your wallet first to place a subscription order."}
               </p>
             </div>
 
@@ -94,10 +96,14 @@ export function InsufficientWalletModal({
               </button>
               <button
                 type="button"
-                onClick={onRecharge}
-                className={`flex-1 rounded-lg px-4 py-2.5 font-semibold transition-colors ${rechargeBtnClass}`}
+                disabled={recharging}
+                onClick={() => {
+                  const amount = Math.max(1, Math.ceil(details.shortageAmount));
+                  void onRecharge(amount);
+                }}
+                className={`flex-1 rounded-lg px-4 py-2.5 font-semibold transition-colors disabled:opacity-65 ${rechargeBtnClass}`}
               >
-                Recharge wallet
+                {recharging ? "Processing…" : "Recharge Now"}
               </button>
             </div>
           </motion.div>

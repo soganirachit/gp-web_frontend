@@ -21,6 +21,10 @@ import { formatDeliveryAddressOrFallback } from "../../utils/formatDeliveryAddre
 import { formatNextDeliveryDateLine } from "../../utils/subscriptionNextDelivery";
 import { computeFirstSubscriptionDeliveryDateFromWeekdayInts } from "../../utils/subscriptionFirstDeliveryDate";
 import { navigateToGpDailyWalletForRecharge } from "../../utils/gpDailyWalletRechargeRedirect";
+import {
+  InsufficientWalletModal,
+  type InsufficientWalletDetails,
+} from "../daily/InsufficientWalletModal";
 
 interface SubscriptionDetails {
   basePackId: string;
@@ -403,6 +407,8 @@ const ConfirmSubscription: React.FC = () => {
   const [storeMetaData, setStoreMetaData] = useState<any>(null);
   const [confirmedSubscriptionData, setConfirmedSubscriptionData] = useState<any>(null);
   const [confirmedProductData, setConfirmedProductData] = useState<any>(null);
+  const [insufficientWalletModal, setInsufficientWalletModal] =
+    useState<InsufficientWalletDetails | null>(null);
 
   const [, setStatusModal] = useState<{
     isOpen: boolean;
@@ -724,11 +730,10 @@ const ConfirmSubscription: React.FC = () => {
             Number(subscriptionDetails.sellingPrice || subscriptionDetails.amount) *
             Number(subscriptionDetails.deliveryCount || 7);
           const currentBalance = Number(subscriptionDetails.walletBalance) || 0;
-          navigateToGpDailyWalletForRecharge(navigate, basePath, {
-            shortageAmount: Math.max(0, totalRequired - currentBalance),
+          setInsufficientWalletModal({
             currentBalance,
-            totalRequired,
-            returnUrl: `${basePath}/subscription/confirm`,
+            requiredAmount: totalRequired,
+            shortageAmount: Math.max(0, totalRequired - currentBalance),
           });
         } else {
           console.error("Detailed error:", {
@@ -1306,6 +1311,23 @@ const ConfirmSubscription: React.FC = () => {
           </>
         )}
       </div>
+
+      <InsufficientWalletModal
+        open={insufficientWalletModal != null}
+        details={insufficientWalletModal}
+        onClose={() => setInsufficientWalletModal(null)}
+        onRecharge={() => {
+          const details = insufficientWalletModal;
+          setInsufficientWalletModal(null);
+          if (!details) return;
+          navigateToGpDailyWalletForRecharge(navigate, basePath, {
+            shortageAmount: details.shortageAmount,
+            currentBalance: details.currentBalance,
+            totalRequired: details.requiredAmount,
+            returnUrl: `${basePath}/subscription/confirm`,
+          });
+        }}
+      />
     </div>
   );
 };
