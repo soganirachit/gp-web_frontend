@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -125,6 +125,7 @@ const ManageMySubscription: React.FC = () => {
   );
   const hasMoreHistoryRows = historyVisibleCount < historyOrders.length;
   const hasMoreHistoryFromApi = Boolean(historyOrdersNextUrl);
+  const historyLoadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
 
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
 
@@ -158,6 +159,69 @@ const ManageMySubscription: React.FC = () => {
   const [highlightedSubId, setHighlightedSubId] = useState<string | null>(null);
   const [refreshingSubscriptions, setRefreshingSubscriptions] =
     useState(false);
+
+  const loadMoreHistory = useCallback(async () => {
+    if (historyLoadingMore) return;
+    if (hasMoreHistoryRows) {
+      setHistoryVisibleCount((c) => c + DELIVERY_HISTORY_PAGE_SIZE);
+      return;
+    }
+    if (!historyOrdersNextUrl) return;
+    try {
+      setHistoryLoadingMore(true);
+      const { orders: raw, nextUrl } = await orderService.getOrdersNextPage(
+        historyOrdersNextUrl,
+        true,
+      );
+      const sorted = [...(raw || [])].sort((a: any, b: any) => {
+        const ta = new Date(
+          resolveOrderStatusUpdatedAt(a as Record<string, unknown>) ||
+            a.created_at ||
+            a.createdAt ||
+            0,
+        ).getTime();
+        const tb = new Date(
+          resolveOrderStatusUpdatedAt(b as Record<string, unknown>) ||
+            b.created_at ||
+            b.createdAt ||
+            0,
+        ).getTime();
+        return tb - ta;
+      });
+      const asRecords = sorted
+        .filter((o) => o && typeof o === "object")
+        .map((o) => o as Record<string, unknown>)
+        .filter((row) => isSubscriptionOrderType(row));
+      await orderService.enrichOrderListProductLabels(asRecords, {
+        concurrency: 4,
+        maxFetches: Math.max(asRecords.length, DELIVERY_HISTORY_PAGE_SIZE),
+      });
+      setHistoryOrders((prev) => [...prev, ...asRecords]);
+      setHistoryOrdersNextUrl(nextUrl);
+      setHistoryVisibleCount((c) => c + DELIVERY_HISTORY_PAGE_SIZE);
+    } finally {
+      setHistoryLoadingMore(false);
+    }
+  }, [historyLoadingMore, hasMoreHistoryRows, historyOrdersNextUrl]);
+
+  const loadMoreHistoryRef = useRef(loadMoreHistory);
+  loadMoreHistoryRef.current = loadMoreHistory;
+
+  useEffect(() => {
+    const hasMore = hasMoreHistoryRows || hasMoreHistoryFromApi;
+    if (!hasMore) return;
+    const el = historyLoadMoreSentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const ob = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        void loadMoreHistoryRef.current();
+      },
+      { root: null, rootMargin: "180px 0px", threshold: 0 },
+    );
+    ob.observe(el);
+    return () => ob.disconnect();
+  }, [hasMoreHistoryRows, hasMoreHistoryFromApi, historyVisibleCount, historyOrders.length, historyOrdersNextUrl]);
 
   // Days of the week
   // const daysOfWeek = ['Mon', 'Tues', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'];
@@ -983,72 +1047,13 @@ const ManageMySubscription: React.FC = () => {
                 })}
                 </div>
                 {hasMoreHistoryRows || hasMoreHistoryFromApi ? (
-                  <button
-                    type="button"
-                    className="w-full py-4 text-center text-sm font-medium text-gray-500 underline"
-                    disabled={historyLoadingMore}
-                    onClick={() => {
-                      if (hasMoreHistoryRows) {
-                        setHistoryVisibleCount(
-                          (c) => c + DELIVERY_HISTORY_PAGE_SIZE,
-                        );
-                        return;
-                      }
-                      if (!historyOrdersNextUrl || historyLoadingMore) return;
-                      void (async () => {
-                        try {
-                          setHistoryLoadingMore(true);
-                          const { orders: raw, nextUrl } =
-                            await orderService.getOrdersNextPage(
-                              historyOrdersNextUrl,
-                              true,
-                            );
-                          const sorted = [...(raw || [])].sort((a: any, b: any) => {
-                            const ta = new Date(
-                              resolveOrderStatusUpdatedAt(
-                                a as Record<string, unknown>,
-                              ) ||
-                                a.created_at ||
-                                a.createdAt ||
-                                0,
-                            ).getTime();
-                            const tb = new Date(
-                              resolveOrderStatusUpdatedAt(
-                                b as Record<string, unknown>,
-                              ) ||
-                                b.created_at ||
-                                b.createdAt ||
-                                0,
-                            ).getTime();
-                            return tb - ta;
-                          });
-                          const asRecords = sorted
-                            .filter((o) => o && typeof o === "object")
-                            .map((o) => o as Record<string, unknown>)
-                            .filter((row) => isSubscriptionOrderType(row));
-                          await orderService.enrichOrderListProductLabels(
-                            asRecords,
-                            {
-                              concurrency: 4,
-                              maxFetches: Math.max(
-                                asRecords.length,
-                                DELIVERY_HISTORY_PAGE_SIZE,
-                              ),
-                            },
-                          );
-                          setHistoryOrders((prev) => [...prev, ...asRecords]);
-                          setHistoryOrdersNextUrl(nextUrl);
-                          setHistoryVisibleCount(
-                            (c) => c + DELIVERY_HISTORY_PAGE_SIZE,
-                          );
-                        } finally {
-                          setHistoryLoadingMore(false);
-                        }
-                      })();
-                    }}
+                  <div
+                    ref={historyLoadMoreSentinelRef}
+                    className="w-full py-4 text-center text-sm font-medium text-gray-500"
+                    aria-hidden
                   >
-                    {historyLoadingMore ? "Loading…" : "Load more"}
-                  </button>
+                    {historyLoadingMore ? "Loading…" : null}
+                  </div>
                 ) : null}
                 </>
               ) : (

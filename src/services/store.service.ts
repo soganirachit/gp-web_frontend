@@ -460,7 +460,7 @@ class StoreService {
       if (storeId == null) {
         return { serviceable: false, message: GUEST_NOT_SERVICEABLE_BODY };
       }
-      const stores = await this.getAllStores(lat, lng, { includeOffline: true });
+      const stores = await this.getAllStores(lat, lng);
       const row = stores.find((s) => s.id === storeId);
       return {
         serviceable: true,

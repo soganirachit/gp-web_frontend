@@ -1,12 +1,6 @@
 import { loadRazorpayScript } from "../lib/razorpayLoader";
 import { walletService } from "../services/wallet.service";
 
-declare global {
-  interface Window {
-    Razorpay: new (options: Record<string, unknown>) => { open: () => void };
-  }
-}
-
 /** Opens Razorpay for wallet top-up; returns true when payment is verified. */
 export async function rechargeWalletInApp(amountRupees: number): Promise<boolean> {
   const effectiveAmount = Math.max(1, Math.ceil(amountRupees));
@@ -57,7 +51,14 @@ export async function rechargeWalletInApp(amountRupees: number): Promise<boolean
       },
     };
 
-    const razorpayInstance = new window.Razorpay(options);
+    const RazorpayCtor = (window as unknown as {
+      Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+    }).Razorpay;
+    if (!RazorpayCtor) {
+      reject(new Error("Razorpay SDK unavailable"));
+      return;
+    }
+    const razorpayInstance = new RazorpayCtor(options);
     razorpayInstance.open();
   });
 

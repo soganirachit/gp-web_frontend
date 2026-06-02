@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { FaChevronLeft } from "react-icons/fa";
 import { SEO } from "../components/SEO";
 import { SajawatCategoryChips, ALL_CATEGORY_ID } from "../components/Sajawat/SajawatCategoryChips";
@@ -14,6 +14,7 @@ import {
 import { SajawatMediaFullscreen } from "../components/Sajawat/SajawatMediaFullscreen";
 
 const SajawatSignatureGallery: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [categories, setCategories] = useState<SajawatGalleryCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategoryId, setSelectedCategoryId] =
@@ -30,6 +31,30 @@ const SajawatSignatureGallery: React.FC = () => {
   useEffect(() => {
     void loadGallery();
   }, [loadGallery]);
+
+  useEffect(() => {
+    if (loading) return;
+    const requested = Number(searchParams.get("category"));
+    if (!Number.isFinite(requested) || requested <= 0) {
+      setSelectedCategoryId(ALL_CATEGORY_ID);
+      return;
+    }
+    const exists = categories.some((c) => c.id === requested);
+    setSelectedCategoryId(exists ? requested : ALL_CATEGORY_ID);
+  }, [loading, categories, searchParams]);
+
+  const handleSelectCategory = useCallback(
+    (id: number) => {
+      setSelectedCategoryId(id);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (id === ALL_CATEGORY_ID) next.delete("category");
+        else next.set("category", String(id));
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams]
+  );
 
   return (
     <>
@@ -70,7 +95,7 @@ const SajawatSignatureGallery: React.FC = () => {
             <SajawatCategoryChips
               categories={categories}
               selectedId={selectedCategoryId}
-              onSelect={setSelectedCategoryId}
+              onSelect={handleSelectCategory}
             />
           )}
         </div>

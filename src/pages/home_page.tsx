@@ -291,7 +291,7 @@ const HomePage: React.FC = () => {
                 <img
                   src={dailyScooterSvg}
                   alt=""
-                  className="pointer-events-none absolute top-4.5 inset-x-0 bottom-0 mx-auto mt-[-22px] h-[92%] w-[118%] max-w-none object-contain object-bottom sm:mt-[-24px] sm:h-[94%] sm:w-[108%] lg:mt-[-20px] lg:h-[92%] lg:w-[102%] xl:w-[100%] 2xl:h-[90%] 2xl:w-[98%]"
+                  className="pointer-events-none absolute -left-[6%] right-auto top-4.5 bottom-0 mt-[-22px] h-[92%] w-[124%] max-w-none object-contain object-left sm:mt-[-24px] sm:h-[94%] sm:w-[112%] sm:-left-[4%] lg:mt-[-20px] lg:h-[92%] lg:w-[104%] lg:-left-[2%] xl:w-[100%] xl:left-0 2xl:h-[90%] 2xl:w-[98%]"
                 />
                 <div className={HOME_SERVICE_CARD_LOGO_WRAP_CLASS}>
                   <span
@@ -360,14 +360,12 @@ const HomePage: React.FC = () => {
             className="relative mb-6 min-h-[8.75rem] cursor-pointer overflow-hidden rounded-2xl bg-[#FDE2D9] p-4 shadow-sm transition-shadow hover:shadow-md sm:min-h-[9.5rem] sm:p-5"
             role="link"
             tabIndex={0}
-            aria-label="Sajawat by Genda Phool on Instagram"
-            onClick={() =>
-              window.open(SOCIAL_URLS.instagramSajawat, '_blank', 'noopener,noreferrer')
-            }
+            aria-label="Open Sajawat by Genda Phool"
+            onClick={() => navigate('/sajawat')}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                window.open(SOCIAL_URLS.instagramSajawat, '_blank', 'noopener,noreferrer');
+                navigate('/sajawat');
               }
             }}
           >
@@ -386,7 +384,7 @@ const HomePage: React.FC = () => {
                   className="inline-flex items-center gap-1.5 rounded-full bg-[#9B2226] px-4 py-2 text-xs font-semibold text-white hover:bg-[#7A1B1E] sm:px-5 sm:py-2.5 sm:text-sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    window.open(SOCIAL_URLS.instagramSajawat, '_blank', 'noopener,noreferrer');
+                    navigate('/sajawat');
                   }}
                 >
                   <span>Free Consultation</span>

@@ -126,10 +126,7 @@ const dailyScooterHeroImgClass =
   "h-[5.5rem] w-[11rem] object-contain object-right sm:h-[6rem] sm:w-[11.75rem]";
 const NAMASTE_MAX_VISIBLE_DOTS = 3;
 
-function getNamasteVisibleDotIndices(
-  total: number,
-  current: number,
-): number[] {
+function getNamasteVisibleDotIndices(total: number, current: number): number[] {
   if (total <= NAMASTE_MAX_VISIBLE_DOTS) {
     return Array.from({ length: total }, (_, i) => i);
   }
@@ -137,12 +134,8 @@ function getNamasteVisibleDotIndices(
     0,
     Math.min(current - 1, total - NAMASTE_MAX_VISIBLE_DOTS),
   );
-  return Array.from(
-    { length: NAMASTE_MAX_VISIBLE_DOTS },
-    (_, i) => start + i,
-  );
+  return Array.from({ length: NAMASTE_MAX_VISIBLE_DOTS }, (_, i) => start + i);
 }
-
 function readNamasteCarouselPosition(el: HTMLDivElement): {
   slideWidth: number;
   virtualIndex: number;
@@ -745,9 +738,8 @@ const Home2: React.FC = () => {
     !isLoggedIn ||
     (!namasteCarouselLoading && namasteSlideCount === 0);
 
-  const namasteVisibleDotIndices = useMemo(
-    () =>
-      getNamasteVisibleDotIndices(namasteSlideCount, subscriptionCarouselIndex),
+  const namasteDotIndices = useMemo(
+    () => getNamasteVisibleDotIndices(namasteSlideCount, subscriptionCarouselIndex),
     [namasteSlideCount, subscriptionCarouselIndex],
   );
   const currentNamasteCarouselSlide =
@@ -1014,15 +1006,18 @@ const Home2: React.FC = () => {
           <MdChevronLeft className="h-4 w-4" />
         </button>
         <div className="flex items-center gap-1.5">
-          {namasteVisibleDotIndices.map((dotIdx) => (
-            <span
+          {namasteDotIndices.map((dotIdx) => (
+            <button
               key={`namaste-dot-${dotIdx}`}
-              className={`h-1.5 w-1.5 rounded-full ${
+              type="button"
+              onClick={() => scrollSubscriptionCarouselTo(dotIdx)}
+              className={`rounded-full transition-all duration-300 ${
                 dotIdx === subscriptionCarouselIndex
-                  ? "bg-[#E1522D]"
-                  : "bg-[#D1D5DB]"
+                  ? "h-2 w-5 bg-[#E1522D]"
+                  : "h-1.5 w-1.5 bg-[#D1D5DB] hover:bg-[#9CA3AF]"
               }`}
-              aria-hidden
+              aria-label={`Go to slide ${dotIdx + 1}`}
+              aria-current={dotIdx === subscriptionCarouselIndex ? "true" : undefined}
             />
           ))}
         </div>
@@ -1138,7 +1133,6 @@ const Home2: React.FC = () => {
               compact
               variant="bottleGreen"
               loading={resumingSubId === sub.id}
-              disabled={resumingSubId != null}
               onClick={(e) => void handleNamasteResume(e, sub.id)}
             />
           ) : null}
@@ -1511,140 +1505,7 @@ const Home2: React.FC = () => {
               </div>
               )}
 
-              {/* Legacy Namaste subscription card — moved into hero; see commented block below. */}
-              {false ? (
-              <div className="relative overflow-hidden rounded-[40px] border border-[#F2E9D7] bg-[#f3e8d5] px-4 pt-3 pb-2">
-                <div className="mb-2.5 flex items-center justify-between gap-3">
-                  <h2 className="min-w-0 flex-1 font-serif text-xl font-semibold leading-6 text-[#222222] [overflow-wrap:anywhere]">
-                    {isLoggedIn ? `Namaste, ${userFirstName || "User"}` : "Namaste!"}
-                  </h2>
-                  {isLoggedIn ? (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`${basePath}/manage-my-subscription`)}
-                      className="shrink-0 rounded-full bg-[#E1522D]/15 px-3 py-1 text-sm font-medium text-[#E1522D] hover:bg-[#E1522D]/25"
-                    >
-                      Manage
-                    </button>
-                  ) : null}
-                </div>
-
-                {isLoadingSubscriptions && activeSubscriptions.length === 0 ? (
-                  <div className="space-y-3 pl-1 animate-pulse">
-                    <div className="h-5 w-[85%] rounded bg-gray-200/80" />
-                    <div className="h-5 w-[55%] rounded bg-gray-200/80" />
-                    <div className="h-5 w-[70%] rounded bg-gray-200/80" />
-                  </div>
-                ) : activeSubscriptions.length === 0 ? (
-                  <p className="pl-1 text-sm font-medium leading-5 text-[#6B7280]">
-                    {isLoggedIn
-                      ? "No subscriptions yet. Explore packs below to subscribe."
-                      : ""}
-                  </p>
-                ) : (
-                  <>
-                    <div
-                      className={`relative transition-opacity duration-300 ${
-                        isLoadingSubscriptions ? "opacity-70" : ""
-                      }`}
-                      onPointerDown={() => snoozeNamasteAutoplay()}
-                      onPointerUp={() => {
-                        syncNamasteCarouselFromScroll();
-                        snoozeNamasteAutoplay();
-                      }}
-                      onPointerCancel={() => snoozeNamasteAutoplay()}
-                      onTouchStart={() => snoozeNamasteAutoplay()}
-                      onTouchMove={() => snoozeNamasteAutoplay()}
-                      onTouchEnd={() => {
-                        syncNamasteCarouselFromScroll();
-                        snoozeNamasteAutoplay();
-                      }}
-                    >
-                    <div
-                      ref={subscriptionCarouselRef}
-                      className="relative z-10 flex min-h-[5.25rem] snap-x snap-mandatory overflow-x-auto overscroll-x-contain no-scrollbar touch-pan-x [scroll-snap-stop:always]"
-                    >
-                      {namasteLoopSlides.map((sub, loopIdx) => (
-                        <div
-                          key={`${String(sub.id)}-namaste-loop-${loopIdx}`}
-                          data-namaste-slide
-                          className="box-border w-full min-w-0 shrink-0 grow-0 basis-full snap-center snap-always"
-                        >
-                          <div className="flex flex-col justify-start gap-1 pr-[3.5rem]">
-                            <div className="flex min-h-7 items-center gap-3 text-[#222222]">
-                              <img
-                                src={scooterIcon}
-                                alt=""
-                                className="h-4 w-4 shrink-0"
-                                aria-hidden
-                              />
-                              <span className="min-w-0 flex-1 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
-                                {formatNamasteDeliveryLine(sub)}
-                              </span>
-                            </div>
-                            <div className="flex min-h-7 items-center justify-between gap-2 text-[#222222]">
-                              <div className="flex min-w-0 flex-1 items-center gap-3">
-                                {sub.status === "PAUSED" ? (
-                                  <img
-                                    src={pauseSubIcon}
-                                    alt=""
-                                    className="h-4 w-4 shrink-0"
-                                    aria-hidden
-                                  />
-                                ) : (
-                                  <IoPlay
-                                    className="h-5 w-5 shrink-0 text-[#222222]"
-                                    aria-hidden
-                                  />
-                                )}
-                                <span className="min-w-0 text-[15px] font-medium leading-5 text-[#222222]">
-                                  {formatNamasteSubscriptionStatusLine(sub)}
-                                </span>
-                              </div>
-                              <div className="flex shrink-0 items-center justify-end">
-                                {sub.status === "PAUSED" ? (
-                                  <SubscriptionResumeButton
-                                    onClick={(e) => void handleNamasteResume(e, sub.id)}
-                                    loading={resumingSubId === sub.id}
-                                    className="!min-w-[4.75rem] !px-2.5 !py-1 !text-[12px] !rounded-lg"
-                                  />
-                                ) : null}
-                              </div>
-                            </div>
-                            <div className="flex min-h-7 items-center gap-3 text-[#222222]">
-                              <img
-                                src={flowerIcon}
-                                alt=""
-                                className="h-4 w-4 shrink-0"
-                                aria-hidden
-                              />
-                              <span className="min-w-0 flex-1 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
-                                {subscriptionProductLabel(sub)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {activeSubscriptions.length > 1 ? (
-                      <p
-                        className="pointer-events-none relative z-[2] mt-1 text-xs font-semibold tabular-nums text-[#6B7280]"
-                        aria-live="polite"
-                      >
-                        {subscriptionCarouselIndex + 1} / {activeSubscriptions.length}
-                      </p>
-                    ) : null}
-                    <img
-                      src={smallgendaIcon}
-                      alt=""
-                      className="pointer-events-none absolute -bottom-2 -right-4 z-[1] h-[4rem] w-[4rem] object-contain object-bottom-right select-none"
-                      aria-hidden
-                    />
-                    </div>
-                  </>
-                )}
-              </div>
-              ) : null}
+              {/* Legacy Namaste subscription card removed (hero carousel above is active). */}
 
             </div>
           </div>
