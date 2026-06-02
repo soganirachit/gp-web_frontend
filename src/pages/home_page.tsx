@@ -52,6 +52,13 @@ import {
   HOME_HEADER_PROFILE_OFFSET,
 } from '../constants/homeHeaderLayout';
 
+/** Identical logo block sizing on Daily + Store service cards (mobile through 2xl). */
+const HOME_SERVICE_CARD_LOGO_WRAP_CLASS =
+  'absolute right-0 top-0 z-10 w-[45%] max-w-[4.25rem] sm:top-1.5 sm:max-w-[6rem] md:max-w-[8rem] lg:w-[46%] lg:max-w-[9rem] xl:w-[48%] xl:max-w-[9.75rem] 2xl:right-0.5 2xl:top-0.5 2xl:w-[40%] 2xl:max-w-[7.5rem]';
+
+const HOME_SERVICE_CARD_LOGO_SCALE_CLASS =
+  'w-full shrink-0 origin-top-right drop-shadow-sm lg:scale-[0.96] xl:scale-[0.98] 2xl:scale-[0.9]';
+
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
@@ -280,16 +287,16 @@ const HomePage: React.FC = () => {
               <span className="absolute right-1 top-0.5 z-20 text-[#DD7600] text-base sm:text-2xl font-bold leading-none pointer-events-none" aria-hidden>
                 ›
               </span>
-              <div className="relative w-full shrink-0 h-[4.25rem] overflow-hidden rounded-[10px] bg-[#FFF5E6]/40 sm:h-[6.5rem] sm:rounded-xl md:h-[6rem] xl:overflow-visible xl:h-[6.75rem]">
+              <div className="relative w-full shrink-0 h-[4.25rem] overflow-hidden rounded-[10px] bg-[#FFF5E6]/40 sm:h-[6.5rem] sm:rounded-xl md:h-[6rem] lg:h-[7.5rem] xl:h-[7.75rem] 2xl:h-[7.25rem]">
                 <img
                   src={dailyScooterSvg}
                   alt=""
-                  className="pointer-events-none absolute top-4.5 inset-x-0 bottom-0 mx-auto mt-[-22px] h-[92%] w-[118%] max-w-none object-contain object-bottom sm:mt-[-24px] sm:h-[94%] sm:w-[108%]"
+                  className="pointer-events-none absolute top-4.5 inset-x-0 bottom-0 mx-auto mt-[-22px] h-[92%] w-[118%] max-w-none object-contain object-bottom sm:mt-[-24px] sm:h-[94%] sm:w-[108%] lg:mt-[-20px] lg:h-[92%] lg:w-[102%] xl:w-[100%] 2xl:h-[90%] 2xl:w-[98%]"
                 />
-                <div className="absolute right-0 top-0.5 z-10 w-[45%] max-w-[4.25rem] sm:top-1.5 sm:max-w-[6rem] md:max-w-[8rem] xl:top-1 xl:max-w-[9.5rem] xl:w-[52%]">
+                <div className={HOME_SERVICE_CARD_LOGO_WRAP_CLASS}>
                   <span
                     aria-hidden
-                    className="block aspect-square w-full shrink-0 bg-[#DD7600] drop-shadow-sm"
+                    className={`block aspect-square bg-[#DD7600] ${HOME_SERVICE_CARD_LOGO_SCALE_CLASS}`}
                     style={{
                       maskImage: `url(${dailyTabGlyph})`,
                       WebkitMaskImage: `url(${dailyTabGlyph})`,
@@ -303,7 +310,7 @@ const HomePage: React.FC = () => {
                   />
                 </div>
               </div>
-              <p className="mt-0 top-0 min-h-[2.25rem] flex-1 min-w-0 px-0.5 text-left text-[10px] font-medium leading-snug text-[#DD7600] [overflow-wrap:anywhere] sm:mt-1.5 sm:min-h-[2.5rem] sm:px-1 sm:text-[11px] md:min-h-[2.75rem] md:text-xs md:leading-snug">
+              <p className="mt-0 top-0 min-h-[2.25rem] flex-1 min-w-0 px-0.5 text-left text-[10px] font-medium leading-snug text-[#DD7600] [overflow-wrap:anywhere] sm:mt-1.5 sm:min-h-[2.5rem] sm:px-1 sm:text-[11px] md:min-h-[2.75rem] md:text-xs md:leading-snug lg:mt-2 lg:min-h-[3rem]">
                 Everyday delivery of fresh flowers for Puja or Home Decor.
               </p>
             </motion.div>
@@ -325,17 +332,21 @@ const HomePage: React.FC = () => {
               <span className="absolute right-1 top-0.5 z-20 text-[#19411F] text-base sm:text-2xl font-bold leading-none pointer-events-none" aria-hidden>
                 ›
               </span>
-              <div className="relative w-full shrink-0 h-[4.25rem] overflow-hidden rounded-[10px] bg-[#E8F5E9]/40 sm:h-[6.5rem] sm:rounded-xl md:h-[6rem] lg:overflow-visible lg:h-[6.75rem]">
+              <div className="relative w-full shrink-0 h-[4.25rem] overflow-hidden rounded-[10px] bg-[#E8F5E9]/40 sm:h-[6.5rem] sm:rounded-xl md:h-[6rem] lg:h-[7.5rem] xl:h-[7.75rem] 2xl:h-[7.25rem]">
                 <img
                   src={truckSvg}
                   alt=""
-                  className="pointer-events-none absolute top-4.5 inset-x-0 bottom-0 mx-auto mt-[-22px] h-[92%] w-[118%] max-w-none object-contain object-bottom sm:mt-[-24px] sm:h-[94%] sm:w-[108%]"
+                  className="pointer-events-none absolute top-4.5 inset-x-0 bottom-0 mx-auto mt-[-22px] h-[92%] w-[118%] max-w-none object-contain object-bottom sm:mt-[-24px] sm:h-[94%] sm:w-[108%] lg:mt-[-20px] lg:h-[92%] lg:w-[102%] xl:w-[100%] 2xl:h-[90%] 2xl:w-[98%]"
                 />
-                <div className="absolute right-0 top-0.5 z-10 w-[45%] max-w-[4.25rem] sm:top-1.5 sm:max-w-[6rem] md:max-w-[8rem] xl:top-1 xl:max-w-[9.5rem] xl:w-[52%]">
-                  <img src={storeLogoSvg} alt="Genda Phool Store" className="h-auto w-full object-contain object-right drop-shadow-sm xl:scale-[0.98] xl:origin-right" />
+                <div className={HOME_SERVICE_CARD_LOGO_WRAP_CLASS}>
+                  <img
+                    src={storeLogoSvg}
+                    alt="Genda Phool Store"
+                    className={`block aspect-square h-auto object-contain object-right ${HOME_SERVICE_CARD_LOGO_SCALE_CLASS}`}
+                  />
                 </div>
               </div>
-              <p className="mt-1 min-h-[2.25rem] flex-1 min-w-0 px-0.5 text-left text-[10px] font-medium leading-snug text-[#19411F] [overflow-wrap:anywhere] sm:mt-1.5 sm:min-h-[2.5rem] sm:px-1 sm:text-[11px] md:min-h-[2.75rem] md:text-xs md:leading-snug">
+              <p className="mt-1 min-h-[2.25rem] flex-1 min-w-0 px-0.5 text-left text-[10px] font-medium leading-snug text-[#19411F] [overflow-wrap:anywhere] sm:mt-1.5 sm:min-h-[2.5rem] sm:px-1 sm:text-[11px] md:min-h-[2.75rem] md:text-xs md:leading-snug lg:mt-2 lg:min-h-[3rem]">
                 From last minute floral needs to grand bouquets, we got it all!
               </p>
             </motion.div>
