@@ -3,18 +3,21 @@ import { useNavigate } from "react-router-dom";
 import { FaHome } from "react-icons/fa";
 import sajawatLogoSvg from "../../assets/svg/sajawat_logo.svg";
 import sajawatScallopSvg from "../../assets/svg/sajawat_red_scallop.svg";
-import { openSajawatWhatsApp } from "../../config/sajawatContact";
+import { SAJAWAT_PAGE_SHELL_CLASS } from "../../constants/sajawatLayout";
+import { scrollToSajawatMeetingForm } from "../../utils/sajawatMeetingForm";
 
 export const SajawatBottomBar: React.FC = () => {
   const navigate = useNavigate();
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#F0D4CC] bg-[#FFF5F0] pb-[env(safe-area-inset-bottom)]"
+      className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-[env(safe-area-inset-bottom)]"
       role="navigation"
       aria-label="Sajawat navigation"
     >
-      <div className="relative mx-auto min-h-[3.125rem] max-w-lg pt-1">
+      <div
+        className={`relative min-h-[3.125rem] w-full border-t border-[#F0D4CC] bg-[#FFF5F0] pt-1 ${SAJAWAT_PAGE_SHELL_CLASS}`}
+      >
         <div className="flex items-center pl-3">
           <button
             type="button"
@@ -49,11 +52,7 @@ export const SajawatBottomBar: React.FC = () => {
 
         <button
           type="button"
-          onClick={() =>
-            openSajawatWhatsApp(
-              "Hi Sajawat by Genda Phool, I'd like a free consultation for my wedding.",
-            )
-          }
+          onClick={scrollToSajawatMeetingForm}
           className="absolute right-0 top-2.5 rounded-l-xl bg-gradient-to-r from-[#FACB1E] to-[#F5A623] px-3 py-2 text-[9px] font-bold leading-tight tracking-wide text-[#9B2226] sm:text-[10px]"
         >
           CONSULT FOR FREE!

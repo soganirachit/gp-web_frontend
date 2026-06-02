@@ -1,9 +1,7 @@
 import React from "react";
-import { FaWhatsapp, FaPhone, FaFileDownload } from "react-icons/fa";
-import {
-  openSajawatWhatsApp,
-  SAJAWAT_CONTACT,
-} from "../../config/sajawatContact";
+import { FaCalendarAlt, FaPhone, FaFileDownload } from "react-icons/fa";
+import { SAJAWAT_CONTACT } from "../../config/sajawatContact";
+import { scrollToSajawatMeetingForm } from "../../utils/sajawatMeetingForm";
 
 export const SajawatWeddingJourneyCta: React.FC = () => {
   const brochureUrl = SAJAWAT_CONTACT.sajawatBrochureUrl.trim();
@@ -20,21 +18,17 @@ export const SajawatWeddingJourneyCta: React.FC = () => {
         <div className="mt-6 space-y-3">
           <button
             type="button"
-            onClick={() =>
-              openSajawatWhatsApp(
-                "Hi Sajawat by Genda Phool, I'd like to chat about my wedding floral decor.",
-              )
-            }
+            onClick={scrollToSajawatMeetingForm}
             className="flex w-full items-center justify-center gap-2 rounded-full bg-[#9B2226] py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#7A1B1E]"
           >
-            <FaWhatsapp className="h-5 w-5" aria-hidden />
-            Chat on WhatsApp
+            <FaCalendarAlt className="h-5 w-5" aria-hidden />
+            Schedule a Meeting
           </button>
           <a
             href={`tel:${SAJAWAT_CONTACT.sajawatContactPhone.replace(/\s/g, "")}`}
             className="flex w-full items-center justify-center gap-2 rounded-full border border-[#D1D5DB] bg-white py-3.5 text-sm font-semibold text-[#1F2937] transition-colors hover:bg-[#F9FAFB]"
           >
-            <FaPhone className="h-4 w-4" aria-hidden />
+            <FaPhone className="h-4 w-4 -scale-x-100" aria-hidden />
             Call Us Now
           </a>
           {brochureUrl ? (

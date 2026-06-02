@@ -1,12 +1,13 @@
 import React from "react";
-import { FaFacebook, FaInstagram, FaWhatsapp, FaPhone, FaEnvelope } from "react-icons/fa";
+import { FaFacebook, FaInstagram, FaCalendarAlt, FaPhone, FaEnvelope } from "react-icons/fa";
 import logoSvg from "../../assets/svg/logo.svg";
 import { SOCIAL_URLS } from "../../config/socialUrls";
 import { SAJAWAT_CONTACT } from "../../config/sajawatContact";
+import { scrollToSajawatMeetingForm } from "../../utils/sajawatMeetingForm";
 
 export const SajawatFooter: React.FC = () => (
   <footer className="bg-white px-5 pb-32 pt-6 sm:px-6">
-    <div className="mx-auto flex max-w-lg flex-col items-center text-center">
+    <div className="mx-auto flex w-full max-w-full flex-col items-center text-center">
       <img
         src={logoSvg}
         alt="Genda Phool"
@@ -17,7 +18,7 @@ export const SajawatFooter: React.FC = () => (
           href={`tel:${SAJAWAT_CONTACT.sajawatContactPhone.replace(/\s/g, "")}`}
           className="inline-flex items-center gap-2 text-[13px] text-[#666666]"
         >
-          <FaPhone className="h-3.5 w-3.5" aria-hidden />
+          <FaPhone className="h-3.5 w-3.5 -scale-x-100" aria-hidden />
           {SAJAWAT_CONTACT.sajawatContactPhone}
         </a>
         <a
@@ -47,19 +48,18 @@ export const SajawatFooter: React.FC = () => (
         >
           <FaInstagram className="h-[1.35rem] w-[1.35rem]" />
         </a>
-        <a
-          href={SOCIAL_URLS.whatsapp}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="WhatsApp"
-          className="text-[#25D366]"
+        <button
+          type="button"
+          onClick={scrollToSajawatMeetingForm}
+          aria-label="Schedule a meeting"
+          className="text-[#9B2226] transition-opacity hover:opacity-80"
         >
-          <FaWhatsapp className="h-[1.35rem] w-[1.35rem]" />
-        </a>
+          <FaCalendarAlt className="h-[1.35rem] w-[1.35rem]" />
+        </button>
       </div>
       <div className="mb-3.5 h-px w-full max-w-md bg-[#E5E7EB]" />
       <p className="text-[11px] text-[#9CA3AF] sm:text-xs">
-        © 2025 Sajawat by Genda Phool. All rights reserved.
+        © 2026 Sajawat by Genda Phool. All rights reserved.
       </p>
     </div>
   </footer>

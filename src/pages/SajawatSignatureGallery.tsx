@@ -12,6 +12,10 @@ import {
   type SajawatGalleryMedia,
 } from "../services/sajawat.service";
 import { SajawatMediaFullscreen } from "../components/Sajawat/SajawatMediaFullscreen";
+import {
+  SAJAWAT_PAGE_ROOT_CLASS,
+  SAJAWAT_PAGE_SHELL_CLASS,
+} from "../constants/sajawatLayout";
 
 const SajawatSignatureGallery: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -63,11 +67,12 @@ const SajawatSignatureGallery: React.FC = () => {
         description="Browse wedding floral decor photos and videos by category. Schedule a meeting with Sajawat by Genda Phool."
         canonical="https://customerapp.mygendaphool.com/sajawat/gallery"
       />
-      <div className="min-h-screen bg-white pb-[4.5rem]">
+      <div className={SAJAWAT_PAGE_ROOT_CLASS}>
         <SajawatMediaFullscreen
           item={viewerItem}
           onClose={() => setViewerItem(null)}
         />
+        <div className={SAJAWAT_PAGE_SHELL_CLASS}>
         <header className="sticky top-0 z-40 flex items-center gap-2 border-b border-[#E5E7EB] bg-white px-3 py-3">
           <Link
             to="/sajawat"
@@ -111,6 +116,7 @@ const SajawatSignatureGallery: React.FC = () => {
         ) : null}
 
         <SajawatMeetingForm />
+        </div>
         <SajawatBottomBar />
       </div>
     </>

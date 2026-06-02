@@ -16,6 +16,7 @@ export type SajawatGalleryMedia = {
 export type SajawatGalleryCategory = {
   id: number;
   name: string;
+  description: string;
   sort_order: number;
   media: SajawatGalleryMedia[];
 };
@@ -71,6 +72,7 @@ function parseGalleryPayload(payload: unknown): SajawatGalleryData {
       return {
         id,
         name,
+        description: String(c.description ?? "").trim(),
         sort_order: Number(c.sort_order) || 0,
         media,
       };
@@ -116,3 +118,72 @@ export function flattenSajawatGalleryMedia(
 }
 
 export const SAJAWAT_GALLERY_PREVIEW_COUNT = 5;
+
+export type SajawatLeadPayload = {
+  name: string;
+  email?: string;
+  phone?: string;
+  event_date?: string;
+  message?: string;
+};
+
+export type SajawatLeadSubmitResult = {
+  ok: true;
+  message: string;
+  sheetWarning?: string;
+};
+
+function parseLeadSubmitResponse(data: unknown): SajawatLeadSubmitResult {
+  const root = data as {
+    success?: boolean;
+    message?: string;
+    data?: { sheet_warning?: string };
+  };
+  const message =
+    (typeof root.message === "string" && root.message.trim()) ||
+    "Thank you! We will contact you shortly.";
+  const sheetWarning =
+    typeof root.data?.sheet_warning === "string"
+      ? root.data.sheet_warning.trim()
+      : undefined;
+  return { ok: true, message, sheetWarning: sheetWarning || undefined };
+}
+
+function leadSubmitErrorMessage(error: unknown): string {
+  const ax = error as {
+    response?: { data?: { message?: string; errors?: Record<string, unknown> } };
+  };
+  const data = ax.response?.data;
+  if (typeof data?.message === "string" && data.message.trim()) {
+    return data.message.trim();
+  }
+  const errors = data?.errors;
+  if (errors && typeof errors === "object") {
+    const parts: string[] = [];
+    for (const val of Object.values(errors)) {
+      if (Array.isArray(val)) {
+        parts.push(...val.map(String));
+      } else if (typeof val === "string") {
+        parts.push(val);
+      }
+    }
+    if (parts.length > 0) return parts.join(" ");
+  }
+  return "Could not submit your request. Please try again.";
+}
+
+/** Saves lead in DB and appends a row to the linked Google Sheet (when configured on server). */
+export async function submitSajawatLead(
+  payload: SajawatLeadPayload,
+): Promise<SajawatLeadSubmitResult> {
+  const response = await api.post("/sajawat/leads/", {
+    name: payload.name.trim(),
+    email: payload.email?.trim() || "",
+    phone: payload.phone?.trim() || "",
+    event_date: payload.event_date?.trim() || "",
+    message: payload.message?.trim() || "",
+  });
+  return parseLeadSubmitResponse(response.data);
+}
+
+export { leadSubmitErrorMessage as sajawatLeadSubmitErrorMessage };

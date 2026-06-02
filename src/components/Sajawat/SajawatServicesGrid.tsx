@@ -34,7 +34,9 @@ export const SajawatServicesGrid: React.FC = () => {
       return galleryCategories.map((category) => ({
         id: String(category.id),
         title: category.name,
-        description: `Browse ${category.media.length} photo/video item${category.media.length === 1 ? "" : "s"} in this category.`,
+        description:
+          category.description ||
+          `Browse ${category.media.length} photo/video item${category.media.length === 1 ? "" : "s"} in this category.`,
         categoryId: category.id,
       }));
     }

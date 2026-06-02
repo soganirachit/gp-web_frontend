@@ -6,7 +6,7 @@ const HERO_BG = "/sajawat/sajawat_hero_bg.png";
 
 export const SajawatHero: React.FC = () => (
   <section className="bg-white">
-    <div className="relative min-h-[17.5rem] w-full overflow-hidden sm:min-h-[20rem]">
+    <div className="relative min-h-[17.5rem] w-full overflow-hidden sm:min-h-[20rem] lg:min-h-[18rem] lg:max-h-[22rem]">
       <img
         src={HERO_BG}
         alt=""

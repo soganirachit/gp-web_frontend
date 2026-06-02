@@ -8,6 +8,10 @@ import { SajawatWhyChoose } from "../components/Sajawat/SajawatWhyChoose";
 import { SajawatWeddingJourneyCta } from "../components/Sajawat/SajawatWeddingJourneyCta";
 import { SajawatFooter } from "../components/Sajawat/SajawatFooter";
 import { SajawatBottomBar } from "../components/Sajawat/SajawatBottomBar";
+import {
+  SAJAWAT_PAGE_ROOT_CLASS,
+  SAJAWAT_PAGE_SHELL_CLASS,
+} from "../constants/sajawatLayout";
 
 const Sajawat: React.FC = () => (
   <>
@@ -16,14 +20,16 @@ const Sajawat: React.FC = () => (
       description="Transform your Indian wedding with enchanting floral decor. Haldi, Mehendi, wedding day and reception — bespoke designs by Sajawat by Genda Phool."
       canonical="https://customerapp.mygendaphool.com/sajawat"
     />
-    <div className="min-h-screen bg-white">
-      <SajawatHero />
-      <SajawatServicesGrid />
-      <SajawatGallery />
-      <SajawatMeetingForm />
-      <SajawatWhyChoose />
-      <SajawatWeddingJourneyCta />
-      <SajawatFooter />
+    <div className={SAJAWAT_PAGE_ROOT_CLASS}>
+      <div className={SAJAWAT_PAGE_SHELL_CLASS}>
+        <SajawatHero />
+        <SajawatServicesGrid />
+        <SajawatGallery />
+        <SajawatMeetingForm />
+        <SajawatWhyChoose />
+        <SajawatWeddingJourneyCta />
+        <SajawatFooter />
+      </div>
       <SajawatBottomBar />
     </div>
   </>
