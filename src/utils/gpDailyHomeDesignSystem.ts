@@ -66,11 +66,15 @@ export const gpDailyHome = {
 
   greeting:
 
-    "font-ibm-plex-serif text-[1.4375rem] font-bold leading-[1.3] text-[#222222] min-w-0 flex-1 pl-3 [overflow-wrap:anywhere] md:text-[1.5rem]",
+    "font-ibm-plex-serif text-[1rem] font-bold leading-[1.3] text-[#222222] min-w-0 flex-1 pl-3 [overflow-wrap:anywhere] md:text-[1.3125rem]",
 
   managePill:
 
     "shrink-0 rounded-sm bg-[#FF2629CC] px-2.5 py-1 text-xs text-white hover:opacity-90",
+
+  /** Active badge + Resume CTA in Namaste subscription row (same size). */
+  namasteActionChip:
+    "shrink-0 inline-flex items-center justify-center gap-1 rounded-lg px-2 py-0.5 text-xs font-semibold leading-4",
 
   namasteHeroInset: "pl-3",
 
@@ -78,7 +82,7 @@ export const gpDailyHome = {
 
   namasteDetail:
 
-    "font-ibm-plex-serif min-w-0 flex-1 text-sm font-normal leading-5 text-[#222222] md:text-[0.9375rem] [overflow-wrap:anywhere]",
+    "font-ibm-plex-serif min-w-0 flex-1 text-xs font-normal leading-4 text-[#222222] md:text-[0.8125rem] md:leading-[1.125rem] [overflow-wrap:anywhere]",
 
   namasteIcon: "h-3.5 w-3.5 shrink-0",
 
@@ -96,7 +100,7 @@ export const gpDailyHome = {
 
   namastePagination:
 
-    "mt-1 flex w-full items-center justify-center gap-0.5 text-[#222222]",
+    "-mt-2 flex w-full items-center justify-center gap-0.5 text-[#222222]",
 
   namastePaginationArrow:
 
@@ -126,31 +130,40 @@ export const gpDailyHome = {
 
   marketingLine: "text-xs font-medium leading-snug text-[#19411F]",
 
-  /** Store/Daily hero greeting when parent already has `namasteHeroInset`. */
+  /** Store hero greeting when parent already has `namasteHeroInset`. */
   storeHeroGreeting:
-    "font-ibm-plex-serif text-[1.4375rem] font-bold leading-[1.3] text-[#222222] mb-2 md:text-[1.5rem]",
+    "font-ibm-plex-serif text-[1.25rem] font-bold leading-[1.3] text-[#222222] mb-2 md:text-[1.3125rem]",
 
 } as const;
 
 
 
+/** Reserve ~30% of hero width for scooter illustration (70% text). */
+export const GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS =
+  "pr-[30%] sm:pr-[28%]";
+
 export const GP_DAILY_SCOOTER_HERO_IMG_CLASS =
-
-  "h-[5.75rem] w-[11rem] object-contain object-right sm:h-[8rem] sm:w-[13.5rem]";
-
-
+  "h-[4.75rem] w-[9rem] object-contain object-right sm:h-[6rem] sm:w-[11rem]";
 
 /** Wrapper for Daily homepage scooter (offline hero + marketing hero). */
-
 export const GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS =
-
-  "pointer-events-none absolute -right-10 top-1/2 z-0 -translate-y-1/2 translate-x-5";
-
+  "pointer-events-none absolute -right-10 top-1/3 z-0 -translate-y-1/2 translate-x-8";
 
 
-/** GP Store default hero truck — fixed size; 5px above marketing overlap anchor. */
+
+/** Reserve ~30% of Store hero width for truck illustration (70% text). */
+export const GP_STORE_HERO_TRUCK_COPY_PAD_CLASS =
+  GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS;
+
 export const GP_STORE_HERO_TRUCK_IMG_CLASS =
+  "h-[4rem] w-[9.5rem] object-contain object-right sm:h-[6rem] sm:w-[11rem]";
 
-  "pointer-events-none absolute -right-[20px] top-[calc(64%-5px)] z-[2] h-[5.75rem] w-[11rem] -translate-y-[32%] translate-x-[10px] object-contain object-right sm:h-[8rem] sm:w-[13.5rem]";
+/** Wrapper for Store offline hero truck. */
+export const GP_STORE_HERO_TRUCK_WRAPPER_CLASS =
+  "pointer-events-none absolute -right-8 top-1/2 z-[1] -translate-y-1/2";
+
+/** GP Store default hero truck — 5px above marketing overlap anchor. */
+export const GP_STORE_HERO_TRUCK_ABSOLUTE_CLASS =
+  "pointer-events-none absolute right-5 top-[calc(64%-5px)] z-[2] -translate-y-[32%] translate-x-10";
 
 

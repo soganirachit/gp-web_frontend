@@ -40,6 +40,7 @@ import facebookIcon from '../../assets/icon/social/facebook.svg';
 import instagramIcon from '../../assets/icon/social/insta.svg';
 import whatsappIcon from '../../assets/icon/social/whatsapp.svg';
 import { SOCIAL_URLS } from '../../config/socialUrls';
+import { APP_DISPLAY_VERSION } from '../../config/appVersion';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 
 const Settings: React.FC = () => {
@@ -813,8 +814,8 @@ const Settings: React.FC = () => {
 
           {/* Social Connect Section */}
           <div className="mt-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Connect With Us</h3>
-            <p className="text-[15px] text-gray-500 mb-4">
+            <h3 className="text-base font-semibold text-gray-900 mb-1.5">Connect With Us</h3>
+            <p className="text-xs leading-snug text-gray-500 mb-3">
               Follow us on social media for daily flowers inspiration, puja tips, & exclusive offers.
             </p>
             <div className="flex items-center justify-center gap-6">
@@ -863,7 +864,7 @@ const Settings: React.FC = () => {
 
           {/* App version — bump on every customer-app deploy so devs can verify the running build. */}
           <div className="mb-3 text-center">
-            <p className="text-xs font-medium text-gray-400">Version 1.2</p>
+            <p className="text-xs font-medium text-gray-400">Version {APP_DISPLAY_VERSION}</p>
           </div>
 
           {/* Delete Account Link - Show only when logged in */}

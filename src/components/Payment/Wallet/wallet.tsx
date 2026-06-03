@@ -47,6 +47,7 @@ import {
   writeWalletPauseScheduleYmd,
 } from "../../../utils/gpDailyWalletPauseSchedule";
 import { UniformPageHeader } from "../../layout/UniformPageHeader";
+import { gpDailyHome } from "../../../utils/gpDailyHomeDesignSystem";
 import { tryCompleteGpDailyPendingSubscriptionAfterRecharge } from "../../../utils/resumeGpDailySubscriptionCheckout";
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
@@ -582,25 +583,48 @@ const Wallet = () => {
           isLoggedIn &&
           gpDailyHasSubscription &&
           gpDailyOrderHold.show && (
-            <div className="w-full shrink-0 rounded-[24px] bg-[#ff4d4f] px-3 py-2.5 text-white">
+            <div
+              className={`w-full shrink-0 ${gpDailyHome.holdCard}`}
+              style={{ backgroundColor: "rgba(255, 38, 41, 0.8)" }}
+            >
               <div className="flex items-start gap-2">
-                <img
-                  src={lowbalanceIcon}
-                  alt=""
-                  className="h-7 w-7 shrink-0 mt-0.5"
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1">
-                  <h3 className="mb-1 font-serif text-sm font-bold leading-5 text-white">
+                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
+                  <img
+                    src={lowbalanceIcon}
+                    alt=""
+                    className="h-[18px] w-[18px]"
+                    aria-hidden
+                  />
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <p className={gpDailyHome.walletHoldText}>
                     {gpDailyOrderHold.showOrderInHold
-                      ? "Order in hold"
-                      : "Wallet running low"}
-                  </h3>
-                  <p className="font-sans text-sm leading-5 text-white/90">
+                      ? "Order In Hold"
+                      : "Wallet Running Low"}
+                  </p>
+                  <p className={gpDailyHome.holdCardBody}>
                     {gpDailyOrderHold.showRunningLow
                       ? `Your wallet balance will only last until ${gpDailyOrderHold.pauseDateLabel}. Please recharge to keep your deliveries running.`
-                      : "Order in hold — please recharge your wallet to resume deliveries."}
+                      : "Your wallet balance is low. Recharge now to continue your daily deliveries."}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const shortage = Math.max(
+                        0,
+                        gpDailyOrderHold.requiredRecharge - balance,
+                      );
+                      const amount =
+                        shortage >= MIN_AMOUNT
+                          ? shortage
+                          : MIN_AMOUNT;
+                      setCustomAmount(String(amount));
+                      handleQuickAmount(amount);
+                    }}
+                    className={gpDailyHome.walletRechargeBtn}
+                  >
+                    Recharge Now
+                  </button>
                 </div>
               </div>
             </div>
@@ -638,7 +662,7 @@ const Wallet = () => {
 
         {/* Add Money — match mobile `WalletScreen` chips, labels, field, CTA */}
         <section className="w-full">
-          <h2 className="mb-3 text-[22px] font-serif font-bold text-[#222222]">
+          <h2 className={`mb-3 ${gpDailyHome.sectionHeading}`}>
             Add Money to Wallet
           </h2>
 
@@ -873,7 +897,7 @@ const Wallet = () => {
         {/* Combined Transactions & Payment History */}
         <section className="w-full">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-[22px] font-serif font-bold text-[#222222]">
+            <h2 className={gpDailyHome.sectionHeading}>
               Recent Transactions
             </h2>
             <button

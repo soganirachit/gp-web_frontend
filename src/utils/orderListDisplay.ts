@@ -61,6 +61,37 @@ export function formatOrderListProductLabel(
   return `${name} + ${count - 1} more`;
 }
 
+/** True when a list title string is an order id, not a product / pack name. */
+export function looksLikeOrderNumberLabel(value: string): boolean {
+  const s = value.trim();
+  if (!s) return false;
+  if (/^GP[_-]/i.test(s)) return true;
+  if (/^ORD[-_]/i.test(s)) return true;
+  if (/POS\d{5,}/i.test(s) && /\d{4}-\d{2}-\d{2}/.test(s)) return true;
+  return /^[A-Z]{2,}[_-][A-Z0-9]+-\d{8}-/i.test(s);
+}
+
+/** Card title for My Orders — pack / product name only, never bare order numbers. */
+export function resolveOrderListCardTitle(order: {
+  productListLabel?: string | null;
+  product?: { name?: string | null } | null;
+  quantity?: number;
+  items_count?: number;
+}): string {
+  const count = order.items_count ?? order.quantity ?? 1;
+  const enriched = (order.productListLabel ?? "").trim();
+  if (enriched && !looksLikeOrderNumberLabel(enriched)) return enriched;
+
+  const fromProduct = (order.product?.name ?? "").trim();
+  if (fromProduct && !looksLikeOrderNumberLabel(fromProduct)) {
+    const formatted = formatOrderListProductLabel(fromProduct, count);
+    if (formatted && !looksLikeOrderNumberLabel(formatted)) return formatted;
+    return fromProduct;
+  }
+
+  return "Order";
+}
+
 function imageFromProductRecord(
   product: Record<string, unknown> | undefined,
 ): string | null {

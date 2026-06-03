@@ -34,6 +34,8 @@ import { GpStoreOfflineHero } from "../components/store/GpStoreOfflineHero";
 import { GpDailyHomeSection } from "../components/daily/GpDailyHomeSection";
 import {
   gpDailyHome,
+  GP_STORE_HERO_TRUCK_ABSOLUTE_CLASS,
+  GP_STORE_HERO_TRUCK_COPY_PAD_CLASS,
   GP_STORE_HERO_TRUCK_IMG_CLASS,
 } from "../utils/gpDailyHomeDesignSystem";
 import {
@@ -473,7 +475,7 @@ const GpStore_Homepage: React.FC = () => {
             <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom overflow-x-hidden">
                 <div className="mx-auto w-full min-w-0 max-w-[min(800px,100vw)]">
                     {/* Top Header with Green Background */}
-                    <div className="relative px-4 pt-0 pb-4" style={{
+                    <div className="relative px-4 pt-0 " style={{
                         background: 'linear-gradient(to bottom, #DAFFD9, #D8F0D7)',
                         minHeight: 'clamp(220px, 42vw, 280px)'
                     }}>
@@ -551,9 +553,9 @@ const GpStore_Homepage: React.FC = () => {
                                 transition={{ duration: 0.5 }}
                                 className="mt-5"
                             >
-                                <div className="relative min-h-[7rem] pb-1 sm:min-h-[7.5rem]">
+                                <div className="relative min-h-[7rem]  sm:min-h-[7.5rem]">
                                     <div
-                                        className={`relative z-[1] min-w-0 pr-[40%] ${gpDailyHome.namasteHeroInset}`}
+                                        className={`relative z-[1] min-w-0 ${GP_STORE_HERO_TRUCK_COPY_PAD_CLASS} ${gpDailyHome.namasteHeroInset}`}
                                     >
                                         <h2 className={`${gpDailyHome.storeHeroGreeting} relative z-10`}>
                                             {userFirstName
@@ -576,7 +578,7 @@ const GpStore_Homepage: React.FC = () => {
                                         src={truckStoreIcon}
                                         alt=""
                                         aria-hidden
-                                        className={GP_STORE_HERO_TRUCK_IMG_CLASS}
+                                        className={`${GP_STORE_HERO_TRUCK_ABSOLUTE_CLASS} ${GP_STORE_HERO_TRUCK_IMG_CLASS}`}
                                     />
                                 </div>
                             </motion.div>

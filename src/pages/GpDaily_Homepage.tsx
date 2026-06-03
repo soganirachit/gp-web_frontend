@@ -40,6 +40,7 @@ import { GpDailyHomeSection } from "../components/daily/GpDailyHomeSection";
 import { GpDailyHomeSkeleton } from "../components/common/PageSkeletons";
 import {
   gpDailyHome,
+  GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS,
   GP_DAILY_SCOOTER_HERO_IMG_CLASS,
   GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS,
 } from "../utils/gpDailyHomeDesignSystem";
@@ -1109,7 +1110,9 @@ const Home2: React.FC = () => {
               {subscriptionProductLabel(sub)}
             </span>
             {sub.status === "ACTIVE" ? (
-              <span className="shrink-0 rounded-lg bg-[#9CAF3A] px-2 py-0.5 text-xs font-semibold leading-4 text-white">
+              <span
+                className={`${gpDailyHome.namasteActionChip} bg-[#9CAF3A] text-white`}
+              >
                 Active
               </span>
             ) : null}
@@ -1385,7 +1388,7 @@ const Home2: React.FC = () => {
 
                 {isLoggedIn && namasteCarouselLoading ? (
                   <div className="relative mt-0.5 -mr-1 pb-1">
-                    <div className={`relative z-10 min-w-0 pr-[58%] sm:pr-[52%] space-y-3 ${gpDailyHome.namasteHeroInset} animate-pulse`}>
+                    <div className={`relative z-10 min-w-0 ${GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS} space-y-3 ${gpDailyHome.namasteHeroInset} animate-pulse`}>
                       <div className="h-5 w-[85%] rounded bg-gray-200/80" />
                       <div className="h-5 w-[55%] rounded bg-gray-200/80" />
                       <div className="h-5 w-[70%] rounded bg-gray-200/80" />
@@ -1403,7 +1406,7 @@ const Home2: React.FC = () => {
                   <div
                     className={`relative mt-0.5 -mr-1 pb-1`}
                   >
-                    <div className={`relative z-10 min-w-0 pr-[58%] sm:pr-[52%] ${gpDailyHome.namasteHeroInset}`}>
+                    <div className={`relative z-10 min-w-0 ${GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS} ${gpDailyHome.namasteHeroInset}`}>
                       <div
                         className="relative transition-opacity duration-300"
                         onPointerDown={() => snoozeNamasteAutoplay()}
@@ -1459,7 +1462,7 @@ const Home2: React.FC = () => {
                 ) : showNamasteMarketing ? (
                   <div className="relative min-h-[6rem] pb-1 sm:min-h-[6.5rem]">
                     <div
-                      className={`relative z-10 min-w-0 pr-[58%] sm:pr-[52%] ${gpDailyHome.namasteHeroInset}`}
+                      className={`relative z-10 min-w-0 ${GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS} ${gpDailyHome.namasteHeroInset}`}
                     >
                       <p className={gpDailyHome.marketingTagline}>
                         We are Genda Phool! Your partner for everyday floral

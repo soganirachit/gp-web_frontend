@@ -8,6 +8,7 @@ import {
 } from "../../config/gpDailyOfflineHeroCopy";
 import {
   gpDailyHome,
+  GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS,
   GP_DAILY_SCOOTER_HERO_IMG_CLASS,
   GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS,
 } from "../../utils/gpDailyHomeDesignSystem";
@@ -60,13 +61,13 @@ export const GpDailyOfflineHero: React.FC<Props> = ({
       </div>
 
       <div className="relative min-h-[6rem] pb-1 sm:min-h-[6.5rem]">
-        <div className={`relative z-10 min-w-0 pr-[58%] sm:pr-[52%] ${gpDailyHome.namasteHeroInset}`}>
+        <div className={`relative z-10 min-w-0 ${GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS} ${gpDailyHome.namasteHeroInset}`}>
           <div className="flex min-h-7 items-start gap-2.5 text-[#222222]">
             <MoonStarsIcon />
             <div className="min-w-0 flex-1">
               <p className={gpDailyHome.namasteDetail}>{GP_DAILY_OFFLINE_MESSAGE}</p>
               <div
-                className="my-2 h-px w-full bg-[#222222]"
+                className="my-2 h-px w-1/2 max-w-[50%] bg-[#222222]"
                 aria-hidden
               />
               <p className="text-xs font-normal leading-4 text-[#808080]">

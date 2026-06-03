@@ -60,6 +60,14 @@ const HOME_SERVICE_CARD_LOGO_WRAP_CLASS =
 const HOME_SERVICE_CARD_LOGO_SCALE_CLASS =
   'w-full shrink-0 origin-top-right drop-shadow-sm lg:scale-[0.96] xl:scale-[0.98] 2xl:scale-[0.9]';
 
+/** Illustration strip — +10px height vs prior baseline at each breakpoint. */
+const HOME_SERVICE_CARD_MEDIA_HEIGHT_CLASS =
+  'h-[calc(4.25rem+10px)] sm:h-[calc(6.5rem+10px)] md:h-[calc(6rem+10px)] lg:h-[calc(7.5rem+10px)] xl:h-[calc(7.75rem+10px)] 2xl:h-[calc(7.25rem+10px)]';
+
+/** Nudge Daily scooter / Store truck down inside the media strip. */
+const HOME_SERVICE_CARD_HERO_IMG_CLASS =
+  'pointer-events-none absolute max-w-none object-contain ';
+
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
@@ -261,7 +269,7 @@ const HomePage: React.FC = () => {
                 alt="Namaste"
                 className="h-10 sm:h-14 w-auto mb-2 sm:mb-3"
               />
-              <p className="text-gray-600 text-sm sm:text-base">
+              <p className="text-gray-600 text-xs leading-snug sm:text-sm sm:leading-normal">
                 We are Genda Phool! Your partner for everyday floral needs.
               </p>
             </div>
@@ -285,14 +293,14 @@ const HomePage: React.FC = () => {
                 }
               }}
             >
-              <span className="absolute right-1 top-0.5 z-20 text-[#DD7600] text-base sm:text-2xl font-bold leading-none pointer-events-none" aria-hidden>
+              <span className="absolute right-3 top-2 z-20 text-[#DD7600] text-base sm:text-2xl font-bold leading-none pointer-events-none" aria-hidden>
                 ›
               </span>
-              <div className="relative w-full shrink-0 h-[4.25rem] overflow-hidden rounded-[10px] bg-[#FFF5E6]/40 sm:h-[6.5rem] sm:rounded-xl md:h-[6rem] lg:h-[7.5rem] xl:h-[7.75rem] 2xl:h-[7.25rem]">
+              <div className={`relative w-full shrink-0 overflow-hidden rounded-[10px] bg-[#FFF5E6]/40 sm:rounded-xl ${HOME_SERVICE_CARD_MEDIA_HEIGHT_CLASS}`}>
                 <img
                   src={dailyScooterSvg}
                   alt=""
-                  className="pointer-events-none absolute -left-[6%] right-auto top-4.5 bottom-0 mt-[-22px] h-[92%] w-[124%] max-w-none object-contain object-left sm:mt-[-24px] sm:h-[94%] sm:w-[112%] sm:-left-[4%] lg:mt-[-20px] lg:h-[92%] lg:w-[104%] lg:-left-[2%] xl:w-[100%] xl:left-0 2xl:h-[90%] 2xl:w-[98%]"
+                  className={`${HOME_SERVICE_CARD_HERO_IMG_CLASS} -left-[6%] right-auto top-4.5 bottom-0 mt-[-22px] h-[72%] w-[124%] object-left sm:mt-[-24px] sm:h-[94%] sm:w-[112%] sm:-left-[4%] lg:mt-[-20px] lg:h-[92%] lg:w-[104%] lg:-left-[2%] xl:w-[100%] xl:left-0 2xl:h-[90%] 2xl:w-[98%]`}
                 />
                 <div className={HOME_SERVICE_CARD_LOGO_WRAP_CLASS}>
                   <span
@@ -330,14 +338,14 @@ const HomePage: React.FC = () => {
                 }
               }}
             >
-              <span className="absolute right-1 top-0.5 z-20 text-[#19411F] text-base sm:text-2xl font-bold leading-none pointer-events-none" aria-hidden>
+              <span className="absolute right-3 top-2 z-20 text-[#19411F] text-base sm:text-2xl font-bold leading-none pointer-events-none" aria-hidden>
                 ›
               </span>
-              <div className="relative w-full shrink-0 h-[4.25rem] overflow-hidden rounded-[10px] bg-[#E8F5E9]/40 sm:h-[6.5rem] sm:rounded-xl md:h-[6rem] lg:h-[7.5rem] xl:h-[7.75rem] 2xl:h-[7.25rem]">
+              <div className={`relative w-full shrink-0 overflow-hidden rounded-[10px] bg-[#E8F5E9]/40 sm:rounded-xl ${HOME_SERVICE_CARD_MEDIA_HEIGHT_CLASS}`}>
                 <img
                   src={truckSvg}
                   alt=""
-                  className="pointer-events-none absolute top-4.5 inset-x-0 bottom-0 mx-auto mt-[-22px] h-[92%] w-[118%] max-w-none object-contain object-bottom sm:mt-[-24px] sm:h-[94%] sm:w-[108%] lg:mt-[-20px] lg:h-[92%] lg:w-[102%] xl:w-[100%] 2xl:h-[90%] 2xl:w-[98%]"
+                  className={`${HOME_SERVICE_CARD_HERO_IMG_CLASS} top-4.5 inset-x-0 bottom-0 mx-auto mt-[-22px] h-[72%] w-[118%] object-bottom sm:mt-[-24px] sm:h-[94%] sm:w-[108%] lg:mt-[-20px] lg:h-[92%] lg:w-[102%] xl:w-[100%] 2xl:h-[90%] 2xl:w-[98%]`}
                 />
                 <div className={HOME_SERVICE_CARD_LOGO_WRAP_CLASS}>
                   <img

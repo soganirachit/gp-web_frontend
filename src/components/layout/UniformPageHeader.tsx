@@ -85,7 +85,10 @@ export const UniformPageHeader: React.FC<UniformPageHeaderProps> = ({
           </button>
         ) : null}
         <h1
-          className={[titleClass, "min-w-0 flex-1", titleClassName]
+          className={[
+            titleClassName || titleClass,
+            "min-w-0 flex-1",
+          ]
             .filter(Boolean)
             .join(" ")}
         >

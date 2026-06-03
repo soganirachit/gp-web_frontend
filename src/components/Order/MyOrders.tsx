@@ -18,10 +18,24 @@ import {
   extractSecondItemImageFromOrderRaw,
   formatOrderListProductLabel,
   resolveOrderItemsCount,
+  looksLikeOrderNumberLabel,
+  resolveOrderListCardTitle,
 } from '../../utils/orderListDisplay';
 import { OrderListThumb } from './OrderListThumb';
 
 const ORDER_LIST_PAGE_SIZE = 6;
+
+/** My Orders header — IBM Plex Serif (matches app `UniformPageHeader`). */
+const MY_ORDER_HEADER_TITLE_CLASS =
+  "font-ibm-plex-serif font-semibold text-[24px] leading-[26px] tracking-normal text-[#111827]";
+
+const ORDER_LIST_STATUS_CLASS =
+  "mb-1 text-[11px] font-semibold leading-snug";
+
+const ORDER_LIST_PRODUCT_NAME_CLASS =
+  "mb-1 line-clamp-1 text-[16px] font-medium leading-snug text-gray-900";
+
+const ORDER_LIST_PRICE_CLASS = "text-sm font-semibold text-gray-700";
 /** Max extra API pages fetched on first load when filtering leaves fewer than 6 rows. */
 const ORDER_LIST_PREFETCH_MAX_PAGES = 2;
 
@@ -38,13 +52,11 @@ function formatRawOrderStatus(raw: string): string {
 
 async function enrichOrdersForList(
   rawRecords: Record<string, unknown>[],
-  limit = ORDER_LIST_PAGE_SIZE,
 ): Promise<void> {
-  const slice = rawRecords.slice(0, limit);
-  if (slice.length === 0) return;
-  await orderService.enrichOrderListProductLabels(slice, {
+  if (rawRecords.length === 0) return;
+  await orderService.enrichOrderListProductLabels(rawRecords, {
     concurrency: 4,
-    maxFetches: ORDER_LIST_PAGE_SIZE,
+    maxFetches: Math.max(rawRecords.length, ORDER_LIST_PAGE_SIZE),
   });
 }
 
@@ -97,15 +109,22 @@ const MyOrders: React.FC = () => {
   const mapRawToOrders = (fetchedOrders: any[]): Order[] =>
     fetchedOrders.map((order: any) => {
       const itemsCount = resolveOrderItemsCount(order);
+      const rawFirstName = extractFirstItemNameFromOrderRaw(order);
+      const firstItemName =
+        rawFirstName && !looksLikeOrderNumberLabel(rawFirstName)
+          ? rawFirstName
+          : null;
+      const enrichedLabel =
+        typeof order.product_list_label === "string" &&
+        order.product_list_label.trim() &&
+        !looksLikeOrderNumberLabel(order.product_list_label)
+          ? order.product_list_label.trim()
+          : "";
       const productListLabel =
-        (typeof order.product_list_label === "string" &&
-          order.product_list_label.trim()) ||
-        formatOrderListProductLabel(
-          extractFirstItemNameFromOrderRaw(order),
-          itemsCount,
-        ) ||
+        enrichedLabel ||
+        formatOrderListProductLabel(firstItemName, itemsCount) ||
         undefined;
-      const cardTitle = productListLabel || order.order_number || "Order";
+      const lineName = firstItemName || productListLabel || "Order";
       return {
         id: order.id?.toString() || order.order_number || Math.random().toString(),
         order_number: order.order_number || `Order #${order.id}`,
@@ -118,7 +137,7 @@ const MyOrders: React.FC = () => {
         preview_image: order.preview_image || null,
         productListLabel,
         product: {
-          name: cardTitle,
+          name: lineName,
           image: order.preview_image ? [order.preview_image] : [],
           imagesUrl: order.preview_image ? [order.preview_image] : [],
           price: parseFloat(order.total_amount || order.total || "0"),
@@ -340,6 +359,7 @@ const MyOrders: React.FC = () => {
             padXClassName="px-0"
             padYClassName="py-0 pb-4"
             className="mb-4 bg-transparent"
+            titleClassName={MY_ORDER_HEADER_TITLE_CLASS}
           />
 
           {/* Search Bar — unified styling, order suggestions as you type */}
@@ -424,24 +444,21 @@ const MyOrders: React.FC = () => {
                     <div className="flex min-w-0 flex-1">
                       <div className="min-w-0 flex-1 pr-2">
                         <p
-                          className={`mb-1 text-xs font-semibold leading-snug ${statusColor}`}
+                          className={`${ORDER_LIST_STATUS_CLASS} ${statusColor}`}
                         >
                           {getStatusText(order)}
                         </p>
                         <p
-                          className="mb-1 line-clamp-2 text-[24px] font-medium leading-snug text-gray-900"
+                          className={ORDER_LIST_PRODUCT_NAME_CLASS}
                           style={{ overflowWrap: 'anywhere' }}
                         >
                           {(subscriptionListOnly
                             ? cleanSubscriptionProductDisplayName
                             : (s: string) => s)(
-                            order.productListLabel ||
-                              order.product?.name ||
-                              order.order_number ||
-                              'Order',
+                            resolveOrderListCardTitle(order),
                           )}
                         </p>
-                        <p className="text-[22px] font-semibold text-gray-700">
+                        <p className={ORDER_LIST_PRICE_CLASS}>
                           ₹{order.total_amount || order.product?.sellingPrice || '0.00'}
                         </p>
                       </div>
