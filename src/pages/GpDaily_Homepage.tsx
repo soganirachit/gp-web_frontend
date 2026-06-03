@@ -1,9 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { MdKeyboardArrowDown, MdChevronLeft, MdChevronRight } from "react-icons/md";
-import { IoPlay } from "react-icons/io5";
-import pauseSubIcon from "../assets/svg/cancelpage/pause.svg";
-
 import { SubscriptionResumeButton } from "../components/Subscription/SubscriptionResumeButton";
 import logo from "../assets/All/logo.png";
 import { walletService } from "../services/wallet.service";
@@ -39,7 +36,13 @@ import { validateGpDailyDeliveryAreaFromCoordinates } from "../services/subscrip
 import { customerService } from "../services/getcustomer.service";
 import { toast } from "react-hot-toast";
 import ProductCard from "../components/common/ProductCard";
+import { GpDailyHomeSection } from "../components/daily/GpDailyHomeSection";
 import { GpDailyHomeSkeleton } from "../components/common/PageSkeletons";
+import {
+  gpDailyHome,
+  GP_DAILY_SCOOTER_HERO_IMG_CLASS,
+  GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS,
+} from "../utils/gpDailyHomeDesignSystem";
 import { SearchBar } from "../components/common/SearchBar";
 import smallgendaIcon from "../assets/svg/smallgenda.svg";
 import scooterIcon from "../assets/svg/gp_daily svg/scooter.svg";
@@ -71,7 +74,6 @@ import { navigateToGpDailyWalletForRecharge } from "../utils/gpDailyWalletRechar
 import { guestHasSavedBrowseAddress } from "../utils/guestAddressEntry";
 import {
   formatNamasteDeliveryLine,
-  formatNamasteSubscriptionStatusLine,
   subscriptionProductLabel,
 } from "../utils/subscriptionNextDelivery";
 
@@ -87,6 +89,7 @@ import {
   GP_OPEN_GUEST_AREA_MODAL_EVENT,
 } from "../config/guestAreaModalCopy";
 import { HomeHeroStatusBanner } from "../components/home/HomeHeroStatusBanner";
+import { GpDailyOfflineHero } from "../components/daily/GpDailyOfflineHero";
 import { SleepingZzzBadge } from "../components/home/SleepingZzzBadge";
 import {
   resolveHomeHeroStatus,
@@ -101,7 +104,6 @@ import {
   HOME_HEADER_LOCATION_CLICK,
   HOME_HEADER_LOCATION_ICON,
   HOME_HEADER_LOCATION_ROW,
-  HOME_HEADER_PROFILE_OFFSET,
 } from "../constants/homeHeaderLayout";
 
 interface DayInfo {
@@ -120,10 +122,7 @@ const NAMASTE_AUTOPLAY_SNOOZE_MS = 3500;
 /** Hard cap on `scrollend` wait so the in-flight flag never gets stuck. */
 const NAMASTE_AUTOPLAY_SCROLL_TIMEOUT_MS = 900;
 const dailyScooterHeroSvg = "/daily_scooter.svg";
-const dailyScooterHeroInlineClass =
-  "pointer-events-none absolute -right-3.5 top-0 z-[1] flex flex-col items-center sm:-right-4";
-const dailyScooterHeroImgClass =
-  "h-[5.5rem] w-[11rem] object-contain object-right sm:h-[6rem] sm:w-[11.75rem]";
+const dailyScooterHeroImgClass = GP_DAILY_SCOOTER_HERO_IMG_CLASS;
 const NAMASTE_MAX_VISIBLE_DOTS = 3;
 
 function getNamasteVisibleDotIndices(total: number, current: number): number[] {
@@ -996,26 +995,26 @@ const Home2: React.FC = () => {
 
   const renderNamastePagination = () =>
     namasteSlideCount > 1 ? (
-      <div className="mt-1 flex items-center justify-center gap-2.5">
+      <div className={gpDailyHome.namastePagination}>
         <button
           type="button"
           onClick={goNamasteCarouselPrev}
-          className="hidden h-6 w-6 shrink-0 items-center justify-center text-[#9CA3AF] hover:text-[#6B7280] lg:flex"
+          className={gpDailyHome.namastePaginationArrow}
           aria-label="Previous subscription"
         >
           <MdChevronLeft className="h-4 w-4" />
         </button>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-0.5">
           {namasteDotIndices.map((dotIdx) => (
             <button
               key={`namaste-dot-${dotIdx}`}
               type="button"
               onClick={() => scrollSubscriptionCarouselTo(dotIdx)}
-              className={`rounded-full transition-all duration-300 ${
+              className={
                 dotIdx === subscriptionCarouselIndex
-                  ? "h-2 w-5 bg-[#E1522D]"
-                  : "h-1.5 w-1.5 bg-[#D1D5DB] hover:bg-[#9CA3AF]"
-              }`}
+                  ? gpDailyHome.namastePaginationDotActive
+                  : gpDailyHome.namastePaginationDot
+              }
               aria-label={`Go to slide ${dotIdx + 1}`}
               aria-current={dotIdx === subscriptionCarouselIndex ? "true" : undefined}
             />
@@ -1024,7 +1023,7 @@ const Home2: React.FC = () => {
         <button
           type="button"
           onClick={goNamasteCarouselNext}
-          className="hidden h-6 w-6 shrink-0 items-center justify-center text-[#9CA3AF] hover:text-[#6B7280] lg:flex"
+          className={gpDailyHome.namastePaginationArrow}
           aria-label="Next subscription"
         >
           <MdChevronRight className="h-4 w-4" />
@@ -1053,15 +1052,15 @@ const Home2: React.FC = () => {
     keySuffix: string,
   ) => (
     <div key={keySuffix} className="min-w-0 flex-1">
-      <div className="flex flex-col justify-start gap-1 pl-2.5 pr-1 lg:pr-2">
+      <div className={`flex flex-col justify-start gap-1 pr-1 lg:pr-2 ${gpDailyHome.namasteHeroInset}`}>
         <div className="flex min-h-7 items-center gap-3 text-[#222222]">
           <img
             src={scooterIcon}
             alt=""
-            className="h-4 w-4 shrink-0"
+            className={gpDailyHome.namasteIcon}
             aria-hidden
           />
-          <span className="min-w-0 flex-1 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
+          <span className={gpDailyHome.namasteDetail}>
             {slide.heading}
           </span>
         </div>
@@ -1073,12 +1072,10 @@ const Home2: React.FC = () => {
             <img
               src={flowerIcon}
               alt=""
-              className="h-4 w-4 shrink-0"
+              className={gpDailyHome.namasteIcon}
               aria-hidden
             />
-            <span className="min-w-0 flex-1 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
-              {packName}
-            </span>
+            <span className={gpDailyHome.namasteDetail}>{packName}</span>
           </div>
         ))}
       </div>
@@ -1097,54 +1094,44 @@ const Home2: React.FC = () => {
 
   const renderNamasteSubSlide = (sub: Subscription, keySuffix: string) => (
     <div key={keySuffix} className="min-w-0 flex-1">
-      <div className="flex flex-col justify-start gap-1 pl-2.5 pr-1 lg:pr-2">
+      <div className={`flex flex-col justify-start gap-1 pr-1 lg:pr-2 ${gpDailyHome.namasteHeroInset}`}>
         <div className="flex min-h-7 items-center gap-3 text-[#222222]">
           <img
             src={flowerIcon}
             alt=""
-            className="h-4 w-4 shrink-0"
+            className={`${gpDailyHome.namasteIcon} shrink-0`}
             aria-hidden
           />
-          <span className="min-w-0 flex-1 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
-            {subscriptionProductLabel(sub)}
-          </span>
-        </div>
-        <div className="flex min-h-7 items-center gap-3 text-[#222222]">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            {sub.status === "PAUSED" ? (
-              <img
-                src={pauseSubIcon}
-                alt=""
-                className="h-4 w-4 shrink-0"
-                aria-hidden
-              />
-            ) : (
-              <IoPlay
-                className="h-5 w-5 shrink-0 text-[#222222]"
-                aria-hidden
-              />
-            )}
-            <span className="min-w-0 text-[15px] font-medium leading-5 text-[#222222]">
-              {formatNamasteSubscriptionStatusLine(sub)}
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <span
+              className={`${gpDailyHome.namasteDetail} min-w-0 flex-1 truncate`}
+            >
+              {subscriptionProductLabel(sub)}
             </span>
+            {sub.status === "ACTIVE" ? (
+              <span className="shrink-0 rounded-lg bg-[#9CAF3A] px-2 py-0.5 text-xs font-semibold leading-4 text-white">
+                Active
+              </span>
+            ) : null}
+            {sub.status === "PAUSED" ? (
+              <SubscriptionResumeButton
+                compact
+                variant="olive"
+                className="shrink-0"
+                loading={resumingSubId === sub.id}
+                onClick={(e) => void handleNamasteResume(e, sub.id)}
+              />
+            ) : null}
           </div>
-          {sub.status === "PAUSED" ? (
-            <SubscriptionResumeButton
-              compact
-              variant="bottleGreen"
-              loading={resumingSubId === sub.id}
-              onClick={(e) => void handleNamasteResume(e, sub.id)}
-            />
-          ) : null}
         </div>
         <div className="flex min-h-7 items-center gap-3 text-[#222222]">
           <img
             src={scooterIcon}
             alt=""
-            className="h-4 w-4 shrink-0"
+            className={gpDailyHome.namasteIcon}
             aria-hidden
           />
-          <span className="min-w-0 flex-1 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
+          <span className={gpDailyHome.namasteDetail}>
             {formatNamasteDeliveryLine(sub)}
           </span>
         </div>
@@ -1309,7 +1296,7 @@ const Home2: React.FC = () => {
                 </div>
 
                 <ProfileAvatarButton
-                  className={`${PROFILE_HEADER_AVATAR_CLASS} ${HOME_HEADER_PROFILE_OFFSET}`}
+                  className={`${PROFILE_HEADER_AVATAR_CLASS} -translate-x-2 sm:-translate-x-1.5`}
                   profileHomeSrc={profilehomeIcon}
                   profileLogoSrc={profilelogoIcon}
                   fallbackHomeClassName={PROFILE_HEADER_FALLBACK_HOME_CLASS}
@@ -1356,26 +1343,15 @@ const Home2: React.FC = () => {
 
               {/* Namaste hero — store-home truck pattern with landing-page scooter. */}
               {homeHeroStatus === "store_offline" ? (
-                <div className="relative mt-3 min-h-[5.5rem] sm:mt-4 sm:min-h-[6rem]">
-                  <div className="relative z-10 max-w-[calc(100%-9.5rem)]">
-                    <HomeHeroStatusBanner
-                      variant="store_offline"
-                      typography="daily"
-                    />
-                  </div>
-                  <div className="pointer-events-none absolute -right-3 top-1/2 z-0 -translate-y-1/2 translate-x-1 sm:-right-4 sm:translate-x-2">
-                    <img
-                      src={dailyScooterHeroSvg}
-                      alt=""
-                      aria-hidden
-                      className={`relative ${dailyScooterHeroImgClass}`}
-                    />
-                    <SleepingZzzBadge
-                      tone="scooter"
-                      className="left-[2.75rem] top-2 right-auto"
-                    />
-                  </div>
-                </div>
+                <GpDailyOfflineHero
+                  userFirstName={userFirstName || "User"}
+                  isLoggedIn={isLoggedIn}
+                  onManage={
+                    isLoggedIn
+                      ? () => navigate(`${basePath}/manage-my-subscription`)
+                      : undefined
+                  }
+                />
               ) : homeHeroStatus !== "default" ? (
                 <HomeHeroStatusBanner
                   variant={homeHeroStatus}
@@ -1388,8 +1364,8 @@ const Home2: React.FC = () => {
                 />
               ) : (
               <div className="relative mt-3 sm:mt-4">
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <h2 className="min-w-0 flex-1 font-serif text-[1.625rem] font-semibold leading-8 text-[#222222] [overflow-wrap:anywhere]">
+                <div className="mb-1.5 flex items-center justify-between gap-2 pr-1">
+                  <h2 className={gpDailyHome.greeting}>
                     {isLoggedIn
                       ? `Namaste, ${userFirstName || "User"}!`
                       : "Namaste!"}
@@ -1400,7 +1376,7 @@ const Home2: React.FC = () => {
                       onClick={() =>
                         navigate(`${basePath}/manage-my-subscription`)
                       }
-                      className="shrink-0 rounded-full bg-[#E1522D]/15 px-3 py-1 text-sm font-medium text-[#E1522D] hover:bg-[#E1522D]/25"
+                      className={gpDailyHome.managePill}
                     >
                       Manage
                     </button>
@@ -1409,12 +1385,12 @@ const Home2: React.FC = () => {
 
                 {isLoggedIn && namasteCarouselLoading ? (
                   <div className="relative mt-0.5 -mr-1 pb-1">
-                    <div className="min-w-0 pr-[46%] space-y-3 pl-1 animate-pulse">
+                    <div className={`relative z-10 min-w-0 pr-[58%] sm:pr-[52%] space-y-3 ${gpDailyHome.namasteHeroInset} animate-pulse`}>
                       <div className="h-5 w-[85%] rounded bg-gray-200/80" />
                       <div className="h-5 w-[55%] rounded bg-gray-200/80" />
                       <div className="h-5 w-[70%] rounded bg-gray-200/80" />
                     </div>
-                    <div className={dailyScooterHeroInlineClass}>
+                    <div className={GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS}>
                       <img
                         src={dailyScooterHeroSvg}
                         alt=""
@@ -1427,7 +1403,7 @@ const Home2: React.FC = () => {
                   <div
                     className={`relative mt-0.5 -mr-1 pb-1`}
                   >
-                    <div className="min-w-0 pr-[46%]">
+                    <div className={`relative z-10 min-w-0 pr-[58%] sm:pr-[52%] ${gpDailyHome.namasteHeroInset}`}>
                       <div
                         className="relative transition-opacity duration-300"
                         onPointerDown={() => snoozeNamasteAutoplay()}
@@ -1468,10 +1444,10 @@ const Home2: React.FC = () => {
                             </div>
                           ))}
                         </div>
-                        {renderNamastePagination()}
                       </div>
                     </div>
-                    <div className={dailyScooterHeroInlineClass}>
+                    {renderNamastePagination()}
+                    <div className={GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS}>
                       <img
                         src={dailyScooterHeroSvg}
                         alt=""
@@ -1481,24 +1457,28 @@ const Home2: React.FC = () => {
                     </div>
                   </div>
                 ) : showNamasteMarketing ? (
-                  <div className="relative min-h-[5.5rem] sm:min-h-[6rem]">
-                    <img
-                      src={dailyScooterHeroSvg}
-                      alt=""
-                      aria-hidden
-                      className={`pointer-events-none absolute -right-3 top-1/2 z-0 -translate-y-1/2 translate-x-1 object-contain object-right sm:-right-4 sm:translate-x-2 ${dailyScooterHeroImgClass}`}
-                    />
-                    <div className="relative z-10 max-w-[calc(100%-9.5rem)]">
-                      <p className="mb-1.5 text-[13px] font-normal leading-[1.35] text-[#19411F] [overflow-wrap:anywhere]">
+                  <div className="relative min-h-[6rem] pb-1 sm:min-h-[6.5rem]">
+                    <div
+                      className={`relative z-10 min-w-0 pr-[58%] sm:pr-[52%] ${gpDailyHome.namasteHeroInset}`}
+                    >
+                      <p className={gpDailyHome.marketingTagline}>
                         We are Genda Phool! Your partner for everyday floral
                         needs.
                       </p>
-                      <p className="text-[12px] font-medium leading-snug text-[#19411F]">
+                      <p className={gpDailyHome.marketingLine}>
                         Order in <span className="font-bold">2hrs</span> and get
                       </p>
-                      <p className="text-[12px] font-medium leading-snug text-[#19411F]">
+                      <p className={gpDailyHome.marketingLine}>
                         it by tomorrow <span className="font-bold">12PM!</span>
                       </p>
+                    </div>
+                    <div className={GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS}>
+                      <img
+                        src={dailyScooterHeroSvg}
+                        alt=""
+                        aria-hidden
+                        className={GP_DAILY_SCOOTER_HERO_IMG_CLASS}
+                      />
                     </div>
                   </div>
                 ) : null}
@@ -1510,7 +1490,7 @@ const Home2: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-[#f8f6f1] px-4 pt-2">
+          <div className={`bg-[#f8f6f1] px-4 ${gpDailyHome.blockGap}`}>
             <OffersBannerCarousel
               storeId={storeService.getStoreIdForProducts() ?? undefined}
               placement={BANNER_PLACEMENT_DAILY_HOME}
@@ -1519,77 +1499,85 @@ const Home2: React.FC = () => {
           </div>
 
           {/* Main Content */}
-          <div className="px-4 pt-2 pb-4 space-y-3">
+          <div className={`px-4 pb-4 ${gpDailyHome.blockGap}`}>
             {!isLoadingBalance &&
               isLoggedIn &&
               hasCustomerSubscription &&
               homeHeroStatus !== "store_offline" &&
               orderOnHold.show && (
-              <div className="rounded-[40px] p-4 text-white" style={{ backgroundColor: "rgba(255, 38, 41, 0.8)" }}>
-                <div className="flex items-start gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <div
+                className={gpDailyHome.holdCard}
+                style={{ backgroundColor: "rgba(255, 38, 41, 0.8)" }}
+              >
+                <div className="flex items-start gap-2">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                     <img src={alertIcon} alt="" className="w-[18px] h-[18px]" aria-hidden />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-[17px] mb-1.5">
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    <p className={gpDailyHome.walletHoldText}>
                       {orderOnHold.showOrderInHold
-                        ? "Order in hold"
-                        : "Wallet running low"}
-                    </h3>
-                    <p className="text-sm text-white/90">
+                        ? "Order In Hold"
+                        : "Wallet Running Low"}
+                    </p>
+                    <p className={gpDailyHome.holdCardBody}>
                       {orderOnHold.showRunningLow
                         ? `Your wallet balance will only last until ${orderOnHold.pauseDateLabel}. Please recharge to keep your deliveries running.`
-                        : "Order in hold — please recharge your wallet to resume deliveries."}
+                        : "Your wallet balance is low. Recharge now to continue your daily deliveries."}
                     </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigateToGpDailyWalletForRecharge(navigate, basePath, {
+                          shortageAmount: Math.max(
+                            0,
+                            orderOnHold.requiredRecharge - walletBalance,
+                          ),
+                          currentBalance: walletBalance,
+                          totalRequired: orderOnHold.requiredRecharge,
+                          returnUrl: `${basePath}/home`,
+                        })
+                      }
+                      className={gpDailyHome.walletRechargeBtn}
+                    >
+                      Recharge Now
+                    </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigateToGpDailyWalletForRecharge(navigate, basePath, {
-                      shortageAmount: Math.max(
-                        0,
-                        orderOnHold.requiredRecharge - walletBalance,
-                      ),
-                      currentBalance: walletBalance,
-                      totalRequired: orderOnHold.requiredRecharge,
-                      returnUrl: `${basePath}/home`,
-                    })
-                  }
-                  className="ml-10 inline-flex min-w-[130px] items-center justify-center self-start rounded-xl border-2 border-white px-[18px] py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
-                >
-                  Recharge Now
-                </button>
               </div>
             )}
             {productsFetchError ? (
               <div className="text-red-500 text-center py-4 text-sm">{productsFetchError}</div>
             ) : null}
 
-            {/* All Packs — same idea as mobile: horizontal strip + Explore full catalog */}
-            <div>
-              <div className="flex items-center justify-between gap-2 mb-4 min-w-0">
-                <h2 className="min-w-0 flex-1 pr-2 font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-[#222222]">
-                  All Packs
-                </h2>
+            <GpDailyHomeSection
+              title="All Packs"
+              isFirstInGroup={
+                !(
+                  !isLoadingBalance &&
+                  isLoggedIn &&
+                  hasCustomerSubscription &&
+                  homeHeroStatus !== "store_offline" &&
+                  orderOnHold.show
+                )
+              }
+              headerRight={
                 <button
                   type="button"
                   onClick={() => navigate(`${basePath}/Products`)}
-                  className="flex shrink-0 items-center gap-1 text-[13px] font-medium text-[#6B7280]"
+                  className={gpDailyHome.exploreMore}
                 >
                   <span>Explore More {">"}</span>
                 </button>
-              </div>
+              }
+            >
               {!productsFetchError && isLoadingProducts ? (
-                <div className="h-40 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
+                <div className="h-36 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
               ) : (
-                <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
+                <div className={gpDailyHome.productStrip}>
                   {allPackProducts.map((pack) => (
-                    <div
-                      key={pack.id}
-                      className="w-[min(46vw,10.75rem)] xs:w-[11rem] flex-shrink-0 snap-start"
-                    >
+                    <div key={pack.id} className={gpDailyHome.productCol}>
                       <ProductCard
+                        compact
                         imageUrl={getImageUrl(pack.imagesUrl)}
                         packName={pack.name}
                         categoryName={pack.categoryName}
@@ -1607,14 +1595,11 @@ const Home2: React.FC = () => {
               {!productsFetchError && !isLoadingProducts && allPackProducts.length === 0 ? (
                 <p className="text-center text-sm text-gray-500 py-2">No packs available right now.</p>
               ) : null}
-            </div>
+            </GpDailyHomeSection>
 
-            {/* Puja Packs — GET /products/?category=puja-packs&availability_type=daily,both */}
-            <div>
-              <div className="flex items-center justify-between gap-2 mb-4 min-w-0">
-                <h2 className="min-w-0 flex-1 pr-2 font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-[#222222]">
-                  Puja Packs
-                </h2>
+            <GpDailyHomeSection
+              title="Puja Packs"
+              headerRight={
                 <button
                   type="button"
                   onClick={() =>
@@ -1622,22 +1607,20 @@ const Home2: React.FC = () => {
                       `${basePath}/Products?${new URLSearchParams({ category: "puja-packs" }).toString()}`,
                     )
                   }
-                  className="flex shrink-0 items-center gap-1 text-[13px] font-medium text-[#6B7280]"
+                  className={gpDailyHome.exploreMore}
                 >
                   <span>Explore More {">"}</span>
                 </button>
-              </div>
-
+              }
+            >
               {!productsFetchError && isLoadingProducts ? (
-                <div className="h-40 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
+                <div className="h-36 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
               ) : (
-                <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
+                <div className={gpDailyHome.productStrip}>
                   {pujaPackProducts.map((pack) => (
-                    <div
-                      key={pack.id}
-                      className="w-[min(46vw,10.75rem)] xs:w-[11rem] flex-shrink-0 snap-start"
-                    >
+                    <div key={pack.id} className={gpDailyHome.productCol}>
                       <ProductCard
+                        compact
                         imageUrl={getImageUrl(pack.imagesUrl)}
                         packName={pack.name}
                         categoryName={pack.categoryName}
@@ -1655,14 +1638,11 @@ const Home2: React.FC = () => {
               {!productsFetchError && !isLoadingProducts && pujaPackProducts.length === 0 ? (
                 <p className="text-center text-sm text-gray-500 py-2">No Puja packs available right now.</p>
               ) : null}
-            </div>
+            </GpDailyHomeSection>
 
-            {/* Exotic Packs — GET /products/?category=exotic-packs&availability_type=daily,both */}
-            <div>
-              <div className="flex items-center justify-between gap-2 mb-4 min-w-0">
-                <h2 className="min-w-0 flex-1 pr-2 font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-[#222222]">
-                  Exotic Packs
-                </h2>
+            <GpDailyHomeSection
+              title="Exotic Packs"
+              headerRight={
                 <button
                   type="button"
                   onClick={() =>
@@ -1670,22 +1650,20 @@ const Home2: React.FC = () => {
                       `${basePath}/Products?${new URLSearchParams({ category: "exotic-packs" }).toString()}`,
                     )
                   }
-                  className="flex shrink-0 items-center gap-1 text-[13px] font-medium text-[#6B7280]"
+                  className={gpDailyHome.exploreMore}
                 >
                   <span>Explore More {">"}</span>
                 </button>
-              </div>
-
+              }
+            >
               {!productsFetchError && isLoadingProducts ? (
-                <div className="h-40 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
+                <div className="h-36 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
               ) : (
-                <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
+                <div className={gpDailyHome.productStrip}>
                   {exoticPackProducts.map((pack) => (
-                    <div
-                      key={pack.id}
-                      className="w-[min(46vw,10.75rem)] xs:w-[11rem] flex-shrink-0 snap-start"
-                    >
+                    <div key={pack.id} className={gpDailyHome.productCol}>
                       <ProductCard
+                        compact
                         imageUrl={getImageUrl(pack.imagesUrl)}
                         packName={pack.name}
                         categoryName={pack.categoryName}
@@ -1703,31 +1681,26 @@ const Home2: React.FC = () => {
               {!productsFetchError && !isLoadingProducts && exoticPackProducts.length === 0 ? (
                 <p className="text-center text-sm text-gray-500 py-2">No exotic packs available right now.</p>
               ) : null}
-            </div>
+            </GpDailyHomeSection>
 
-            {/* Full product browse — always visible (route: /gp-daily/Products) */}
-            <div className="flex justify-center pt-1">
+            <div className="flex justify-center">
               <button
                 type="button"
                 onClick={() => navigate(`${basePath}/Products`)}
-                className="w-full max-w-none rounded-lg bg-[#FFB343] px-3.5 py-3.5 text-[15px] font-normal text-[#222222] transition-opacity hover:opacity-95"
+                className={gpDailyHome.viewAllCta}
               >
                 View All Category
               </button>
             </div>
 
-            {/* Quote of the Day Section */}
-            <div className="pt-1">
-              <h2 className="mb-2 self-start font-serif text-lg font-semibold leading-6 text-[#222222]">
-                Quote of the day
-              </h2>
+            {/* <GpDailyHomeSection title="Quote Of The Day">
               <img
                 src={bottomBannerSvg}
                 alt=""
                 className="h-auto w-full"
                 aria-hidden
               />
-            </div>
+            </GpDailyHomeSection> */}
           </div>
         </div>
 

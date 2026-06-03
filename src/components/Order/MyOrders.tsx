@@ -9,9 +9,8 @@ import { SearchBar } from '../common/SearchBar';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { UniformPageHeader } from '../layout/UniformPageHeader';
 import {
-  getCustomerOrderStatusLabel,
   getCustomerOrderStatusTextClass,
-  toCustomerOrderStatusKey,
+  normalizeOrderStatusKey,
 } from '../../utils/customerOrderStatus';
 import {
   cleanSubscriptionProductDisplayName,
@@ -23,6 +22,31 @@ import {
 import { OrderListThumb } from './OrderListThumb';
 
 const ORDER_LIST_PAGE_SIZE = 6;
+/** Max extra API pages fetched on first load when filtering leaves fewer than 6 rows. */
+const ORDER_LIST_PREFETCH_MAX_PAGES = 2;
+
+function formatRawOrderStatus(raw: string): string {
+  const s = (raw || '').trim();
+  if (!s) return '';
+  return s
+    .toLowerCase()
+    .split('_')
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : ''))
+    .filter(Boolean)
+    .join(' ');
+}
+
+async function enrichOrdersForList(
+  rawRecords: Record<string, unknown>[],
+  limit = ORDER_LIST_PAGE_SIZE,
+): Promise<void> {
+  const slice = rawRecords.slice(0, limit);
+  if (slice.length === 0) return;
+  await orderService.enrichOrderListProductLabels(slice, {
+    concurrency: 4,
+    maxFetches: ORDER_LIST_PAGE_SIZE,
+  });
+}
 
 interface Order {
   id: string;
@@ -125,12 +149,7 @@ const MyOrders: React.FC = () => {
         subscriptionListOnly ? { order_type: "subscription" } : undefined,
       );
       const rawRecords = ((raw || []) as Record<string, unknown>[]);
-      if (rawRecords.length > 0) {
-        await orderService.enrichOrderListProductLabels(rawRecords, {
-          concurrency: 4,
-          maxFetches: Math.max(rawRecords.length, ORDER_LIST_PAGE_SIZE),
-        });
-      }
+      await enrichOrdersForList(rawRecords);
       const transformedOrders = mapRawToOrders(rawRecords);
       const sortedOrders = transformedOrders.sort(
         (a: Order, b: Order) =>
@@ -142,7 +161,7 @@ const MyOrders: React.FC = () => {
       while (
         merged.length < ORDER_LIST_PAGE_SIZE &&
         url &&
-        prefetchGuard < 25
+        prefetchGuard < ORDER_LIST_PREFETCH_MAX_PAGES
       ) {
         prefetchGuard += 1;
         const { orders: raw2, nextUrl: n } = await orderService.getOrdersNextPage(
@@ -151,12 +170,7 @@ const MyOrders: React.FC = () => {
         );
         url = n;
         const batchRaw = (raw2 || []) as Record<string, unknown>[];
-        if (batchRaw.length > 0) {
-          await orderService.enrichOrderListProductLabels(batchRaw, {
-            concurrency: 4,
-            maxFetches: Math.max(batchRaw.length, ORDER_LIST_PAGE_SIZE),
-          });
-        }
+        await enrichOrdersForList(batchRaw);
         const batch = mapRawToOrders(batchRaw);
         const filteredBatch = filterOrdersForFeature(
           batch.sort(
@@ -220,12 +234,7 @@ const MyOrders: React.FC = () => {
         );
         url = nextUrl;
         const batchRaw = (raw || []) as Record<string, unknown>[];
-        if (batchRaw.length > 0) {
-          await orderService.enrichOrderListProductLabels(batchRaw, {
-            concurrency: 4,
-            maxFetches: Math.max(batchRaw.length, ORDER_LIST_PAGE_SIZE),
-          });
-        }
+        await enrichOrdersForList(batchRaw);
         const batch = filterOrdersForFeature(
           mapRawToOrders(batchRaw).sort(
             (a: Order, b: Order) =>
@@ -251,15 +260,20 @@ const MyOrders: React.FC = () => {
   };
 
   const getStatusText = (order: Order) => {
-    const key = toCustomerOrderStatusKey(order.status ?? '');
+    const s = normalizeOrderStatusKey(order.status ?? '');
     const date = format(new Date(order.createdAt), 'MMM d');
 
-    if (key === 'delivered') return `Delivered on ${date}`;
-    if (key === 'cancelled') return `Canceled on ${date}`;
-    if (key === 'failed') return `Failed on ${date}`;
-    if (key === 'out_for_delivery') return 'Out for Delivery';
-    if (key === 'preparing') return 'Preparing';
-    if (key === 'confirmed') return 'Confirmed';
+    if (s === 'delivered') return `Delivered on ${date}`;
+    if (s.includes('cancel')) return `Canceled on ${date}`;
+    if (s === 'failed') return `Failed on ${date}`;
+    if (s === 'out_for_delivery') return 'Out for Delivery';
+    if (s === 'scheduled') return 'Scheduled';
+    if (s === 'confirmed') return 'Confirmed';
+    if (s === 'ready') return 'Ready';
+    if (s === 'pending' || s === 'processing' || s === 'preparing') {
+      return formatRawOrderStatus(order.status);
+    }
+    if (order.status) return formatRawOrderStatus(order.status);
     return `Ordered on ${date}`;
   };
 
@@ -321,11 +335,11 @@ const MyOrders: React.FC = () => {
       <div className="max-w-[800px] mx-auto min-h-screen flex flex-col">
         <div className="sticky top-0 z-10 bg-[#f8f6f1] px-4 pt-6">
           <UniformPageHeader
-            title="My Orders"
+            title="My Order"
             onBack={() => navigate(`${basePath}/account`)}
             padXClassName="px-0"
             padYClassName="py-0 pb-4"
-            className="mb-6 bg-transparent"
+            className="mb-4 bg-transparent"
           />
 
           {/* Search Bar — unified styling, order suggestions as you type */}
@@ -373,7 +387,7 @@ const MyOrders: React.FC = () => {
         {/* Content */}
         <div className="relative flex-1 overflow-x-hidden bg-[#f8f6f1] px-4 pb-nav-bottom">
           {filteredOrders.length > 0 ? (
-            <div className="space-y-4">
+            <div className="min-w-0">
               {visibleOrders.map((order, index) => {
                 const statusColor = getCustomerOrderStatusTextClass(order.status);
                 const productImg =
@@ -385,8 +399,21 @@ const MyOrders: React.FC = () => {
                 return (
                   <div
                     key={order.id || index}
-                    onClick={() => order.order_number && navigate(`${basePath}/orders/${order.order_number}`)}
-                    className="flex w-full max-w-full min-w-0 gap-4 border-b border-gray-200 p-4 cursor-pointer transition-shadow hover:shadow-md"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() =>
+                      order.order_number &&
+                      navigate(`${basePath}/orders/${order.order_number}`)
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (order.order_number) {
+                          navigate(`${basePath}/orders/${order.order_number}`);
+                        }
+                      }
+                    }}
+                    className="flex w-full max-w-full min-w-0 cursor-pointer gap-3 border-b border-gray-200 py-3"
                   >
                     <OrderListThumb
                       primaryImageUrl={productImg}
@@ -394,29 +421,32 @@ const MyOrders: React.FC = () => {
                       secondImageUrl={order.secondItemImage}
                     />
 
-                    {/* Details */}
-                    <div className="relative min-w-0 w-0 max-w-full flex-1 overflow-hidden pr-5">
-                      <p className={`mb-1 text-sm font-semibold ${statusColor}`}>
-                        {getStatusText(order)}
-                      </p>
-                      <p
-                        className="mb-1 text-base font-medium leading-snug text-gray-900"
-                        style={{ overflowWrap: 'anywhere', wordBreak: 'break-all' }}
-                      >
-                        {(subscriptionListOnly
-                          ? cleanSubscriptionProductDisplayName
-                          : (s: string) => s)(
-                          order.productListLabel ||
-                            order.product?.name ||
-                            order.order_number ||
-                            "Order",
-                        )}
-                      </p>
-                      <p className="text-sm font-semibold text-gray-700">
-                        ₹{order.total_amount || order.product?.sellingPrice || '0.00'}
-                      </p>
+                    <div className="flex min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 pr-2">
+                        <p
+                          className={`mb-1 text-xs font-semibold leading-snug ${statusColor}`}
+                        >
+                          {getStatusText(order)}
+                        </p>
+                        <p
+                          className="mb-1 line-clamp-2 text-[24px] font-medium leading-snug text-gray-900"
+                          style={{ overflowWrap: 'anywhere' }}
+                        >
+                          {(subscriptionListOnly
+                            ? cleanSubscriptionProductDisplayName
+                            : (s: string) => s)(
+                            order.productListLabel ||
+                              order.product?.name ||
+                              order.order_number ||
+                              'Order',
+                          )}
+                        </p>
+                        <p className="text-[22px] font-semibold text-gray-700">
+                          ₹{order.total_amount || order.product?.sellingPrice || '0.00'}
+                        </p>
+                      </div>
                       <FaChevronRight
-                        className="absolute right-0 top-1 text-gray-400"
+                        className="mt-1 shrink-0 text-gray-400"
                         size={14}
                         aria-hidden
                       />
@@ -425,17 +455,16 @@ const MyOrders: React.FC = () => {
                 );
               })}
 
-              {showLoadMore && (
+              {showLoadMore ? (
                 <div
                   ref={loadMoreSentinelRef}
-                  className="w-full py-2 flex items-center justify-center min-h-[40px]"
+                  className="flex min-h-[40px] w-full items-center justify-center py-4"
                 >
                   {loadingMore ? (
-                    <span className="text-gray-500 text-sm">Loading…</span>
+                    <span className="text-xs font-medium text-gray-500">Loading…</span>
                   ) : null}
                 </div>
-
-)}
+              ) : null}
             </div>
           ) : (
             <div className="text-center pt-20 text-gray-500">

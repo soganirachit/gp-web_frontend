@@ -1,5 +1,5 @@
 import React from "react";
-import { HiArrowPath } from "react-icons/hi2";
+import { HiMiniPlay } from "react-icons/hi2";
 import Spinner from "../common/Spinner";
 
 export interface SubscriptionResumeButtonProps {
@@ -7,7 +7,7 @@ export interface SubscriptionResumeButtonProps {
   loading?: boolean;
   className?: string;
   compact?: boolean;
-  variant?: "default" | "bottleGreen";
+  variant?: "default" | "bottleGreen" | "olive";
 }
 
 /** GP Daily resume CTA — charcoal or bottle green fill. */
@@ -21,25 +21,32 @@ export const SubscriptionResumeButton: React.FC<
   variant = "default",
 }) => {
   const green = variant === "bottleGreen";
+  const olive = variant === "olive";
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={loading}
       aria-label="Resume subscription"
-      className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 py-2 font-semibold text-white shadow-sm transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
+      className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 py-2 font-semibold shadow-sm transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
         compact ? "min-w-[4.75rem] rounded-lg px-2.5 py-1 text-xs" : "min-w-[5.75rem] text-[13px]"
       } ${
-        green
-          ? "bg-[#19411F] hover:bg-[#143318]"
-          : "bg-[#222222] hover:bg-[#111111]"
+        olive
+          ? "bg-[#C9BC4A] text-[#222222] hover:bg-[#BFB14A]"
+          : green
+            ? "bg-[#19411F] text-white hover:bg-[#143318]"
+            : "bg-[#222222] text-white hover:bg-[#111111]"
       } ${className}`}
     >
       {loading ? (
-        <Spinner size={18} variant="light" className="!inline-flex" />
+        <Spinner
+          size={18}
+          variant={olive ? "default" : "light"}
+          className="!inline-flex"
+        />
       ) : (
         <>
-          <HiArrowPath className="h-4 w-4 shrink-0" aria-hidden />
+          <HiMiniPlay className="h-4 w-4 shrink-0" aria-hidden />
           Resume
         </>
       )}

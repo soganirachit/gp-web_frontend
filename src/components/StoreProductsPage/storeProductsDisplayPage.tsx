@@ -29,6 +29,7 @@ import deliveryIcon from "../../assets/svg/gp_store_svg/delivery.svg";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
+import { gpDailyHome } from "../../utils/gpDailyHomeDesignSystem";
 import { ProductImageTag } from "../common/ProductImageTag";
 import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
 import {
@@ -1218,14 +1219,14 @@ const StorePage: React.FC = () => {
           {relatedProducts.length > 0 && (
             <div className="mt-10 mb-8">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="font-ibm-plex-serif text-gp-section font-semibold text-gray-900">Best Sellers</h2>
+                <h2 className={gpDailyHome.sectionHeading}>Best Sellers</h2>
                 <button
                   type="button"
                   onClick={() => navigate("/gp-store/products")}
-                  className="gp-link-row shrink-0 text-gray-600 hover:text-gray-900"
+                  className="inline-flex shrink-0 items-center gap-0.5 py-1"
                 >
-                  <span>Explore More</span>
-                  <FaChevronRight className="text-xs" />
+                  <span className={gpDailyHome.exploreMore}>Explore More</span>
+                  <FaChevronRight className={`${gpDailyHome.exploreMore} opacity-80`} />
                 </button>
               </div>
               <div className="gp-h-scroll-track">

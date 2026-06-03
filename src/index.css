@@ -131,7 +131,7 @@
    * No xs/sm width jumps; avoids layout shift between Pixel models.
    */
   .gp-store-card-scroll {
-    @apply flex h-full min-h-0 shrink-0 flex-col self-stretch w-[min(42vw,9.5rem)] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer;
+    @apply flex h-full min-h-0 shrink-0 flex-col self-stretch w-[min(44vw,10.25rem)] xs:w-[10.5rem] snap-start bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer;
   }
 
   .gp-store-card-scroll-inner {

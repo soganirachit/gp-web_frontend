@@ -37,10 +37,17 @@ const config: Config = {
         sans: ['IBM Plex Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         serif: ['IBM Plex Serif', 'Georgia', 'serif'],
       },
-      /** Fluid type for section titles — ~20–28px across 360–420px without per-breakpoint classes */
+      /** GP Daily section titles — 22px mobile, 24px tablet+ (28px line) */
       fontSize: {
-        'gp-section': ['clamp(1.25rem, 4vw, 1.75rem)', { lineHeight: '1.28' }],
+        'gp-section': ['1.375rem', { lineHeight: '1.75rem' }],
+        'gp-section-md': ['1.5rem', { lineHeight: '1.75rem' }],
         'gp-body-sm': ['0.8125rem', { lineHeight: '1.45' }],
+        'gp-card-title': ['0.75rem', { lineHeight: '1.35' }],
+        'gp-card-title-md': ['0.8125rem', { lineHeight: '1.35' }],
+        'gp-card-meta': ['0.6875rem', { lineHeight: '1.4' }],
+        'gp-card-meta-md': ['0.75rem', { lineHeight: '1.4' }],
+        'gp-card-price': ['0.875rem', { lineHeight: '1.3' }],
+        'gp-card-price-md': ['0.9375rem', { lineHeight: '1.3' }],
       },
       colors: {
         background: '#f8f6f1',

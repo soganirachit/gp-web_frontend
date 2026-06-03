@@ -26,6 +26,11 @@ import {
   formatOrderListProductLabel,
   resolveOrderItemsCount,
 } from "../../../utils/orderListDisplay";
+import {
+  extractOrderNumberFromTxnDescription,
+  normalizeWalletTransactionDescription,
+  resolveWalletTransactionTitleFromRow,
+} from "../../../utils/walletTransactionDisplay";
 import { addressService, Address } from "../../../services/address.service";
 import {
   subscriptionService,
@@ -100,22 +105,6 @@ function rowCreatedMs(item: unknown): number {
   const raw = String(o.createdAt ?? o.created_at ?? "");
   const t = new Date(raw).getTime();
   return Number.isFinite(t) ? t : 0;
-}
-
-/**
- * Backend writes order-related wallet transactions with descriptions like:
- *   "Payment for order GP-20260513-53027"
- *   "Refund for order GP_IPU-20260518-DLY0000001"
- *   "Refund for cancelled order GP-20260513-53027"
- *   "Subscription delivery — Order GP-20260513-53027"
- * Non-order rows (e.g. "Wallet recharge", "Wallet top-up") return null.
- */
-function extractOrderNumberFromTxnDescription(
-  description: string | null | undefined,
-): string | null {
-  if (!description) return null;
-  const m = description.match(/[Oo]rder\s+([A-Z0-9][A-Z0-9_\-]+)/);
-  return m && m[1] ? m[1].trim() : null;
 }
 
 interface CouponType {
@@ -392,7 +381,8 @@ const Wallet = () => {
   useEffect(() => {
     const orderNumbers = new Set<string>();
     transactions.forEach((t) => {
-      const orderNumber = extractOrderNumberFromTxnDescription(t.description);
+      const desc = normalizeWalletTransactionDescription(t);
+      const orderNumber = extractOrderNumberFromTxnDescription(desc);
       if (orderNumber && !(orderNumber in orderLabelByNumber)) {
         orderNumbers.add(orderNumber);
       }
@@ -953,40 +943,20 @@ const Wallet = () => {
                     new Date().toISOString();
 
                   const orderNumber = isTransaction
-                    ? extractOrderNumberFromTxnDescription(item.description)
+                    ? extractOrderNumberFromTxnDescription(
+                        normalizeWalletTransactionDescription(item),
+                      )
                     : null;
                   const orderProductLabel = orderNumber
                     ? orderLabelByNumber[orderNumber] ?? null
                     : null;
 
-                  // Show the product (e.g. "Premium Marigold + 2 more") in place
-                  // of the raw order number; fall back to the description prefix
-                  // ("Payment for order", "Refund for order", etc.) when the
-                  // order lookup is still loading or unavailable.
-                  let titleLine: string;
-                  if (isTransaction) {
-                    if (orderNumber) {
-                      if (orderProductLabel) {
-                        titleLine = orderProductLabel;
-                      } else {
-                        const cleaned = (item.description || "")
-                          .replace(orderNumber, "")
-                          .replace(/\s*[—-]?\s*$/, "")
-                          .trim();
-                        titleLine =
-                          cleaned ||
-                          (item.type === "CREDIT"
-                            ? "Refund"
-                            : "Order payment");
-                      }
-                    } else {
-                      titleLine =
-                        item.description ||
-                        `${item.type === "CREDIT" ? "Credit" : "Debit"} - Transaction`;
-                    }
-                  } else {
-                    titleLine = "Wallet Recharge";
-                  }
+                  const titleLine = isTransaction
+                    ? resolveWalletTransactionTitleFromRow(
+                        item as unknown as Record<string, unknown>,
+                        orderProductLabel,
+                      )
+                    : "Wallet Recharge";
 
                   const isClickable = Boolean(orderNumber);
                   const handleRowClick = () => {

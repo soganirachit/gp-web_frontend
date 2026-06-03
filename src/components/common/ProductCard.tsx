@@ -1,5 +1,6 @@
 import React from 'react';
 import { FaChevronRight } from 'react-icons/fa';
+import { gpDailyTitleCase } from '../../utils/gpDailyHomeDesignSystem';
 import { ProductImageTag } from './ProductImageTag';
 
 interface ProductCardProps {
@@ -13,6 +14,8 @@ interface ProductCardProps {
   originalPrice?: number;
   showDailyButton?: boolean;
   showBestsellerTag?: boolean;
+  /** GP Daily home — denser card (~10–15% smaller type/padding). */
+  compact?: boolean;
   /** Optional API labels (shown on image top-left; overrides showBestsellerTag when set) */
   labels?: { name?: string; slug?: string }[];
   onClick?: () => void;
@@ -28,6 +31,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   originalPrice,
   showDailyButton = false,
   showBestsellerTag = false,
+  compact = false,
   labels,
   onClick,
   className = ''
@@ -35,6 +39,27 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const shouldShowOriginalOnCard =
     originalPrice != null && originalPrice > 0 && String(price || "").length <= 8;
   const tagVariant = showDailyButton ? "daily" : "store";
+  const isCompact = compact || showDailyButton;
+  const imageHeightClass = isCompact
+    ? "sm:aspect-auto sm:h-[8.75rem] md:h-36"
+    : "sm:aspect-auto sm:h-40 md:h-48 lg:h-52";
+  const bodyPadClass = isCompact ? "p-3" : "p-2.5 sm:p-3";
+  const titleClass = isCompact
+    ? "text-gp-card-title sm:text-gp-card-title-md font-semibold text-[#111827] line-clamp-2 leading-snug mb-0.5"
+    : "text-[15px] leading-5 font-semibold text-[#111827] line-clamp-2 mb-0.5";
+  const categoryClass = isCompact
+    ? "text-gp-card-meta sm:text-gp-card-meta-md font-medium text-[#19411f]/80 truncate mb-0.5"
+    : "text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[#19411f]/80 truncate mb-0.5";
+  const descClass = isCompact
+    ? "text-gp-body-sm text-[#6B7280] truncate"
+    : "text-[11px] leading-snug text-[#6B7280] truncate";
+  const priceClass = isCompact
+    ? "text-gp-card-price sm:text-gp-card-price-md font-semibold text-[#111827] whitespace-nowrap"
+    : "text-[19px] leading-[22px] font-semibold text-[#111827] whitespace-nowrap";
+  const chevronClass = isCompact ? "text-sm" : "text-base";
+  const dailyPillClass = isCompact
+    ? "bg-[#FFB343] text-[#222222] text-[9px] font-semibold px-1.5 py-0.5 rounded-sm flex-shrink-0 self-start mt-0.5"
+    : "bg-[#FFB343] text-[#222222] text-[10px] font-medium px-2 py-0.5 rounded-sm flex-shrink-0 self-start";
 
   return (
     <div
@@ -43,7 +68,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
     >
       {/* Image Section */}
       <div
-        className={`relative isolate w-full aspect-square sm:aspect-auto sm:h-40 md:h-48 lg:h-52 overflow-hidden ${
+        className={`relative isolate w-full aspect-square ${imageHeightClass} overflow-hidden ${
           showDailyButton ? "bg-[#f8f6f1]" : "bg-[#8B4513]"
         }`}
       >
@@ -62,30 +87,26 @@ const ProductCard: React.FC<ProductCardProps> = ({
       </div>
 
       {/* Information Section */}
-      <div className="p-2.5 sm:p-3 flex flex-1 flex-col">
+      <div className={`${bodyPadClass} flex flex-1 flex-col`}>
         <div className="flex items-start justify-between gap-2 mb-1">
           <div className="flex-1 min-w-0">
-            <h3 className="text-[15px] leading-5 font-semibold text-[#111827] truncate mb-0.5">
-              {packName}
-            </h3>
+            <h3 className={titleClass}>{packName}</h3>
             {categoryName ? (
-              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[#19411f]/80 truncate mb-0.5">
-                {categoryName}
+              <p className={categoryClass}>
+                {isCompact ? gpDailyTitleCase(categoryName) : categoryName}
               </p>
             ) : null}
-            <p className="text-[11px] leading-snug text-[#6B7280] truncate">
-              {description}
-            </p>
+            <p className={descClass}>{description}</p>
           </div>
 
           {/* Daily Button */}
           {showDailyButton && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                // Handle daily button click if needed
               }}
-              className="bg-[#ffb042] text-[#3C2A00] text-[10px] font-medium px-2 py-0.5 rounded-sm flex-shrink-0"
+              className={dailyPillClass}
             >
               Daily
             </button>
@@ -93,14 +114,14 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         {/* Offer price first, then struck MRP when applicable */}
-        <div className="flex items-center justify-between mt-auto pt-1.5">
-          <span className="text-[19px] leading-[22px] font-semibold text-[#111827] whitespace-nowrap">
+        <div className={`flex items-center justify-between mt-auto ${isCompact ? "pt-1" : "pt-1.5"}`}>
+          <span className={priceClass}>
             {price}
             {shouldShowOriginalOnCard && (
               <span className="text-gray-500 font-medium line-through ml-1">₹{originalPrice}</span>
             )}
           </span>
-          <FaChevronRight className="text-[#111827] text-base shrink-0" />
+          <FaChevronRight className={`mr-1.5 text-[#111827] ${chevronClass} shrink-0`} />
         </div>
       </div>
     </div>

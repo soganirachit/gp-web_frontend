@@ -76,28 +76,35 @@ export function GpDailyHomeSkeleton() {
     <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
       <div className={shell}>
         <div
-          className="relative px-4 pt-0 pb-8"
+          className="relative px-4 pt-0 pb-6"
           style={{
             background:
               "linear-gradient(to bottom, rgba(250, 193, 20, 0.8), rgba(250, 193, 20, 0.4))",
-            minHeight: "clamp(220px, 42vw, 280px)",
+            minHeight: "clamp(200px, 38vw, 260px)",
           }}
         >
           <div className="flex justify-between items-start pt-3 mb-4">
-            <Pulse className="h-10 w-44 rounded-xl" />
-            <Pulse className="h-10 w-10 rounded-full" />
+            <Pulse className="h-9 w-40 rounded-xl" />
+            <Pulse className="h-9 w-9 rounded-full" />
           </div>
-          <Pulse className="h-12 w-full rounded-xl mb-2" />
+          <Pulse className="h-11 w-full rounded-xl" />
+          <Pulse className="mt-4 h-5 w-36 rounded" />
         </div>
-        <div className="px-4 -mt-4 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="space-y-2">
-                <Pulse className="aspect-[4/5] w-full rounded-xl" />
-                <Pulse className="h-4 w-3/4" />
-                <Pulse className="h-4 w-1/2" />
-              </div>
-            ))}
+        <div className="px-4 mt-8 space-y-8">
+          <div>
+            <Pulse className="h-5 w-28 rounded mb-4" />
+            <Pulse className="h-[8.75rem] w-full rounded-[2rem]" />
+          </div>
+          <div>
+            <Pulse className="h-5 w-24 rounded mb-4" />
+            <div className="flex gap-3 overflow-hidden">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Pulse
+                  key={i}
+                  className="h-52 w-[10.25rem] shrink-0 rounded-2xl"
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -184,17 +191,17 @@ export function OrdersListSkeleton() {
           </div>
           <Pulse className="h-[46px] w-full rounded-xl" />
         </div>
-        <div className="px-4 pt-4 space-y-4">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <div className="px-4 pt-2">
+          {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="flex gap-4 p-4 border-b border-gray-200"
+              className="flex gap-3 border-b border-gray-200 py-3"
             >
-              <Pulse className="w-20 h-20 flex-shrink-0 rounded-xl" />
-              <div className="flex-1 min-w-0 space-y-2">
-                <Pulse className="h-4 w-3/4" />
-                <Pulse className="h-4 w-1/2" />
-                <Pulse className="h-3 w-24" />
+              <Pulse className="h-20 w-20 shrink-0 rounded-xl" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <Pulse className="h-3 w-2/5" />
+                <Pulse className="h-3.5 w-4/5" />
+                <Pulse className="h-3 w-16" />
               </div>
             </div>
           ))}

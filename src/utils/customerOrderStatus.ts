@@ -95,6 +95,9 @@ export function getCustomerOrderStatusBadgeClass(
 
 /** Text color classes (order list rows). */
 export function getCustomerOrderStatusTextClass(raw: string): string {
+  if (normalizeOrderStatusKey(raw) === "ready") {
+    return "text-[#0D9488]";
+  }
   switch (toCustomerOrderStatusKey(raw)) {
     case "delivered":
       return "text-[#166534]";

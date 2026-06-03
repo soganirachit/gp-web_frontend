@@ -30,11 +30,18 @@ import { useAuth } from "../context/AuthContext";
 import { GP_OPEN_GUEST_AREA_MODAL_EVENT } from "../config/guestAreaModalCopy";
 import { guestHasSavedBrowseAddress } from "../utils/guestAddressEntry";
 import { HomeHeroStatusBanner } from "../components/home/HomeHeroStatusBanner";
-import { SleepingZzzBadge } from "../components/home/SleepingZzzBadge";
+import { GpStoreOfflineHero } from "../components/store/GpStoreOfflineHero";
+import { GpDailyHomeSection } from "../components/daily/GpDailyHomeSection";
 import {
+  gpDailyHome,
+  GP_STORE_HERO_TRUCK_IMG_CLASS,
+} from "../utils/gpDailyHomeDesignSystem";
+import {
+  parseDeliveryAddressCoords,
   resolveHomeHeroStatus,
   type HomeHeroStatus,
 } from "../utils/homeLocationHeroState";
+import { resolveGpStoreOfflineStoreCandidates } from "../utils/gpStoreOfflineStore";
 import truckStoreIcon from "../assets/svg/gp_store_svg/truckhome.svg";
 import storeGreenBanner from "../assets/svg/gp_store_svg/greenbanner.svg";
 import storeWhiteLogo from "../assets/svg/gp_store_svg/whitelogo.svg";
@@ -66,7 +73,6 @@ import {
   HOME_HEADER_PROFILE_OFFSET,
 } from "../constants/homeHeaderLayout";
 import { ProductImageTag } from "../components/common/ProductImageTag";
-import namasteSvg from '../assets/svg/namaste.svg';
 import { OffersBannerCarousel } from "../components/OffersBannerCarousel";
 import { BANNER_PLACEMENT_STORE_HOME } from "../utils/bannerPlacement";
 
@@ -94,28 +100,38 @@ const GpStore_Homepage: React.FC = () => {
     const [isLoadingBestSellers, setIsLoadingBestSellers] = useState(true);
     const [storeId, setStoreId] = useState<number | null>(null);
     const [homeHeroStatus, setHomeHeroStatus] = useState<HomeHeroStatus>("default");
+    const deliveryCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+    const [deliveryCoordsTick, setDeliveryCoordsTick] = useState(0);
 
     const refreshHomeHeroStatus = useCallback(async () => {
-        const sid = storeService.getStoreIdForProducts() ?? storeId;
+        const { primaryStoreId, storeIds } =
+            await resolveGpStoreOfflineStoreCandidates();
+        const sid = primaryStoreId ?? storeId;
         const guestTempId = storeService.getTemporaryStoreId();
         const inServiceArea =
-            guestTempId != null || (!!localStorage.getItem("access_token") && sid != null);
-        let deviceLat: number | null = null;
-        let deviceLng: number | null = null;
-        try {
-            const raw = localStorage.getItem("userCoordinates");
-            if (raw) {
-                const parsed = JSON.parse(raw) as { lat?: number; lng?: number };
-                if (typeof parsed.lat === "number" && typeof parsed.lng === "number") {
-                    deviceLat = parsed.lat;
-                    deviceLng = parsed.lng;
+            guestTempId != null ||
+            storeIds.length > 0 ||
+            (!!localStorage.getItem("access_token") && sid != null);
+        const delivery = deliveryCoordsRef.current;
+        let deviceLat: number | null = delivery?.lat ?? null;
+        let deviceLng: number | null = delivery?.lng ?? null;
+        if (deviceLat == null || deviceLng == null) {
+            try {
+                const raw = localStorage.getItem("userCoordinates");
+                if (raw) {
+                    const parsed = JSON.parse(raw) as { lat?: number; lng?: number };
+                    if (typeof parsed.lat === "number" && typeof parsed.lng === "number") {
+                        deviceLat = parsed.lat;
+                        deviceLng = parsed.lng;
+                    }
                 }
+            } catch {
+                /* ignore */
             }
-        } catch {
-            /* ignore */
         }
         const status = await resolveHomeHeroStatus({
             storeId: sid ?? null,
+            storeIds,
             inServiceArea,
             deviceLat,
             deviceLng,
@@ -125,7 +141,7 @@ const GpStore_Homepage: React.FC = () => {
 
     useEffect(() => {
         void refreshHomeHeroStatus();
-    }, [refreshHomeHeroStatus, deliveryLocation, isLoggedIn]);
+    }, [refreshHomeHeroStatus, deliveryCoordsTick, deliveryLocation, isLoggedIn]);
 
     const fetchCustomerName = async () => {
         try {
@@ -299,10 +315,14 @@ const GpStore_Homepage: React.FC = () => {
                 ].filter(Boolean).join(', ');
                 setDeliveryLocation(formattedAddress);
                 setAddressType(selectedAddress.type || "Home");
+                deliveryCoordsRef.current =
+                    parseDeliveryAddressCoords(selectedAddress);
             } else {
                 setDeliveryLocation("");
                 setAddressType("Home");
+                deliveryCoordsRef.current = null;
             }
+            setDeliveryCoordsTick((t) => t + 1);
         } catch (error) {
             console.error("Error fetching address:", error);
             // Avoid showing stale address when logged out or on failures.
@@ -453,7 +473,7 @@ const GpStore_Homepage: React.FC = () => {
             <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom overflow-x-hidden">
                 <div className="mx-auto w-full min-w-0 max-w-[min(800px,100vw)]">
                     {/* Top Header with Green Background */}
-                    <div className="relative px-4 pt-0 pb-8" style={{
+                    <div className="relative px-4 pt-0 pb-4" style={{
                         background: 'linear-gradient(to bottom, #DAFFD9, #D8F0D7)',
                         minHeight: 'clamp(220px, 42vw, 280px)'
                     }}>
@@ -512,20 +532,9 @@ const GpStore_Homepage: React.FC = () => {
 
                             {/* Namaste + delivery truck — single row (design ref) */}
                             {homeHeroStatus === "store_offline" ? (
-                                <div className="relative min-h-[5.5rem] sm:min-h-[6rem]">
-                                    <div className="relative z-10 max-w-[calc(100%-9.5rem)]">
-                                        <HomeHeroStatusBanner variant="store_offline" />
-                                    </div>
-                                    <div className="pointer-events-none absolute -right-3 top-1/2 z-0 -translate-y-1/2 translate-x-1 sm:-right-4 sm:translate-x-2">
-                                        <img
-                                            src={truckStoreIcon}
-                                            alt=""
-                                            aria-hidden
-                                            className="relative h-[5.5rem] w-[11rem] object-contain object-right sm:h-[6rem] sm:w-[11.75rem]"
-                                        />
-                                        <SleepingZzzBadge className="right-6 top-3" />
-                                    </div>
-                                </div>
+                                <GpStoreOfflineHero
+                                    userFirstName={userFirstName || "User"}
+                                />
                             ) : homeHeroStatus !== "default" ? (
                                 <HomeHeroStatusBanner
                                     variant={homeHeroStatus}
@@ -540,38 +549,46 @@ const GpStore_Homepage: React.FC = () => {
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.5 }}
-                                className="mt-10"
+                                className="mt-5"
                             >
-                                <div className="relative min-h-[5.5rem] sm:min-h-[6rem]">
+                                <div className="relative min-h-[7rem] pb-1 sm:min-h-[7.5rem]">
+                                    <div
+                                        className={`relative z-[1] min-w-0 pr-[40%] ${gpDailyHome.namasteHeroInset}`}
+                                    >
+                                        <h2 className={`${gpDailyHome.storeHeroGreeting} relative z-10`}>
+                                            {userFirstName
+                                                ? `Namaste, ${userFirstName}!`
+                                                : "Namaste!"}
+                                        </h2>
+                                        <div className="relative z-[1]">
+                                            <p className={gpDailyHome.marketingTagline}>
+                                                We are Genda Phool! Your partner for everyday floral needs.
+                                            </p>
+                                            <p className={gpDailyHome.marketingLine}>
+                                                Order in <span className="font-bold">2hrs</span> and get
+                                            </p>
+                                            <p className={gpDailyHome.marketingLine}>
+                                                it by tomorrow <span className="font-bold">12PM!</span>
+                                            </p>
+                                        </div>
+                                    </div>
                                     <img
                                         src={truckStoreIcon}
                                         alt=""
                                         aria-hidden
-                                        className="pointer-events-none absolute -right-3 top-1/2 z-0 h-[5.5rem] w-[11rem] -translate-y-1/2 translate-x-1 object-contain object-right sm:-right-4 sm:h-[6rem] sm:w-[11.75rem] sm:translate-x-2"
+                                        className={GP_STORE_HERO_TRUCK_IMG_CLASS}
                                     />
-                                    <div className="relative z-10">
-                                        <img
-                                            src={namasteSvg}
-                                            alt="Namaste"
-                                            className="mb-1.5 h-9 w-auto max-w-[calc(100%-9.5rem)]"
-                                        />
-                                        <p className="mb-1.5 max-w-[calc(100%-9.5rem)] text-[13px] font-normal leading-[1.35] text-[#19411F] [overflow-wrap:anywhere]">
-                                            We are Genda Phool! Your partner for everyday floral needs.
-                                        </p>
-                                        <p className="whitespace-nowrap text-[12px] font-medium leading-none text-[#19411F]">
-                                            Order in <span className="font-bold">2hrs</span> and get it by tomorrow <span className="font-bold">12PM!</span>
-                                        </p>
-                                    </div>
                                 </div>
                             </motion.div>
                             )}
                         </div>
                     </div>
 
-                    {/* Pick your Blooms — equal vertical gaps: heading → row 1 → row 2 */}
-                    <div className="px-4 py-4">
+                    <div className={`px-4 pb-4 ${gpDailyHome.blockGap}`}>
+                    {/* Pick your Blooms */}
+                    <section>
                         <div className="flex flex-col gap-3">
-                        <h2 className="font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-gray-800">Pick your Blooms</h2>
+                        <h2 className={gpDailyHome.sectionHeadingWithGap}>Pick your Blooms</h2>
                         {[categories.slice(0, 4), categories.slice(4)].filter((row) => row.length > 0).map((row, rowIdx) => (
                         <div key={rowIdx} className="grid grid-cols-4 gap-x-2 xs:gap-x-2.5 sm:gap-x-3">
                             {row.map((category) => (
@@ -618,31 +635,32 @@ const GpStore_Homepage: React.FC = () => {
                         </div>
                         ))}
                         </div>
-                    </div>
+                    </section>
 
-                    <div className="px-4 py-3 xs:py-4">
+                    <div className={` mb-8 ${gpDailyHome.blockGap}`}>
                         <OffersBannerCarousel
                             storeId={storeId}
                             placement={BANNER_PLACEMENT_STORE_HOME}
+                            compactSpacing
                         />
                     </div>
 
-                    {/* all Packs Section */}
-                    <div className="px-4 py-2">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-gray-800 min-w-0 pr-2">All Packs</h2>
-                            {products.length > 0 && (
-                            <button
-                                type="button"
-                                onClick={() => navigate("/gp-store/products")}
-                                className="gp-link-row shrink-0"
-                            >
-                                <span>Explore More</span>
-                                <FaChevronRight className="text-xs" />
-                            </button>
-                            )}
-                        </div>
-                        <div className="gp-h-scroll-track">
+                    <GpDailyHomeSection
+                        title="All Packs"
+                        isFirstInGroup
+                        headerRight={
+                            products.length > 0 ? (
+                                <button
+                                    type="button"
+                                    onClick={() => navigate("/gp-store/products")}
+                                    className={gpDailyHome.exploreMore}
+                                >
+                                    <span>Explore More {">"}</span>
+                                </button>
+                            ) : null
+                        }
+                    >
+                        <div className={gpDailyHome.productStrip}>
                             {products.length > 0 ? (
                                 products.map((product) => (
                                     <div
@@ -675,7 +693,7 @@ const GpStore_Homepage: React.FC = () => {
                                                         <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(product)}</span>
                                                     )}
                                                 </p>
-                                                <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
+                                                <FaChevronRight className="mr-1.5 text-gray-400 text-sm flex-shrink-0" />
                                             </div>
                                         </div>
                                     </div>
@@ -684,24 +702,23 @@ const GpStore_Homepage: React.FC = () => {
                                 <p className="text-sm text-gray-500">No products available</p>
                             )}
                         </div>
-                    </div>
+                    </GpDailyHomeSection>
 
-                    {/* Best Section */}
-                    <div className="px-4 py-2">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-gray-800 min-w-0 pr-2">Best Sellers</h2>
-                            {filteredBestSellers.length > 0 && (
-                            <button
-                                type="button"
-                                onClick={() => navigate("/gp-store/products")}
-                                className="gp-link-row shrink-0"
-                            >
-                                <span>Explore More</span>
-                                <FaChevronRight className="text-xs" />
-                            </button>
-                            )}
-                        </div>
-                        <div className="gp-h-scroll-track">
+                    <GpDailyHomeSection
+                        title="Best Sellers"
+                        headerRight={
+                            filteredBestSellers.length > 0 ? (
+                                <button
+                                    type="button"
+                                    onClick={() => navigate("/gp-store/products")}
+                                    className={gpDailyHome.exploreMore}
+                                >
+                                    <span>Explore More {">"}</span>
+                                </button>
+                            ) : null
+                        }
+                    >
+                        <div className={gpDailyHome.productStrip}>
                             {filteredBestSellers.length > 0 ? (
                                 filteredBestSellers.map((bestSeller) => (
                                     <div
@@ -739,7 +756,7 @@ const GpStore_Homepage: React.FC = () => {
                                                         <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(bestSeller)}</span>
                                                     )}
                                                 </p>
-                                                <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
+                                                <FaChevronRight className="mr-1.5 text-gray-400 text-sm flex-shrink-0" />
                                             </div>
                                         </div>
                                     </div>
@@ -750,24 +767,23 @@ const GpStore_Homepage: React.FC = () => {
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </GpDailyHomeSection>
 
-                    {/* Premium Packs Section */}
-                    <div className="px-4 py-2">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-ibm-plex-serif text-gp-section font-semibold tracking-normal text-gray-800 min-w-0 pr-2">Premium Packs</h2>
-                            {premiumProducts.length > 0 && (
-                            <button
-                                type="button"
-                                onClick={() => navigate("/gp-store/products")}
-                                className="gp-link-row shrink-0"
-                            >
-                                <span>Explore More</span>
-                                <FaChevronRight className="text-xs" />
-                            </button>
-                            )}
-                        </div>
-                        <div className="gp-h-scroll-track">
+                    <GpDailyHomeSection
+                        title="Premium Packs"
+                        headerRight={
+                            premiumProducts.length > 0 ? (
+                                <button
+                                    type="button"
+                                    onClick={() => navigate("/gp-store/products")}
+                                    className={gpDailyHome.exploreMore}
+                                >
+                                    <span>Explore More {">"}</span>
+                                </button>
+                            ) : null
+                        }
+                    >
+                        <div className={gpDailyHome.productStrip}>
                             {premiumProducts.length > 0 ? (
                                 premiumProducts.map((product) => (
                                 <div
@@ -801,7 +817,7 @@ const GpStore_Homepage: React.FC = () => {
                                                     <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(product)}</span>
                                                 )}
                                             </p>
-                                            <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />
+                                            <FaChevronRight className="mr-1.5 text-gray-400 text-sm flex-shrink-0" />
                                         </div>
                                     </div>
                                 </div>
@@ -812,15 +828,16 @@ const GpStore_Homepage: React.FC = () => {
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </GpDailyHomeSection>
 
-                    {/* Quote of the Day Section */}
-                    <div>
+                    {/* <GpDailyHomeSection title="Quote Of The Day">
                         <img
                             src={bottomBannerSvg}
-                            alt="Quote of the Day"
-                            className="w-full h-auto"
+                            alt=""
+                            className="h-auto w-full"
+                            aria-hidden
                         />
+                    </GpDailyHomeSection> */}
                     </div>
                 </div>
 

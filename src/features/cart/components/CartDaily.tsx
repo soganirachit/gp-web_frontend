@@ -2178,7 +2178,7 @@ const Cart: React.FC = () => {
                 return (
                 <div
                   key={item.id}
-                  className="relative overflow-hidden rounded-[20px] border border-gray-200 bg-white p-4 shadow-sm"
+                  className="relative mx-0.5 mb-3 overflow-hidden rounded-[25px] bg-white p-4 shadow-sm"
                 >
                   <button
                     type="button"
@@ -2211,7 +2211,7 @@ const Cart: React.FC = () => {
                         src={item.image}
                         alt=""
                         loading="lazy"
-                        className="pointer-events-none h-[5.25rem] w-[5.25rem] rounded-2xl object-cover"
+                        className="pointer-events-none h-[5.25rem] w-[5.25rem] rounded-[16px] object-cover"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = '/placeholder.svg';
                         }}
@@ -2284,7 +2284,7 @@ const Cart: React.FC = () => {
               })}
 
               {/* Select Delivery Days — matches app `CartScreen` (dailyDeliveryCard + chips + warning) */}
-              <div className="relative mb-3.5 rounded-2xl bg-white p-3 shadow-sm" style={{ marginLeft: 2, marginRight: 2 }}>
+              <div className="relative mb-3.5 rounded-md bg-white p-3 shadow-sm" style={{ marginLeft: 2, marginRight: 2 }}>
                 <h2 className="mb-2.5 font-ibm-plex-serif text-xl font-semibold text-[#222222]">Select Delivery Days</h2>
 
                 <div className="mb-2.5 flex flex-row flex-wrap gap-2">
@@ -2298,7 +2298,7 @@ const Cart: React.FC = () => {
                           setDeliveryFrequency(opt);
                           setSelectedDays([]);
                         }}
-                        className={`min-h-[40px] min-w-0 flex-1 rounded-xl border-2 border-[#E9E6E2] px-3 py-2 text-center text-xs font-medium text-[#111827] transition-colors ${
+                        className={`min-h-[40px] min-w-0 flex-1 rounded-[12px] border-2 border-[#E9E6E2] px-3 py-2 text-center text-xs font-medium text-[#111827] transition-colors ${
                           isActive ? "border-transparent text-[#111827]" : "bg-white text-gray-500"
                         }`}
                         style={isActive ? { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary } : undefined}
@@ -2324,7 +2324,7 @@ const Cart: React.FC = () => {
                         type="button"
                         onClick={() => toggleDeliveryDay(day)}
                         disabled={isDisabled}
-                        className={`min-w-[2.4rem] flex-1 rounded-lg border-2 px-1.5 py-1.5 text-[11px] font-medium transition-colors ${
+                        className={`min-w-[2.4rem] flex-1 rounded-[8px] border-2 px-1.5 py-1.5 text-[11px] font-medium transition-colors ${
                           isSelected
                             ? "border-transparent font-bold text-[#111827]"
                             : "border-[#E9E6E2] bg-white text-gray-500"
@@ -2348,7 +2348,7 @@ const Cart: React.FC = () => {
               </div>
 
               <div className="mb-2 mt-1">
-                <div className="flex flex-row items-center gap-3 rounded-2xl border border-amber-200/80 bg-[#FFF4E5] p-4 shadow-sm">
+                <div className="flex flex-row items-center gap-3 rounded-[16px] border border-amber-200/80 bg-[#FFF4E5] p-4 shadow-sm">
                   <img
                     src={deliveryTruckIcon}
                     alt=""
@@ -2463,7 +2463,7 @@ const Cart: React.FC = () => {
 
               {/* ── Promo Code ─────────────────────────────────────────────── */}
               <div
-                className="bg-white rounded-2xl py-2.5 px-3 shadow-sm border-2"
+                className="rounded-[16px] border-2 bg-white px-3 py-2.5 shadow-sm"
                 style={{ borderColor: theme.colors.primary }}
               >
                 {appliedPromoCode ? (

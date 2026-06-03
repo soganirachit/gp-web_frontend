@@ -10,6 +10,7 @@ import { motion } from 'framer-motion';
 import { addressService, Address } from '../services/address.service';
 import { storeService, GUEST_STORE_UPDATED_EVENT } from '../services/store.service';
 import { OffersBannerCarousel } from '../components/OffersBannerCarousel';
+import { GP_LANDING_SECTION_HEADING_CLASS } from '../utils/landingHomeTypography';
 import ProfileIcon from '../assets/icon/Profile.png';
 import { SearchBar } from '../components/common/SearchBar';
 // Large assets served from public/ — no bundle impact, long-cache headers apply
@@ -419,7 +420,7 @@ const HomePage: React.FC = () => {
             transition={{ duration: 0.4, delay: 0.5 }}
             className="mb-8 sm:mb-10"
           >
-            <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">WHY CHOOSE US</h2>
+            <h2 className={GP_LANDING_SECTION_HEADING_CLASS}>WHY CHOOSE US</h2>
             <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-4 items-stretch w-full min-w-0">
               <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center min-w-0 [overflow-wrap:anywhere]">
                 <FaLeaf className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-gray-800" />
@@ -451,7 +452,7 @@ const HomePage: React.FC = () => {
             transition={{ duration: 0.4, delay: 0.6 }}
             className="mb-8 sm:mb-10"
           >
-            <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">OUR STORY</h2>
+            <h2 className={GP_LANDING_SECTION_HEADING_CLASS}>OUR STORY</h2>
             <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-200">
               <img
                 src={storyImage}
@@ -504,7 +505,7 @@ const HomePage: React.FC = () => {
             transition={{ duration: 0.4, delay: 0.7 }}
             className="mb-8 sm:mb-10"
           >
-            <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">WE ARE LOVED</h2>
+            <h2 className={GP_LANDING_SECTION_HEADING_CLASS}>WE ARE LOVED</h2>
             <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain touch-pan-x pb-2 sm:gap-4 -mx-1 px-1 min-w-0">
               {[
                 {
@@ -553,16 +554,17 @@ const HomePage: React.FC = () => {
             </div>
           </motion.div>
 
-          {/* Bottom Banner Section */}
+          {/* Flower Wisdom */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.8 }}
             className="mb-8 sm:mb-10"
           >
+            <h2 className={GP_LANDING_SECTION_HEADING_CLASS}>FLOWER WISDOM</h2>
             <img
               src={bottomBannerSvg}
-              alt="Flower Wisdom Banner"
+              alt="Flower Wisdom"
               className="w-full h-auto object-contain rounded-lg"
             />
           </motion.div>

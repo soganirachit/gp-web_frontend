@@ -228,6 +228,42 @@ class StoreService {
     }
   }
 
+  /** GET /stores/nearest/ without filtering offline — used for hero/cart offline detection. */
+  async fetchNearestStoreUnfiltered(
+    latitude: number,
+    longitude: number,
+  ): Promise<Store | null> {
+    try {
+      const response = await axios.get(`${getApiUrl()}/stores/nearest/`, {
+        params: { lat: latitude, lng: longitude },
+      });
+      if (response.data.success && response.data.data) {
+        return response.data.data as Store;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error fetching nearest store (unfiltered):", error);
+      return null;
+    }
+  }
+
+  /** Closest store by distance from GET /stores/ (includes offline rows when API returns them). */
+  async findNearestStoreForCoordinates(
+    latitude: number,
+    longitude: number,
+  ): Promise<Store | null> {
+    const list = await this.getAllStores(latitude, longitude);
+    if (!list.length) return null;
+    const sorted = [...list].sort((a, b) => {
+      const da = Number(a.distance_km);
+      const db = Number(b.distance_km);
+      const na = Number.isFinite(da) ? da : Number.POSITIVE_INFINITY;
+      const nb = Number.isFinite(db) ? db : Number.POSITIVE_INFINITY;
+      return na - nb;
+    });
+    return sorted[0] ?? null;
+  }
+
   /**
    * Online stores in a city (guest picker). Backend: GET /stores/?city=
    */

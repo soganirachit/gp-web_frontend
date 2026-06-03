@@ -1,5 +1,8 @@
 export const BANNER_PLACEMENT_STORE_HOME = "store_home" as const;
+/** Client slot id for `/home` offers carousel. */
 export const BANNER_PLACEMENT_LANDING_HOME = "landing_home" as const;
+/** API `placement` value for landing-page banners (`GET .../banners/?placement=landing`). */
+export const BANNER_PLACEMENT_LANDING = "landing" as const;
 export const BANNER_PLACEMENT_DAILY_HOME = "daily_home" as const;
 
 export type BannerPlacement =
@@ -26,10 +29,27 @@ export function filterBannersByPlacement<T extends BannerWithPlacement>(
   if (placement === BANNER_PLACEMENT_DAILY_HOME) {
     return sorted.filter((b) => b.placement === BANNER_PLACEMENT_DAILY_HOME);
   }
-  return sorted.filter(
-    (b) =>
-      !b.placement ||
-      b.placement === BANNER_PLACEMENT_LANDING_HOME ||
-      b.placement === "home",
+  return sorted.filter((b) => isLandingBannerPlacement(b.placement));
+}
+
+function normalizeBannerPlacementValue(
+  raw: string | null | undefined,
+): string {
+  return String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
+}
+
+/** Landing `/home` — API may send `landing`, legacy `landing_home`, or `home`. */
+export function isLandingBannerPlacement(
+  raw: string | null | undefined,
+): boolean {
+  const v = normalizeBannerPlacementValue(raw);
+  return (
+    !v ||
+    v === BANNER_PLACEMENT_LANDING ||
+    v === BANNER_PLACEMENT_LANDING_HOME ||
+    v === "home"
   );
 }

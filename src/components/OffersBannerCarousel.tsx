@@ -4,11 +4,14 @@ import { getStoreBanners, Banner } from '../services/store.service';
 import { useFeatureTheme } from '../context/FeatureThemeContext';
 import {
   BANNER_PLACEMENT_DAILY_HOME,
+  BANNER_PLACEMENT_LANDING,
   BANNER_PLACEMENT_LANDING_HOME,
   BANNER_PLACEMENT_STORE_HOME,
   filterBannersByPlacement,
   type BannerPlacement,
 } from '../utils/bannerPlacement';
+import { gpDailyHome } from '../utils/gpDailyHomeDesignSystem';
+import { GP_LANDING_SECTION_HEADING_CLASS } from '../utils/landingHomeTypography';
 
 interface Props {
   /** Resolved store (guest temp / logged-in selected). Omit or null = no banners request. */
@@ -17,6 +20,10 @@ interface Props {
   placement?: BannerPlacement;
   /** Tighter gap before the next homepage section (e.g. All Packs on GP Daily home). */
   compactSpacing?: boolean;
+  /** Landing / basket: section title in all caps (`OFFERS FOR YOU`). */
+  titleAllCaps?: boolean;
+  /** Use landing banner corner radius (rounded-xl) instead of store/daily pill radius. */
+  useLandingCardRadius?: boolean;
 }
 
 function parseStoreIdForBanners(raw: Props['storeId']): number | null {
@@ -66,8 +73,26 @@ export function OffersBannerCarousel({
   storeId,
   placement = BANNER_PLACEMENT_LANDING_HOME,
   compactSpacing = false,
+  titleAllCaps = false,
+  useLandingCardRadius = false,
 }: Props) {
-  const sectionMarginClass = compactSpacing ? "mb-2 sm:mb-3" : "mb-6 sm:mb-8";
+  const isDailyHome = placement === BANNER_PLACEMENT_DAILY_HOME;
+  const useGpDailySectionHeading =
+    isDailyHome ||
+    placement === BANNER_PLACEMENT_STORE_HOME ||
+    compactSpacing;
+  const sectionHeadingClass = useGpDailySectionHeading
+    ? gpDailyHome.sectionHeadingWithGap
+    : GP_LANDING_SECTION_HEADING_CLASS;
+  const sectionMarginClass =
+    compactSpacing && isDailyHome
+      ? "mb-0"
+      : compactSpacing
+        ? "mb-2 sm:mb-3"
+        : "mb-6 sm:mb-8";
+  const dailyBannerHeightClass = isDailyHome
+    ? "h-[8.75rem] min-h-[8.75rem] sm:h-[9.5rem] sm:min-h-[9.5rem]"
+    : OFFERS_BANNER_HEIGHT;
   const { theme } = useFeatureTheme();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -80,8 +105,12 @@ export function OffersBannerCarousel({
 
   const primaryColor = theme.colors.primary ?? '#19411f';
   const fallbackGradients = theme.feature === 'gpDaily' ? FALLBACK_GRADIENTS_GP_DAILY : FALLBACK_GRADIENTS_GP_STORE;
+  const sectionTitle =
+    placement === BANNER_PLACEMENT_LANDING_HOME || titleAllCaps
+      ? 'OFFERS FOR YOU'
+      : 'Offers For You';
   const cardRadiusClass =
-    placement === BANNER_PLACEMENT_LANDING_HOME
+    placement === BANNER_PLACEMENT_LANDING_HOME || useLandingCardRadius
       ? "rounded-xl sm:rounded-3xl"
       : "rounded-[40px]";
 
@@ -102,7 +131,7 @@ export function OffersBannerCarousel({
           ? BANNER_PLACEMENT_STORE_HOME
           : placement === BANNER_PLACEMENT_DAILY_HOME
             ? BANNER_PLACEMENT_DAILY_HOME
-            : undefined,
+            : BANNER_PLACEMENT_LANDING,
     })
       .then(res => {
         if (!cancelled) {
@@ -171,8 +200,10 @@ export function OffersBannerCarousel({
   if (loading) {
     return (
       <div className={`${sectionMarginClass}`}>
-        <div className="h-5 w-32 bg-gray-200 rounded animate-pulse mb-3 sm:mb-4" />
-        <div className={`w-full ${OFFERS_BANNER_HEIGHT} ${cardRadiusClass} bg-gray-200 animate-pulse`} />
+        <div
+          className={`h-5 w-32 bg-gray-200 rounded animate-pulse ${isDailyHome ? "mb-4" : "mb-3 sm:mb-4"}`}
+        />
+        <div className={`w-full ${dailyBannerHeightClass} ${cardRadiusClass} bg-gray-200 animate-pulse`} />
       </div>
     );
   }
@@ -180,15 +211,13 @@ export function OffersBannerCarousel({
   if (banners.length === 0) {
     return (
       <div className={`${sectionMarginClass} relative z-0`}>
-        <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">
-          OFFERS FOR YOU!
-        </h2>
+        <h2 className={sectionHeadingClass}>{sectionTitle}</h2>
         <div
-          className={`relative w-full ${OFFERS_BANNER_HEIGHT} ${cardRadiusClass} overflow-hidden shadow-md border border-gray-200/60 flex items-end`}
+          className={`relative w-full ${dailyBannerHeightClass} ${cardRadiusClass} overflow-hidden shadow-md border border-gray-200/60 flex items-end`}
           style={{ background: fallbackGradients[0] }}
         >
           <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent" />
-          <p className="relative z-10 p-3 sm:p-4 text-white font-semibold text-sm sm:text-base">
+          <p className="relative z-10 p-3 sm:p-4 text-xs font-medium leading-4 text-white sm:text-sm">
             New offers coming soon — check back shortly.
           </p>
         </div>
@@ -203,14 +232,12 @@ export function OffersBannerCarousel({
   return (
     <div className={`${sectionMarginClass} relative z-0`}>
       {/* Section heading — matches home page sections */}
-      <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">
-        OFFERS FOR YOU
-      </h2>
+      <h2 className={sectionHeadingClass}>{sectionTitle}</h2>
 
       {/* Banner card — theme-aligned, responsive (4/3 mobile, 16/9 tablet+), key triggers animation */}
       <div
         key={banner.id}
-        className={`relative w-full ${OFFERS_BANNER_HEIGHT} ${cardRadiusClass} overflow-hidden cursor-pointer select-none shadow-md border border-gray-200/60`}
+        className={`relative w-full ${dailyBannerHeightClass} ${cardRadiusClass} overflow-hidden cursor-pointer select-none shadow-md border border-gray-200/60`}
         style={{ animation: 'bannerFadeIn 0.4s ease-out' }}
         onClick={() => handleNavigate(banner.cta_link)}
         role="button"
@@ -253,7 +280,7 @@ export function OffersBannerCarousel({
 
           {banner.cta_label && (
             <button
-              className="flex-shrink-0 self-start sm:self-auto px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg font-semibold text-xs sm:text-sm shadow-lg whitespace-nowrap transition-opacity active:opacity-90 min-h-[44px] flex items-center justify-center"
+              className="flex-shrink-0 self-start sm:self-auto px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm shadow-lg whitespace-nowrap transition-opacity active:opacity-90 min-h-[42px] flex items-center justify-center"
               style={{
                 backgroundColor: banner.cta_bg_color || primaryColor,
                 color: theme.feature === 'gpDaily' ? '#1a1a1a' : 'white',

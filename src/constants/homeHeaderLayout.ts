@@ -25,7 +25,7 @@ export const HOME_HEADER_CHEVRON =
   "text-gray-600 flex-shrink-0 text-lg sm:text-xl";
 
 export const HOME_HEADER_PROFILE_OFFSET =
-  "translate-x-1 sm:translate-x-2";
+  "-translate-x-1 sm:-translate-x-0.5";
 
 export function formatHomeHeaderAddressDisplay(
   value: string,

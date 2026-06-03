@@ -187,12 +187,7 @@ export function formatNamasteSubscriptionStatusLine(
 /** GP Daily home Namaste row — schedule-first, then API fallback. */
 export function formatNamasteDeliveryLine(subscription: Subscription): string {
   if (subscription.status === "PAUSED") {
-    /** For paused subs the resume date IS the next delivery (API: `next_delivery_date`). */
-    const resume = getPausedResumeDate(subscription);
-    if (resume) {
-      return formatNextDeliveryDateLine(resume);
-    }
-    return "No upcoming delivery scheduled";
+    return formatPausedDeliveryLine(subscription);
   }
 
   const fromSchedule = computeNextDeliveryFromSubscribedDays(subscription);

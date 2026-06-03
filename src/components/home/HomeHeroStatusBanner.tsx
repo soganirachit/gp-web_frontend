@@ -1,5 +1,6 @@
 import React from "react";
-import { IoChevronForward, IoLocationOutline, IoMoonOutline } from "react-icons/io5";
+import { IoChevronForward, IoLocationOutline } from "react-icons/io5";
+import truckStoreIcon from "../../assets/svg/gp_store_svg/truckhome.svg";
 import {
   AREA_COMING_SOON_HERO_SUBTITLE,
   AREA_COMING_SOON_HERO_TITLE,
@@ -33,12 +34,16 @@ export const HomeHeroStatusBanner: React.FC<Props> = ({
     <>
       <span
         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
-          isOffline ? "bg-black/[0.06]" : "bg-red-500/10"
+          isOffline ? "bg-[#19411f]/15" : "bg-red-500/10"
         }`}
         aria-hidden
       >
         {isOffline ? (
-          <IoMoonOutline className="h-[24px] w-[24px] text-gray-800/70" />
+          <img
+            src={truckStoreIcon}
+            alt=""
+            className="h-6 w-10 object-contain object-center"
+          />
         ) : (
           <IoLocationOutline className="h-6 w-6 text-red-600" />
         )}

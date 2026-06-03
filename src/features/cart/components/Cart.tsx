@@ -1945,7 +1945,7 @@ const Cart: React.FC = () => {
               {items.map((item) => {
                 const lineStale = lineCartStaleByItemId[item.id];
                 return (
-                <div key={item.id} className="relative overflow-hidden rounded-[24px] border border-[#e9e5de] bg-white p-4 shadow-sm">
+                <div key={item.id} className="relative mx-0.5 mb-3 overflow-hidden rounded-[25px] bg-white p-4 shadow-sm">
                   <button
                     type="button"
                     onClick={() => void handleDeleteItem(item.id)}
@@ -1974,7 +1974,7 @@ const Cart: React.FC = () => {
                         src={item.image}
                         alt=""
                         loading="lazy"
-                        className="pointer-events-none h-[5.25rem] w-[5.25rem] flex-shrink-0 rounded-2xl object-cover"
+                        className="pointer-events-none h-[5.25rem] w-[5.25rem] flex-shrink-0 rounded-[16px] object-cover"
                         onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
                       />
                       <div className="flex min-w-0 flex-1 flex-col">
@@ -2122,7 +2122,7 @@ const Cart: React.FC = () => {
                       type="button"
                       disabled={isTodayDisabled}
                       onClick={() => handleDateOptionSelect(opt)}
-                      className={`min-h-[44px] w-full min-w-0 rounded-xl px-3 py-2.5 text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5 text-center leading-tight sm:text-sm ${
+                      className={`min-h-[44px] w-full min-w-0 rounded-[12px] px-3 py-2.5 text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5 text-center leading-tight sm:text-sm ${
                         isTodayDisabled
                           ? 'cursor-not-allowed border border-gray-200 bg-gray-50 text-gray-400'
                           : selectedDateOption === opt
@@ -2212,7 +2212,7 @@ const Cart: React.FC = () => {
                           key={slot.id}
                           type="button"
                           onClick={() => handleTimeSlotSelect(slot)}
-                          className={`w-full min-w-0 px-1.5 py-2 min-h-[36px] rounded-xl text-[10px] xs:text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                          className={`w-full min-w-0 px-1.5 py-2 min-h-[36px] rounded-[12px] text-[10px] xs:text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5 ${
                             selectedSlotId === slot.id
                               ? 'bg-[#19411F] text-white'
                               : 'bg-white text-gray-700 border border-gray-200'
@@ -2325,7 +2325,7 @@ const Cart: React.FC = () => {
               ) : null}
 
               {/* ── Promo Code ─────────────────────────────────────────────── */}
-              <div className="bg-white rounded-2xl py-2.5 px-3 shadow-sm border-2 border-[#19411F]">
+              <div className="rounded-[16px] border-2 border-[#19411F] bg-white px-3 py-2.5 shadow-sm">
                 {appliedPromoCode ? (
                   <div className="flex items-center justify-between gap-2 min-h-0">
                     <div className="flex items-center gap-2 min-w-0">

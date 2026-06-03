@@ -819,6 +819,8 @@ const ManageMySubscription: React.FC = () => {
             </p>
             {isPaused ? (
               <SubscriptionResumeButton
+                compact
+                variant="olive"
                 onClick={(ev) =>
                   void handleResumeSubscription(ev, String(subscription.id))
                 }

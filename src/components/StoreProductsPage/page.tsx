@@ -472,7 +472,7 @@ const StoreProductsPages: React.FC = () => {
           ) : (
             <>
               {/* Category Title */}
-              <h1 className="text-[clamp(1.125rem,4vw,1.5rem)] font-bold text-gray-900 mb-4 leading-tight [overflow-wrap:anywhere]">
+              <h1 className="font-ibm-plex-serif text-[clamp(1rem,3.5vw,1.25rem)] font-semibold text-gray-900 mb-4 leading-snug [overflow-wrap:anywhere]">
                 {categoryName}
               </h1>
 
