@@ -30,6 +30,9 @@ export const GP_DAILY_HOME_RHYTHM = {
 
   blockGap: 32,
 
+  /** Matches `homeSectionStackGap` (`gap-4` = 16px) between homepage sections. */
+  sectionStackGap: 16,
+
 } as const;
 
 
@@ -52,7 +55,7 @@ export function gpDailyTitleCase(value: string): string {
 
 export const gpDailyHome = {
 
-  blockGap: "mt-8",
+  // blockGap: "mt-8",
 
   headingToContent: "mb-4",
 
@@ -66,7 +69,9 @@ export const gpDailyHome = {
 
   greeting:
 
-    "font-ibm-plex-serif text-[1rem] font-bold leading-[1.3] text-[#222222] min-w-0 flex-1 pl-3 [overflow-wrap:anywhere] md:text-[1.3125rem]",
+    "font-ibm-plex-serif text-[1rem] font-bold leading-[1.3] text-[#222222] min-w-0 flex-1 [overflow-wrap:anywhere] md:text-[1.3125rem]",
+
+  namasteHeroInset: "px-3",
 
   managePill:
 
@@ -75,8 +80,6 @@ export const gpDailyHome = {
   /** Active badge + Resume CTA in Namaste subscription row (same size). */
   namasteActionChip:
     "shrink-0 inline-flex items-center justify-center gap-1 rounded-lg px-2 py-0.5 text-xs font-semibold leading-4",
-
-  namasteHeroInset: "pl-3",
 
   exploreMore: "text-[10px] font-medium leading-none text-[#808080]",
 
@@ -96,15 +99,21 @@ export const gpDailyHome = {
 
   walletRechargeBtn:
 
-    "inline-flex min-h-[34px] items-center justify-center self-start rounded-sm border border-white bg-transparent px-3 py-1 text-sm  text-white transition-opacity hover:bg-white/10",
+    "inline-flex min-h-[28px] items-center justify-center self-start rounded-sm border border-white bg-transparent px-2.5 py-0.5 text-xs font-semibold text-white transition-opacity hover:bg-white/10",
 
   namastePagination:
 
-    "-mt-2 flex w-full items-center justify-center gap-0.5 text-[#222222]",
+    "mt-1 flex w-full items-center justify-center gap-1 text-[#222222]",
 
+  /** Prev/next — desktop/laptop only; touch screens use dots only. */
   namastePaginationArrow:
 
-    "flex h-6 w-6 shrink-0 items-center justify-center text-[#222222] hover:opacity-80",
+    "hidden lg:flex h-6 w-6 shrink-0 items-center justify-center text-[#222222] hover:opacity-80",
+
+  /** Cream content below hero — equal horizontal + vertical inset. */
+  homeContentArea: "bg-[#f8f6f1] p-4",
+
+  homeSectionStackGap: "gap-4",
 
   namastePaginationDot:
 
@@ -116,7 +125,7 @@ export const gpDailyHome = {
 
   productStrip:
 
-    "flex snap-x snap-mandatory overflow-x-auto gap-3 no-scrollbar pb-4 -mx-1 px-1",
+    "flex snap-x snap-mandatory overflow-x-auto gap-3 no-scrollbar pb-4",
 
   productCol: "w-[min(44vw,10.25rem)] xs:w-[10.5rem] flex-shrink-0 snap-start",
 
@@ -143,7 +152,7 @@ export const GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS =
   "pr-[30%] sm:pr-[28%]";
 
 export const GP_DAILY_SCOOTER_HERO_IMG_CLASS =
-  "h-[4.75rem] w-[9rem] object-contain object-right sm:h-[6rem] sm:w-[11rem]";
+  "h-[5.25rem] w-[9.75rem] object-contain object-right sm:h-[6.5rem] sm:w-[11.75rem]";
 
 /** Wrapper for Daily homepage scooter (offline hero + marketing hero). */
 export const GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS =

@@ -167,10 +167,15 @@ export function formatPausedDeliveryLine(subscription: Subscription): string {
 }
 
 /** Namaste carousel — subscription status (replaces delivery time slot row). */
+function isNamastePausedStatus(status: Subscription["status"] | undefined): boolean {
+  const s = String(status ?? "").toUpperCase();
+  return s === "PAUSED" || s === "INACTIVE";
+}
+
 export function formatNamasteSubscriptionStatusLine(
   subscription: Subscription,
 ): string {
-  if (subscription.status === "PAUSED") {
+  if (isNamastePausedStatus(subscription.status)) {
     return "Paused";
   }
   if (subscription.status === "ACTIVE") {
@@ -186,7 +191,7 @@ export function formatNamasteSubscriptionStatusLine(
 
 /** GP Daily home Namaste row — schedule-first, then API fallback. */
 export function formatNamasteDeliveryLine(subscription: Subscription): string {
-  if (subscription.status === "PAUSED") {
+  if (isNamastePausedStatus(subscription.status)) {
     return formatPausedDeliveryLine(subscription);
   }
 

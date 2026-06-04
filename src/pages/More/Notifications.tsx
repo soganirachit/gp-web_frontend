@@ -11,6 +11,7 @@ import {
 } from "../../notifications/types";
 import type { NotificationItem } from "../../notifications/notificationClient";
 import { UniformPageHeader } from "../../components/layout/UniformPageHeader";
+import { HorizontalScrollSection } from "../../components/common/HorizontalScrollSection";
 
 const MODULES: Array<NotificationModule | "all"> = [
   "all",
@@ -77,7 +78,7 @@ const NotificationsPage: React.FC = () => {
     <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
       <UniformPageHeader title="Notifications" />
       <div className="px-4 pt-3 space-y-3">
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <HorizontalScrollSection trackClassName="flex gap-2 overflow-x-auto pb-1">
           {MODULES.map((m) => (
             <button
               key={m}
@@ -92,7 +93,7 @@ const NotificationsPage: React.FC = () => {
               {m === "all" ? "All" : m.charAt(0).toUpperCase() + m.slice(1)}
             </button>
           ))}
-        </div>
+        </HorizontalScrollSection>
         <div className="flex flex-wrap items-center gap-2">
           {STATUS.map((s) => (
             <button

@@ -22,6 +22,7 @@ import { ProductBrowseSkeleton } from "../common/PageSkeletons";
 import { SearchBar } from "../common/SearchBar";
 import scooterIcon from "../../assets/svg/gp_daily svg/scooter.svg";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
+import { HorizontalScrollSection } from "../common/HorizontalScrollSection";
 import { resolveGpDailyCatalogStoreId } from "../../utils/gpDailyCatalogStore";
 
 function dailySortByToApiOrdering(sortType: string): string | undefined {
@@ -335,7 +336,7 @@ const ProductBrowsePage: React.FC = () => {
           </div>
 
           <div className="px-4 pb-3 relative">
-            <div className="flex gap-2.5 overflow-x-auto no-scrollbar">
+            <HorizontalScrollSection trackClassName="flex gap-2.5 overflow-x-auto no-scrollbar">
               <button
                 type="button"
                 onClick={() => handleCategoryClick(null)}
@@ -357,7 +358,7 @@ const ProductBrowsePage: React.FC = () => {
                   {c.name}
                 </button>
               ))}
-            </div>
+            </HorizontalScrollSection>
 
             <div className="mt-2.5 flex items-center gap-2.5">
               <button

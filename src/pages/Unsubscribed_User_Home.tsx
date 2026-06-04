@@ -18,6 +18,7 @@ import Eco from '../assets/icon/Eco.png'
 import wallet from '../assets/icon/Wallet.png'
 import Profile from '../assets/icon/Profile.png'
 import { UnsubscribedHomeSkeleton } from '../components/common/PageSkeletons';
+import { HorizontalScrollSection } from '../components/common/HorizontalScrollSection';
 
 
 interface Product {
@@ -300,7 +301,7 @@ function Unsubscribed_User_Home() {
                 No flowers available at the moment
               </div>
             ) : (
-              <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
+              <HorizontalScrollSection trackClassName="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
                 {products
                   .filter(item => item.type === 'FLOWERS' && item.isAvailable)
                   .map(item => (
@@ -334,7 +335,7 @@ function Unsubscribed_User_Home() {
                       </div>
                     </div>
                   ))}
-              </div>
+              </HorizontalScrollSection>
             )}
           </div>
 
@@ -351,7 +352,7 @@ function Unsubscribed_User_Home() {
                 No leaves available at the moment
               </div>
             ) : (
-              <div className="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
+              <HorizontalScrollSection trackClassName="flex snap-x snap-mandatory overflow-x-auto gap-3 xs:gap-4 no-scrollbar pb-4 -mx-1 px-1">
                 {products
                   .filter(item => item.type === 'LEAVES' && item.isAvailable)
                   .map(item => (
@@ -385,7 +386,7 @@ function Unsubscribed_User_Home() {
                       </div>
                     </div>
                   ))}
-              </div>
+              </HorizontalScrollSection>
             )}
           </div>
         </div>

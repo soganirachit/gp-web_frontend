@@ -51,6 +51,7 @@ import flowerIcon from "../assets/svg/gp_daily svg/flower.svg";
 import bannerPng from "../assets/svg/gp_daily svg/banner.png";
 import dailyOfferImage from "../assets/svg/gp_daily svg/offer.png";
 import { OffersBannerCarousel } from "../components/OffersBannerCarousel";
+import { HorizontalScrollSection } from "../components/common/HorizontalScrollSection";
 import { BANNER_PLACEMENT_DAILY_HOME } from "../utils/bannerPlacement";
 import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
 import locationhomeIcon from "../assets/svg/gp_daily svg/locationhome.svg";
@@ -308,11 +309,16 @@ const Home2: React.FC = () => {
         /** Namaste carousel: active + paused only (same as mobile). */
         const rank = (s: (typeof fetchedSubscriptions)[0]) => {
           if (s.status === "ACTIVE") return 0;
-          if (s.status === "PAUSED") return 1;
+          if (s.status === "PAUSED" || s.status === "INACTIVE") return 1;
           return 2;
         };
         const namasteList = fetchedSubscriptions
-          .filter((sub) => sub.status === "ACTIVE" || sub.status === "PAUSED")
+          .filter(
+            (sub) =>
+              sub.status === "ACTIVE" ||
+              sub.status === "PAUSED" ||
+              sub.status === "INACTIVE",
+          )
           .sort((a, b) => {
             const d = rank(a) - rank(b);
             if (d !== 0) return d;
@@ -748,7 +754,9 @@ const Home2: React.FC = () => {
     currentNamasteCarouselSlide?.kind === "subscription"
       ? currentNamasteCarouselSlide.sub
       : null;
-  const currentNamasteSubPaused = currentNamasteSub?.status === "PAUSED";
+  const currentNamasteSubPaused =
+    currentNamasteSub?.status === "PAUSED" ||
+    currentNamasteSub?.status === "INACTIVE";
 
   const getNamasteRealIndexFromVirtual = useCallback(
     (virtualIdx: number) => {
@@ -1053,7 +1061,7 @@ const Home2: React.FC = () => {
     keySuffix: string,
   ) => (
     <div key={keySuffix} className="min-w-0 flex-1">
-      <div className={`flex flex-col justify-start gap-1 pr-1 lg:pr-2 ${gpDailyHome.namasteHeroInset}`}>
+      <div className={`flex flex-col justify-start gap-1 ${gpDailyHome.namasteHeroInset}`}>
         <div className="flex min-h-7 items-center gap-3 text-[#222222]">
           <img
             src={scooterIcon}
@@ -1095,7 +1103,7 @@ const Home2: React.FC = () => {
 
   const renderNamasteSubSlide = (sub: Subscription, keySuffix: string) => (
     <div key={keySuffix} className="min-w-0 flex-1">
-      <div className={`flex flex-col justify-start gap-1 pr-1 lg:pr-2 ${gpDailyHome.namasteHeroInset}`}>
+      <div className={`flex flex-col justify-start gap-1 ${gpDailyHome.namasteHeroInset}`}>
         <div className="flex min-h-7 items-center gap-3 text-[#222222]">
           <img
             src={flowerIcon}
@@ -1116,7 +1124,7 @@ const Home2: React.FC = () => {
                 Active
               </span>
             ) : null}
-            {sub.status === "PAUSED" ? (
+            {sub.status === "PAUSED" || sub.status === "INACTIVE" ? (
               <SubscriptionResumeButton
                 compact
                 variant="olive"
@@ -1256,7 +1264,7 @@ const Home2: React.FC = () => {
       <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
         <div className="mx-auto w-full max-w-[min(800px,100vw)]">
           <div
-            className="relative px-4 pt-4 pb-0 rounded-b-2xl overflow-hidden"
+            className="relative px-4 pt-4 pb-1 rounded-b-2xl overflow-hidden"
             style={{
               background:
                 "linear-gradient(90deg, rgba(250, 193, 20, 0.4) 0%, rgba(250, 193, 20, 0.2) 100%)",
@@ -1366,8 +1374,8 @@ const Home2: React.FC = () => {
                   }
                 />
               ) : (
-              <div className="relative mt-3 sm:mt-4">
-                <div className="mb-1.5 flex items-center justify-between gap-2 pr-1">
+              <div className="relative mt-5 sm:mt-6">
+                <div className={`mb-1.5 flex items-center justify-between gap-2 ${gpDailyHome.namasteHeroInset}`}>
                   <h2 className={gpDailyHome.greeting}>
                     {isLoggedIn
                       ? `Namaste, ${userFirstName || "User"}!`
@@ -1387,7 +1395,7 @@ const Home2: React.FC = () => {
                 </div>
 
                 {isLoggedIn && namasteCarouselLoading ? (
-                  <div className="relative mt-0.5 -mr-1 pb-1">
+                  <div className="relative mt-0.5 pb-1">
                     <div className={`relative z-10 min-w-0 ${GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS} space-y-3 ${gpDailyHome.namasteHeroInset} animate-pulse`}>
                       <div className="h-5 w-[85%] rounded bg-gray-200/80" />
                       <div className="h-5 w-[55%] rounded bg-gray-200/80" />
@@ -1404,7 +1412,7 @@ const Home2: React.FC = () => {
                   </div>
                 ) : hasNamasteSubs ? (
                   <div
-                    className={`relative mt-0.5 -mr-1 pb-1`}
+                    className="relative mt-0.5 pb-1"
                   >
                     <div className={`relative z-10 min-w-0 ${GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS} ${gpDailyHome.namasteHeroInset}`}>
                       <div
@@ -1422,9 +1430,32 @@ const Home2: React.FC = () => {
                           snoozeNamasteAutoplay();
                         }}
                       >
-                        <div
+                        <HorizontalScrollSection
                           ref={subscriptionCarouselRef}
-                          className="relative z-10 flex min-h-[5.25rem] snap-x snap-mandatory overflow-x-auto overscroll-x-contain no-scrollbar touch-pan-x [scroll-snap-stop:always]"
+                          trackClassName="relative z-10 flex min-h-[5.25rem] snap-x snap-mandatory overflow-x-auto overscroll-x-contain no-scrollbar touch-pan-x [scroll-snap-stop:always]"
+                          prevLabel="Previous subscription"
+                          nextLabel="Next subscription"
+                          hideArrows={namasteSlideCount <= 1}
+                          arrowCanGoPrev={namasteSlideCount > 1}
+                          arrowCanGoNext={namasteSlideCount > 1}
+                          onArrowPrev={() => {
+                            snoozeNamasteAutoplay();
+                            if (namasteSlideCount <= 1) return;
+                            const next =
+                              (subscriptionCarouselIndex -
+                                1 +
+                                namasteSlideCount) %
+                              namasteSlideCount;
+                            scrollSubscriptionCarouselTo(next);
+                          }}
+                          onArrowNext={() => {
+                            snoozeNamasteAutoplay();
+                            if (namasteSlideCount <= 1) return;
+                            const next =
+                              (subscriptionCarouselIndex + 1) %
+                              namasteSlideCount;
+                            scrollSubscriptionCarouselTo(next);
+                          }}
                         >
                           {namasteLoopSlides.map((item, loopIdx) => (
                             <div
@@ -1446,7 +1477,7 @@ const Home2: React.FC = () => {
                               )}
                             </div>
                           ))}
-                        </div>
+                        </HorizontalScrollSection>
                       </div>
                     </div>
                     {renderNamastePagination()}
@@ -1493,16 +1524,15 @@ const Home2: React.FC = () => {
             </div>
           </div>
 
-          <div className={`bg-[#f8f6f1] px-4 ${gpDailyHome.blockGap}`}>
+          <div
+            className={`${gpDailyHome.homeContentArea} flex flex-col ${gpDailyHome.homeSectionStackGap}`}
+          >
             <OffersBannerCarousel
               storeId={storeService.getStoreIdForProducts() ?? undefined}
               placement={BANNER_PLACEMENT_DAILY_HOME}
               compactSpacing
             />
-          </div>
 
-          {/* Main Content */}
-          <div className={`px-4 pb-4 ${gpDailyHome.blockGap}`}>
             {!isLoadingBalance &&
               isLoggedIn &&
               hasCustomerSubscription &&
@@ -1576,7 +1606,7 @@ const Home2: React.FC = () => {
               {!productsFetchError && isLoadingProducts ? (
                 <div className="h-36 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
               ) : (
-                <div className={gpDailyHome.productStrip}>
+                <HorizontalScrollSection trackClassName={gpDailyHome.productStrip}>
                   {allPackProducts.map((pack) => (
                     <div key={pack.id} className={gpDailyHome.productCol}>
                       <ProductCard
@@ -1593,7 +1623,7 @@ const Home2: React.FC = () => {
                       />
                     </div>
                   ))}
-                </div>
+                </HorizontalScrollSection>
               )}
               {!productsFetchError && !isLoadingProducts && allPackProducts.length === 0 ? (
                 <p className="text-center text-sm text-gray-500 py-2">No packs available right now.</p>
@@ -1619,7 +1649,7 @@ const Home2: React.FC = () => {
               {!productsFetchError && isLoadingProducts ? (
                 <div className="h-36 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
               ) : (
-                <div className={gpDailyHome.productStrip}>
+                <HorizontalScrollSection trackClassName={gpDailyHome.productStrip}>
                   {pujaPackProducts.map((pack) => (
                     <div key={pack.id} className={gpDailyHome.productCol}>
                       <ProductCard
@@ -1636,7 +1666,7 @@ const Home2: React.FC = () => {
                       />
                     </div>
                   ))}
-                </div>
+                </HorizontalScrollSection>
               )}
               {!productsFetchError && !isLoadingProducts && pujaPackProducts.length === 0 ? (
                 <p className="text-center text-sm text-gray-500 py-2">No Puja packs available right now.</p>
@@ -1662,7 +1692,7 @@ const Home2: React.FC = () => {
               {!productsFetchError && isLoadingProducts ? (
                 <div className="h-36 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
               ) : (
-                <div className={gpDailyHome.productStrip}>
+                <HorizontalScrollSection trackClassName={gpDailyHome.productStrip}>
                   {exoticPackProducts.map((pack) => (
                     <div key={pack.id} className={gpDailyHome.productCol}>
                       <ProductCard
@@ -1679,7 +1709,7 @@ const Home2: React.FC = () => {
                       />
                     </div>
                   ))}
-                </div>
+                </HorizontalScrollSection>
               )}
               {!productsFetchError && !isLoadingProducts && exoticPackProducts.length === 0 ? (
                 <p className="text-center text-sm text-gray-500 py-2">No exotic packs available right now.</p>
@@ -1706,7 +1736,6 @@ const Home2: React.FC = () => {
             </GpDailyHomeSection> */}
           </div>
         </div>
-
       </div>
 
       <InsufficientWalletModal

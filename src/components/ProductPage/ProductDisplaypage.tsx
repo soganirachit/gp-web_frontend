@@ -29,6 +29,7 @@ import { IoCartOutline } from "react-icons/io5";
 import { ShareNodesIcon } from "../common/ShareNodesIcon";
 import { FaChevronRight } from "react-icons/fa";
 import { ProductImageTag } from "../common/ProductImageTag";
+import { HorizontalScrollSection } from "../common/HorizontalScrollSection";
 import cautionIcon from "../../assets/svg/gp_daily svg/caution.svg";
 import deliveryTruckIcon from "../../assets/svg/gp_daily svg/delivery_truck.svg";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
@@ -1250,7 +1251,11 @@ const ProductPage: React.FC = () => {
                     </motion.div>
                   </AnimatePresence>
                 </div>
-                <div className="mt-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                <HorizontalScrollSection
+                  trackClassName="mt-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar"
+                  prevLabel="Previous image"
+                  nextLabel="Next image"
+                >
                   {catalogGallerySlides.map((img, idx) => (
                     <button
                       key={`${img.src}-${idx}`}
@@ -1276,7 +1281,7 @@ const ProductPage: React.FC = () => {
                       />
                     </button>
                   ))}
-                </div>
+                </HorizontalScrollSection>
                 <div className="mt-2 flex justify-center gap-1.5" aria-hidden>
                   {catalogGallerySlides.map((_, idx) => (
                     <span
@@ -1366,7 +1371,7 @@ const ProductPage: React.FC = () => {
                   <div className="mb-2.5">
                     <span className="text-base font-medium text-[#111827]">Select Size</span>
                   </div>
-                  <div className="-mx-1 overflow-x-auto pb-2 no-scrollbar">
+                  <HorizontalScrollSection trackClassName="-mx-1 overflow-x-auto pb-2 no-scrollbar">
                     <div className="flex min-w-max gap-3 px-1">
                       {getActiveVariants().map((variant: any) => {
                         const chipSale = Number(
@@ -1412,7 +1417,7 @@ const ProductPage: React.FC = () => {
                         );
                       })}
                     </div>
-                  </div>
+                  </HorizontalScrollSection>
                 </div>
               )}
               <div className="mt-5">
@@ -1487,7 +1492,7 @@ const ProductPage: React.FC = () => {
               </div>
               <div className="mt-4">
                 <h3 className="mb-3 text-base font-semibold text-gray-900">Includes</h3>
-                <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2 no-scrollbar">
+                <HorizontalScrollSection trackClassName="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2 no-scrollbar">
                   {bomDisplayRows.length > 0
                     ? bomDisplayRows.map((row) => (
                         <span
@@ -1505,7 +1510,7 @@ const ProductPage: React.FC = () => {
                           {label}
                         </span>
                       ))}
-                </div>
+                </HorizontalScrollSection>
                 {bomDisplayRows.length === 0 && getIncludesFallbackLabels().length === 0 && (
                   <p className="text-sm text-gray-500">No ingredient list for this product.</p>
                 )}
@@ -1519,7 +1524,7 @@ const ProductPage: React.FC = () => {
           {combineProducts.length > 0 && (
             <div className="mt-6">
               <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-3 sm:mb-4">Combine with</h3>
-              <div className="flex overflow-x-auto gap-3 sm:gap-4 pb-2 no-scrollbar">
+              <HorizontalScrollSection trackClassName="flex overflow-x-auto gap-3 sm:gap-4 pb-2 no-scrollbar">
                 {combineProducts.map((item) => {
                   const itemImage = resolveProductImageUrl(item as unknown as Record<string, unknown>);
                   const itemQty = combineQuantities[item.id] || 0;
@@ -1575,7 +1580,7 @@ const ProductPage: React.FC = () => {
                     </div>
                   );
                 })}
-              </div>
+              </HorizontalScrollSection>
             </div>
           )}
 
@@ -1754,7 +1759,7 @@ const ProductPage: React.FC = () => {
                   <FaChevronRight className={`${gpDailyHome.exploreMore} opacity-80`} />
                 </button>
               </div>
-              <div className="gp-h-scroll-track">
+              <HorizontalScrollSection trackClassName="gp-h-scroll-track">
                 {bestSellers.map((item) => (
                   <div
                     key={item.id ?? item.slug}
@@ -1806,7 +1811,7 @@ const ProductPage: React.FC = () => {
                     </div>
                   </div>
                 ))}
-              </div>
+              </HorizontalScrollSection>
             </div>
           )}
         </div>

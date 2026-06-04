@@ -2513,7 +2513,7 @@ const Cart: React.FC = () => {
 
               {/* Order Summary */}
               <div className="bg-white rounded-[25px] p-4 shadow-sm">
-                <h3 className="text-base font-semibold text-gray-900 mb-4">Order Summary</h3>
+                <h3 className="font-ibm-plex-serif text-base font-semibold text-gray-900 mb-4">Order Summary</h3>
                 <div className="space-y-2 mb-4">
                   <div className="flex justify-between text-sm text-gray-700">
                     <span>Subtotal</span>
@@ -2558,9 +2558,9 @@ const Cart: React.FC = () => {
                   )}
                 </div>
                 <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-                  <span className="text-lg font-bold text-gray-900">Total</span>
-                  <span className="text-xl font-bold" style={{ color: theme.colors.primary }}>
-                    ₹{total.toLocaleString('en-IN')}
+                  <span className="font-ibm-plex-serif text-lg font-bold text-gray-900">Total</span>
+                  <span className="font-ibm-plex-serif text-lg font-semibold" style={{ color: theme.colors.primary }}>
+                    ₹{total.toLocaleString('en-IN')}/Delivery
                   </span>
                 </div>
               </div>

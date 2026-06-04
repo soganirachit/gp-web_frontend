@@ -76,36 +76,68 @@ export function GpDailyHomeSkeleton() {
     <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
       <div className={shell}>
         <div
-          className="relative px-4 pt-0 pb-6"
+          className="relative overflow-hidden rounded-b-2xl px-4 pt-4 pb-1"
           style={{
             background:
-              "linear-gradient(to bottom, rgba(250, 193, 20, 0.8), rgba(250, 193, 20, 0.4))",
-            minHeight: "clamp(200px, 38vw, 260px)",
+              "linear-gradient(90deg, rgba(250, 193, 20, 0.4) 0%, rgba(250, 193, 20, 0.2) 100%)",
           }}
         >
-          <div className="flex justify-between items-start pt-3 mb-4">
-            <Pulse className="h-9 w-40 rounded-xl" />
-            <Pulse className="h-9 w-9 rounded-full" />
-          </div>
-          <Pulse className="h-11 w-full rounded-xl" />
-          <Pulse className="mt-4 h-5 w-36 rounded" />
-        </div>
-        <div className="px-4 mt-8 space-y-8">
-          <div>
-            <Pulse className="h-5 w-28 rounded mb-4" />
-            <Pulse className="h-[8.75rem] w-full rounded-[2rem]" />
-          </div>
-          <div>
-            <Pulse className="h-5 w-24 rounded mb-4" />
-            <div className="flex gap-3 overflow-hidden">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Pulse
-                  key={i}
-                  className="h-52 w-[10.25rem] shrink-0 rounded-2xl"
-                />
-              ))}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1 space-y-2">
+              <Pulse className="h-3 w-16 rounded" />
+              <Pulse className="h-3.5 w-[88%] rounded" />
             </div>
+            <Pulse className="h-10 w-10 shrink-0 rounded-full" />
           </div>
+          <Pulse className="mt-1.5 h-11 w-full rounded-xl" />
+          <div className="relative mt-4 min-h-[7rem]">
+            <div className="relative z-10 space-y-3 pl-3 pr-2">
+              <div className="flex items-center justify-between gap-2">
+                <Pulse className="h-5 w-40 rounded" />
+                <Pulse className="h-7 w-16 rounded-sm" />
+              </div>
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-3">
+                  <Pulse className="h-3.5 w-3.5 shrink-0 rounded-full" />
+                  <Pulse className="h-3.5 flex-1 rounded" />
+                  <Pulse className="h-6 w-14 shrink-0 rounded-lg" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Pulse className="h-3.5 w-3.5 shrink-0 rounded-full" />
+                  <Pulse className="h-3.5 w-[72%] rounded" />
+                </div>
+              </div>
+              <div className="flex items-center justify-center gap-1.5 pt-1">
+                <Pulse className="h-2 w-5 rounded-full" />
+                <Pulse className="h-1.5 w-1.5 rounded-full" />
+                <Pulse className="h-1.5 w-1.5 rounded-full" />
+              </div>
+            </div>
+            <Pulse className="pointer-events-none absolute right-0 top-1/2 h-[4.75rem] w-[9rem] -translate-y-1/2 rounded-xl sm:h-24 sm:w-44" />
+          </div>
+        </div>
+        <div className="flex flex-col gap-4 bg-[#f8f6f1] p-4">
+          <div>
+            <Pulse className="mb-4 h-5 w-32 rounded" />
+            <Pulse className="h-36 w-full rounded-2xl sm:h-40" />
+          </div>
+          {["All Packs", "Puja Packs", "Exotic Packs"].map((label) => (
+            <div key={label}>
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <Pulse className="h-5 w-28 rounded" />
+                <Pulse className="h-3 w-20 rounded" />
+              </div>
+              <div className="flex gap-3 overflow-hidden">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Pulse
+                    key={i}
+                    className="h-52 w-[10.25rem] shrink-0 rounded-2xl"
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+          <Pulse className="h-10 w-full rounded-xl" />
         </div>
       </div>
     </div>

@@ -166,7 +166,7 @@ const Login = () => {
                 {/* Form Section */}
                 <div className="px-4 sm:px-6 md:px-8 pb-4 sm:pb-6 md:pb-8">
                     <div className="mb-6 sm:mb-8 text-center">
-                        <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-gray-800 mb-1.5 sm:mb-2">
+                        <h1 className="font-ibm-plex-serif text-2xl sm:text-3xl font-semibold text-gray-800 mb-1.5 sm:mb-2">
                             Get Started
                         </h1>
                         <p className="text-sm sm:text-base text-gray-600 font-normal px-2">

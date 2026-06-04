@@ -1,5 +1,6 @@
 import React from "react";
 import type { SajawatGalleryCategory } from "../../services/sajawat.service";
+import { HorizontalScrollSection } from "../common/HorizontalScrollSection";
 
 export const ALL_CATEGORY_ID = 0;
 
@@ -14,7 +15,7 @@ export const SajawatCategoryChips: React.FC<Props> = ({
   selectedId,
   onSelect,
 }) => (
-  <div className="flex gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+  <HorizontalScrollSection trackClassName="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
     <button
       type="button"
       onClick={() => onSelect(ALL_CATEGORY_ID)}
@@ -45,5 +46,5 @@ export const SajawatCategoryChips: React.FC<Props> = ({
         </button>
       );
     })}
-  </div>
+  </HorizontalScrollSection>
 );

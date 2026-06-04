@@ -11,6 +11,7 @@ import {
   type BannerPlacement,
 } from '../utils/bannerPlacement';
 import { gpDailyHome } from '../utils/gpDailyHomeDesignSystem';
+import { DesktopHorizontalNavButtons } from './common/HorizontalScrollSection';
 import { GP_LANDING_SECTION_HEADING_CLASS } from '../utils/landingHomeTypography';
 
 interface Props {
@@ -235,6 +236,23 @@ export function OffersBannerCarousel({
       <h2 className={sectionHeadingClass}>{sectionTitle}</h2>
 
       {/* Banner card — theme-aligned, responsive (4/3 mobile, 16/9 tablet+), key triggers animation */}
+      <div className="relative">
+        {banners.length > 1 ? (
+          <DesktopHorizontalNavButtons
+            canScrollLeft
+            canScrollRight
+            prevLabel="Previous offer"
+            nextLabel="Next offer"
+            onPrev={() =>
+              handleManualSlide(
+                (activeIndex - 1 + banners.length) % banners.length,
+              )
+            }
+            onNext={() =>
+              handleManualSlide((activeIndex + 1) % banners.length)
+            }
+          />
+        ) : null}
       <div
         key={banner.id}
         className={`relative w-full ${dailyBannerHeightClass} ${cardRadiusClass} overflow-hidden cursor-pointer select-none shadow-md border border-gray-200/60`}
@@ -291,6 +309,7 @@ export function OffersBannerCarousel({
             </button>
           )}
         </div>
+      </div>
       </div>
 
       {/* Dot indicators — theme primary, only when more than 1 banner */}

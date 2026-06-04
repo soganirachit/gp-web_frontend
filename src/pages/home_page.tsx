@@ -10,7 +10,13 @@ import { motion } from 'framer-motion';
 import { addressService, Address } from '../services/address.service';
 import { storeService, GUEST_STORE_UPDATED_EVENT } from '../services/store.service';
 import { OffersBannerCarousel } from '../components/OffersBannerCarousel';
-import { GP_LANDING_SECTION_HEADING_CLASS } from '../utils/landingHomeTypography';
+import { HorizontalScrollSection } from '../components/common/HorizontalScrollSection';
+import {
+  GP_LANDING_FLOWER_WISDOM_IMAGE_CLASS,
+  GP_LANDING_FLOWER_WISDOM_MEDIA_CLASS,
+  GP_LANDING_FLOWER_WISDOM_SKELETON_CLASS,
+  GP_LANDING_SECTION_HEADING_CLASS,
+} from '../utils/landingHomeTypography';
 import ProfileIcon from '../assets/icon/Profile.png';
 import { SearchBar } from '../components/common/SearchBar';
 // Large assets served from public/ — no bundle impact, long-cache headers apply
@@ -41,6 +47,10 @@ import {
   GUEST_HEADER_LOCATION_TITLE,
   GUEST_LOCATION_UNAVAILABLE_HINT,
 } from '../utils/guestHeaderLocation';
+import {
+  landingService,
+  type LandingCustomerReview,
+} from '../services/landing.service';
 import {
   formatHomeHeaderAddressDisplay,
   HOME_HEADER_ADDRESS_LINE,
@@ -76,6 +86,10 @@ const HomePage: React.FC = () => {
   const [addressType, setAddressType] = useState<string>('Home');
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [isStoryExpanded, setIsStoryExpanded] = useState(false);
+  const [customerReviews, setCustomerReviews] = useState<LandingCustomerReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [flowerWisdomImageUrl, setFlowerWisdomImageUrl] = useState<string | null>(null);
+  const [flowerWisdomLoading, setFlowerWisdomLoading] = useState(true);
   const [offersStoreId, setOffersStoreId] = useState<number | null>(() =>
     storeService.getStoreIdForProducts(),
   );
@@ -154,6 +168,34 @@ const HomePage: React.FC = () => {
       window.removeEventListener('addressUpdated', handleAddressUpdate);
     };
   }, [fetchLatestAddress]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadLandingContent = async () => {
+      setReviewsLoading(true);
+      setFlowerWisdomLoading(true);
+      try {
+        const [reviews, wisdom] = await Promise.all([
+          landingService.getCustomerReviews(),
+          landingService.getFlowerWisdom(),
+        ]);
+        if (cancelled) return;
+        setCustomerReviews(reviews);
+        setFlowerWisdomImageUrl(wisdom.image_url);
+      } finally {
+        if (!cancelled) {
+          setReviewsLoading(false);
+          setFlowerWisdomLoading(false);
+        }
+      }
+    };
+
+    void loadLandingContent();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleLocationClick = () => {
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
@@ -514,52 +556,51 @@ const HomePage: React.FC = () => {
             className="mb-8 sm:mb-10"
           >
             <h2 className={GP_LANDING_SECTION_HEADING_CLASS}>WE ARE LOVED</h2>
-            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain touch-pan-x pb-2 sm:gap-4 -mx-1 px-1 min-w-0">
-              {[
-                {
-                  name: "Priya S.",
-                  rating: 5,
-                  review: "Fresh flowers delivered on time every day. Perfect for our morning puja!"
-                },
-                {
-                  name: "Rajesh K.",
-                  rating: 5,
-                  review: "Excellent service! The flowers are always fresh and beautifully arranged."
-                },
-                {
-                  name: "Anita M.",
-                  rating: 5,
-                  review: "Love the subscription plans. Makes my home look beautiful every day."
-                },
-                {
-                  name: "Suresh P.",
-                  rating: 5,
-                  review: "Best floral service in town. Highly recommend to everyone!"
-                },
-                {
-                  name: "Meera R.",
-                  rating: 5,
-                  review: "Amazing customer support and the quality of flowers is outstanding."
-                }
-              ].map((review, index) => (
-                <div
-                  key={index}
-                  className="w-[min(85vw,11rem)] xs:w-[min(180px,42vw)] sm:w-[200px] min-h-[140px] sm:min-h-[160px] snap-start bg-white rounded-xl p-3 sm:p-4 shadow-md flex-shrink-0 min-w-0 max-w-[100%] [overflow-wrap:anywhere]"
-                >
-                  <div className="flex items-center justify-between mb-2 sm:mb-3">
-                    <span className="font-bold text-gray-800 text-sm sm:text-base">{review.name}</span>
-                    <div className="flex gap-1">
-                      {[...Array(review.rating)].map((_, i) => (
-                        <span key={i} className="text-[#FAA222] text-xs sm:text-sm">★</span>
-                      ))}
-                    </div>
+            {reviewsLoading ? (
+              <HorizontalScrollSection
+                trackClassName="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:gap-4 -mx-1 px-1 min-w-0"
+                prevLabel="Previous review"
+                nextLabel="Next review"
+              >
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div
+                    key={`review-skel-${index}`}
+                    className="w-[min(85vw,11rem)] xs:w-[min(180px,42vw)] sm:w-[200px] min-h-[140px] sm:min-h-[160px] snap-start bg-white rounded-xl p-3 sm:p-4 shadow-md flex-shrink-0 animate-pulse"
+                  >
+                    <div className="mb-3 h-4 w-2/3 rounded bg-gray-200" />
+                    <div className="mb-2 h-3 w-full rounded bg-gray-200" />
+                    <div className="h-3 w-[88%] rounded bg-gray-200" />
                   </div>
-                  <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">
-                    "{review.review}"
-                  </p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </HorizontalScrollSection>
+            ) : customerReviews.length === 0 ? (
+              <p className="text-sm text-gray-500">Customer reviews will appear here soon.</p>
+            ) : (
+              <HorizontalScrollSection
+                trackClassName="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain touch-pan-x pb-2 sm:gap-4 -mx-1 px-1 min-w-0"
+                prevLabel="Previous review"
+                nextLabel="Next review"
+              >
+                {customerReviews.map((review, index) => (
+                  <div
+                    key={`${review.name}-${index}`}
+                    className="w-[min(85vw,11rem)] xs:w-[min(180px,42vw)] sm:w-[200px] min-h-[140px] sm:min-h-[160px] snap-start bg-white rounded-xl p-3 sm:p-4 shadow-md flex-shrink-0 min-w-0 max-w-[100%] [overflow-wrap:anywhere]"
+                  >
+                    <div className="flex items-center justify-between mb-2 sm:mb-3">
+                      <span className="font-bold text-gray-800 text-sm sm:text-base">{review.name}</span>
+                      <div className="flex gap-1">
+                        {[...Array(review.rating)].map((_, i) => (
+                          <span key={i} className="text-[#FAA222] text-xs sm:text-sm">★</span>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">
+                      &ldquo;{review.review}&rdquo;
+                    </p>
+                  </div>
+                ))}
+              </HorizontalScrollSection>
+            )}
           </motion.div>
 
           {/* Flower Wisdom */}
@@ -570,11 +611,20 @@ const HomePage: React.FC = () => {
             className="mb-8 sm:mb-10"
           >
             <h2 className={GP_LANDING_SECTION_HEADING_CLASS}>FLOWER WISDOM</h2>
-            <img
-              src={bottomBannerSvg}
-              alt="Flower Wisdom"
-              className="w-full h-auto object-contain rounded-lg"
-            />
+            {flowerWisdomLoading ? (
+              <div
+                className={GP_LANDING_FLOWER_WISDOM_SKELETON_CLASS}
+                aria-hidden
+              />
+            ) : (
+              <div className={GP_LANDING_FLOWER_WISDOM_MEDIA_CLASS}>
+                <img
+                  src={flowerWisdomImageUrl ?? bottomBannerSvg}
+                  alt="Flower Wisdom"
+                  className={GP_LANDING_FLOWER_WISDOM_IMAGE_CLASS}
+                />
+              </div>
+            )}
           </motion.div>
 
           {/* Branding Section */}

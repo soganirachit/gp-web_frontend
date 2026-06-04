@@ -8,6 +8,7 @@ import {
 } from "../../services/sajawat.service";
 import { SajawatGalleryMediaTile } from "./SajawatGalleryMediaTile";
 import { SajawatMediaFullscreen } from "./SajawatMediaFullscreen";
+import { HorizontalScrollSection } from "../common/HorizontalScrollSection";
 
 export const SajawatGallery: React.FC = () => {
   const navigate = useNavigate();
@@ -54,7 +55,7 @@ export const SajawatGallery: React.FC = () => {
           />
         </div>
       ) : (
-        <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <HorizontalScrollSection trackClassName="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 no-scrollbar">
           {previewItems.length > 0 ? (
             previewItems.map((item) => (
               <SajawatGalleryMediaTile
@@ -74,7 +75,7 @@ export const SajawatGallery: React.FC = () => {
               />
             ))
           )}
-        </div>
+        </HorizontalScrollSection>
       )}
     </section>
   );

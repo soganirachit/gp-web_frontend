@@ -8,7 +8,7 @@ type Props = {
   title: string;
   headerRight?: ReactNode;
   children: ReactNode;
-  /** Skips top block gap (32px) — first section in a group. */
+  /** Legacy — spacing comes from parent `homeSectionStackGap` (gap-4). */
   isFirstInGroup?: boolean;
 };
 
@@ -19,10 +19,9 @@ export function GpDailyHomeSection({
   title,
   headerRight,
   children,
-  isFirstInGroup = false,
 }: Props) {
   return (
-    <section className={!isFirstInGroup ? gpDailyHome.blockGap : undefined}>
+    <section>
       <div
         className={`flex items-center justify-between gap-2 min-w-0 ${gpDailyHome.headingToContent}`}
       >

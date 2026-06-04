@@ -20,6 +20,7 @@ import { GUEST_STORE_UPDATED_EVENT, storeService } from "../../services/store.se
 import { getApiUrl } from "../../config/api.config";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
+import { HorizontalScrollSection } from "../common/HorizontalScrollSection";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
 
 function storeSortByToApiOrdering(sortType: string): string | undefined {
@@ -360,7 +361,7 @@ const StoreProductsPages: React.FC = () => {
 
           {/* Category chips — sizing matches Sort/Filter below */}
           <div className="px-4 pb-3">
-            <div className="flex gap-2.5 overflow-x-auto no-scrollbar">
+            <HorizontalScrollSection trackClassName="flex gap-2.5 overflow-x-auto no-scrollbar">
               <button
                 type="button"
                 onClick={() => handleCategoryClick(null)}
@@ -382,7 +383,7 @@ const StoreProductsPages: React.FC = () => {
                   {category.name}
                 </button>
               ))}
-            </div>
+            </HorizontalScrollSection>
 
             {/* Sort (filter button commented out until wired) — same padding/typography as category chips */}
             <div className="mt-2.5 flex items-center gap-2.5">

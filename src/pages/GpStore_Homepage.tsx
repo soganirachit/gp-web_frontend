@@ -76,6 +76,7 @@ import {
 } from "../constants/homeHeaderLayout";
 import { ProductImageTag } from "../components/common/ProductImageTag";
 import { OffersBannerCarousel } from "../components/OffersBannerCarousel";
+import { HorizontalScrollSection } from "../components/common/HorizontalScrollSection";
 import { BANNER_PLACEMENT_STORE_HOME } from "../utils/bannerPlacement";
 
 // Note: If truckstore.svg doesn't exist, rename truckhome.svg to truckstore.svg
@@ -586,7 +587,9 @@ const GpStore_Homepage: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className={`px-4 pb-4 ${gpDailyHome.blockGap}`}>
+                    <div
+                        className={`${gpDailyHome.homeContentArea} flex flex-col ${gpDailyHome.homeSectionStackGap}`}
+                    >
                     {/* Pick your Blooms */}
                     <section>
                         <div className="flex flex-col gap-3">
@@ -639,13 +642,11 @@ const GpStore_Homepage: React.FC = () => {
                         </div>
                     </section>
 
-                    <div className={` mb-8 ${gpDailyHome.blockGap}`}>
-                        <OffersBannerCarousel
-                            storeId={storeId}
-                            placement={BANNER_PLACEMENT_STORE_HOME}
-                            compactSpacing
-                        />
-                    </div>
+                    <OffersBannerCarousel
+                        storeId={storeId}
+                        placement={BANNER_PLACEMENT_STORE_HOME}
+                        compactSpacing
+                    />
 
                     <GpDailyHomeSection
                         title="All Packs"
@@ -662,7 +663,7 @@ const GpStore_Homepage: React.FC = () => {
                             ) : null
                         }
                     >
-                        <div className={gpDailyHome.productStrip}>
+                        <HorizontalScrollSection trackClassName={gpDailyHome.productStrip}>
                             {products.length > 0 ? (
                                 products.map((product) => (
                                     <div
@@ -703,7 +704,7 @@ const GpStore_Homepage: React.FC = () => {
                             ) : (
                                 <p className="text-sm text-gray-500">No products available</p>
                             )}
-                        </div>
+                        </HorizontalScrollSection>
                     </GpDailyHomeSection>
 
                     <GpDailyHomeSection
@@ -720,7 +721,7 @@ const GpStore_Homepage: React.FC = () => {
                             ) : null
                         }
                     >
-                        <div className={gpDailyHome.productStrip}>
+                        <HorizontalScrollSection trackClassName={gpDailyHome.productStrip}>
                             {filteredBestSellers.length > 0 ? (
                                 filteredBestSellers.map((bestSeller) => (
                                     <div
@@ -768,7 +769,7 @@ const GpStore_Homepage: React.FC = () => {
                                     No best sellers available
                                 </div>
                             )}
-                        </div>
+                        </HorizontalScrollSection>
                     </GpDailyHomeSection>
 
                     <GpDailyHomeSection
@@ -785,7 +786,7 @@ const GpStore_Homepage: React.FC = () => {
                             ) : null
                         }
                     >
-                        <div className={gpDailyHome.productStrip}>
+                        <HorizontalScrollSection trackClassName={gpDailyHome.productStrip}>
                             {premiumProducts.length > 0 ? (
                                 premiumProducts.map((product) => (
                                 <div
@@ -829,7 +830,7 @@ const GpStore_Homepage: React.FC = () => {
                                     No premium products available
                                 </div>
                             )}
-                        </div>
+                        </HorizontalScrollSection>
                     </GpDailyHomeSection>
 
                     {/* <GpDailyHomeSection title="Quote Of The Day">

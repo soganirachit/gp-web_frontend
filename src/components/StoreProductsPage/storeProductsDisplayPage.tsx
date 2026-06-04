@@ -31,6 +31,7 @@ import { useAuth } from "../../context/AuthContext";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { gpDailyHome } from "../../utils/gpDailyHomeDesignSystem";
 import { ProductImageTag } from "../common/ProductImageTag";
+import { HorizontalScrollSection } from "../common/HorizontalScrollSection";
 import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
 import {
   extractCartStockApiMessage,
@@ -850,7 +851,11 @@ const StorePage: React.FC = () => {
             {/* Thumbnails + pagination dots (dots sit below thumbnails, right-aligned — matches product UI) */}
             {orderedImages.length > 1 && (
               <>
-                <div className="mt-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                <HorizontalScrollSection
+                  trackClassName="mt-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar"
+                  prevLabel="Previous image"
+                  nextLabel="Next image"
+                >
                   {orderedImages.map((img, idx) => (
                     <button
                       key={idx}
@@ -874,7 +879,7 @@ const StorePage: React.FC = () => {
                       />
                     </button>
                   ))}
-                </div>
+                </HorizontalScrollSection>
                 <div
                   className="mt-2 flex justify-center gap-1.5"
                   aria-hidden
@@ -966,7 +971,7 @@ const StorePage: React.FC = () => {
               <div className="mb-3">
                 <span className="text-base font-medium text-gray-900">Select Size</span>
               </div>
-              <div className="overflow-x-auto pb-2 -mx-1 no-scrollbar">
+              <HorizontalScrollSection trackClassName="overflow-x-auto pb-2 -mx-1 no-scrollbar">
                 <div className="flex gap-3 min-w-max">
                 {getActiveVariants().map((variant: any) => {
                   const chipSale = Number(
@@ -1012,7 +1017,7 @@ const StorePage: React.FC = () => {
                   );
                 })}
                 </div>
-              </div>
+              </HorizontalScrollSection>
             </div>
           )}
 
@@ -1229,7 +1234,7 @@ const StorePage: React.FC = () => {
                   <FaChevronRight className={`${gpDailyHome.exploreMore} opacity-80`} />
                 </button>
               </div>
-              <div className="gp-h-scroll-track">
+              <HorizontalScrollSection trackClassName="gp-h-scroll-track">
                 {relatedProducts.map((item) => (
                   <div
                     key={item.id || item.slug}
@@ -1276,7 +1281,7 @@ const StorePage: React.FC = () => {
                     </div>
                   </div>
                 ))}
-              </div>
+              </HorizontalScrollSection>
             </div>
           )}
         </div>

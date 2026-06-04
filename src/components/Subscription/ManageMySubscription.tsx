@@ -1023,7 +1023,7 @@ const ManageMySubscription: React.FC = () => {
                               {rowTitle}
                             </p>
                             <span
-                              className={`shrink-0 rounded-full px-2.5 py-0.5 text-sm font-semibold ${
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${
                                 delivered
                                   ? "bg-[#DCFCE7] text-[#166534]"
                                   : undelivered
