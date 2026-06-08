@@ -76,7 +76,7 @@ export function GpDailyHomeSkeleton() {
     <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
       <div className={shell}>
         <div
-          className="relative overflow-hidden rounded-b-2xl px-4 pt-4 pb-1"
+          className="relative overflow-hidden rounded-b-2xl px-4 pt-0 pb-1"
           style={{
             background:
               "linear-gradient(90deg, rgba(250, 193, 20, 0.4) 0%, rgba(250, 193, 20, 0.2) 100%)",

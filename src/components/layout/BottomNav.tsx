@@ -227,7 +227,7 @@ const BottomNav: React.FC = () => {
         className="fixed bottom-0 left-0 right-0 z-50 w-full pointer-events-none"
         data-testid="gp-bottom-nav"
       >
-        <div className="w-full max-w-none bg-white shadow-lg rounded-none pointer-events-auto overflow-visible pb-[env(safe-area-inset-bottom,0px)]">
+        <div className="w-full max-w-[min(800px,100vw)] mx-auto bg-white shadow-lg rounded-none pointer-events-auto overflow-visible pb-[env(safe-area-inset-bottom,0px)]">
           <div className="flex min-h-[56px] items-center justify-between px-3 py-2.5 pt-2.5">
             <Link
               to="/home"

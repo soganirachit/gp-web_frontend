@@ -24,16 +24,19 @@ export const GP_DAILY_HOME_COLORS = {
 
 export const GP_DAILY_HOME_RHYTHM = {
 
-  sectionToHeading: 24,
+  sectionToHeading: 16,
 
-  headingToContent: 16,
+  headingToContent: 12,
 
-  blockGap: 32,
+  blockGap: 24,
 
-  /** Matches `homeSectionStackGap` (`gap-4` = 16px) between homepage sections. */
-  sectionStackGap: 16,
+  /** Matches `homeSectionStackGap` (`gap-3` = 12px) between homepage sections. */
+  sectionStackGap: 12,
 
 } as const;
+
+/** GP Daily brand orange — pagination, hero accents. */
+export const GP_DAILY_PRIMARY_ORANGE = "#DD7600";
 
 
 
@@ -57,15 +60,22 @@ export const gpDailyHome = {
 
   // blockGap: "mt-8",
 
-  headingToContent: "mb-4",
+  headingToContent: "mb-3",
 
   sectionHeading:
 
-    "font-ibm-plex-serif text-[1.125rem] leading-6 font-semibold tracking-normal text-[#222222] md:text-[1rem] md:leading-7",
+    "font-sans text-[1rem] leading-6 font-semibold tracking-normal text-[#222222] md:text-[1rem] md:leading-7",
 
   sectionHeadingWithGap:
 
-    "font-ibm-plex-serif text-[1.125rem] leading-6 font-semibold tracking-normal text-[#222222] mb-4 md:text-[1rem] md:leading-7",
+    "font-sans text-[1rem] leading-6 font-semibold tracking-normal text-[#222222] mb-3 md:text-[1rem] md:leading-7",
+
+  sectionHeadingSans:
+
+    "font-sans text-[1rem] leading-6 font-semibold tracking-normal text-[#222222] md:text-[1rem] md:leading-7",
+
+  namasteCarouselTrack:
+    "relative z-10 flex min-h-0 snap-x snap-mandatory overflow-x-auto overscroll-x-contain no-scrollbar touch-pan-x [scroll-snap-stop:always]",
 
   greeting:
 
@@ -103,25 +113,36 @@ export const gpDailyHome = {
 
   namastePagination:
 
-    "mt-1 flex w-full items-center justify-center gap-1 text-[#222222]",
+    "mt-[5px] flex w-full items-center justify-center gap-1 text-[#DD7600]",
 
-  /** Prev/next — desktop/laptop only; touch screens use dots only. */
+  /** Icon + label rows — shared column alignment in hero. */
+  namasteDetailRow:
+    "flex min-h-7 items-center gap-3 text-[#222222]",
+
+  namastePackNameRow:
+    "flex min-w-0 flex-1 items-center gap-[5px] overflow-hidden",
+
+  /** Pack label beside status badge — no flex-1 so badge sits flush after name. */
+  namastePackName:
+    "font-ibm-plex-serif min-w-0 shrink truncate text-xs font-normal leading-4 text-[#222222] md:text-[0.8125rem] md:leading-[1.125rem]",
+
+  /** Prev/next beside dots — laptop+ only; GP Daily primary orange. */
   namastePaginationArrow:
 
-    "hidden lg:flex h-6 w-6 shrink-0 items-center justify-center text-[#222222] hover:opacity-80",
+    "hidden lg:flex h-6 w-6 shrink-0 items-center justify-center text-[#DD7600] hover:opacity-80",
 
   /** Cream content below hero — equal horizontal + vertical inset. */
   homeContentArea: "bg-[#f8f6f1] p-4",
 
-  homeSectionStackGap: "gap-4",
+  homeSectionStackGap: "gap-3",
 
   namastePaginationDot:
 
-    "h-1.5 w-1.5 rounded-full bg-[#222222]/35 transition-all duration-300",
+    "h-1.5 w-1.5 rounded-full bg-[#DD7600]/35 transition-all duration-300",
 
   namastePaginationDotActive:
 
-    "h-2 w-5 rounded-full bg-[#222222]",
+    "h-2 w-5 rounded-full bg-[#DD7600]",
 
   productStrip:
 
@@ -156,7 +177,7 @@ export const GP_DAILY_SCOOTER_HERO_IMG_CLASS =
 
 /** Wrapper for Daily homepage scooter (offline hero + marketing hero). */
 export const GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS =
-  "pointer-events-none absolute -right-10 top-1/3 z-0 -translate-y-1/2 translate-x-8";
+  "pointer-events-none absolute -right-10 top-1/2 z-0 -translate-y-1/2 translate-x-8";
 
 
 

@@ -68,7 +68,7 @@ const FALLBACK_GRADIENTS_GP_DAILY = [
  * grows with logo + copy + CTA; fixed banner height aligns to that rendered size).
  */
 const OFFERS_BANNER_HEIGHT =
-  'h-[10.75rem] min-h-[10.75rem] sm:h-[11.75rem] sm:min-h-[11.75rem]';
+  'h-[12.25rem] min-h-[12.25rem] sm:h-[13.5rem] sm:min-h-[13.5rem]';
 
 export function OffersBannerCarousel({
   storeId,
@@ -91,9 +91,7 @@ export function OffersBannerCarousel({
       : compactSpacing
         ? "mb-2 sm:mb-3"
         : "mb-6 sm:mb-8";
-  const dailyBannerHeightClass = isDailyHome
-    ? "h-[8.75rem] min-h-[8.75rem] sm:h-[9.5rem] sm:min-h-[9.5rem]"
-    : OFFERS_BANNER_HEIGHT;
+  const dailyBannerHeightClass = OFFERS_BANNER_HEIGHT;
   const { theme } = useFeatureTheme();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);

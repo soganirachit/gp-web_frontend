@@ -8,8 +8,10 @@ type Props = {
   title: string;
   headerRight?: ReactNode;
   children: ReactNode;
-  /** Legacy — spacing comes from parent `homeSectionStackGap` (gap-4). */
+  /** Legacy — spacing comes from parent `homeSectionStackGap`. */
   isFirstInGroup?: boolean;
+  /** Open Sans section title (All Packs, Puja Packs, …). */
+  titleSans?: boolean;
 };
 
 /**
@@ -19,6 +21,7 @@ export function GpDailyHomeSection({
   title,
   headerRight,
   children,
+  titleSans = true,
 }: Props) {
   return (
     <section>
@@ -26,7 +29,9 @@ export function GpDailyHomeSection({
         className={`flex items-center justify-between gap-2 min-w-0 ${gpDailyHome.headingToContent}`}
       >
         <h2
-          className={`min-w-0 flex-1 shrink pr-2 ${gpDailyHome.sectionHeading}`}
+          className={`min-w-0 flex-1 shrink pr-2 ${
+            titleSans ? gpDailyHome.sectionHeadingSans : gpDailyHome.sectionHeading
+          }`}
         >
           {gpDailyTitleCase(title)}
         </h2>

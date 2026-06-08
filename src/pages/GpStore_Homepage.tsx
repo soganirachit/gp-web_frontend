@@ -31,6 +31,7 @@ import { GP_OPEN_GUEST_AREA_MODAL_EVENT } from "../config/guestAreaModalCopy";
 import { guestHasSavedBrowseAddress } from "../utils/guestAddressEntry";
 import { HomeHeroStatusBanner } from "../components/home/HomeHeroStatusBanner";
 import { GpStoreOfflineHero } from "../components/store/GpStoreOfflineHero";
+import { BrandIntroPyramidCopy } from "../components/common/BrandIntroPyramidCopy";
 import { GpDailyHomeSection } from "../components/daily/GpDailyHomeSection";
 import {
   gpDailyHome,
@@ -564,15 +565,13 @@ const GpStore_Homepage: React.FC = () => {
                                                 : "Namaste!"}
                                         </h2>
                                         <div className="relative z-[1]">
-                                            <p className={gpDailyHome.marketingTagline}>
-                                                We are Genda Phool! Your partner for everyday floral needs.
-                                            </p>
-                                            <p className={gpDailyHome.marketingLine}>
+                                            <BrandIntroPyramidCopy className="mb-1.5" />
+                                            {/* <p className={gpDailyHome.marketingLine}>
                                                 Order in <span className="font-bold">2hrs</span> and get
                                             </p>
                                             <p className={gpDailyHome.marketingLine}>
                                                 it by tomorrow <span className="font-bold">12PM!</span>
-                                            </p>
+                                            </p> */}
                                         </div>
                                     </div>
                                     <img

@@ -70,9 +70,9 @@ const HOME_SERVICE_CARD_LOGO_WRAP_CLASS =
 const HOME_SERVICE_CARD_LOGO_SCALE_CLASS =
   'w-full shrink-0 origin-top-right drop-shadow-sm lg:scale-[0.96] xl:scale-[0.98] 2xl:scale-[0.9]';
 
-/** Illustration strip — +10px height vs prior baseline at each breakpoint. */
+/** Illustration strip — mobile heights unchanged; fixed 250px from 590px up. */
 const HOME_SERVICE_CARD_MEDIA_HEIGHT_CLASS =
-  'h-[calc(4.25rem+10px)] sm:h-[calc(6.5rem+10px)] md:h-[calc(6rem+10px)] lg:h-[calc(7.5rem+10px)] xl:h-[calc(7.75rem+10px)] 2xl:h-[calc(7.25rem+10px)]';
+  'h-[calc(4.25rem+10px)] sm:h-[calc(6.5rem+10px)] md:h-[calc(6rem+10px)] min-[590px]:h-[250px]';
 
 /** Nudge Daily scooter / Store truck down inside the media strip. */
 const HOME_SERVICE_CARD_HERO_IMG_CLASS =
@@ -342,7 +342,7 @@ const HomePage: React.FC = () => {
                 <img
                   src={dailyScooterSvg}
                   alt=""
-                  className={`${HOME_SERVICE_CARD_HERO_IMG_CLASS} -left-[6%] right-auto top-4.5 bottom-0 mt-[-22px] h-[72%] w-[124%] object-left sm:mt-[-24px] sm:h-[94%] sm:w-[112%] sm:-left-[4%] lg:mt-[-20px] lg:h-[92%] lg:w-[104%] lg:-left-[2%] xl:w-[100%] xl:left-0 2xl:h-[90%] 2xl:w-[98%]`}
+                  className={`${HOME_SERVICE_CARD_HERO_IMG_CLASS} -left-[6%] right-auto top-4.5 bottom-0 mt-[-22px] h-[72%] w-[124%] object-left sm:mt-[-24px] sm:h-[80%] sm:w-[112%] sm:-left-[4%] lg:mt-[-20px] lg:h-[60%] lg:w-[104%] lg:-left-[2%] xl:w-[100%] xl:left-0 2xl:h-[60%] 2xl:w-[98%]`}
                 />
                 <div className={HOME_SERVICE_CARD_LOGO_WRAP_CLASS}>
                   <span
@@ -387,7 +387,7 @@ const HomePage: React.FC = () => {
                 <img
                   src={truckSvg}
                   alt=""
-                  className={`${HOME_SERVICE_CARD_HERO_IMG_CLASS} top-4.5 inset-x-0 bottom-0 mx-auto mt-[-22px] h-[72%] w-[118%] object-bottom sm:mt-[-24px] sm:h-[94%] sm:w-[108%] lg:mt-[-20px] lg:h-[92%] lg:w-[102%] xl:w-[100%] 2xl:h-[90%] 2xl:w-[98%]`}
+                  className={`${HOME_SERVICE_CARD_HERO_IMG_CLASS} -left-[6%] right-auto top-4.5 inset-x-0 bottom-0 mx-auto mt-[-22px] h-[72%] w-[118%] object-bottom sm:mt-[-24px] sm:h-[114%] sm:w-[128%] lg:mt-[-20px] lg:h-[92%] lg:w-[102%] xl:w-[100%] 2xl:h-[110%] 2xl:w-[118%]`}
                 />
                 <div className={HOME_SERVICE_CARD_LOGO_WRAP_CLASS}>
                   <img

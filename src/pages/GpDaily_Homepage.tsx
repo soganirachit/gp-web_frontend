@@ -36,6 +36,7 @@ import { validateGpDailyDeliveryAreaFromCoordinates } from "../services/subscrip
 import { customerService } from "../services/getcustomer.service";
 import { toast } from "react-hot-toast";
 import ProductCard from "../components/common/ProductCard";
+import { BrandIntroPyramidCopy } from "../components/common/BrandIntroPyramidCopy";
 import { GpDailyHomeSection } from "../components/daily/GpDailyHomeSection";
 import { GpDailyHomeSkeleton } from "../components/common/PageSkeletons";
 import {
@@ -1061,8 +1062,8 @@ const Home2: React.FC = () => {
     keySuffix: string,
   ) => (
     <div key={keySuffix} className="min-w-0 flex-1">
-      <div className={`flex flex-col justify-start gap-1 ${gpDailyHome.namasteHeroInset}`}>
-        <div className="flex min-h-7 items-center gap-3 text-[#222222]">
+      <div className="flex flex-col justify-start gap-1">
+        <div className={gpDailyHome.namasteDetailRow}>
           <img
             src={scooterIcon}
             alt=""
@@ -1076,7 +1077,7 @@ const Home2: React.FC = () => {
         {slide.packNames.map((packName, packIdx) => (
           <div
             key={`${keySuffix}-pack-${packIdx}`}
-            className="flex min-h-7 items-center gap-3 text-[#222222]"
+            className={gpDailyHome.namasteDetailRow}
           >
             <img
               src={flowerIcon}
@@ -1103,23 +1104,21 @@ const Home2: React.FC = () => {
 
   const renderNamasteSubSlide = (sub: Subscription, keySuffix: string) => (
     <div key={keySuffix} className="min-w-0 flex-1">
-      <div className={`flex flex-col justify-start gap-1 ${gpDailyHome.namasteHeroInset}`}>
-        <div className="flex min-h-7 items-center gap-3 text-[#222222]">
+      <div className="flex flex-col justify-start gap-1">
+        <div className={gpDailyHome.namasteDetailRow}>
           <img
             src={flowerIcon}
             alt=""
             className={`${gpDailyHome.namasteIcon} shrink-0`}
             aria-hidden
           />
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span
-              className={`${gpDailyHome.namasteDetail} min-w-0 flex-1 truncate`}
-            >
+          <div className={gpDailyHome.namastePackNameRow}>
+            <span className={gpDailyHome.namastePackName}>
               {subscriptionProductLabel(sub)}
             </span>
             {sub.status === "ACTIVE" ? (
               <span
-                className={`${gpDailyHome.namasteActionChip} bg-[#9CAF3A] text-white`}
+                className={`${gpDailyHome.namasteActionChip} shrink-0 bg-[#9CAF3A] text-white`}
               >
                 Active
               </span>
@@ -1135,7 +1134,7 @@ const Home2: React.FC = () => {
             ) : null}
           </div>
         </div>
-        <div className="flex min-h-7 items-center gap-3 text-[#222222]">
+        <div className={gpDailyHome.namasteDetailRow}>
           <img
             src={scooterIcon}
             alt=""
@@ -1261,6 +1260,7 @@ const Home2: React.FC = () => {
 
   return (
     <ErrorBoundary>
+      <>
       <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
         <div className="mx-auto w-full max-w-[min(800px,100vw)]">
           <div
@@ -1432,10 +1432,10 @@ const Home2: React.FC = () => {
                       >
                         <HorizontalScrollSection
                           ref={subscriptionCarouselRef}
-                          trackClassName="relative z-10 flex min-h-[5.25rem] snap-x snap-mandatory overflow-x-auto overscroll-x-contain no-scrollbar touch-pan-x [scroll-snap-stop:always]"
+                          trackClassName={gpDailyHome.namasteCarouselTrack}
                           prevLabel="Previous subscription"
                           nextLabel="Next subscription"
-                          hideArrows={namasteSlideCount <= 1}
+                          hideArrows
                           arrowCanGoPrev={namasteSlideCount > 1}
                           arrowCanGoNext={namasteSlideCount > 1}
                           onArrowPrev={() => {
@@ -1479,8 +1479,8 @@ const Home2: React.FC = () => {
                           ))}
                         </HorizontalScrollSection>
                       </div>
+                      {renderNamastePagination()}
                     </div>
-                    {renderNamastePagination()}
                     <div className={GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS}>
                       <img
                         src={dailyScooterHeroSvg}
@@ -1495,16 +1495,13 @@ const Home2: React.FC = () => {
                     <div
                       className={`relative z-10 min-w-0 ${GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS} ${gpDailyHome.namasteHeroInset}`}
                     >
-                      <p className={gpDailyHome.marketingTagline}>
-                        We are Genda Phool! Your partner for everyday floral
-                        needs.
-                      </p>
-                      <p className={gpDailyHome.marketingLine}>
+                      <BrandIntroPyramidCopy className="mb-1.5" />
+                      {/* <p className={gpDailyHome.marketingLine}>
                         Order in <span className="font-bold">2hrs</span> and get
                       </p>
                       <p className={gpDailyHome.marketingLine}>
                         it by tomorrow <span className="font-bold">12PM!</span>
-                      </p>
+                      </p> */}
                     </div>
                     <div className={GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS}>
                       <img
@@ -1582,53 +1579,55 @@ const Home2: React.FC = () => {
               <div className="text-red-500 text-center py-4 text-sm">{productsFetchError}</div>
             ) : null}
 
-            <GpDailyHomeSection
-              title="All Packs"
-              isFirstInGroup={
-                !(
-                  !isLoadingBalance &&
-                  isLoggedIn &&
-                  hasCustomerSubscription &&
-                  homeHeroStatus !== "store_offline" &&
-                  orderOnHold.show
-                )
-              }
-              headerRight={
-                <button
-                  type="button"
-                  onClick={() => navigate(`${basePath}/Products`)}
-                  className={gpDailyHome.exploreMore}
-                >
-                  <span>Explore More {">"}</span>
-                </button>
-              }
-            >
-              {!productsFetchError && isLoadingProducts ? (
-                <div className="h-36 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
-              ) : (
-                <HorizontalScrollSection trackClassName={gpDailyHome.productStrip}>
-                  {allPackProducts.map((pack) => (
-                    <div key={pack.id} className={gpDailyHome.productCol}>
-                      <ProductCard
-                        compact
-                        imageUrl={getImageUrl(pack.imagesUrl)}
-                        packName={pack.name}
-                        categoryName={pack.categoryName}
-                        description="Mixed flowers daily"
-                        price={`₹${pack.sellingPrice}`}
-                        showDailyButton
-                        showBestsellerTag={!pack.labels?.length}
-                        labels={pack.labels?.length ? pack.labels : undefined}
-                        onClick={() => handleProductClick(pack)}
-                      />
-                    </div>
-                  ))}
-                </HorizontalScrollSection>
-              )}
-              {!productsFetchError && !isLoadingProducts && allPackProducts.length === 0 ? (
-                <p className="text-center text-sm text-gray-500 py-2">No packs available right now.</p>
-              ) : null}
-            </GpDailyHomeSection>
+            <div className="pt-[12px]">
+              <GpDailyHomeSection
+                title="All Packs"
+                isFirstInGroup={
+                  !(
+                    !isLoadingBalance &&
+                    isLoggedIn &&
+                    hasCustomerSubscription &&
+                    homeHeroStatus !== "store_offline" &&
+                    orderOnHold.show
+                  )
+                }
+                headerRight={
+                  <button
+                    type="button"
+                    onClick={() => navigate(`${basePath}/Products`)}
+                    className={gpDailyHome.exploreMore}
+                  >
+                    <span>Explore More {">"}</span>
+                  </button>
+                }
+              >
+                {!productsFetchError && isLoadingProducts ? (
+                  <div className="h-36 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
+                ) : (
+                  <HorizontalScrollSection trackClassName={gpDailyHome.productStrip}>
+                    {allPackProducts.map((pack) => (
+                      <div key={pack.id} className={gpDailyHome.productCol}>
+                        <ProductCard
+                          compact
+                          imageUrl={getImageUrl(pack.imagesUrl)}
+                          packName={pack.name}
+                          categoryName={pack.categoryName}
+                          description="Mixed flowers daily"
+                          price={`₹${pack.sellingPrice}`}
+                          showDailyButton
+                          showBestsellerTag={!pack.labels?.length}
+                          labels={pack.labels?.length ? pack.labels : undefined}
+                          onClick={() => handleProductClick(pack)}
+                        />
+                      </div>
+                    ))}
+                  </HorizontalScrollSection>
+                )}
+                {!productsFetchError && !isLoadingProducts && allPackProducts.length === 0 ? (
+                  <p className="text-center text-sm text-gray-500 py-2">No packs available right now.</p>
+                ) : null}
+              </GpDailyHomeSection>
+            </div>
 
             <GpDailyHomeSection
               title="Puja Packs"
@@ -1754,6 +1753,7 @@ const Home2: React.FC = () => {
           });
         }}
       />
+      </>
     </ErrorBoundary>
   );
 };
