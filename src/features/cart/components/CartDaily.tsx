@@ -17,6 +17,9 @@ import {
   STORE_OFFLINE_CART_BODY,
   STORE_OFFLINE_CART_TITLE,
 } from '../../../config/homeHeroStatusCopy';
+import { isOrderingBlockedByStoreOffline } from '../../../utils/homeLocationHeroState';
+import { resolveGpDailyCatalogStoreId } from '../../../utils/gpDailyCatalogStore';
+import { useOrderingStoreOffline } from '../../../hooks/useOrderingStoreOffline';
 import {
   subscriptionCartService,
   isSubscriptionCartStoreChangeConfirmation,
@@ -802,6 +805,8 @@ const Cart: React.FC = () => {
   const [showSuggestedStoreSwitchModal, setShowSuggestedStoreSwitchModal] = useState(false);
   /** Closest store by distance is offline (ordering unavailable). */
   const [deliveryStoreOffline, setDeliveryStoreOffline] = useState(false);
+  const catalogOrderingOffline = useOrderingStoreOffline(cartStoreId);
+  const storeOfflineBlocked = deliveryStoreOffline || catalogOrderingOffline;
   /** True when selected address is outside GP Daily subscription zone (check-zone / store-by-zone). */
   const [addressOutsideDelivery, setAddressOutsideDelivery] = useState<boolean | null>(null);
   const [isCheckingDeliveryCoverage, setIsCheckingDeliveryCoverage] = useState(false);
@@ -1287,6 +1292,27 @@ const Cart: React.FC = () => {
     let cancelled = false;
     void (async () => {
       try {
+        const catalogId =
+          storeService.getStoreIdForProducts() ??
+          (await resolveGpDailyCatalogStoreId()) ??
+          null;
+        const blocked = await isOrderingBlockedByStoreOffline({
+          storeId: cartStoreId ?? catalogId,
+          storeIds: [cartStoreId, catalogId].filter(
+            (id): id is number =>
+              id != null && Number.isFinite(Number(id)) && Number(id) > 0,
+          ),
+          lat: coords.lat,
+          lng: coords.lng,
+        });
+        if (cancelled) return;
+        if (blocked) {
+          setDeliveryStoreOffline(true);
+          setSuggestedStoreForAddress(null);
+          deliveryStoreSyncKey.current = key;
+          return;
+        }
+
         const storesList = await storeService.getAllStores(coords.lat, coords.lng);
         if (cancelled) return;
 
@@ -1810,7 +1836,7 @@ const Cart: React.FC = () => {
       return;
     }
 
-    if (deliveryStoreOffline) {
+    if (storeOfflineBlocked) {
       toast.error(STORE_OFFLINE_CART_BODY);
       setCheckoutInlineError(STORE_OFFLINE_CART_BODY);
       return;
@@ -2078,7 +2104,7 @@ const Cart: React.FC = () => {
   const showUnifiedDeliveryAlert =
     suggestedStoreForAddress != null ||
     deliveryBlockedByCoverage ||
-    deliveryStoreOffline;
+    storeOfflineBlocked;
 
   const suggestedStoreNameButtonClass =
     'gp-cart-suggested-store-blink inline border-0 bg-transparent p-0 align-baseline font-semibold text-red-900 underline decoration-red-700 underline-offset-2 hover:text-red-950 disabled:cursor-not-allowed disabled:opacity-55';
@@ -2426,7 +2452,7 @@ const Cart: React.FC = () => {
               </div>
 
               {showUnifiedDeliveryAlert ? (
-                deliveryStoreOffline ? (
+                storeOfflineBlocked ? (
                   <div
                     className="min-w-0 rounded-[12px] border border-amber-500 bg-amber-50 px-3 py-2.5 shadow-sm"
                     role="alert"
@@ -2594,7 +2620,7 @@ const Cart: React.FC = () => {
                   hasStaleDailyLine ||
                   deliveryBlockedByCoverage ||
                   deliveryBlockedByStoreMismatch ||
-                  deliveryStoreOffline
+                  storeOfflineBlocked
                 }
                 className="w-full py-4 rounded-[25px] text-base font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 style={{ backgroundColor: theme.colors.primary, color: 'black' }}

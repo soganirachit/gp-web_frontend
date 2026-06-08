@@ -81,6 +81,23 @@ async function isAnyCandidateStoreOffline(
   return false;
 }
 
+/** True when catalog / nearest store is offline — block subscribe & checkout. */
+export async function isOrderingBlockedByStoreOffline(opts: {
+  storeId: number | null;
+  storeIds?: number[];
+  lat: number | null;
+  lng: number | null;
+}): Promise<boolean> {
+  const status = await resolveHomeHeroStatus({
+    storeId: opts.storeId,
+    storeIds: opts.storeIds,
+    inServiceArea: true,
+    deviceLat: opts.lat,
+    deviceLng: opts.lng,
+  });
+  return status === "store_offline";
+}
+
 export async function resolveHomeHeroStatus(opts: {
   storeId: number | null;
   /** Extra store ids (cart / catalog) checked before area_coming_soon. */

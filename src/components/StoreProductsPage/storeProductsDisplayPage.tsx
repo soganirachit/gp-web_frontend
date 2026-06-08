@@ -45,6 +45,11 @@ import {
   DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES,
   formatFreeDeliveryThresholdForDisplay,
 } from "../../services/store.service";
+import { useOrderingStoreOffline } from "../../hooks/useOrderingStoreOffline";
+import {
+  STORE_OFFLINE_CART_BODY,
+  STORE_OFFLINE_ORDER_BUTTON_LABEL,
+} from "../../config/homeHeroStatusCopy";
 
 interface ProductImage {
   id: number;
@@ -118,6 +123,7 @@ const gallerySlideVariants = {
 };
 
 const StorePage: React.FC = () => {
+  const orderingStoreOffline = useOrderingStoreOffline();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -392,6 +398,11 @@ const StorePage: React.FC = () => {
       toast.error("Product information not available", {
         id: "Product information not available",
       });
+      return;
+    }
+
+    if (orderingStoreOffline) {
+      toast.error(STORE_OFFLINE_CART_BODY, { id: STORE_OFFLINE_CART_BODY });
       return;
     }
 
@@ -1146,12 +1157,15 @@ const StorePage: React.FC = () => {
               disabled={
                 !product ||
                 product.in_stock === false ||
-                product.is_available === false
+                product.is_available === false ||
+                orderingStoreOffline
               }
             >
-              {product?.in_stock !== false && product?.is_available !== false
-                ? "Add to Basket"
-                : "Out of Stock"}
+              {orderingStoreOffline
+                ? STORE_OFFLINE_ORDER_BUTTON_LABEL
+                : product?.in_stock !== false && product?.is_available !== false
+                  ? "Add to Basket"
+                  : "Out of Stock"}
             </button>
           )}
 

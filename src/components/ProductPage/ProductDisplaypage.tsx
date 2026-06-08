@@ -60,6 +60,11 @@ import {
 } from "../daily/InsufficientWalletModal";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
 import { resolveProductShareUrl, shareProductLink } from "../../utils/productShare";
+import { useOrderingStoreOffline } from "../../hooks/useOrderingStoreOffline";
+import {
+  STORE_OFFLINE_CART_BODY,
+  STORE_OFFLINE_ORDER_BUTTON_LABEL,
+} from "../../config/homeHeroStatusCopy";
 
 // Add interface for content items
 // interface ContentItem {
@@ -218,6 +223,7 @@ const ProductPage: React.FC = () => {
   const { feature, theme } = useFeatureTheme();
   const { isLoggedIn } = useAuth();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+  const orderingStoreOffline = useOrderingStoreOffline();
   const productListAvailability =
     feature === 'gpStore' ? PRODUCT_AVAILABILITY_STORE : PRODUCT_AVAILABILITY_DAILY;
 
@@ -814,7 +820,10 @@ const ProductPage: React.FC = () => {
   // Handle subscription initiation
   const handleSubscribe = async () => {
     try {
-      // const { id } = useParams<{ id: string }>();
+      if (orderingStoreOffline) {
+        toast.error(STORE_OFFLINE_CART_BODY, { id: STORE_OFFLINE_CART_BODY });
+        return;
+      }
 
       if (!localStorage.getItem("phoneNumber")) {
         toast.error("Please login to continue", { id: "Please login to continue" });
@@ -939,6 +948,10 @@ const ProductPage: React.FC = () => {
       toast.error("Product information not available", {
         id: "Product information not available",
       });
+      return;
+    }
+    if (orderingStoreOffline) {
+      toast.error(STORE_OFFLINE_CART_BODY, { id: STORE_OFFLINE_CART_BODY });
       return;
     }
     if (feature === "gpStore") return;
@@ -1657,9 +1670,13 @@ const ProductPage: React.FC = () => {
               type="button"
               onClick={() => void handleAddToBasket()}
               className="mb-6 mt-6 flex w-full items-center justify-center rounded-[25px] bg-[#FAA222] py-3.5 text-base font-semibold text-gray-900 transition-colors hover:bg-[#e8941a] disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!product || addingToBasket}
+              disabled={!product || addingToBasket || orderingStoreOffline}
             >
-              {addingToBasket ? "Adding…" : "Add to Basket"}
+              {orderingStoreOffline
+                ? STORE_OFFLINE_ORDER_BUTTON_LABEL
+                : addingToBasket
+                  ? "Adding…"
+                  : "Add to Basket"}
             </button>
           )}
 
