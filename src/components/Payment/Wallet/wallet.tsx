@@ -41,6 +41,8 @@ import {
   shouldShowGpDailyWalletAlertCard,
   shouldShowGpDailyOrderInHoldCard,
   shouldShowGpDailyRunningLowCard,
+  sumActiveSubscriptionsThirtyDayTotal,
+  WALLET_RECOMMEND_RECHARGE_DAYS,
 } from "../../../utils/gpDailyWalletHold";
 import {
   readWalletPauseScheduleYmd,
@@ -220,6 +222,20 @@ const Wallet = () => {
       cancelled = true;
     };
   }, [feature, isLoggedIn]);
+
+  const thirtyDayRechargePlan = useMemo(() => {
+    if (feature !== "gpDaily" || !isLoggedIn || !gpDailyHasSubscription) {
+      return { total: 0, topUpAmount: 0 };
+    }
+    const total = sumActiveSubscriptionsThirtyDayTotal(
+      gpDailyAllSubs.map((sub) => ({ sub })),
+    );
+    if (total <= 0) {
+      return { total: 0, topUpAmount: 0 };
+    }
+    const topUpAmount = Math.max(Math.ceil(total - balance), 1);
+    return { total, topUpAmount };
+  }, [feature, isLoggedIn, gpDailyHasSubscription, gpDailyAllSubs, balance]);
 
   const gpDailyOrderHold = useMemo(() => {
     if (feature !== "gpDaily" || !isLoggedIn) {
@@ -658,6 +674,41 @@ const Wallet = () => {
             </div>
           </div>
         )}
+
+        {!isLoadingBalance &&
+          feature === "gpDaily" &&
+          isLoggedIn &&
+          thirtyDayRechargePlan.total > 0 && (
+            <div className="w-full shrink-0 rounded-[24px] border border-[#FAA222]/35 bg-[#FFF7ED] px-4 py-3.5">
+              <div className="flex items-start gap-2.5">
+                <span className="mt-0.5 text-lg" aria-hidden>
+                  📅
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-serif text-sm font-bold leading-5 text-[#92400E]">
+                    Recharge for {WALLET_RECOMMEND_RECHARGE_DAYS} days
+                  </h3>
+                  <p className="mt-1 font-sans text-xs leading-[17px] text-[#78350F]">
+                    Cover your next {WALLET_RECOMMEND_RECHARGE_DAYS} days of
+                    deliveries in one go — ₹
+                    {thirtyDayRechargePlan.total.toLocaleString("en-IN")}.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const amount = thirtyDayRechargePlan.topUpAmount;
+                      setCustomAmount(String(amount));
+                      handleQuickAmount(amount);
+                    }}
+                    className="mt-2 rounded-full bg-[#FAA222] px-3.5 py-2 font-sans text-xs font-semibold text-[#222222] transition-opacity hover:opacity-90"
+                  >
+                    Recharge ₹
+                    {thirtyDayRechargePlan.topUpAmount.toLocaleString("en-IN")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Add Money — match mobile `WalletScreen` chips, labels, field, CTA */}

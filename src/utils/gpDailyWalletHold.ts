@@ -93,6 +93,8 @@ export function pickActiveSubscriptionDailyUnitRupees(
 export type GpDailyWalletBannerKind = "none" | "running_low" | "on_hold";
 
 export const WALLET_WARNING_DAYS = 3;
+/** Recommended one-shot wallet top-up window on the wallet page. */
+export const WALLET_RECOMMEND_RECHARGE_DAYS = 30;
 export const PAUSE_REASON_INSUFFICIENT_WALLET = "insufficient_wallet";
 export const GP_DAILY_WALLET_PAUSE_SCHEDULE_KEY = "gp-daily-wallet-pause-schedule-ymd";
 
@@ -263,6 +265,21 @@ export function sumActiveSubscriptionsThreeDayTotal(
     ctxs,
     startOfDay(),
     WALLET_WARNING_DAYS,
+    isPastSameDayDeliveryCutoff(new Date()),
+  );
+}
+
+export function sumActiveSubscriptionsThirtyDayTotal(
+  subscriptions: Array<{
+    sub: Subscription | Record<string, unknown>;
+    extra?: Record<string, unknown> | null;
+  }>,
+): number {
+  const ctxs = buildSubWalletContexts(subscriptions);
+  return computeRequiredForNextDeliveryDays(
+    ctxs,
+    startOfDay(),
+    WALLET_RECOMMEND_RECHARGE_DAYS,
     isPastSameDayDeliveryCutoff(new Date()),
   );
 }

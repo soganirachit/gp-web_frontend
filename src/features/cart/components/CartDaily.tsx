@@ -79,6 +79,7 @@ import { setGpDailyPendingSubscriptionCheckout } from '../../../utils/gpDailyPen
 import {
   InsufficientWalletModal,
   type InsufficientWalletDetails,
+  computeMinimumSubscriptionWalletRecharge,
 } from '../../../components/daily/InsufficientWalletModal';
 
 
@@ -680,7 +681,11 @@ const Cart: React.FC = () => {
       const unit =
         Number(anyIt?.unit_price ?? (p?.current_price ?? p?.sale_price ?? p?.base_price ?? 0));
       const qty = Number.parseFloat(String(anyIt?.quantity ?? 0));
-      const vidRaw = anyIt?.variant_id ?? p?.variant_id;
+      const vidRaw =
+        anyIt?.variant_id ??
+        anyIt?.variant?.id ??
+        anyIt?.product_variant_id ??
+        p?.variant_id;
       const vid =
         vidRaw != null && Number.isFinite(Number(vidRaw)) ? Number(vidRaw) : undefined;
       const vNameRaw = anyIt?.variant_name ?? p?.variant_name;
@@ -1848,8 +1853,15 @@ const Cart: React.FC = () => {
       setIsProcessingPayment(true);
       const { balance: walletBalance } = await walletService.getWalletBalance();
       const cartAmount = Number(total);
-      if (Number.isFinite(cartAmount) && walletBalance < cartAmount) {
-        const shortage = cartAmount - walletBalance;
+      const { threeDayRequiredAmount } = computeMinimumSubscriptionWalletRecharge(
+        cartAmount,
+        0,
+      );
+      if (
+        Number.isFinite(cartAmount) &&
+        walletBalance < threeDayRequiredAmount
+      ) {
+        const shortage = Math.max(0, threeDayRequiredAmount - walletBalance);
         setGpDailyPendingSubscriptionCheckout({
           kind: 'subscription_cart_checkout',
           requiredAmount: cartAmount,
@@ -2585,7 +2597,7 @@ const Cart: React.FC = () => {
                 </div>
                 <div className="flex justify-between items-center pt-4 border-t border-gray-200">
                   <span className="font-ibm-plex-serif text-lg font-bold text-gray-900">Total</span>
-                  <span className="font-ibm-plex-serif text-lg font-semibold" style={{ color: theme.colors.primary }}>
+                  <span className="font-ibm-plex-serif text-lg font-semibold text-gray-900">
                     ₹{total.toLocaleString('en-IN')}/Delivery
                   </span>
                 </div>

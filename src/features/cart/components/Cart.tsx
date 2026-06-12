@@ -2413,7 +2413,7 @@ const Cart: React.FC = () => {
                 </div>
                 <div className="flex justify-between items-center pt-4 border-t border-gray-200">
                   <span className="text-lg font-bold text-gray-900">Total</span>
-                  <span className="text-xl font-bold text-[#19411F]">₹{total.toLocaleString('en-IN')}</span>
+                  <span className="text-xl font-bold text-gray-900">₹{total.toLocaleString('en-IN')}</span>
                 </div>
               </div>
 

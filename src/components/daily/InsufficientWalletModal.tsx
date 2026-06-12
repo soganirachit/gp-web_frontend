@@ -1,5 +1,22 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import { featureThemes } from "../../config/features";
+
+/** Minimum subscription wallet top-up covers this many delivery days. */
+export const MIN_SUBSCRIPTION_WALLET_RECHARGE_DAYS = 3;
+
+export function computeMinimumSubscriptionWalletRecharge(
+  requiredAmount: number,
+  currentBalance = 0,
+): { threeDayRequiredAmount: number; rechargeAmount: number } {
+  const threeDayRequiredAmount = Math.ceil(
+    Math.max(0, requiredAmount) * MIN_SUBSCRIPTION_WALLET_RECHARGE_DAYS,
+  );
+  const rechargeAmount = Math.max(
+    1,
+    Math.ceil(threeDayRequiredAmount - Math.max(0, currentBalance)),
+  );
+  return { threeDayRequiredAmount, rechargeAmount };
+}
 
 export type InsufficientWalletDetails = {
   currentBalance: number;
@@ -24,13 +41,16 @@ export function InsufficientWalletModal({
   onRecharge,
   recharging = false,
 }: Props) {
-  const { theme, feature } = useFeatureTheme();
   if (!details) return null;
 
-  const rechargeBtnClass =
-    feature === "gpStore"
-      ? "bg-[#19411F] text-white hover:bg-[#143318]"
-      : `${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`;
+  const { threeDayRequiredAmount, rechargeAmount } =
+    computeMinimumSubscriptionWalletRecharge(
+      details.requiredAmount,
+      details.currentBalance,
+    );
+
+  const dailyTheme = featureThemes.gpDaily;
+  const rechargeBtnClass = `${dailyTheme.classes.primaryButton} ${dailyTheme.classes.primaryButtonHover}`;
 
   return (
     <AnimatePresence>
@@ -66,24 +86,28 @@ export function InsufficientWalletModal({
             </div>
 
             <div className="mb-6 space-y-3">
-              <div className="flex items-center justify-between border-b py-2">
+              {/* <div className="flex items-center justify-between border-b py-2">
                 <span className="text-gray-600">Current balance</span>
                 <span className="font-semibold">
                   ₹{details.currentBalance.toLocaleString("en-IN")}
                 </span>
-              </div>
+              </div> */}
               <div className="flex items-center justify-between border-b py-2">
                 <span className="text-gray-600">Required amount</span>
                 <span className="font-semibold">
-                  ₹{details.requiredAmount.toLocaleString("en-IN")}
+                  ₹{threeDayRequiredAmount.toLocaleString("en-IN")}
                 </span>
               </div>
-              <div className="flex items-center justify-between rounded bg-red-50 px-2 py-2">
+              <p className="text-center text-sm leading-relaxed text-gray-600">
+                Minimum wallet recharge must cover at least{" "}
+                {MIN_SUBSCRIPTION_WALLET_RECHARGE_DAYS} days of deliveries.
+              </p>
+              {/* <div className="flex items-center justify-between rounded bg-red-50 px-2 py-2">
                 <span className="text-red-600">Add at least</span>
                 <span className="font-semibold text-red-600">
                   ₹{Math.ceil(details.shortageAmount).toLocaleString("en-IN")}
                 </span>
-              </div>
+              </div> */}
             </div>
 
             <div className="flex gap-3">
@@ -98,7 +122,7 @@ export function InsufficientWalletModal({
                 type="button"
                 disabled={recharging}
                 onClick={() => {
-                  const amount = Math.max(1, Math.ceil(details.shortageAmount));
+                  const amount = rechargeAmount;
                   void onRecharge(amount);
                 }}
                 className={`flex-1 rounded-lg px-4 py-2.5 font-semibold transition-colors disabled:opacity-65 ${rechargeBtnClass}`}
