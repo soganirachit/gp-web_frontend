@@ -117,28 +117,96 @@ export const editCustomerService = {
    * Delete user account
    */
   async deleteAccount(): Promise<{ success: boolean; message?: string }> {
-    try {
-      const apiUrl = getApiUrl();
-      const deleteAccountUrl = `${apiUrl}/users/me/delete-account/`;
-
-      const response = await api.post(deleteAccountUrl, {});
-
-      if (response.data.success || response.status === 200) {
-        return {
-          success: true,
-          message: response.data.message || "Account deleted successfully",
-        };
-      }
-
-      throw new Error(response.data.message || "Failed to delete account");
-    } catch (error) {
-      console.error("Error deleting account:", error);
-      if (error instanceof AxiosError) {
-        throw new Error(
-          error.response?.data?.message || error.message || "Failed to delete account",
+    const endpoint = "/users/me/delete-account/";
+    const runDelete = async (method: "post" | "delete") => {
+      if (method === "post") {
+        return api.post<{ success?: boolean; message?: string; data?: { success?: boolean; message?: string } }>(
+          endpoint,
+          {},
         );
       }
-      throw error instanceof Error ? error : new Error("An unknown error occurred");
+      return api.delete<{ success?: boolean; message?: string; data?: { success?: boolean; message?: string } }>(
+        endpoint,
+      );
+    };
+    const responseIndicatesSuccess = (response: {
+      status: number;
+      data?: { success?: boolean; message?: string; data?: { success?: boolean; message?: string } };
+    }) => {
+      const body = response.data;
+      const nested = body?.data;
+      return (
+        body?.success === true ||
+        nested?.success === true ||
+        response.status === 200 ||
+        response.status === 204
+      );
+    };
+    const messageFromResponse = (response: {
+      data?: { success?: boolean; message?: string; data?: { success?: boolean; message?: string } };
+    }) =>
+      response.data?.message ||
+      response.data?.data?.message ||
+      "Account deleted successfully";
+
+    const isRetryableStatus = (status?: number) =>
+      status === 401 ||
+      status === 403 ||
+      status === 429 ||
+      status === 500 ||
+      status === 502 ||
+      status === 503 ||
+      status === 504;
+
+    let firstError: unknown = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const response = await runDelete("post");
+        if (responseIndicatesSuccess(response)) {
+          return {
+            success: true,
+            message: messageFromResponse(response),
+          };
+        }
+        throw new Error(messageFromResponse(response) || "Failed to delete account");
+      } catch (err: unknown) {
+        firstError = firstError ?? err;
+        const status = (err as { response?: { status?: number } })?.response?.status;
+
+        if (status === 404 || status === 405) {
+          try {
+            const response = await runDelete("delete");
+            if (responseIndicatesSuccess(response)) {
+              return {
+                success: true,
+                message: messageFromResponse(response),
+              };
+            }
+          } catch (deleteErr: unknown) {
+            firstError = firstError ?? deleteErr;
+          }
+        }
+
+        if (attempt === 0 && isRetryableStatus(status)) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          continue;
+        }
+        break;
+      }
     }
+
+    if (firstError instanceof AxiosError) {
+      throw new Error(
+        firstError.response?.data?.message ||
+          firstError.message ||
+          "Failed to delete account",
+      );
+    }
+    throw new Error(
+      (firstError as { response?: { data?: { message?: string } } })?.response?.data
+        ?.message ||
+        (firstError as Error)?.message ||
+        "Failed to delete account",
+    );
   },
 };

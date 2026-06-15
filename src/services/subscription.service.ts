@@ -235,6 +235,12 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
     nextDeliveryDate: nextDeliveryDate && !Number.isNaN(nextDeliveryDate.getTime()) ? nextDeliveryDate : undefined,
     pausedUntilDate:
       pausedUntilDate && !Number.isNaN(pausedUntilDate.getTime()) ? pausedUntilDate : undefined,
+    pauseReason: (() => {
+      const rawReason = raw.pause_reason ?? raw.pauseReason;
+      return rawReason != null && String(rawReason).trim()
+        ? String(rawReason).trim()
+        : undefined;
+    })(),
     createdAt: raw.created_at ? new Date(String(raw.created_at)) : new Date(),
     productDetails: plan
       ? {
@@ -313,6 +319,8 @@ export interface Subscription {
   nextDeliveryDate?: Date;
   /** Auto-resume date when status is PAUSED (`paused_until_date` from API). */
   pausedUntilDate?: Date;
+  /** Why the subscription was paused (`pause_reason` from API). */
+  pauseReason?: string;
 }
 
 export interface SubscriptionInitiateResponse {

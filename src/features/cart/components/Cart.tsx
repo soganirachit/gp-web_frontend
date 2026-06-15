@@ -28,6 +28,7 @@ import { customerService } from '../../../services/getcustomer.service';
 import { cartService, type CartData } from '../../../services/cart.service';
 import Spinner from '../../../components/common/Spinner';
 import { CartPageSkeleton } from '../../../components/common/PageSkeletons';
+import { GP_SHEET_DESKTOP_ALIGN_CLASSES } from '../../../components/common/SearchBar';
 import api from '../../../services/api';
 import { getApiUrl } from '../../../config/api.config';
 import { useNetworkRecovery } from '../../../hooks/useNetworkRecovery';
@@ -145,6 +146,24 @@ function applyServerCartData(
     const n = Number(sid as number | string);
     setStoreId(Number.isFinite(n) ? n : null);
   }
+}
+
+function promoDiscountFromCartData(cartData: CartData): number {
+  const fromCoupon = parseFloat(String(cartData.coupon_discount ?? ''));
+  if (Number.isFinite(fromCoupon) && fromCoupon > 0) return fromCoupon;
+  return parseFloat(String(cartData.discount_amount ?? '0')) || 0;
+}
+
+function cartProductSignatureFromItems(
+  items: Array<{
+    productId?: number | string;
+    variant?: { id?: number } | null;
+  }>,
+): string {
+  return items
+    .map((it) => `${it.productId ?? 0}:${it.variant?.id ?? 0}`)
+    .sort()
+    .join('|');
 }
 
 function parseAddressCoordinates(address: Address | null): { lat: number; lng: number } | null {
@@ -296,7 +315,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
 
       {/* Bottom sheet — bottom/maxHeight follow visualViewport so content stays above the keyboard */}
       <div
-        className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+2.5rem)] z-[99999] flex min-h-0 flex-col rounded-t-[24px] bg-white pb-[max(5.75rem,env(safe-area-inset-bottom,0px))] shadow-2xl sm:bottom-0 sm:rounded-t-[28px]"
+        className={`fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+2.5rem)] z-[99999] flex min-h-0 flex-col rounded-t-[24px] bg-white pb-[max(5.75rem,env(safe-area-inset-bottom,0px))] shadow-2xl sm:bottom-0 sm:rounded-t-[28px] ${GP_SHEET_DESKTOP_ALIGN_CLASSES}`}
         style={{ maxHeight: sheetMaxHeight }}
         role="dialog"
         aria-modal="true"
@@ -536,6 +555,8 @@ const Cart: React.FC = () => {
   // Promo code state
   const [showPromoModal, setShowPromoModal] = useState(false);
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
+  const appliedPromoCodeRef = useRef<string | null>(null);
+  const cartProductSignatureRef = useRef('');
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState<number>(0);
   const [promoInlineMessage, setPromoInlineMessage] = useState<{
@@ -788,14 +809,34 @@ const Cart: React.FC = () => {
 
   // Automatically remove applied promo when leaving the basket page
   useEffect(() => {
+    appliedPromoCodeRef.current = appliedPromoCode;
+  }, [appliedPromoCode]);
+
+  useEffect(() => {
     return () => {
-      if (appliedPromoCode) {
+      if (appliedPromoCodeRef.current) {
         removeCouponAPI().catch((err) => {
           console.error('Failed to auto-remove promo code on navigation:', err);
         });
       }
     };
-  }, [appliedPromoCode]);
+  }, []);
+
+  useEffect(() => {
+    const sig = cartProductSignatureFromItems(items);
+    const prev = cartProductSignatureRef.current;
+    if (prev) {
+      const prevSet = new Set(prev.split('|').filter(Boolean));
+      const addedNew = sig
+        .split('|')
+        .filter(Boolean)
+        .some((key) => !prevSet.has(key));
+      if (addedNew && appliedPromoCodeRef.current) {
+        void handleRemovePromoCode();
+      }
+    }
+    cartProductSignatureRef.current = sig;
+  }, [items]);
 
   // Preload Razorpay SDK when basket opens so checkout is not blocked on first load
   useEffect(() => {
@@ -969,7 +1010,34 @@ const Cart: React.FC = () => {
           setIsLoadingCartTotals(true);
           const raw = await cartService.getCartData();
           const cartData = await reconcileCartStoreWithAccountSelection(raw);
+          const activeCode = appliedPromoCodeRef.current;
+          if (activeCode) {
+            try {
+              const response = await applyCouponAPI(activeCode);
+              const discountAmt = parseFloat(String(response.discount_amount ?? 0));
+              setPromoDiscount(Number.isFinite(discountAmt) ? discountAmt : 0);
+              if (response.total !== undefined || response.subtotal !== undefined) {
+                const d = Number.isFinite(discountAmt) ? discountAmt : 0;
+                setCartTotals((prev) => mergeTotalsFromApplyResponse(response, prev, d));
+              } else {
+                applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
+              }
+              setAppliedPromoCode(activeCode);
+              return;
+            } catch {
+              await removeCouponAPI().catch(() => {});
+              setAppliedPromoCode(null);
+              setPromoDiscount(0);
+            }
+          }
           applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
+          if (cartData.coupon_code) {
+            setAppliedPromoCode(String(cartData.coupon_code));
+            setPromoDiscount(promoDiscountFromCartData(cartData));
+          } else if (!appliedPromoCodeRef.current) {
+            setAppliedPromoCode(null);
+            setPromoDiscount(0);
+          }
         } catch (_) {
           setCartTotals(null);
           setCartStoreName('');

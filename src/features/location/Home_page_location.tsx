@@ -19,7 +19,7 @@ import {
   messageFromGeolocationPositionError,
 } from "../../utils/geolocationMessages";
 import Spinner from "../../components/common/Spinner";
-import { GP_SEARCH_ICON_CLASSES } from "../../components/common/SearchBar";
+import { GP_MAP_SEARCH_INPUT_CLASSES, GP_SEARCH_ICON_CLASSES } from "../../components/common/SearchBar";
 import {
   MapLoadingPlaceholder,
   MapPanelSkeleton,
@@ -595,7 +595,7 @@ const HomePageLocation: React.FC = () => {
                     type="text"
                     placeholder="Search for a location..."
                     defaultValue=""
-                    className="w-full rounded-xl border border-[#808080] bg-transparent p-3 pl-4 pr-10 text-left text-gray-900 placeholder:text-[#808080] focus:border-[#808080] focus:outline-none focus:ring-2"
+                    className={GP_MAP_SEARCH_INPUT_CLASSES}
                     style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
                   />
                   <div className={`absolute right-3 top-1/2 -translate-y-1/2 ${GP_SEARCH_ICON_CLASSES}`}>
@@ -622,7 +622,7 @@ const HomePageLocation: React.FC = () => {
                   type="text"
                   placeholder="Loading map..."
                   disabled
-                  className="w-full rounded-xl border border-[#808080] bg-transparent p-3 pl-4 pr-10 text-left text-gray-400"
+                  className={`${GP_MAP_SEARCH_INPUT_CLASSES} text-gray-400`}
                 />
                 <div className={`absolute right-3 top-1/2 -translate-y-1/2 ${GP_SEARCH_ICON_CLASSES}`}>
                   <svg
@@ -672,14 +672,6 @@ const HomePageLocation: React.FC = () => {
                   <div className="w-3 h-3 -mt-2 bg-black/20 rounded-full shadow-lg"></div>
                 </div>
               </div>
-
-              {/* Back Button */}
-              <button
-                onClick={() => navigate(-1)}
-                className="absolute top-4 left-4 bg-white rounded-full p-2 shadow-lg z-10 hover:bg-gray-50"
-              >
-                <MdArrowBack />
-              </button>
 
               {/* Locate me */}
               <button

@@ -147,6 +147,9 @@ const Wallet = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentFieldMessage, setPaymentFieldMessage] = useState<string | null>(null);
   const [gpDailyAllSubs, setGpDailyAllSubs] = useState<Subscription[]>([]);
+  const [gpDailySubscriptionExtras, setGpDailySubscriptionExtras] = useState<
+    Record<string, Record<string, unknown>>
+  >({});
   const [gpDailyHasSubscription, setGpDailyHasSubscription] = useState(false);
   const [walletPauseScheduleYmd, setWalletPauseScheduleYmd] = useState<string | null>(
     () => readWalletPauseScheduleYmd(),
@@ -201,6 +204,7 @@ const Wallet = () => {
   useEffect(() => {
     if (feature !== "gpDaily" || !isLoggedIn) {
       setGpDailyAllSubs([]);
+      setGpDailySubscriptionExtras({});
       setGpDailyHasSubscription(false);
       return;
     }
@@ -211,9 +215,35 @@ const Wallet = () => {
         if (cancelled) return;
         setGpDailyAllSubs(list || []);
         setGpDailyHasSubscription((list || []).length > 0);
+        const detailIds = [
+          ...new Set(
+            (list || [])
+              .filter((s) => {
+                const st = String(s.status ?? "").toUpperCase();
+                return st === "ACTIVE" || st === "RUNNING" || st === "PAUSED";
+              })
+              .map((s) => String(s.id).trim())
+              .filter(Boolean),
+          ),
+        ];
+        const extras: Record<string, Record<string, unknown>> = {};
+        await Promise.all(
+          detailIds.map(async (id) => {
+            try {
+              const detail = await subscriptionService.getSubscriptionById(id);
+              if (detail && Object.keys(detail).length > 0) {
+                extras[id] = detail;
+              }
+            } catch {
+              /* optional */
+            }
+          }),
+        );
+        if (!cancelled) setGpDailySubscriptionExtras(extras);
       } catch {
         if (!cancelled) {
           setGpDailyAllSubs([]);
+          setGpDailySubscriptionExtras({});
           setGpDailyHasSubscription(false);
         }
       }
@@ -222,20 +252,6 @@ const Wallet = () => {
       cancelled = true;
     };
   }, [feature, isLoggedIn]);
-
-  const thirtyDayRechargePlan = useMemo(() => {
-    if (feature !== "gpDaily" || !isLoggedIn || !gpDailyHasSubscription) {
-      return { total: 0, topUpAmount: 0 };
-    }
-    const total = sumActiveSubscriptionsThirtyDayTotal(
-      gpDailyAllSubs.map((sub) => ({ sub })),
-    );
-    if (total <= 0) {
-      return { total: 0, topUpAmount: 0 };
-    }
-    const topUpAmount = Math.max(Math.ceil(total - balance), 1);
-    return { total, topUpAmount };
-  }, [feature, isLoggedIn, gpDailyHasSubscription, gpDailyAllSubs, balance]);
 
   const gpDailyOrderHold = useMemo(() => {
     if (feature !== "gpDaily" || !isLoggedIn) {
@@ -256,6 +272,7 @@ const Wallet = () => {
       walletLoading: false,
       walletBalance: balance,
       subscriptions: gpDailyAllSubs,
+      extrasBySubId: gpDailySubscriptionExtras,
       storedPauseScheduleYmd: walletPauseScheduleYmd,
     });
     return {
@@ -269,7 +286,44 @@ const Wallet = () => {
       requiredRecharge: banner.requiredRecharge,
       hasWalletHoldPause: banner.hasWalletHoldPause,
     };
-  }, [feature, isLoggedIn, balance, gpDailyAllSubs, walletPauseScheduleYmd]);
+  }, [feature, isLoggedIn, balance, gpDailyAllSubs, gpDailySubscriptionExtras, walletPauseScheduleYmd]);
+
+  const thirtyDayRechargePlan = useMemo(() => {
+    if (feature !== "gpDaily" || !isLoggedIn || !gpDailyHasSubscription) {
+      return { total: 0, topUpAmount: 0, perDeliveryAmount: 0 };
+    }
+    const banner = computeGpDailyWalletBanner({
+      isLoggedIn: true,
+      walletLoading: false,
+      walletBalance: balance,
+      subscriptions: gpDailyAllSubs,
+      extrasBySubId: gpDailySubscriptionExtras,
+      storedPauseScheduleYmd: walletPauseScheduleYmd,
+    });
+    const total = sumActiveSubscriptionsThirtyDayTotal(
+      gpDailyAllSubs.map((sub) => ({
+        sub,
+        extra: gpDailySubscriptionExtras[String(sub.id)] ?? null,
+      })),
+    );
+    if (total <= 0) {
+      return { total: 0, topUpAmount: 0, perDeliveryAmount: 0 };
+    }
+    const perDeliveryAmount =
+      banner.oneDayTotal > 0
+        ? banner.oneDayTotal
+        : Math.ceil(total / WALLET_RECOMMEND_RECHARGE_DAYS);
+    const topUpAmount = Math.max(Math.ceil(total - balance), 1);
+    return { total, topUpAmount, perDeliveryAmount };
+  }, [
+    feature,
+    isLoggedIn,
+    gpDailyHasSubscription,
+    gpDailyAllSubs,
+    gpDailySubscriptionExtras,
+    balance,
+    walletPauseScheduleYmd,
+  ]);
 
   useEffect(() => {
     if (feature !== "gpDaily" || !isLoggedIn) return;
@@ -278,6 +332,7 @@ const Wallet = () => {
       walletLoading: false,
       walletBalance: balance,
       subscriptions: gpDailyAllSubs,
+      extrasBySubId: gpDailySubscriptionExtras,
       storedPauseScheduleYmd: walletPauseScheduleYmd,
     });
     const next = banner.nextStoredPauseScheduleYmd;
@@ -289,6 +344,7 @@ const Wallet = () => {
     isLoggedIn,
     balance,
     gpDailyAllSubs,
+    gpDailySubscriptionExtras,
     walletPauseScheduleYmd,
   ]);
 
@@ -649,6 +705,7 @@ const Wallet = () => {
         {!isLoadingBalance &&
           feature === "gpDaily" &&
           isLoggedIn &&
+          gpDailyHasSubscription &&
           !gpDailyOrderHold.show &&
           balance < 500 &&
           gpDailyOrderHold.kind === "none" && (
@@ -681,17 +738,25 @@ const Wallet = () => {
           thirtyDayRechargePlan.total > 0 && (
             <div className="w-full shrink-0 rounded-[24px] border border-[#FAA222]/35 bg-[#FFF7ED] px-4 py-3.5">
               <div className="flex items-start gap-2.5">
-                <span className="mt-0.5 text-lg" aria-hidden>
-                  📅
-                </span>
+                <IoWalletOutline
+                  className="mt-0.5 h-5 w-5 shrink-0 text-[#B45309]"
+                  aria-hidden
+                />
                 <div className="min-w-0 flex-1">
                   <h3 className="font-serif text-sm font-bold leading-5 text-[#92400E]">
                     Recharge for {WALLET_RECOMMEND_RECHARGE_DAYS} days
                   </h3>
-                  <p className="mt-1 font-sans text-xs leading-[17px] text-[#78350F]">
+                  <p className="mt-1 font-sans text-sm font-semibold leading-5 text-[#78350F]">
+                    ₹
+                    {thirtyDayRechargePlan.perDeliveryAmount.toLocaleString(
+                      "en-IN",
+                    )}{" "}
+                    × {WALLET_RECOMMEND_RECHARGE_DAYS} = ₹
+                    {thirtyDayRechargePlan.total.toLocaleString("en-IN")}
+                  </p>
+                  <p className="mt-1 font-sans text-[13px] leading-[18px] text-[#B45309]/90">
                     Cover your next {WALLET_RECOMMEND_RECHARGE_DAYS} days of
-                    deliveries in one go — ₹
-                    {thirtyDayRechargePlan.total.toLocaleString("en-IN")}.
+                    deliveries in one go.
                   </p>
                   <button
                     type="button"

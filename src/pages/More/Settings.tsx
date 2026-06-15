@@ -400,16 +400,15 @@ const Settings: React.FC = () => {
       
       toast.success('Account deleted successfully');
       
-      // Clear all local storage
       localStorage.clear();
       
-      // Logout user
-      await logout();
+      try {
+        await logout();
+      } catch {
+        /* Account already deleted — local session cleanup still proceeds */
+      }
       
-      // Close dialog
       setShowDeleteAccountDialog(false);
-      
-      // Navigate to login page
       navigate(`${basePath}/login`);
     } catch (error: any) {
       console.error('Error deleting account:', error);

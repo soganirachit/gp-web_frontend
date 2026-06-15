@@ -197,7 +197,7 @@ const Startup: React.FC = () => {
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-[11px] font-medium text-slate-400">
-                    Your store
+                    Store
                   </p>
                   <p className="mt-0.5 truncate text-left text-[12px] font-semibold text-slate-800">
                     {account.storeName}

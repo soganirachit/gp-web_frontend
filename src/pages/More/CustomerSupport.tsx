@@ -141,7 +141,7 @@ const CustomerSupport: React.FC = () => {
     if (!selectedOrderNumber) {
       return orders.length === 0
         ? 'No orders available for support'
-        : 'Select an order (active or delivered in last 12 hours)';
+        : 'Select an order';
     }
     const match = orders.find(
       (o) => normalizeOrderNumber(o.order_number) === normalizeOrderNumber(selectedOrderNumber),

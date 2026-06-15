@@ -584,20 +584,22 @@ const AddressSelection: React.FC = () => {
     localStorage.setItem("selectedDeliveryAddress", JSON.stringify(addressToUse));
 
     if (location.state?.fromHome) {
-      if (String(addressToUse.id) === LIVE_DEVICE_ADDRESS_ID) {
-        toast.success("Using your current location for delivery");
-        navigate(basePath, { replace: true });
-        return;
-      }
       try {
-        await addressService.setDefaultAddress(String(addressToUse.id));
+        if (String(addressToUse.id) === LIVE_DEVICE_ADDRESS_ID) {
+          await storeService.applyUseCurrentGpsForCatalog();
+          toast.success("Using your current location for the store");
+        } else {
+          await storeService.applyBrowseAddressForCatalog(addressToUse);
+          toast.success("Delivery location updated");
+        }
+        navigate(basePath, { replace: true });
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Could not set default address";
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "Could not update location. Try again.";
         toast.error(msg);
-        return;
       }
-      toast.success("Delivery address updated");
-      navigate(basePath, { replace: true });
       return;
     }
 

@@ -160,6 +160,38 @@ export function extractSecondItemImageFromOrderRaw(
   return imageFromLineItem(items[1] as Record<string, unknown>);
 }
 
+/** Variant label from an order line — same fallbacks as cart / subscription cart. */
+export function extractVariantNameFromOrderLineItem(
+  line: Record<string, unknown>,
+): string | null {
+  const variant = line.variant as Record<string, unknown> | undefined;
+  const productVariant = line.product_variant as
+    | Record<string, unknown>
+    | undefined;
+  const candidates = [
+    line.variant_name,
+    line.product_variant_name,
+    variant?.name,
+    productVariant?.name,
+  ];
+  for (const raw of candidates) {
+    if (typeof raw === "string" && raw.trim()) return raw.trim();
+  }
+  return null;
+}
+
+/** Order detail row title — variant before pack name when present. */
+export function formatOrderItemPackDisplayName(
+  packName: string | null | undefined,
+  variantName?: string | null,
+): string {
+  const pack = String(packName ?? "").trim();
+  const variant = String(variantName ?? "").trim();
+  if (!pack) return variant || "Item";
+  if (!variant) return pack;
+  return `${variant} ${pack}`;
+}
+
 /** Strip leading/trailing “Daily” frequency suffix from product titles in subscription UI. */
 export function cleanSubscriptionProductDisplayName(name: string): string {
   let s = name.trim();

@@ -44,6 +44,7 @@ import {
   GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS,
   GP_DAILY_SCOOTER_HERO_IMG_CLASS,
   GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS,
+  GP_DAILY_SCOOTER_HERO_MARKETING_GUEST_WRAPPER_CLASS,
 } from "../utils/gpDailyHomeDesignSystem";
 import { SearchBar } from "../components/common/SearchBar";
 import smallgendaIcon from "../assets/svg/smallgenda.svg";
@@ -171,6 +172,13 @@ const Home2: React.FC = () => {
   const [activeSubscriptions, setActiveSubscriptions] = useState<
     Subscription[]
   >([]);
+  /** Full GET /subscriptions/ list — wallet hold rules need every row (incl. RUNNING / wallet-paused). */
+  const [customerSubscriptions, setCustomerSubscriptions] = useState<
+    Subscription[]
+  >([]);
+  const [subscriptionExtrasById, setSubscriptionExtrasById] = useState<
+    Record<string, Record<string, unknown>>
+  >({});
   const [hasCustomerSubscription, setHasCustomerSubscription] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
   const [todayOrderSlides, setTodayOrderSlides] = useState<
@@ -302,6 +310,8 @@ const Home2: React.FC = () => {
       const fetchedSubscriptions =
         await subscriptionService.getCustomerSubscriptions();
 
+      setCustomerSubscriptions(fetchedSubscriptions ?? []);
+
       setHasCustomerSubscription(
         Boolean(fetchedSubscriptions && fetchedSubscriptions.length > 0),
       );
@@ -317,6 +327,7 @@ const Home2: React.FC = () => {
           .filter(
             (sub) =>
               sub.status === "ACTIVE" ||
+              String(sub.status ?? "").toUpperCase() === "RUNNING" ||
               sub.status === "PAUSED" ||
               sub.status === "INACTIVE",
           )
@@ -332,6 +343,33 @@ const Home2: React.FC = () => {
         setSubscriptionCarouselIndex(0);
         const firstForDetail =
           namasteList.find((s) => s.status === "ACTIVE") ?? namasteList[0];
+        const detailIds = [
+          ...new Set(
+            fetchedSubscriptions
+              .filter((s) => {
+                const st = String(s.status ?? "").toUpperCase();
+                return st === "ACTIVE" || st === "RUNNING" || st === "PAUSED";
+              })
+              .map((s) => String(s.id).trim())
+              .filter(Boolean),
+          ),
+        ];
+        void (async () => {
+          const extras: Record<string, Record<string, unknown>> = {};
+          await Promise.all(
+            detailIds.map(async (id) => {
+              try {
+                const detail = await subscriptionService.getSubscriptionById(id);
+                if (detail && Object.keys(detail).length > 0) {
+                  extras[id] = detail;
+                }
+              } catch {
+                /* optional */
+              }
+            }),
+          );
+          setSubscriptionExtrasById(extras);
+        })();
         if (firstForDetail?.id) {
           try {
             const detail = await subscriptionService.getSubscriptionById(
@@ -348,6 +386,8 @@ const Home2: React.FC = () => {
         }
       } else {
         setHasCustomerSubscription(false);
+        setCustomerSubscriptions([]);
+        setSubscriptionExtrasById({});
         setActiveSubscriptions([]);
         setSelectedSubscription(null);
         setSubscriptionCarouselIndex(0);
@@ -356,6 +396,8 @@ const Home2: React.FC = () => {
     } catch (error: any) {
       console.error("Error fetching subscriptions:", error);
       setHasCustomerSubscription(false);
+      setCustomerSubscriptions([]);
+      setSubscriptionExtrasById({});
       setActiveSubscriptions([]);
       setSelectedSubscription(null);
       setSubscriptionCarouselIndex(0);
@@ -1164,14 +1206,16 @@ const Home2: React.FC = () => {
         isLoggedIn,
         walletLoading: isLoadingBalance,
         walletBalance,
-        subscriptions: activeSubscriptions,
+        subscriptions: customerSubscriptions,
+        extrasBySubId: subscriptionExtrasById,
         storedPauseScheduleYmd: walletPauseScheduleYmd,
       }),
     [
       isLoggedIn,
       isLoadingBalance,
       walletBalance,
-      activeSubscriptions,
+      customerSubscriptions,
+      subscriptionExtrasById,
       walletPauseScheduleYmd,
     ],
   );
@@ -1491,7 +1535,7 @@ const Home2: React.FC = () => {
                     </div>
                   </div>
                 ) : showNamasteMarketing ? (
-                  <div className="relative min-h-[6rem] pb-1 sm:min-h-[6.5rem]">
+                  <div className="relative min-h-[6rem] pb-1 sm:min-h-[4.5rem]">
                     <div
                       className={`relative z-10 min-w-0 ${GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS} ${gpDailyHome.namasteHeroInset}`}
                     >
@@ -1503,7 +1547,7 @@ const Home2: React.FC = () => {
                         it by tomorrow <span className="font-bold">12PM!</span>
                       </p> */}
                     </div>
-                    <div className={GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS}>
+                    <div className={GP_DAILY_SCOOTER_HERO_MARKETING_GUEST_WRAPPER_CLASS}>
                       <img
                         src={dailyScooterHeroSvg}
                         alt=""
