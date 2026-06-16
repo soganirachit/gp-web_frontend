@@ -10,7 +10,8 @@ import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import ReactDOM from "react-dom/client";
 import { orderService } from "../../services/order.service";
 import { subscriptionService } from "../../services/subscription.service";
-import { subscriptionCartService, isSubscriptionCartStoreChangeConfirmation } from "../../services/subscriptionCart.service";
+import { subscriptionCartService, isSubscriptionCartStoreChangeConfirmation, normalizeSubscriptionCartSetAddressResponse } from "../../services/subscriptionCart.service";
+import { CartConfirmModal } from "../cart/CartConfirmModal";
 import {
   validateGpDailyDeliveryAreaForAddressId,
   validateGpDailyDeliveryAreaFromCoordinates,
@@ -680,11 +681,12 @@ const AddressSelection: React.FC = () => {
                 Number(address.id),
                 false,
               );
-              if (isSubscriptionCartStoreChangeConfirmation(raw)) {
+              const normalized = normalizeSubscriptionCartSetAddressResponse(raw);
+              if (isSubscriptionCartStoreChangeConfirmation(normalized)) {
                 const msg =
-                  typeof raw.message === "string" && raw.message.trim()
-                    ? raw.message.trim()
-                    : `Your delivery address maps to ${raw.new_store?.name ?? "a different store"}. Continuing will clear items in your daily basket that may not be available there.`;
+                  typeof normalized.message === "string" && normalized.message.trim()
+                    ? normalized.message.trim()
+                    : `Your delivery address maps to ${(normalized as { new_store?: { name?: string } }).new_store?.name ?? "a different store"}. Continuing will clear items in your daily basket that may not be available there.`;
                 setDailyCartFromAddressModal({ address, message: msg });
                 return;
               }
@@ -1791,72 +1793,47 @@ const AddressSelection: React.FC = () => {
         </div>
       ) : null}
 
-      {dailyCartFromAddressModal ? (
-        <div
-          className="fixed inset-0 z-[220] flex items-center justify-center bg-black/45 px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="gp-address-daily-cart-store-title"
-        >
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h2 id="gp-address-daily-cart-store-title" className="text-lg font-semibold text-gray-900">
-              Address changed
-            </h2>
-            <p className="mt-3 text-sm leading-relaxed text-gray-600 whitespace-pre-wrap">
-              {dailyCartFromAddressModal.message}
-            </p>
-            <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
-              <button
-                type="button"
-                disabled={confirmingDailyCartStoreChange}
-                onClick={async () => {
-                  const m = dailyCartFromAddressModal;
-                  if (!m) return;
-                  setConfirmingDailyCartStoreChange(true);
-                  try {
-                    const raw = await subscriptionCartService.setDeliveryAddress(
-                      Number(m.address.id),
-                      true,
-                    );
-                    if (isSubscriptionCartStoreChangeConfirmation(raw)) {
-                      toast.error("Could not confirm address change. Try again.");
-                      return;
-                    }
-                    setDailyCartFromAddressModal(null);
-                    localStorage.setItem(
-                      "selectedDeliveryAddress",
-                      JSON.stringify(m.address),
-                    );
-                    navigate("/gp-daily/basket", {
-                      state: {
-                        selectedAddress: m.address,
-                        addressUpdated: true,
-                      },
-                    });
-                  } catch (err) {
-                    toast.error(
-                      err instanceof Error ? err.message : "Could not confirm address change.",
-                    );
-                  } finally {
-                    setConfirmingDailyCartStoreChange(false);
-                  }
-                }}
-                className="rounded-xl bg-gray-900 py-3 text-center text-base font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {confirmingDailyCartStoreChange ? "Please wait…" : "Continue"}
-              </button>
-              <button
-                type="button"
-                disabled={confirmingDailyCartStoreChange}
-                onClick={() => setDailyCartFromAddressModal(null)}
-                className="rounded-xl border border-gray-200 py-3 text-center text-base font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <CartConfirmModal
+        open={dailyCartFromAddressModal != null}
+        title="Address changed"
+        message={dailyCartFromAddressModal?.message ?? ""}
+        loading={confirmingDailyCartStoreChange}
+        onConfirm={async () => {
+          const m = dailyCartFromAddressModal;
+          if (!m) return;
+          setConfirmingDailyCartStoreChange(true);
+          try {
+            const raw = await subscriptionCartService.setDeliveryAddress(
+              Number(m.address.id),
+              true,
+            );
+            const normalized = normalizeSubscriptionCartSetAddressResponse(raw);
+            if (isSubscriptionCartStoreChangeConfirmation(normalized)) {
+              toast.error("Could not confirm address change. Try again.");
+              return;
+            }
+            setDailyCartFromAddressModal(null);
+            localStorage.setItem(
+              "selectedDeliveryAddress",
+              JSON.stringify(m.address),
+            );
+            navigate("/gp-daily/basket", {
+              state: {
+                selectedAddress: m.address,
+                addressUpdated: true,
+              },
+            });
+          } catch (err) {
+            toast.error(
+              err instanceof Error ? err.message : "Could not confirm address change.",
+            );
+          } finally {
+            setConfirmingDailyCartStoreChange(false);
+          }
+        }}
+        onCancel={() => setDailyCartFromAddressModal(null)}
+        titleId="gp-address-daily-cart-store-title"
+      />
 
       <InsufficientWalletModal
         open={insufficientWalletModal != null}

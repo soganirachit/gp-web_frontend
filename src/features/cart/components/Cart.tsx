@@ -37,6 +37,11 @@ import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
 import { formatCartDeliveryAddress } from '../../../utils/formatCartDeliveryAddress';
+import { CartConfirmModal } from '../../../components/cart/CartConfirmModal';
+import {
+  SWITCH_STORE_CONFIRM_MESSAGE,
+  SWITCH_STORE_CONFIRM_TITLE,
+} from '../../../utils/cartConfirmCopy';
 import { errorMessageFromCatch, isCartLineUnavailableMessage } from '../../../utils/apiErrorMessage';
 import {
   extractCartStockApiMessage,
@@ -2538,39 +2543,15 @@ const Cart: React.FC = () => {
 
       </div>
 
-      {/* Store switch confirmation — same copy/layout as Settings */}
-      {showSuggestedStoreSwitchModal && (
-        <div className="fixed inset-0 z-[99997] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-3 text-center text-lg font-semibold text-gray-900">Switch Store?</h3>
-            <p className="mb-6 text-center text-sm text-gray-600">
-              Due to the change in store, items in your cart might get affected. Do you want to continue?
-            </p>
-            <div className="space-y-3">
-              <button
-                type="button"
-                disabled={isSwitchingSuggestedStore}
-                onClick={() => void performSwitchToSuggestedStore()}
-                className="w-full rounded-lg py-3 text-base font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                style={{
-                  backgroundColor: theme.colors.primary,
-                  color: feature === 'gpStore' ? 'white' : 'black',
-                }}
-              >
-                {isSwitchingSuggestedStore ? 'Please wait…' : 'Continue'}
-              </button>
-              <button
-                type="button"
-                disabled={isSwitchingSuggestedStore}
-                onClick={cancelSuggestedStoreSwitchModal}
-                className="w-full rounded-lg py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CartConfirmModal
+        open={showSuggestedStoreSwitchModal}
+        title={SWITCH_STORE_CONFIRM_TITLE}
+        message={SWITCH_STORE_CONFIRM_MESSAGE}
+        loading={isSwitchingSuggestedStore}
+        onConfirm={() => void performSwitchToSuggestedStore()}
+        onCancel={cancelSuggestedStoreSwitchModal}
+        titleId="gp-store-switch-store-title"
+      />
 
       {/* Promo Code Modal */}
       {showPromoModal && (

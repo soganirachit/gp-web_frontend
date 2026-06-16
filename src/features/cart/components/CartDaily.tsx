@@ -23,10 +23,16 @@ import { useOrderingStoreOffline } from '../../../hooks/useOrderingStoreOffline'
 import {
   subscriptionCartService,
   isSubscriptionCartStoreChangeConfirmation,
+  normalizeSubscriptionCartSetAddressResponse,
   isSubscriptionCartZoneStaleError,
   type DailyCart,
 } from '../../../services/subscriptionCart.service';
 import { notifyDailyCartUpdated } from '../../../utils/dailyCartEvents';
+import { CartConfirmModal } from '../../../components/cart/CartConfirmModal';
+import {
+  SWITCH_STORE_CONFIRM_MESSAGE,
+  SWITCH_STORE_CONFIRM_TITLE,
+} from '../../../utils/cartConfirmCopy';
 import {
   LIVE_DEVICE_ADDRESS_ID,
   resolveLiveDeviceToSavedAddress,
@@ -656,6 +662,10 @@ const Cart: React.FC = () => {
     addressId: number;
     message: string;
   } | null>(null);
+  const [confirmingSubscriptionStoreChange, setConfirmingSubscriptionStoreChange] =
+    useState(false);
+  /** Store label from set-address before cart reload (nested API envelope). */
+  const [pendingFulfilmentStoreName, setPendingFulfilmentStoreName] = useState('');
   const [insufficientWalletModal, setInsufficientWalletModal] =
     useState<InsufficientWalletDetails | null>(null);
   const [walletRecharging, setWalletRecharging] = useState(false);
@@ -670,6 +680,7 @@ const Cart: React.FC = () => {
       notifyDailyCartUpdated(cart);
       setLineCartStaleByItemId({});
       applySubscriptionDailyCartData(cart, setCartTotals, setCartStoreName, setCartStoreId);
+      setPendingFulfilmentStoreName('');
       setHasLoadedCartTotalsOnce(true);
       const promoCode = promoCodeFromDailyCart(cart);
       if (promoCode) {
@@ -699,11 +710,18 @@ const Cart: React.FC = () => {
     async (addressId: number): Promise<boolean> => {
       try {
         const raw = await subscriptionCartService.setDeliveryAddress(addressId, false);
-        if (isSubscriptionCartStoreChangeConfirmation(raw)) {
+        const normalized = normalizeSubscriptionCartSetAddressResponse(raw);
+        if (isSubscriptionCartStoreChangeConfirmation(normalized)) {
+          const newStoreName = (
+            normalized as { new_store?: { name?: string } }
+          ).new_store?.name;
+          if (typeof newStoreName === 'string' && newStoreName.trim()) {
+            setPendingFulfilmentStoreName(newStoreName.trim());
+          }
           const msg =
-            typeof raw.message === 'string' && raw.message.trim()
-              ? raw.message.trim()
-              : `Your delivery address maps to ${raw.new_store?.name ?? 'a different store'}. Continuing will clear items in your daily basket that are not available there.`;
+            typeof normalized.message === 'string' && normalized.message.trim()
+              ? normalized.message.trim()
+              : `Your delivery address maps to ${(normalized as { new_store?: { name?: string } }).new_store?.name ?? 'a different store'}. Continuing will clear items in your daily basket that are not available there.`;
           return await new Promise<boolean>((resolve) => {
             pendingSubscriptionAddressResolveRef.current = resolve;
             setSubscriptionStoreChangePrompt({ addressId, message: msg });
@@ -732,8 +750,10 @@ const Cart: React.FC = () => {
     const p = subscriptionStoreChangePrompt;
     if (!p) return;
     try {
+      setConfirmingSubscriptionStoreChange(true);
       const raw = await subscriptionCartService.setDeliveryAddress(p.addressId, true);
-      if (isSubscriptionCartStoreChangeConfirmation(raw)) {
+      const normalized = normalizeSubscriptionCartSetAddressResponse(raw);
+      if (isSubscriptionCartStoreChangeConfirmation(normalized)) {
         toast.error('Could not confirm address change. Try again.', {
           id: 'sub-cart-store-change-retry',
         });
@@ -751,6 +771,8 @@ const Cart: React.FC = () => {
       pendingSubscriptionAddressResolveRef.current?.(false);
       pendingSubscriptionAddressResolveRef.current = null;
       setSubscriptionStoreChangePrompt(null);
+    } finally {
+      setConfirmingSubscriptionStoreChange(false);
     }
   }, [subscriptionStoreChangePrompt, refreshDailyCart]);
 
@@ -2234,7 +2256,7 @@ const Cart: React.FC = () => {
     subscriptionTotals?.total ??
     subtotal + deliveryFee + tax + surcharge - discount;
 
-  const displayStoreName = cartStoreName.trim();
+  const displayStoreName = (pendingFulfilmentStoreName || cartStoreName).trim();
   const deliveryBlockedByCoverage = addressOutsideDelivery === true;
   const deliveryBlockedByStoreMismatch = suggestedStoreForAddress != null;
 
@@ -2781,74 +2803,25 @@ const Cart: React.FC = () => {
 
       </div>
 
-      {/* Store switch confirmation — same copy/layout as Settings */}
-      {showSuggestedStoreSwitchModal && (
-        <div className="fixed inset-0 z-[99997] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-3 text-center text-lg font-semibold text-gray-900">Switch Store?</h3>
-            <p className="mb-6 text-center text-sm text-gray-600">
-              Due to the change in store, items in your cart might get affected. Do you want to continue?
-            </p>
-            <div className="space-y-3">
-              <button
-                type="button"
-                disabled={isSwitchingSuggestedStore}
-                onClick={() => void performSwitchToSuggestedStore()}
-                className="w-full rounded-lg py-3 text-base font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                style={{
-                  backgroundColor: theme.colors.primary,
-                  color: 'black',
-                }}
-              >
-                {isSwitchingSuggestedStore ? 'Please wait…' : 'Continue'}
-              </button>
-              <button
-                type="button"
-                disabled={isSwitchingSuggestedStore}
-                onClick={cancelSuggestedStoreSwitchModal}
-                className="w-full rounded-lg py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CartConfirmModal
+        open={showSuggestedStoreSwitchModal}
+        title={SWITCH_STORE_CONFIRM_TITLE}
+        message={SWITCH_STORE_CONFIRM_MESSAGE}
+        loading={isSwitchingSuggestedStore}
+        onConfirm={() => void performSwitchToSuggestedStore()}
+        onCancel={cancelSuggestedStoreSwitchModal}
+        titleId="gp-daily-switch-store-title"
+      />
 
-      {/* Subscription cart: store change clears incompatible lines — confirm with user */}
-      {subscriptionStoreChangePrompt ? (
-        <div
-          className="fixed inset-0 z-[220] flex items-center justify-center bg-black/45 px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="gp-sub-cart-store-change-title"
-        >
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h2 id="gp-sub-cart-store-change-title" className="text-lg font-semibold text-gray-900">
-              Address changed
-            </h2>
-            <p className="mt-3 text-sm leading-relaxed text-gray-600 whitespace-pre-wrap">
-              {subscriptionStoreChangePrompt.message}
-            </p>
-            <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
-              <button
-                type="button"
-                onClick={() => void confirmSubscriptionStoreChange()}
-                className="rounded-xl bg-gray-900 py-3 text-center text-base font-semibold text-white hover:bg-gray-800"
-              >
-                Continue
-              </button>
-              <button
-                type="button"
-                onClick={cancelSubscriptionStoreChange}
-                className="rounded-xl border border-gray-200 py-3 text-center text-base font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <CartConfirmModal
+        open={subscriptionStoreChangePrompt != null}
+        title="Address changed"
+        message={subscriptionStoreChangePrompt?.message ?? ""}
+        loading={confirmingSubscriptionStoreChange}
+        onConfirm={() => void confirmSubscriptionStoreChange()}
+        onCancel={cancelSubscriptionStoreChange}
+        titleId="gp-sub-cart-store-change-title"
+      />
 
       {/* Promo Code Modal */}
       {showPromoModal && (

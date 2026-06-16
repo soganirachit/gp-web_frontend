@@ -32,7 +32,7 @@ const ModifySubscription: React.FC = () => {
   const [subscription, setSubscription] = useState<Subscription | null>(
     subscriptionFromNav,
   );
-  const [quantity, setQuantity] = useState(1);
+  const [lineQuantities, setLineQuantities] = useState<number[]>([1]);
   const [deliveryType, setDeliveryType] = useState<"daily" | "custom">("daily");
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -151,11 +151,12 @@ const ModifySubscription: React.FC = () => {
       setSelectedDays(shorts.length ? shorts : [...WEEK_SHORT]);
     }
 
-    const qty = firstLine?.quantity;
-    if (typeof qty === "number" && qty >= 1) {
-      setQuantity(Math.round(qty));
-    }
-  }, [subscription, lineItems, firstLine?.quantity]);
+    const qtys = lineItems.map((li) => {
+      const q = Number(li.quantity);
+      return Number.isFinite(q) && q >= 1 ? Math.round(q) : 1;
+    });
+    setLineQuantities(qtys.length > 0 ? qtys : [1]);
+  }, [subscription, lineItems]);
 
   const subscribedDaysDisplay = useMemo(() => {
     if (deliveryType === "daily") {
@@ -177,11 +178,14 @@ const ModifySubscription: React.FC = () => {
     }
   };
 
-  const handleQuantityChange = (change: number) => {
-    const newQuantity = quantity + change;
-    if (newQuantity >= 1) {
-      setQuantity(newQuantity);
-    }
+  const handleQuantityChange = (lineIndex: number, change: number) => {
+    setLineQuantities((prev) =>
+      prev.map((qty, idx) => {
+        if (idx !== lineIndex) return qty;
+        const next = qty + change;
+        return next >= 1 ? next : qty;
+      }),
+    );
   };
 
   const handleSaveChanges = async () => {
@@ -211,11 +215,37 @@ const ModifySubscription: React.FC = () => {
           : selectedDays.map((day) => dayMap[day]);
       const subscriptionType = deliveryType === "daily" ? "DAILY" : "CUSTOM";
 
-      await subscriptionService.updateSubscription(subscription.id, {
+      const itemPayload = lineItems
+        .map((li, idx) => {
+          const productId = li.productId;
+          const qty = lineQuantities[idx] ?? li.quantity;
+          if (productId == null || !Number.isFinite(productId) || productId <= 0) {
+            return null;
+          }
+          return {
+            product_id: productId,
+            quantity: Math.max(1, Math.round(qty)),
+          };
+        })
+        .filter(
+          (row): row is { product_id: number; quantity: number } => row != null,
+        );
+
+      const updateBody: Parameters<typeof subscriptionService.updateSubscription>[1] = {
         type: subscriptionType,
         selectedDays: apiSelectedDays,
         status: subscription.status as "ACTIVE" | "PAUSED" | "CANCELLED" | "INACTIVE",
-      });
+      };
+
+      if (itemPayload.length === 1) {
+        updateBody.quantity = itemPayload[0].quantity;
+      } else if (itemPayload.length > 1) {
+        updateBody.items = itemPayload;
+      } else if (lineQuantities[0] != null && lineQuantities[0] >= 1) {
+        updateBody.quantity = Math.max(1, Math.round(lineQuantities[0]));
+      }
+
+      await subscriptionService.updateSubscription(subscription.id, updateBody);
 
       toast.success("Subscription updated successfully!");
       navigate("/gp-daily/manage-my-subscription");
@@ -296,43 +326,51 @@ const ModifySubscription: React.FC = () => {
                     {li.name}
                   </p>
                   <p className="mt-0.5 text-xs text-[#6B7280]">
-                    Qty: {formatQty(li.quantity)} × ₹{formatRupees(li.unitPrice)}
+                    Qty: {formatQty(lineQuantities[idx] ?? li.quantity)} × ₹
+                    {formatRupees(li.unitPrice)}
                   </p>
+                  <div className="mt-3 flex items-center justify-between gap-4">
+                    <span className="shrink-0 text-sm font-semibold text-black">
+                      Quantity
+                    </span>
+                    <div className="flex shrink-0 items-center gap-4">
+                      <button
+                        type="button"
+                        onClick={() => handleQuantityChange(idx, -1)}
+                        disabled={(lineQuantities[idx] ?? 1) <= 1}
+                        className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full border-0 bg-gray-100 p-0 transition-colors hover:bg-gray-200 disabled:opacity-50"
+                        aria-label="Decrease quantity"
+                      >
+                        <span className="text-[18px] font-normal leading-none text-black">
+                          −
+                        </span>
+                      </button>
+                      <span className="min-w-[1.25rem] text-center text-sm font-bold tabular-nums text-black">
+                        {lineQuantities[idx] ?? li.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleQuantityChange(idx, 1)}
+                        className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full border-0 p-0 transition-opacity hover:opacity-90"
+                        style={{ backgroundColor: primary }}
+                        aria-label="Increase quantity"
+                      >
+                        <span className="text-[18px] font-normal leading-none text-black">
+                          +
+                        </span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="shrink-0 self-center text-sm font-bold text-[#1A1A1A]">
-                  ₹{formatRupees(li.subtotal)}
+                <div className="shrink-0 self-start text-sm font-bold text-[#1A1A1A]">
+                  ₹
+                  {formatRupees(
+                    (lineQuantities[idx] ?? li.quantity) * (li.unitPrice || 0),
+                  )}
                 </div>
               </div>
             ))}
           </div>
-
-          {lineItems.length === 1 ? (
-            <div className="mt-5 flex items-center justify-between gap-4">
-              <span className="shrink-0 text-base font-semibold text-black">Quantity</span>
-              <div className="flex shrink-0 items-center gap-4">
-                <button
-                  type="button"
-                  onClick={() => handleQuantityChange(-1)}
-                  className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full border-0 bg-gray-100 p-0 transition-colors hover:bg-gray-200 disabled:opacity-50"
-                  aria-label="Decrease quantity"
-                >
-                  <span className="text-[18px] font-normal leading-none text-black">−</span>
-                </button>
-                <span className="min-w-[1.25rem] text-center text-sm font-bold tabular-nums text-black">
-                  {quantity}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleQuantityChange(1)}
-                  className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full border-0 p-0 transition-opacity hover:opacity-90"
-                  style={{ backgroundColor: primary }}
-                  aria-label="Increase quantity"
-                >
-                  <span className="text-[18px] font-normal leading-none text-black">+</span>
-                </button>
-              </div>
-            </div>
-          ) : null}
         </section>
 
         {/* Delivery schedule — heading first, then subscribed-days card, then options */}
@@ -417,6 +455,9 @@ const ModifySubscription: React.FC = () => {
         {deliveryType === "custom" ? (
           <section className="mt-9">
             <h3 className="text-base font-semibold text-black">Select Days</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Minimum 3 days are required
+            </p>
             <div className="relative mt-5 px-0.5">
               <div
                 className="pointer-events-none absolute left-[8%] right-[8%] top-1/2 z-0 h-px -translate-y-1/2 bg-gray-400"
