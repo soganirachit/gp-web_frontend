@@ -742,7 +742,7 @@ const AddressSelection: React.FC = () => {
         setLoading(true);
 
         // Import the RazorpayPayment component dynamically
-        const { default: RazorpayPayment } = await import("../Payment/Rezorpay/RezorpayPayment");
+        const { default: RazorpayPayment } = await import("../Payment/Razorpay/RazorpayPayment");
 
         // Handle store product payment directly
         // Use currentUserData (local variable) to avoid closure issues

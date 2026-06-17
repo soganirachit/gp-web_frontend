@@ -47,7 +47,7 @@ import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow, startOfDay } from 'date-fns';
 import toast from 'react-hot-toast';
-import CartRazorpayPayment from '../../../components/Payment/Rezorpay/CartRazorpayPayment';
+import CartRazorpayPayment from '../../../components/Payment/Razorpay/CartRazorpayPayment';
 import { paymentService } from '../../../services/payment.service';
 import { orderService } from '../../../services/order.service';
 import { customerService } from '../../../services/getcustomer.service';

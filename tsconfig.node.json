@@ -10,5 +10,5 @@
     "lib": ["ES2023"],
     "outDir": "dist"
   },
-  "include": ["vite.config.ts", "tailwind.config.ts"]
+  "include": ["vite.config.ts"]
 }

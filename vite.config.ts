@@ -1,10 +1,16 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import fs from "node:fs";
 import path from "path";
 import { fileURLToPath } from "node:url";
 
 /** Directory containing this file — always use for `.env` + aliases (not `process.cwd()`). */
 const configDir = path.dirname(fileURLToPath(import.meta.url));
+
+// Same jiti cache as postcss.config.cjs (see that file for rationale).
+const jitiCacheDir = path.join(configDir, ".cache", "jiti");
+fs.mkdirSync(jitiCacheDir, { recursive: true });
+process.env.JITI_CACHE_DIR ??= jitiCacheDir;
 
 /**
  * When `VITE_DEV_PROXY_TARGET` is set (e.g. `https://apigp.mygendaphool.com`) and
