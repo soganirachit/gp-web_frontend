@@ -14,6 +14,14 @@ const Unsubscribed_User_Home = lazy(() => import('../pages/Unsubscribed_User_Hom
 const Gp_daily_Homepage = lazy(() => import('../pages/GpDaily_Homepage'));
 const GpStore_Homepage = lazy(() => import('../pages/GpStore_Homepage'));
 const HomePage = lazy(() => import('../pages/home_page'));
+const BloomBarLayout = lazy(() => import('../pages/BloomBar/BloomBarLayout'));
+const BloomBarLanding = lazy(() => import('../pages/BloomBar/BloomBarLanding'));
+const BloomBarScanner = lazy(() => import('../pages/BloomBar/BloomBarScanner'));
+const BloomBarProduct = lazy(() => import('../pages/BloomBar/BloomBarProduct'));
+const BloomBarBasket = lazy(() => import('../pages/BloomBar/BloomBarBasket'));
+const BloomBarCheckout = lazy(() => import('../pages/BloomBar/BloomBarCheckout'));
+const BloomBarScanNext = lazy(() => import('../pages/BloomBar/BloomBarScanNext'));
+const BloomBarConfirmation = lazy(() => import('../pages/BloomBar/BloomBarConfirmation'));
 const Sajawat = lazy(() => import('../pages/Sajawat'));
 const SajawatSignatureGallery = lazy(() => import('../pages/SajawatSignatureGallery'));
 const Products = lazy(() => import('../components/ProductPage/page'));
@@ -77,11 +85,27 @@ const router = createBrowserRouter(
     children: [
       { path: '/', element: <Startup /> },
       { path: '/startup', element: <Startup /> },
+      { path: '/landing', element: <BloomBarLanding /> },
       { path: '/search', element: <Navigate to="/home" replace /> },
       { path: '/explore-more', element: <ExploreMore /> },
       { path: '/home', element: <HomePage /> },
       { path: '/sajawat', element: <Sajawat /> },
       { path: '/sajawat/gallery', element: <SajawatSignatureGallery /> },
+      
+      // ================== BLOOMBAR ROUTES ==================
+      {
+        path: '/bloombar',
+        element: <BloomBarLayout />,
+        children: [
+          { index: true, element: <BloomBarLanding /> },
+          { path: 'scanner', element: <BloomBarScanner /> },
+          { path: 'scan-next', element: <BloomBarScanNext /> },
+          { path: 'product', element: <BloomBarProduct /> },
+          { path: 'basket', element: <BloomBarBasket /> },
+          { path: 'checkout', element: <BloomBarCheckout /> },
+          { path: 'confirmation', element: <BloomBarConfirmation /> },
+        ],
+      },
       {
         path: '/gp-daily',
         element: <Gp_daily_Homepage />

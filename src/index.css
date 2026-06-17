@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap');
+
+@layer components {
+  .genda-gradient {
+    background: linear-gradient(135deg, #1d4d2a 0%, #2d7a42 100%);
+  }
+  .premium-shadow {
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  }
+  .float-shadow {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
+  }
+}
+
 :root {
   /** Tab bar: min-h 52px + py-2.5 + safe area (inside BottomNav) */
   --gp-bottom-nav-height: 3.875rem;
