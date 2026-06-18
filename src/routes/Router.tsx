@@ -19,7 +19,6 @@ const BloomBarLanding = lazy(() => import('../pages/BloomBar/BloomBarLanding'));
 const BloomBarScanner = lazy(() => import('../pages/BloomBar/BloomBarScanner'));
 const BloomBarProduct = lazy(() => import('../pages/BloomBar/BloomBarProduct'));
 const BloomBarBasket = lazy(() => import('../pages/BloomBar/BloomBarBasket'));
-const BloomBarCheckout = lazy(() => import('../pages/BloomBar/BloomBarCheckout'));
 const BloomBarScanNext = lazy(() => import('../pages/BloomBar/BloomBarScanNext'));
 const BloomBarConfirmation = lazy(() => import('../pages/BloomBar/BloomBarConfirmation'));
 const Sajawat = lazy(() => import('../pages/Sajawat'));
@@ -102,7 +101,7 @@ const router = createBrowserRouter(
           { path: 'scan-next', element: <BloomBarScanNext /> },
           { path: 'product', element: <BloomBarProduct /> },
           { path: 'basket', element: <BloomBarBasket /> },
-          { path: 'checkout', element: <BloomBarCheckout /> },
+          { path: 'checkout', element: <Navigate to="/bloombar/basket" replace /> },
           { path: 'confirmation', element: <BloomBarConfirmation /> },
         ],
       },

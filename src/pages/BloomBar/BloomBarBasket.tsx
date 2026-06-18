@@ -10,7 +10,6 @@ import BloomBarConfirmation from './BloomBarConfirmation';
 
 
 const TAX_RATE = 0.05;
-const DELIVERY_FEE = 50;
 
 export default function BloomBarBasket() {
   const { items, itemCount, total, updateQuantity, removeItem, clearCart, hotelContext, sessionId } =
@@ -22,7 +21,7 @@ export default function BloomBarBasket() {
   const [customerName, setCustomerName] = useState('');
 
   const tax = Math.round(total * TAX_RATE);
-  const grandTotal = total + tax + DELIVERY_FEE;
+  const grandTotal = total + tax;
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -61,25 +60,22 @@ export default function BloomBarBasket() {
     });
 
     const options = {
-      key: 'rzp_test_placeholder',
-      amount: grandTotal * 100,
+      key: order.key,
+      amount: order.amount,
       currency: 'INR',
+      order_id: order.razorpay_order_id,
       name: 'Genda Phool',
       description: `Flowers from ${(hotelContext?.hotel as { name?: string })?.name || 'Kiosk'}`,
       image: 'https://images.unsplash.com/photo-1490750967868-88df5691cc2b?w=100&h=100&fit=crop',
       handler: async (response: RazorpayResponse) => {
+        // session_id lets the backend mark the matching scan event as converted
+        // (conversion + revenue are recorded server-side in payments/verify).
         await base44.entities.Order.update(order.id as string, {
           status: 'paid',
           payment_id: response.razorpay_payment_id,
           razorpay_order_id: response.razorpay_order_id,
-        });
-        await base44.entities.QRScanEvent.create({
-          hotel_id: hotelContext?.hotelId || '',
-          kiosk_id: hotelContext?.kioskId || '',
-          campaign: hotelContext?.campaign || 'direct',
+          razorpay_signature: response.razorpay_signature,
           session_id: sessionId,
-          converted: true,
-          revenue: grandTotal,
         });
         clearCart();
         setCustomerName(form.name);
@@ -218,7 +214,7 @@ export default function BloomBarBasket() {
           <h3 className="font-semibold text-sm mb-3">Order Summary</h3>
           <div className="space-y-2">
             <BloomBarOrderSummaryRow label="Subtotal" value={`₹${total.toLocaleString('en-IN')}`} />
-            <BloomBarOrderSummaryRow label="Delivery Fee" value={`₹${DELIVERY_FEE}`} />
+
             <BloomBarOrderSummaryRow label="Tax (5%)" value={`₹${tax}`} />
             <BloomBarOrderSummaryRow
               label="Total"

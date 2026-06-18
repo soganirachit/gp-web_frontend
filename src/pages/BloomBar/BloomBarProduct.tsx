@@ -8,17 +8,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ScanLine, CheckCircle2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
-/** Map the backend product shape (effective_price/image) to the card's shape (price/image_url). */
-function normalizeProduct(raw: Record<string, unknown>): Product {
-  return {
-    ...raw,
-    id: String(raw.id),
-    name: String(raw.name ?? ''),
-    price: Number(raw.effective_price ?? raw.price ?? 0),
-    image_url: (raw.image ?? raw.image_url ?? undefined) as string | undefined,
-  } as Product;
-}
-
 export default function BloomBarProductPage() {
   const { setHotelContext, sessionId } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
@@ -45,11 +34,11 @@ export default function BloomBarProductPage() {
       let resolvedProduct: Product | undefined;
       if (productId) {
         const products = await base44.entities.Product.filter({ id: productId });
-        if (products.length > 0) resolvedProduct = normalizeProduct(products[0] as Record<string, unknown>);
+        if (products.length > 0) resolvedProduct = products[0] as unknown as Product;
         else throw new Error('Product not found');
       } else {
         const products = await base44.entities.Product.list('-created_date', 1);
-        if (products.length > 0) resolvedProduct = normalizeProduct(products[0] as Record<string, unknown>);
+        if (products.length > 0) resolvedProduct = products[0] as unknown as Product;
         else throw new Error('No products available');
       }
       setProduct(resolvedProduct!);

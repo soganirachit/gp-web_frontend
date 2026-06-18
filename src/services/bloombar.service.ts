@@ -14,9 +14,20 @@ function unwrap<T>(res: { data: { data: T } }): T {
 
 // ── Product ──────────────────────────────────────────────────────────────────
 
+/** Map the backend product shape (effective_price/image) to the card's shape (price/image_url). */
+function normalizeProduct(raw: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...raw,
+    id: String(raw.id),
+    name: String(raw.name ?? ''),
+    price: Number(raw.effective_price ?? raw.price ?? 0),
+    image_url: (raw.image ?? raw.image_url ?? undefined) as string | undefined,
+  };
+}
+
 async function fetchProduct(id: string | number) {
   const res = await api.get(`${BASE}/products/${id}/`);
-  return unwrap<Record<string, unknown>>(res);
+  return normalizeProduct(unwrap<Record<string, unknown>>(res));
 }
 
 // ── Kiosk (mapped from "Hotel" in base44) ───────────────────────────────────

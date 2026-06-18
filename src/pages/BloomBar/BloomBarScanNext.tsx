@@ -16,7 +16,7 @@ interface ScanParams {
 }
 
 export default function BloomBarScanNext() {
-  const { items, itemCount, total, setHotelContext } = useCart();
+  const { items, itemCount, total, setHotelContext, sessionId } = useCart();
   const [view, setView] = useState<View>('scanning');
   const [scanKey, setScanKey] = useState(0);
   const [product, setProduct] = useState<BloomBarProduct | null>(null);
@@ -64,7 +64,7 @@ export default function BloomBarScanNext() {
             kiosk_id: kioskId,
             product_id: productId,
             campaign,
-            session_id: `sess_${Date.now()}`,
+            session_id: sessionId,
             user_agent: navigator.userAgent,
           }).catch(() => {});
         }
