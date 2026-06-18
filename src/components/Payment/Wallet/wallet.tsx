@@ -9,7 +9,7 @@ import { toast } from "react-hot-toast";
 import { useAuth } from "../../../context/AuthContext";
 import { useFeatureTheme } from "../../../context/FeatureThemeContext";
 import { useCart, CartItem, CartDeliveryInfo } from "../../../context/CartContext";
-import RazorpayPayment from "../../Payment/Rezorpay/RezorpayPayment";
+import RazorpayPayment from "../../Payment/Razorpay/RazorpayPayment";
 import { IoAlertCircle, IoWarningOutline } from "react-icons/io5";
 import { useNetworkRecovery } from "../../../hooks/useNetworkRecovery";
 import { IoMdArrowDown, IoMdArrowUp } from "react-icons/io";

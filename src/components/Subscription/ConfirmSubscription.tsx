@@ -12,7 +12,7 @@ import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import { subscriptionService } from "../../services/subscription.service";
 import { customerService } from "@/services/getcustomer.service";
 import { orderService } from "@/services/order.service";
-import RazorpayPayment from "../Payment/Rezorpay/RezorpayPayment";
+import RazorpayPayment from "../Payment/Razorpay/RazorpayPayment";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import Spinner from "../common/Spinner";
 import { SubscriptionFlowSkeleton } from "../common/PageSkeletons";

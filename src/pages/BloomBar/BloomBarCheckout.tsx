@@ -4,13 +4,8 @@ import { base44 } from '@/api/base44Client';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Phone, Mail, User, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { loadRazorpayScript } from '@/lib/razorpayLoader';
 import BloomBarConfirmation from './BloomBarConfirmation';
-
-declare global {
-  interface Window {
-    Razorpay: new (options: Record<string, unknown>) => { open: () => void };
-  }
-}
 
 const TAX_RATE = 0.05;
 
@@ -37,23 +32,14 @@ export default function BloomBarCheckout() {
     return Object.keys(e).length === 0;
   };
 
-  const loadRazorpay = () =>
-    new Promise<boolean>(resolve => {
-      if (window.Razorpay) return resolve(true);
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-
   const handlePayment = async () => {
     if (!validate()) return;
     setLoading(true);
     setOrderError(null);
 
-    const loaded = await loadRazorpay();
-    if (!loaded) {
+    try {
+      await loadRazorpayScript();
+    } catch {
       setLoading(false);
       alert('Failed to load payment gateway. Please check your connection and try again.');
       return;
@@ -82,7 +68,7 @@ export default function BloomBarCheckout() {
         name: 'Genda Phool',
         description: `Flowers from ${(hotelContext?.hotel as { name?: string })?.name || 'Kiosk'}`,
         image: 'https://images.unsplash.com/photo-1490750967868-88df5691cc2b?w=100&h=100&fit=crop',
-        handler: async (response: Record<string, string>) => {
+        handler: async (response: RazorpayResponse) => {
           await base44.entities.Order.update(order.id as string, {
             status: 'paid',
             payment_id: response.razorpay_payment_id,
