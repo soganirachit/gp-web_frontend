@@ -29,6 +29,10 @@ import SearchIcon from "../assets/icon/Search.png";
 import { useAuth } from "../context/AuthContext";
 import { GP_OPEN_GUEST_AREA_MODAL_EVENT } from "../config/guestAreaModalCopy";
 import { guestHasSavedBrowseAddress } from "../utils/guestAddressEntry";
+import {
+  formatSavedAddressLine,
+  pickHomeCatalogHeaderAddress,
+} from "../utils/resolveHomeCatalogHeaderAddress";
 import { HomeHeroStatusBanner } from "../components/home/HomeHeroStatusBanner";
 import { GpStoreOfflineHero } from "../components/store/GpStoreOfflineHero";
 import { BrandIntroPyramidCopy } from "../components/common/BrandIntroPyramidCopy";
@@ -76,6 +80,7 @@ import {
   HOME_HEADER_PROFILE_OFFSET,
 } from "../constants/homeHeaderLayout";
 import { ProductImageTag } from "../components/common/ProductImageTag";
+import { formatNamasteGreeting, hasRealUserFirstName } from "../utils/namasteGreeting";
 import { OffersBannerCarousel } from "../components/OffersBannerCarousel";
 import { HorizontalScrollSection } from "../components/common/HorizontalScrollSection";
 import { BANNER_PLACEMENT_STORE_HOME } from "../utils/bannerPlacement";
@@ -152,13 +157,16 @@ const GpStore_Homepage: React.FC = () => {
             const customers = await customerService.getAllCustomers();
             if (customers && customers.length > 0) {
                 const user = customers[0];
-                setUserFirstName(user.firstName);
+                const first = user.firstName?.trim() || "";
+                setUserFirstName(hasRealUserFirstName(first) ? first : "");
             } else {
-                setUserFirstName(localStorage.getItem("userName")?.split(" ")[0] || "User");
+                const stored = localStorage.getItem("userName")?.split(" ")[0] || "";
+                setUserFirstName(hasRealUserFirstName(stored) ? stored : "");
             }
         } catch (error) {
             console.error("Error fetching customer name:", error);
-            setUserFirstName(localStorage.getItem("userName")?.split(" ")[0] || "User");
+            const stored = localStorage.getItem("userName")?.split(" ")[0] || "";
+            setUserFirstName(hasRealUserFirstName(stored) ? stored : "");
         }
     };
 
@@ -293,30 +301,10 @@ const GpStore_Homepage: React.FC = () => {
                 return;
             }
             const addresses = await addressService.getAllAddresses();
-            const overrideId = storeService.getGpStoreCatalogAddressOverrideId();
-            const fromOverride = overrideId
-                ? addresses.find((a) => String(a.id) === String(overrideId))
-                : null;
-            const defaultAddress = addresses.find((addr) => addr.isDefault);
-            const selectedAddress =
-                fromOverride ||
-                defaultAddress ||
-                addresses
-                    .sort(
-                        (a, b) =>
-                            new Date(b.updatedAt).getTime() -
-                            new Date(a.updatedAt).getTime()
-                    )[0];
+            const selectedAddress = pickHomeCatalogHeaderAddress(addresses);
 
             if (selectedAddress) {
-                const formattedAddress = [
-                    selectedAddress.houseNo,
-                    selectedAddress.streetName,
-                    selectedAddress.area,
-                    selectedAddress.city,
-                    selectedAddress.state,
-                    selectedAddress.pincode
-                ].filter(Boolean).join(', ');
+                const formattedAddress = formatSavedAddressLine(selectedAddress);
                 setDeliveryLocation(formattedAddress);
                 setAddressType(selectedAddress.type || "Home");
                 deliveryCoordsRef.current =
@@ -537,7 +525,7 @@ const GpStore_Homepage: React.FC = () => {
                             {/* Namaste + delivery truck — single row (design ref) */}
                             {homeHeroStatus === "store_offline" ? (
                                 <GpStoreOfflineHero
-                                    userFirstName={userFirstName || "User"}
+                                    userFirstName={userFirstName || ""}
                                 />
                             ) : homeHeroStatus !== "default" ? (
                                 <HomeHeroStatusBanner
@@ -560,9 +548,7 @@ const GpStore_Homepage: React.FC = () => {
                                         className={`relative z-[1] min-w-0 ${GP_STORE_HERO_TRUCK_COPY_PAD_CLASS} ${gpDailyHome.namasteHeroInset}`}
                                     >
                                         <h2 className={`${gpDailyHome.storeHeroGreeting} relative z-10`}>
-                                            {userFirstName
-                                                ? `Namaste, ${userFirstName}!`
-                                                : "Namaste!"}
+                                            {formatNamasteGreeting(isLoggedIn, userFirstName)}
                                         </h2>
                                         <div className="relative z-[1]">
                                             <BrandIntroPyramidCopy className="mb-1.5" />

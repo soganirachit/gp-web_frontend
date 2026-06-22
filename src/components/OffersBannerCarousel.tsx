@@ -13,6 +13,7 @@ import {
 import { gpDailyHome } from '../utils/gpDailyHomeDesignSystem';
 import { DesktopHorizontalNavButtons } from './common/HorizontalScrollSection';
 import { GP_LANDING_SECTION_HEADING_CLASS } from '../utils/landingHomeTypography';
+import { SessionCachedImage } from './common/SessionCachedImage';
 
 interface Props {
   /** Resolved store (guest temp / logged-in selected). Omit or null = no banners request. */
@@ -64,11 +65,9 @@ const FALLBACK_GRADIENTS_GP_DAILY = [
 ];
 
 /**
- * Match Sajawat card visual height on /home (Sajawat uses min-h 8.75rem/9.5rem but
- * grows with logo + copy + CTA; fixed banner height aligns to that rendered size).
+ * Responsive banner frame — scales width and height together (no fixed-height crop).
  */
-const OFFERS_BANNER_HEIGHT =
-  'h-[12.25rem] min-h-[12.25rem] sm:h-[13.5rem] sm:min-h-[13.5rem]';
+const BANNER_ASPECT_CLASS = "aspect-[16/9] w-full";
 
 export function OffersBannerCarousel({
   storeId,
@@ -91,7 +90,7 @@ export function OffersBannerCarousel({
       : compactSpacing
         ? "mb-2 sm:mb-3"
         : "mb-6 sm:mb-8";
-  const dailyBannerHeightClass = OFFERS_BANNER_HEIGHT;
+  const dailyBannerHeightClass = BANNER_ASPECT_CLASS;
   const { theme } = useFeatureTheme();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -264,11 +263,10 @@ export function OffersBannerCarousel({
       >
         {/* Background — image or theme fallback gradient */}
         {hasImage ? (
-          <img
+          <SessionCachedImage
             src={banner.image_url!}
             alt={banner.title}
-            className="absolute inset-0 h-full w-full object-cover object-center"
-            loading="lazy"
+            className="absolute inset-0 h-full w-full object-contain object-center bg-[#f8f6f1]"
             onError={() => setImgErrors(prev => ({ ...prev, [banner.id]: true }))}
           />
         ) : (

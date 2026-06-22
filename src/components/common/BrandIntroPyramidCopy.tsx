@@ -17,17 +17,17 @@ export function BrandIntroPyramidCopy({ className = "" }: Props) {
           .filter(Boolean)
           .join(" ")}
       >
-        <span className={GP_BRAND_PYRAMID_LEAD_CLASS}>We are Genda Phool!</span>
+        <span className={GP_BRAND_PYRAMID_LEAD_CLASS}>We are Genda Phool.</span>
         <span className="mt-0.5 block">Your partner for</span>
-        <span className="block">everyday floral needs</span>
+        <span className="block">daily floral needs!</span>
       </p>
       <p
         className={[GP_BRAND_PYRAMID_CLASS, "hidden lg:block", className]
           .filter(Boolean)
           .join(" ")}
       >
-        <span className={GP_BRAND_PYRAMID_LEAD_CLASS}>We are Genda Phool!</span>{" "}
-        Your partner for everyday floral needs
+        <span className={GP_BRAND_PYRAMID_LEAD_CLASS}>We are Genda Phool.</span>{" "}
+        Your partner for daily floral needs!
       </p>
     </>
   );

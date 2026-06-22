@@ -539,11 +539,21 @@ const ManageMySubscription: React.FC = () => {
     const deliveryInts = getDeliveryDayInts(subscription);
 
     const primaryLine = lineItems[0];
-    const headline = cleanSubscriptionProductDisplayName(
-      primaryLine?.name ||
-        subscription.productDetails?.name ||
-        "Subscription",
-    );
+    const headline =
+      formatOrderListProductLabel(
+        cleanSubscriptionProductDisplayName(
+          primaryLine?.name ||
+            subscription.productDetails?.name ||
+            "Subscription",
+        ),
+        lineItems.length,
+      ) ||
+      cleanSubscriptionProductDisplayName(
+        primaryLine?.name ||
+          subscription.productDetails?.name ||
+          "Subscription",
+      );
+    const secondLineImage = lineItems[1]?.imageUrl ?? null;
     const totalPackQty = lineItems.reduce(
       (s, li) => s + (Number(li.quantity) || 1),
       0
@@ -587,19 +597,12 @@ const ManageMySubscription: React.FC = () => {
       >
         {/* Card header — summary row + status / edit (design ref) */}
         <div className="flex gap-3">
-          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-100">
-            {primaryLine?.imageUrl ? (
-              <img
-                src={primaryLine.imageUrl}
-                alt={headline}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-gray-200 text-lg font-medium text-gray-400">
-                {headline.charAt(0)}
-              </div>
-            )}
-          </div>
+          <OrderListThumb
+            primaryImageUrl={primaryLine?.imageUrl}
+            secondImageUrl={secondLineImage}
+            itemsCount={lineItems.length}
+            className="h-14 w-14"
+          />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">

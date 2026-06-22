@@ -30,6 +30,10 @@ import {
 } from "../../config/guestBrowseAddressCopy";
 import { AddressSelectionSkeleton } from "../common/PageSkeletons";
 import { formatPhoneForDisplay } from "../../utils/phoneDisplay";
+import {
+  formatAddressReceiverNameLine,
+  formatAddressReceiverPhoneLine,
+} from "../../utils/formatAddressReceiverContact";
 import { formatCartDeliveryAddress } from "../../utils/formatCartDeliveryAddress";
 import homeIcon from "../../assets/svg/adressbook/home.svg";
 import workIcon from "../../assets/svg/adressbook/office.svg";
@@ -40,6 +44,8 @@ import defaultIcon from "../../assets/svg/adressbook/default.svg";
 import {
   LIVE_DEVICE_ADDRESS_ID,
   resolveLiveDeviceToSavedAddress,
+  findSavedAddressAtCoordinates,
+  parseAddressCoordinates,
 } from "../../utils/addressCoordinates";
 import { walletService } from "../../services/wallet.service";
 import { setGpDailyPendingSubscriptionCheckout } from "../../utils/gpDailyPendingSubscriptionCheckout";
@@ -487,8 +493,15 @@ const AddressSelection: React.FC = () => {
       setSelectedAddress(newAddress);
       localStorage.setItem(
         "selectedDeliveryAddress",
-        JSON.stringify(newAddress)
+        JSON.stringify(newAddress),
       );
+
+      if (location.state?.fromCart) {
+        navigate(`${basePath}/cart`, {
+          state: { addressUpdated: true, selectedAddressId: newAddress.id },
+        });
+        return;
+      }
     } catch (error: any) {
       handleAuthError(error);
     } finally {
@@ -561,18 +574,38 @@ const AddressSelection: React.FC = () => {
   };
 
   const handleAddressSelect = async (address: Address) => {
-    const addressToUse = resolveLiveDeviceToSavedAddress(address, addresses);
+    let addressToUse = resolveLiveDeviceToSavedAddress(address, addresses);
 
     if (
       String(addressToUse.id) === LIVE_DEVICE_ADDRESS_ID &&
       !location.state?.fromHome
     ) {
-      toast.error(
-        location.state?.fromCart
-          ? "Save your current location as an address to use it for checkout."
-          : "Save your current location as an address to use it for delivery.",
-      );
-      return;
+      const coords = parseAddressCoordinates(addressToUse.coordinates);
+      if (coords) {
+        const savedMatch = findSavedAddressAtCoordinates(
+          coords.lat,
+          coords.lng,
+          addresses,
+        );
+        if (savedMatch) {
+          addressToUse = savedMatch;
+        } else {
+          setFormData((prev) => ({
+            ...prev,
+            area: liveDeviceLocation?.formattedAddress || prev.area,
+            coordinates: `${coords.lat},${coords.lng}`,
+          }));
+          setShowAddForm(true);
+          return;
+        }
+      } else {
+        toast.error(
+          location.state?.fromCart
+            ? "Save your current location as an address to use it for checkout."
+            : "Save your current location as an address to use it for delivery.",
+        );
+        return;
+      }
     }
 
     // Validate address before selecting
@@ -593,6 +626,7 @@ const AddressSelection: React.FC = () => {
           await storeService.applyBrowseAddressForCatalog(addressToUse);
           toast.success("Delivery location updated");
         }
+        window.dispatchEvent(new Event("addressUpdated"));
         navigate(basePath, { replace: true });
       } catch (err: unknown) {
         const msg =
@@ -1614,9 +1648,11 @@ const AddressSelection: React.FC = () => {
                 const isGreenBg = addressTypeLower !== "work" && addressTypeLower !== "office";
                 const iconBgClass = isGreenBg ? "bg-[#ECFDF5]" : "bg-[#EEF2FF]";
                 const isSelected = selectedAddress?.id === address.id;
-                const phoneDisplay = formatPhoneForDisplay(address.associatedPhoneNumber);
-                const phoneDigits = phoneDisplay.replace(/\D/g, "");
-                const showPhoneLine = phoneDigits.length === 10;
+                const phoneLine = formatAddressReceiverPhoneLine(
+                  address.associatedPhoneNumber,
+                );
+                const receiverName = formatAddressReceiverNameLine(address.name);
+                const showPhoneLine = Boolean(phoneLine);
 
                 return (
                   <div
@@ -1667,10 +1703,19 @@ const AddressSelection: React.FC = () => {
                               pincode: address.pincode,
                             })}
                           </p>
-                          {showPhoneLine ? (
-                            <p className="mt-0.5 text-sm font-medium text-gray-800">
-                              <span className="whitespace-nowrap">+91 {phoneDisplay}</span>
-                            </p>
+                          {receiverName || showPhoneLine ? (
+                            <div className="mt-0.5 space-y-0.5">
+                              {receiverName ? (
+                                <p className="text-sm font-semibold text-gray-800">
+                                  {receiverName}
+                                </p>
+                              ) : null}
+                              {showPhoneLine ? (
+                                <p className="text-sm font-medium text-gray-800">
+                                  <span className="whitespace-nowrap">{phoneLine}</span>
+                                </p>
+                              ) : null}
+                            </div>
                           ) : null}
                         </div>
                         <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">

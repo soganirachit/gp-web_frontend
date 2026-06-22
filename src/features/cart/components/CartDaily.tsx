@@ -80,6 +80,7 @@ import {
 } from '../../../utils/deliverySlotSelection';
 import { pickPrimaryImageUrl } from '../../../utils/pickPrimaryImageUrl';
 import { computeFirstSubscriptionDeliveryDateFromWeekdayInts } from '../../../utils/subscriptionFirstDeliveryDate';
+import { SUBSCRIPTION_FIRST_DELIVERY_CUTOFF_MESSAGE } from '../../../utils/subscriptionCartDeliveryMessage';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
 import deliveryTruckIcon from "../../../assets/svg/gp_daily svg/delivery_truck.svg";
 import { rechargeWalletInApp } from '../../../utils/walletRechargeCheckout';
@@ -2539,8 +2540,7 @@ const Cart: React.FC = () => {
                     className="h-14 w-14 shrink-0 object-contain"
                   />
                   <p className="flex-1 text-sm font-semibold leading-5 text-[#111827]">
-                  Orders placed before 8 PM will be delivered next day.
-                    {/* Orders placed before 8 PM will be delivered next day. Sunday deliveries available on request. */}
+                  {SUBSCRIPTION_FIRST_DELIVERY_CUTOFF_MESSAGE}
                   </p>
                 </div>
               </div>

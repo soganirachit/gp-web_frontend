@@ -168,6 +168,24 @@ const OTPVerification: React.FC = () => {
         // No need to manually sync here to avoid conflicts
         // The CartContext will detect the login and sync the temp cart automatically
 
+        const fullNameFromUser =
+          response.user?.full_name ||
+          (response.user &&
+            `${(response.user as { first_name?: string }).first_name ?? ""} ${(response.user as { last_name?: string }).last_name ?? ""}`.trim());
+        const hasFullName = !!(
+          fullNameFromUser?.trim() &&
+          fullNameFromUser.trim() !== phoneNumber
+        );
+        const backendSaysNew = response.is_new_user || !response.userExists;
+        const isNewOrIncomplete = backendSaysNew || !hasFullName;
+
+        if (isNewOrIncomplete) {
+          navigate(`${basePath}/name-input`, {
+            state: { returnUrl, fromCart },
+          });
+          return;
+        }
+
         // If coming from cart checkout, redirect back to cart
         if (fromCart && returnUrl) {
           navigate(returnUrl);
@@ -180,41 +198,28 @@ const OTPVerification: React.FC = () => {
           return;
         }
 
-        // Check if user is new or existing
-        const isNewUser = response.is_new_user || !response.userExists;
-
-        if (!isNewUser) {
-          // Existing user - check if they have addresses
-          try {
-            const addresses = await addressService.getAllAddresses();
-            if (addresses && addresses.length > 0) {
-              // User has addresses, go directly to home
-              navigate(basePath, {
-                state: {
-                  returnUrl: basePath
-                }
-              });
-            } else {
-              // User has no addresses, go to location page
-              navigate(`${basePath}/location`, {
-                state: {
-                  returnUrl: basePath
-                }
-              });
-            }
-          } catch (error) {
-            // If there's an error checking addresses, assume user needs to set location
-            console.error('Error checking addresses:', error);
+        // Existing user with a complete profile — route by saved addresses.
+        try {
+          const addresses = await addressService.getAllAddresses();
+          if (addresses && addresses.length > 0) {
+            navigate(basePath, {
+              state: {
+                returnUrl: basePath,
+              },
+            });
+          } else {
             navigate(`${basePath}/location`, {
               state: {
-                returnUrl: basePath
-              }
+                returnUrl: basePath,
+              },
             });
           }
-        } else {
-          // New user - go to name input page
-          navigate(`${basePath}/name-input`, {
-            state: { returnUrl, fromCart },
+        } catch (error) {
+          console.error("Error checking addresses:", error);
+          navigate(`${basePath}/location`, {
+            state: {
+              returnUrl: basePath,
+            },
           });
         }
       } else {

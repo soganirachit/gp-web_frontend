@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { FaPen, FaTrash } from "react-icons/fa";
 import { MdMyLocation } from "react-icons/md";
 import { toast } from "react-hot-toast";
@@ -18,9 +18,17 @@ import {
   storeService,
   notifyGpsCatalogLocationUpdated,
 } from "../../services/store.service";
+import { findSavedAddressAtCoordinates } from "../../utils/addressCoordinates";
+import {
+  formatAddressReceiverNameLine,
+  formatAddressReceiverPhoneLine,
+} from "../../utils/formatAddressReceiverContact";
 
 const ChooseLocation: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnUrl =
+    (location.state as { returnUrl?: string } | null)?.returnUrl ?? null;
   const { theme, feature } = useFeatureTheme();
   const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -115,10 +123,38 @@ const ChooseLocation: React.FC = () => {
     if (gpsBusy) return;
     setGpsBusy(true);
     try {
-      await storeService.applyUseCurrentGpsForCatalog();
-      toast.success("Using your current location for the store");
-      setBrowseOverrideId(null);
-      navigate(-1);
+      if (!navigator.geolocation) {
+        throw new Error("Geolocation is not supported on this device.");
+      }
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false,
+          timeout: 20_000,
+          maximumAge: 120_000,
+        });
+      });
+      const { latitude, longitude } = position.coords;
+      const savedMatch = findSavedAddressAtCoordinates(
+        latitude,
+        longitude,
+        addresses,
+      );
+      if (!savedMatch) {
+        navigate(`${basePath}/addresses/add`, {
+          state: {
+            returnUrl: returnUrl ?? `${basePath}/cart`,
+            prefilledCoordinates: `${latitude},${longitude}`,
+          },
+        });
+        return;
+      }
+      await storeService.applyBrowseAddressForCatalog(savedMatch);
+      toast.success("Using your saved address at this location");
+      if (returnUrl) {
+        navigate(returnUrl);
+      } else {
+        navigate(-1);
+      }
     } catch (e: unknown) {
       const m =
         e instanceof Error
@@ -298,39 +334,37 @@ const ChooseLocation: React.FC = () => {
                           pincode: address.pincode,
                         })}
                       </p>
-                      <div className="mb-3 mt-1 flex min-w-0 flex-wrap items-center gap-2">
+                      <div className="mb-3 mt-1 flex min-w-0 flex-col gap-0.5">
                         {(() => {
-                          const digits = formatPhoneForDisplay(
+                          const receiverName = formatAddressReceiverNameLine(
+                            address.name,
+                          );
+                          const phoneLine = formatAddressReceiverPhoneLine(
                             address.associatedPhoneNumber,
-                          ).replace(/\D/g, "");
-                          const last10 =
-                            digits.length >= 10 ? digits.slice(-10) : "";
-                          const hasPhone = last10.length === 10;
-                          if (!hasPhone && !address.isDefault && !isSelected) {
-                            return null;
-                          }
+                          );
+                          if (!receiverName && !phoneLine) return null;
                           return (
                             <>
-                              {hasPhone ? (
-                                <p className="min-w-0 shrink text-sm text-gray-800">
-                                  +91 {last10.slice(0, 5)} {last10.slice(5)}
+                              {receiverName ? (
+                                <p className="min-w-0 shrink text-sm font-semibold text-gray-800">
+                                  {receiverName}
                                 </p>
                               ) : null}
-                              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                                {address.isDefault ? (
-                                  <span className="rounded-2xl bg-[#E6F4EA] px-2 py-1 text-xs font-semibold text-[#1E8E3E]">
-                                    Default
-                                  </span>
-                                ) : null}
-                                {/* {isSelected ? (
-                                  <span className="rounded-2xl bg-[#E6F4EA] px-2 py-1 text-xs font-semibold text-[#1E8E3E]">
-                                    Active
-                                  </span>
-                                ) : null} */}
-                              </div>
+                              {phoneLine ? (
+                                <p className="min-w-0 shrink text-sm text-gray-800">
+                                  {phoneLine}
+                                </p>
+                              ) : null}
                             </>
                           );
                         })()}
+                      </div>
+                      <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
+                        {address.isDefault ? (
+                          <span className="rounded-2xl bg-[#E6F4EA] px-2 py-1 text-xs font-semibold text-[#1E8E3E]">
+                            Default
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                     {address.coordinates ? (

@@ -9,7 +9,6 @@ import dailyBottomBanner from "../assets/svg/gp_daily svg/bottom_banner.svg";
 import dailyLocationHome from "../assets/svg/gp_daily svg/locationhome.svg";
 import dailyProfileHome from "../assets/svg/gp_daily svg/profilehome.svg";
 import dailyProfileLogo from "../assets/svg/gp_daily svg/profilelogo.svg";
-import dailyBlackProfile from "../assets/svg/gp_daily svg/Blackprofile.svg";
 import dailyFaqIcon from "../assets/svg/gp_daily svg/faq.svg";
 import dailyFaqUpIcon from "../assets/svg/gp_daily svg/faqup.svg";
 
@@ -104,7 +103,7 @@ export const featureThemes: Record<Feature, FeatureTheme> = {
       headerProfileHomeIcon: dailyProfileHome,
       headerProfileLogoIcon: dailyProfileLogo,
       lowBalanceIcon: dailyLowBalance,
-      profileLogo: dailyBlackProfile,
+      profileLogo: dailyProfileLogo,
       profileBackground: vectorBg,
       startupBanner: vectorBg,
       startupLogo: logoDaily,

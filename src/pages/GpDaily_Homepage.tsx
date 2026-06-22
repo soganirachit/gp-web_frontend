@@ -28,8 +28,9 @@ import {
   writeWalletPauseScheduleYmd,
 } from "../utils/gpDailyWalletPauseSchedule";
 import { subscriptionsDueForAutoResume } from "../utils/subscriptionAutoResume";
-import { storeService } from "../services/store.service";
+import { storeService, GUEST_STORE_UPDATED_EVENT, GPS_CATALOG_LOCATION_UPDATED_EVENT } from "../services/store.service";
 import { resolveGpDailyCatalogStoreId } from "../utils/gpDailyCatalogStore";
+import { formatNamasteGreeting, hasRealUserFirstName } from "../utils/namasteGreeting";
 import type { Product as ProductType } from "../services/product.service";
 import { addressService } from "../services/address.service";
 import { validateGpDailyDeliveryAreaFromCoordinates } from "../services/subscriptionZone.service";
@@ -89,6 +90,10 @@ import {
   GUEST_HEADER_LOCATION_TITLE,
   GUEST_LOCATION_UNAVAILABLE_HINT,
 } from "../utils/guestHeaderLocation";
+import {
+  formatSavedAddressLine,
+  pickHomeCatalogHeaderAddress,
+} from "../utils/resolveHomeCatalogHeaderAddress";
 import {
   GP_OPEN_GUEST_AREA_MODAL_EVENT,
 } from "../config/guestAreaModalCopy";
@@ -230,6 +235,31 @@ const Home2: React.FC = () => {
   const [isValidatingDeliveryZone, setIsValidatingDeliveryZone] =
     useState(false);
   const [homeHeroStatus, setHomeHeroStatus] = useState<HomeHeroStatus>("default");
+  const [dailyBannerStoreId, setDailyBannerStoreId] = useState<number | null>(() =>
+    storeService.getStoreIdForProducts(),
+  );
+
+  const refreshDailyBannerStoreId = useCallback(async () => {
+    let sid = await resolveGpDailyCatalogStoreId().catch(() => undefined);
+    if (sid == null) {
+      sid =
+        storeService.getStoreIdForProducts() ??
+        (await storeService.resolveStoreIdForApiAsync().catch(() => null)) ??
+        undefined;
+    }
+    setDailyBannerStoreId(sid ?? null);
+  }, []);
+
+  useEffect(() => {
+    void refreshDailyBannerStoreId();
+    const onStore = () => {
+      void refreshDailyBannerStoreId();
+    };
+    window.addEventListener(GUEST_STORE_UPDATED_EVENT, onStore);
+    return () => {
+      window.removeEventListener(GUEST_STORE_UPDATED_EVENT, onStore);
+    };
+  }, [isLoggedIn, deliveryLocation, refreshDailyBannerStoreId]);
 
   const refreshHomeHeroStatus = useCallback(async () => {
     const storeId =
@@ -287,16 +317,21 @@ const Home2: React.FC = () => {
       const customers = await customerService.getAllCustomers();
       if (customers && customers.length > 0) {
         const user = customers[0];
-        setUserName(`${user.firstName} ${user.lastName}`);
-        setUserFirstName(user.firstName);
+        const first = user.firstName?.trim() || "";
+        setUserName(`${user.firstName} ${user.lastName}`.trim());
+        setUserFirstName(hasRealUserFirstName(first) ? first : "");
       } else {
-        setUserName(localStorage.getItem("userName") || "User");
-        setUserFirstName(localStorage.getItem("userName")?.split(" ")[0] || "User");
+        const stored = localStorage.getItem("userName")?.trim() || "";
+        setUserName(stored || "");
+        const first = stored.split(" ")[0] || "";
+        setUserFirstName(hasRealUserFirstName(first) ? first : "");
       }
     } catch (error) {
       console.error("Error fetching customer name:", error);
-      setUserName(localStorage.getItem("userName") || "User");
-      setUserFirstName(localStorage.getItem("userName")?.split(" ")[0] || "User");
+      const stored = localStorage.getItem("userName")?.trim() || "";
+      setUserName(stored || "");
+      const first = stored.split(" ")[0] || "";
+      setUserFirstName(hasRealUserFirstName(first) ? first : "");
     }
   };
 
@@ -562,25 +597,25 @@ const Home2: React.FC = () => {
   const fetchLatestAddress = useCallback(async () => {
     try {
       setIsLoadingAddress(true);
-      const addresses = await addressService.getAllAddresses();
+      if (!localStorage.getItem("phoneNumber")) {
+        const guestAddr = storeService.getGuestBrowseAddress();
+        if (guestAddr) {
+          setAddressType(guestAddr.label || GUEST_HEADER_LOCATION_TITLE);
+          setDeliveryLocation(guestAddr.formattedLine);
+          return;
+        }
+        setAddressType(GUEST_HEADER_LOCATION_TITLE);
+        setDeliveryLocation("");
+        const label = await fetchGuestDeviceLocationLabel();
+        setDeliveryLocation(label);
+        return;
+      }
 
-      // Get default address first, otherwise get the latest address
-      const defaultAddress = addresses.find(addr => addr.isDefault);
-      const selectedAddress = defaultAddress || addresses
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-      [0];
+      const addresses = await addressService.getAllAddresses();
+      const selectedAddress = pickHomeCatalogHeaderAddress(addresses);
 
       if (selectedAddress) {
-        const formattedAddress = [
-          selectedAddress.houseNo,
-          selectedAddress.streetName,
-          selectedAddress.area,
-          selectedAddress.city,
-          selectedAddress.state,
-          selectedAddress.pincode
-        ].filter(Boolean).join(', ');
-
-        setDeliveryLocation(formattedAddress);
+        setDeliveryLocation(formatSavedAddressLine(selectedAddress));
         setAddressType(selectedAddress.type || "Home");
       } else {
         setDeliveryLocation("");
@@ -588,8 +623,22 @@ const Home2: React.FC = () => {
       }
     } catch (error) {
       console.error("Error fetching address:", error);
-      setDeliveryLocation(localStorage.getItem("userLocation") || "");
-      setAddressType("Home");
+      const stored = localStorage.getItem("selectedDeliveryAddress");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as Parameters<
+            typeof formatSavedAddressLine
+          >[0];
+          setDeliveryLocation(formatSavedAddressLine(parsed));
+          setAddressType(parsed.type || "Home");
+        } catch {
+          setDeliveryLocation(localStorage.getItem("userLocation") || "");
+          setAddressType("Home");
+        }
+      } else {
+        setDeliveryLocation(localStorage.getItem("userLocation") || "");
+        setAddressType("Home");
+      }
     } finally {
       setIsLoadingAddress(false);
     }
@@ -616,51 +665,32 @@ const Home2: React.FC = () => {
 
     fetchProducts();
     validateDeliveryZone(false);
-    if (localStorage.getItem("access_token")) {
-      fetchLatestAddress();
-    } else if (!isLoggedIn) {
-      const guestAddr = storeService.getGuestBrowseAddress();
-      if (guestAddr) {
-        setAddressType(guestAddr.label || GUEST_HEADER_LOCATION_TITLE);
-        setDeliveryLocation(guestAddr.formattedLine);
-        setIsLoadingAddress(false);
-        return;
-      }
-      setAddressType(GUEST_HEADER_LOCATION_TITLE);
-      setDeliveryLocation("");
-      setIsLoadingAddress(true);
-      void fetchGuestDeviceLocationLabel().then((label) => {
-        setDeliveryLocation(label);
-        setIsLoadingAddress(false);
-      });
-    } else {
-      setIsLoadingAddress(false);
-    }
+    void fetchLatestAddress();
   }, [fetchLatestAddress]);
 
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "userLocation") {
-        setDeliveryLocation(e.newValue || "");
-      }
+    const onCatalogLocationChange = () => {
+      void fetchLatestAddress();
+      void refreshDailyBannerStoreId();
     };
-
-    window.addEventListener('storage', handleStorageChange);
-
-    const checkLocalStorage = () => {
-      const location = localStorage.getItem("userLocation") || "";
-      if (location !== deliveryLocation) {
-        setDeliveryLocation(location);
-      }
-    };
-
-    const interval = setInterval(checkLocalStorage, 1000);
-
+    window.addEventListener(GPS_CATALOG_LOCATION_UPDATED_EVENT, onCatalogLocationChange);
+    window.addEventListener(GUEST_STORE_UPDATED_EVENT, onCatalogLocationChange);
+    window.addEventListener("addressUpdated", onCatalogLocationChange);
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
+      window.removeEventListener(
+        GPS_CATALOG_LOCATION_UPDATED_EVENT,
+        onCatalogLocationChange,
+      );
+      window.removeEventListener(GUEST_STORE_UPDATED_EVENT, onCatalogLocationChange);
+      window.removeEventListener("addressUpdated", onCatalogLocationChange);
     };
-  }, [deliveryLocation]);
+  }, [fetchLatestAddress, refreshDailyBannerStoreId]);
+
+  useEffect(() => {
+    if (location.pathname !== basePath) return;
+    void fetchLatestAddress();
+    void refreshDailyBannerStoreId();
+  }, [location.pathname, basePath, fetchLatestAddress, refreshDailyBannerStoreId]);
 
   useEffect(() => {
     if (deliveryLocation) {
@@ -1399,7 +1429,7 @@ const Home2: React.FC = () => {
               {/* Namaste hero — store-home truck pattern with landing-page scooter. */}
               {homeHeroStatus === "store_offline" ? (
                 <GpDailyOfflineHero
-                  userFirstName={userFirstName || "User"}
+                  userFirstName={userFirstName || ""}
                   isLoggedIn={isLoggedIn}
                   onManage={
                     isLoggedIn
@@ -1421,9 +1451,7 @@ const Home2: React.FC = () => {
               <div className="relative mt-5 sm:mt-6">
                 <div className={`mb-1.5 flex items-center justify-between gap-2 ${gpDailyHome.namasteHeroInset}`}>
                   <h2 className={gpDailyHome.greeting}>
-                    {isLoggedIn
-                      ? `Namaste, ${userFirstName || "User"}!`
-                      : "Namaste!"}
+                    {formatNamasteGreeting(isLoggedIn, userFirstName)}
                   </h2>
                   {isLoggedIn ? (
                     <button
@@ -1569,7 +1597,7 @@ const Home2: React.FC = () => {
             className={`${gpDailyHome.homeContentArea} flex flex-col ${gpDailyHome.homeSectionStackGap}`}
           >
             <OffersBannerCarousel
-              storeId={storeService.getStoreIdForProducts() ?? undefined}
+              storeId={dailyBannerStoreId ?? undefined}
               placement={BANNER_PLACEMENT_DAILY_HOME}
               compactSpacing
             />
