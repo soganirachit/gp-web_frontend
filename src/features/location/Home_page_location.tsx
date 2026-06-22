@@ -20,7 +20,7 @@ import {
   messageFromGeolocationPositionError,
 } from "../../utils/geolocationMessages";
 import Spinner from "../../components/common/Spinner";
-import { GP_MAP_SEARCH_INPUT_CLASSES, GP_SEARCH_ICON_CLASSES } from "../../components/common/SearchBar";
+import { GP_MAP_SEARCH_INPUT_CLASSES, MapSearchEndIcon } from "../../components/common/SearchBar";
 import {
   MapLoadingPlaceholder,
   MapPanelSkeleton,
@@ -48,6 +48,19 @@ const HomePageLocation: React.FC = () => {
   const placesAutocompleteMountKey = useMemo(() => location.key, [location.key]);
   const placesSearchInputRef = useRef<HTMLInputElement | null>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [mapSearchQuery, setMapSearchQuery] = useState("");
+
+  const syncPlacesSearchInput = useCallback((text: string) => {
+    if (placesSearchInputRef.current) {
+      placesSearchInputRef.current.value = text;
+    }
+    setMapSearchQuery(text);
+  }, []);
+
+  const clearMapSearch = useCallback(() => {
+    syncPlacesSearchInput("");
+    placesSearchInputRef.current?.focus();
+  }, [syncPlacesSearchInput]);
   // const [, setLocationPredictions] = useState<PlacePrediction[]>([]);
   const [selectedPosition, setSelectedPosition] = useState<{
     lat: number;
@@ -139,9 +152,7 @@ const HomePageLocation: React.FC = () => {
         setSelectedPosition(coords);
         void (async () => {
           await updateAddressDetails(coords.lat, coords.lng);
-          if (placesSearchInputRef.current) {
-            placesSearchInputRef.current.value = savedLocation;
-          }
+          syncPlacesSearchInput(savedLocation);
         })();
       } catch {
         setError(
@@ -214,9 +225,7 @@ const HomePageLocation: React.FC = () => {
               return;
             }
             const address = data.results[0].formatted_address;
-            if (placesSearchInputRef.current) {
-              placesSearchInputRef.current.value = address;
-            }
+            syncPlacesSearchInput(address);
             updateAddressDetails(latitude, longitude);
           } catch (error) {
             console.error("Error fetching address details:", error);
@@ -312,9 +321,7 @@ const HomePageLocation: React.FC = () => {
 
       setAddressDetails(newAddressDetails);
 
-      if (placesSearchInputRef.current) {
-        placesSearchInputRef.current.value = fullAddress;
-      }
+      syncPlacesSearchInput(fullAddress);
 
       setSelectedLocationType((prev) => prev || "Home");
 
@@ -596,25 +603,14 @@ const HomePageLocation: React.FC = () => {
                     type="text"
                     placeholder="Search for a location..."
                     defaultValue=""
+                    onChange={(e) => setMapSearchQuery(e.target.value)}
                     className={GP_MAP_SEARCH_INPUT_CLASSES}
                     style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
                   />
-                  <div className={`absolute right-3 top-1/2 -translate-y-1/2 ${GP_SEARCH_ICON_CLASSES}`}>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-full w-full"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                      />
-                    </svg>
-                  </div>
+                  <MapSearchEndIcon
+                    hasText={mapSearchQuery.trim().length > 0}
+                    onClear={clearMapSearch}
+                  />
                 </div>
               </Autocomplete>
             ) : (
@@ -625,22 +621,7 @@ const HomePageLocation: React.FC = () => {
                   disabled
                   className={`${GP_MAP_SEARCH_INPUT_CLASSES} text-gray-400`}
                 />
-                <div className={`absolute right-3 top-1/2 -translate-y-1/2 ${GP_SEARCH_ICON_CLASSES}`}>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-full w-full"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                </div>
+                <MapSearchEndIcon hasText={false} />
               </div>
             )}
           </div>

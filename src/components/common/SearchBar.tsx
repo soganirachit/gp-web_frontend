@@ -20,6 +20,66 @@ export const GP_SEARCH_FIELD_INPUT_CLASSES =
 export const GP_SEARCH_ICON_CLASSES =
   "h-4 w-4 shrink-0 text-[#808080] sm:h-5 sm:w-5";
 
+type MapSearchEndIconProps = {
+  hasText: boolean;
+  onClear?: () => void;
+  className?: string;
+};
+
+/** Map search trailing icon — magnifier when empty, clear when typing (mobile parity). */
+export const MapSearchEndIcon: React.FC<MapSearchEndIconProps> = ({
+  hasText,
+  onClear,
+  className = GP_SEARCH_ICON_CLASSES,
+}) => {
+  const wrapClass = `absolute right-3 top-1/2 -translate-y-1/2 ${className}`;
+
+  if (hasText) {
+    return (
+      <button
+        type="button"
+        aria-label="Clear search"
+        onClick={onClear}
+        className={`${wrapClass} cursor-pointer`}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-full w-full"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </button>
+    );
+  }
+
+  return (
+    <div className={wrapClass} aria-hidden>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-full w-full"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+        />
+      </svg>
+    </div>
+  );
+};
+
 /** GP Store / GP Daily home hero search — frosted white, no border. */
 export const GP_HOMEPAGE_SEARCH_WRAP_CLASSES =
   "w-full rounded-xl border-0 bg-[#FFFFFFE5] px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 text-left";
