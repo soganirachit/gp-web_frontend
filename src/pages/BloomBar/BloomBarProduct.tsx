@@ -35,39 +35,46 @@ export default function BloomBarProductPage() {
       if (productId) {
         const products = await base44.entities.Product.filter({ id: productId });
         if (products.length > 0) resolvedProduct = products[0] as unknown as Product;
-        else throw new Error('Product not found');
+        else throw new Error('Product not found or unavailable');
       } else {
         const products = await base44.entities.Product.list('-created_date', 1);
         if (products.length > 0) resolvedProduct = products[0] as unknown as Product;
         else throw new Error('No products available');
       }
       setProduct(resolvedProduct!);
+    } catch (e) {
+      setError((e as Error).message);
+      setLoading(false);
+      return;
+    }
 
-      if (hotelId) {
+    // Kiosk is branding-only — never block the product page if it fails
+    if (hotelId) {
+      try {
         const hotels = await base44.entities.Hotel.filter({ id: hotelId });
         if (hotels.length > 0) {
           setHotel(hotels[0]);
           setHotelContext({ hotelId, kioskId, campaign, hotel: hotels[0] });
         }
+      } catch {
+        // kiosk fetch failed (inactive/deleted) — show product without co-brand header
       }
-
-      if (productId) {
-        // Record the scan with the shared session id so the backend can attribute
-        // a later conversion (payment) back to this scan, and bump scan_count.
-        base44.entities.QRScanEvent.create({
-          hotel_id: hotelId,
-          kiosk_id: kioskId,
-          product_id: productId,
-          campaign,
-          session_id: sessionId,
-          user_agent: navigator.userAgent,
-        }).catch(() => {});
-      }
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
     }
+
+    if (productId) {
+      // Record the scan with the shared session id so the backend can attribute
+      // a later conversion (payment) back to this scan, and bump scan_count.
+      base44.entities.QRScanEvent.create({
+        hotel_id: hotelId,
+        kiosk_id: kioskId,
+        product_id: productId,
+        campaign,
+        session_id: sessionId,
+        user_agent: navigator.userAgent,
+      }).catch(() => {});
+    }
+
+    setLoading(false);
   };
 
   if (loading) return <BloomBarLoadingSkeleton />;
