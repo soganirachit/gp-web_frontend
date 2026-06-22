@@ -200,7 +200,9 @@ const NameInput: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-gray-700 mb-3 font-semibold">Gender</label>
+              <label className="block text-gray-700 mb-3 font-semibold">
+                Gender<span className="text-red-500">*</span>
+              </label>
             <div className="flex gap-8">
               {[
                 { value: "male", label: "Male" },

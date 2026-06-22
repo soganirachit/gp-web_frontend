@@ -19,6 +19,80 @@ function uniqueStoreIds(ids: Array<number | null | undefined>): number[] {
   return out;
 }
 
+const ORDERING_OFFLINE_CACHE_TTL_MS = 90_000;
+const STORES_LIST_CACHE_TTL_MS = 90_000;
+
+type OrderingOfflineCacheEntry = {
+  blocked: boolean;
+  expiresAt: number;
+};
+
+let orderingOfflineCache: {
+  key: string;
+  entry: OrderingOfflineCacheEntry;
+} | null = null;
+
+let storesListCache: {
+  key: string;
+  list: Store[];
+  expiresAt: number;
+} | null = null;
+
+function orderingOfflineCacheKey(
+  storeIds: number[],
+  lat: number | null,
+  lng: number | null,
+): string {
+  const ids = [...storeIds].sort((a, b) => a - b).join(",");
+  const loc =
+    lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng)
+      ? `${lat.toFixed(4)},${lng.toFixed(4)}`
+      : "no-loc";
+  return `${ids}|${loc}`;
+}
+
+/** Clear after guest store / address changes (see useOrderingStoreOffline). */
+export function invalidateOrderingOfflineCache(): void {
+  orderingOfflineCache = null;
+  storesListCache = null;
+}
+
+async function getStoresListCached(
+  latitude?: number | null,
+  longitude?: number | null,
+): Promise<Store[]> {
+  const hasLoc =
+    latitude != null &&
+    longitude != null &&
+    !Number.isNaN(latitude) &&
+    !Number.isNaN(longitude);
+  const key = hasLoc
+    ? `loc:${latitude!.toFixed(4)},${longitude!.toFixed(4)}`
+    : "all";
+
+  if (
+    storesListCache &&
+    storesListCache.key === key &&
+    Date.now() < storesListCache.expiresAt
+  ) {
+    return storesListCache.list;
+  }
+
+  const list = hasLoc
+    ? await storeService.getAllStores(latitude!, longitude!)
+    : await storeService.getAllStores();
+  storesListCache = {
+    key,
+    list,
+    expiresAt: Date.now() + STORES_LIST_CACHE_TTL_MS,
+  };
+  return list;
+}
+
+function findStoreInList(list: Store[], storeId: number): Store | null {
+  return list.find((s) => Number(s.id) === storeId) ?? null;
+}
+
 async function fetchStoreForHeroCheck(
   storeId: number,
   latitude?: number | null,
@@ -69,16 +143,66 @@ async function isUserCityServed(
   return served.some((c) => normalizeCityLabel(c.name) === target);
 }
 
-async function isAnyCandidateStoreOffline(
+async function areKnownStoresOffline(
   storeIds: number[],
   deviceLat: number | null,
   deviceLng: number | null,
 ): Promise<boolean> {
+  const hasLoc =
+    deviceLat != null &&
+    deviceLng != null &&
+    !Number.isNaN(deviceLat) &&
+    !Number.isNaN(deviceLng);
+
+  const nearList = hasLoc
+    ? await getStoresListCached(deviceLat, deviceLng)
+    : null;
+  let allList: Store[] | null = null;
+
+  for (const sid of storeIds) {
+    let store = nearList ? findStoreInList(nearList, sid) : null;
+    if (!store) {
+      allList ??= await getStoresListCached();
+      store = findStoreInList(allList, sid);
+    }
+    if (store && isStoreOffline(store)) return true;
+  }
+  return false;
+}
+
+async function isAnyCandidateStoreOffline(
+  storeIds: number[],
+  deviceLat: number | null,
+  deviceLng: number | null,
+  opts?: { knownStoreOnly?: boolean },
+): Promise<boolean> {
+  if (opts?.knownStoreOnly) {
+    return areKnownStoresOffline(storeIds, deviceLat, deviceLng);
+  }
+
   for (const sid of storeIds) {
     const store = await fetchStoreForHeroCheck(sid, deviceLat, deviceLng);
     if (store && isStoreOffline(store)) return true;
   }
   return false;
+}
+
+async function isNearestStoreOffline(
+  deviceLat: number | null,
+  deviceLng: number | null,
+): Promise<boolean> {
+  const hasCoords =
+    deviceLat != null &&
+    deviceLng != null &&
+    !Number.isNaN(deviceLat) &&
+    !Number.isNaN(deviceLng);
+  if (!hasCoords) return false;
+
+  const nearest = await storeService.fetchNearestStoreUnfiltered(
+    deviceLat!,
+    deviceLng!,
+  );
+  return !!(nearest && isStoreOffline(nearest));
 }
 
 /** True when catalog / nearest store is offline — block subscribe & checkout. */
@@ -88,14 +212,36 @@ export async function isOrderingBlockedByStoreOffline(opts: {
   lat: number | null;
   lng: number | null;
 }): Promise<boolean> {
-  const status = await resolveHomeHeroStatus({
-    storeId: opts.storeId,
-    storeIds: opts.storeIds,
-    inServiceArea: true,
-    deviceLat: opts.lat,
-    deviceLng: opts.lng,
-  });
-  return status === "store_offline";
+  const candidateIds = uniqueStoreIds([...(opts.storeIds ?? []), opts.storeId]);
+  const cacheKey = orderingOfflineCacheKey(candidateIds, opts.lat, opts.lng);
+  if (
+    orderingOfflineCache &&
+    orderingOfflineCache.key === cacheKey &&
+    Date.now() < orderingOfflineCache.entry.expiresAt
+  ) {
+    return orderingOfflineCache.entry.blocked;
+  }
+
+  let blocked: boolean;
+  if (candidateIds.length > 0) {
+    blocked = await isAnyCandidateStoreOffline(
+      candidateIds,
+      opts.lat,
+      opts.lng,
+      { knownStoreOnly: true },
+    );
+  } else {
+    blocked = await isNearestStoreOffline(opts.lat, opts.lng);
+  }
+
+  orderingOfflineCache = {
+    key: cacheKey,
+    entry: {
+      blocked,
+      expiresAt: Date.now() + ORDERING_OFFLINE_CACHE_TTL_MS,
+    },
+  };
+  return blocked;
 }
 
 export async function resolveHomeHeroStatus(opts: {

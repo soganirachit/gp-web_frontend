@@ -10,7 +10,8 @@ import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import ReactDOM from "react-dom/client";
 import { orderService } from "../../services/order.service";
 import { subscriptionService } from "../../services/subscription.service";
-import { subscriptionCartService, isSubscriptionCartStoreChangeConfirmation } from "../../services/subscriptionCart.service";
+import { subscriptionCartService, isSubscriptionCartStoreChangeConfirmation, normalizeSubscriptionCartSetAddressResponse } from "../../services/subscriptionCart.service";
+import { CartConfirmModal } from "../cart/CartConfirmModal";
 import {
   validateGpDailyDeliveryAreaForAddressId,
   validateGpDailyDeliveryAreaFromCoordinates,
@@ -29,6 +30,10 @@ import {
 } from "../../config/guestBrowseAddressCopy";
 import { AddressSelectionSkeleton } from "../common/PageSkeletons";
 import { formatPhoneForDisplay } from "../../utils/phoneDisplay";
+import {
+  formatAddressReceiverNameLine,
+  formatAddressReceiverPhoneLine,
+} from "../../utils/formatAddressReceiverContact";
 import { formatCartDeliveryAddress } from "../../utils/formatCartDeliveryAddress";
 import homeIcon from "../../assets/svg/adressbook/home.svg";
 import workIcon from "../../assets/svg/adressbook/office.svg";
@@ -39,6 +44,8 @@ import defaultIcon from "../../assets/svg/adressbook/default.svg";
 import {
   LIVE_DEVICE_ADDRESS_ID,
   resolveLiveDeviceToSavedAddress,
+  findSavedAddressAtCoordinates,
+  parseAddressCoordinates,
 } from "../../utils/addressCoordinates";
 import { walletService } from "../../services/wallet.service";
 import { setGpDailyPendingSubscriptionCheckout } from "../../utils/gpDailyPendingSubscriptionCheckout";
@@ -486,8 +493,15 @@ const AddressSelection: React.FC = () => {
       setSelectedAddress(newAddress);
       localStorage.setItem(
         "selectedDeliveryAddress",
-        JSON.stringify(newAddress)
+        JSON.stringify(newAddress),
       );
+
+      if (location.state?.fromCart) {
+        navigate(`${basePath}/cart`, {
+          state: { addressUpdated: true, selectedAddressId: newAddress.id },
+        });
+        return;
+      }
     } catch (error: any) {
       handleAuthError(error);
     } finally {
@@ -560,18 +574,38 @@ const AddressSelection: React.FC = () => {
   };
 
   const handleAddressSelect = async (address: Address) => {
-    const addressToUse = resolveLiveDeviceToSavedAddress(address, addresses);
+    let addressToUse = resolveLiveDeviceToSavedAddress(address, addresses);
 
     if (
       String(addressToUse.id) === LIVE_DEVICE_ADDRESS_ID &&
       !location.state?.fromHome
     ) {
-      toast.error(
-        location.state?.fromCart
-          ? "Save your current location as an address to use it for checkout."
-          : "Save your current location as an address to use it for delivery.",
-      );
-      return;
+      const coords = parseAddressCoordinates(addressToUse.coordinates);
+      if (coords) {
+        const savedMatch = findSavedAddressAtCoordinates(
+          coords.lat,
+          coords.lng,
+          addresses,
+        );
+        if (savedMatch) {
+          addressToUse = savedMatch;
+        } else {
+          setFormData((prev) => ({
+            ...prev,
+            area: liveDeviceLocation?.formattedAddress || prev.area,
+            coordinates: `${coords.lat},${coords.lng}`,
+          }));
+          setShowAddForm(true);
+          return;
+        }
+      } else {
+        toast.error(
+          location.state?.fromCart
+            ? "Save your current location as an address to use it for checkout."
+            : "Save your current location as an address to use it for delivery.",
+        );
+        return;
+      }
     }
 
     // Validate address before selecting
@@ -584,20 +618,23 @@ const AddressSelection: React.FC = () => {
     localStorage.setItem("selectedDeliveryAddress", JSON.stringify(addressToUse));
 
     if (location.state?.fromHome) {
-      if (String(addressToUse.id) === LIVE_DEVICE_ADDRESS_ID) {
-        toast.success("Using your current location for delivery");
-        navigate(basePath, { replace: true });
-        return;
-      }
       try {
-        await addressService.setDefaultAddress(String(addressToUse.id));
+        if (String(addressToUse.id) === LIVE_DEVICE_ADDRESS_ID) {
+          await storeService.applyUseCurrentGpsForCatalog();
+          toast.success("Using your current location for the store");
+        } else {
+          await storeService.applyBrowseAddressForCatalog(addressToUse);
+          toast.success("Delivery location updated");
+        }
+        window.dispatchEvent(new Event("addressUpdated"));
+        navigate(basePath, { replace: true });
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Could not set default address";
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "Could not update location. Try again.";
         toast.error(msg);
-        return;
       }
-      toast.success("Delivery address updated");
-      navigate(basePath, { replace: true });
       return;
     }
 
@@ -678,11 +715,12 @@ const AddressSelection: React.FC = () => {
                 Number(address.id),
                 false,
               );
-              if (isSubscriptionCartStoreChangeConfirmation(raw)) {
+              const normalized = normalizeSubscriptionCartSetAddressResponse(raw);
+              if (isSubscriptionCartStoreChangeConfirmation(normalized)) {
                 const msg =
-                  typeof raw.message === "string" && raw.message.trim()
-                    ? raw.message.trim()
-                    : `Your delivery address maps to ${raw.new_store?.name ?? "a different store"}. Continuing will clear items in your daily basket that may not be available there.`;
+                  typeof normalized.message === "string" && normalized.message.trim()
+                    ? normalized.message.trim()
+                    : `Your delivery address maps to ${(normalized as { new_store?: { name?: string } }).new_store?.name ?? "a different store"}. Continuing will clear items in your daily basket that may not be available there.`;
                 setDailyCartFromAddressModal({ address, message: msg });
                 return;
               }
@@ -1610,9 +1648,11 @@ const AddressSelection: React.FC = () => {
                 const isGreenBg = addressTypeLower !== "work" && addressTypeLower !== "office";
                 const iconBgClass = isGreenBg ? "bg-[#ECFDF5]" : "bg-[#EEF2FF]";
                 const isSelected = selectedAddress?.id === address.id;
-                const phoneDisplay = formatPhoneForDisplay(address.associatedPhoneNumber);
-                const phoneDigits = phoneDisplay.replace(/\D/g, "");
-                const showPhoneLine = phoneDigits.length === 10;
+                const phoneLine = formatAddressReceiverPhoneLine(
+                  address.associatedPhoneNumber,
+                );
+                const receiverName = formatAddressReceiverNameLine(address.name);
+                const showPhoneLine = Boolean(phoneLine);
 
                 return (
                   <div
@@ -1663,10 +1703,19 @@ const AddressSelection: React.FC = () => {
                               pincode: address.pincode,
                             })}
                           </p>
-                          {showPhoneLine ? (
-                            <p className="mt-0.5 text-sm font-medium text-gray-800">
-                              <span className="whitespace-nowrap">+91 {phoneDisplay}</span>
-                            </p>
+                          {receiverName || showPhoneLine ? (
+                            <div className="mt-0.5 space-y-0.5">
+                              {receiverName ? (
+                                <p className="text-sm font-semibold text-gray-800">
+                                  {receiverName}
+                                </p>
+                              ) : null}
+                              {showPhoneLine ? (
+                                <p className="text-sm font-medium text-gray-800">
+                                  <span className="whitespace-nowrap">{phoneLine}</span>
+                                </p>
+                              ) : null}
+                            </div>
                           ) : null}
                         </div>
                         <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
@@ -1789,72 +1838,47 @@ const AddressSelection: React.FC = () => {
         </div>
       ) : null}
 
-      {dailyCartFromAddressModal ? (
-        <div
-          className="fixed inset-0 z-[220] flex items-center justify-center bg-black/45 px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="gp-address-daily-cart-store-title"
-        >
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h2 id="gp-address-daily-cart-store-title" className="text-lg font-semibold text-gray-900">
-              Address changed
-            </h2>
-            <p className="mt-3 text-sm leading-relaxed text-gray-600 whitespace-pre-wrap">
-              {dailyCartFromAddressModal.message}
-            </p>
-            <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
-              <button
-                type="button"
-                disabled={confirmingDailyCartStoreChange}
-                onClick={async () => {
-                  const m = dailyCartFromAddressModal;
-                  if (!m) return;
-                  setConfirmingDailyCartStoreChange(true);
-                  try {
-                    const raw = await subscriptionCartService.setDeliveryAddress(
-                      Number(m.address.id),
-                      true,
-                    );
-                    if (isSubscriptionCartStoreChangeConfirmation(raw)) {
-                      toast.error("Could not confirm address change. Try again.");
-                      return;
-                    }
-                    setDailyCartFromAddressModal(null);
-                    localStorage.setItem(
-                      "selectedDeliveryAddress",
-                      JSON.stringify(m.address),
-                    );
-                    navigate("/gp-daily/basket", {
-                      state: {
-                        selectedAddress: m.address,
-                        addressUpdated: true,
-                      },
-                    });
-                  } catch (err) {
-                    toast.error(
-                      err instanceof Error ? err.message : "Could not confirm address change.",
-                    );
-                  } finally {
-                    setConfirmingDailyCartStoreChange(false);
-                  }
-                }}
-                className="rounded-xl bg-gray-900 py-3 text-center text-base font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {confirmingDailyCartStoreChange ? "Please wait…" : "Continue"}
-              </button>
-              <button
-                type="button"
-                disabled={confirmingDailyCartStoreChange}
-                onClick={() => setDailyCartFromAddressModal(null)}
-                className="rounded-xl border border-gray-200 py-3 text-center text-base font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <CartConfirmModal
+        open={dailyCartFromAddressModal != null}
+        title="Address changed"
+        message={dailyCartFromAddressModal?.message ?? ""}
+        loading={confirmingDailyCartStoreChange}
+        onConfirm={async () => {
+          const m = dailyCartFromAddressModal;
+          if (!m) return;
+          setConfirmingDailyCartStoreChange(true);
+          try {
+            const raw = await subscriptionCartService.setDeliveryAddress(
+              Number(m.address.id),
+              true,
+            );
+            const normalized = normalizeSubscriptionCartSetAddressResponse(raw);
+            if (isSubscriptionCartStoreChangeConfirmation(normalized)) {
+              toast.error("Could not confirm address change. Try again.");
+              return;
+            }
+            setDailyCartFromAddressModal(null);
+            localStorage.setItem(
+              "selectedDeliveryAddress",
+              JSON.stringify(m.address),
+            );
+            navigate("/gp-daily/basket", {
+              state: {
+                selectedAddress: m.address,
+                addressUpdated: true,
+              },
+            });
+          } catch (err) {
+            toast.error(
+              err instanceof Error ? err.message : "Could not confirm address change.",
+            );
+          } finally {
+            setConfirmingDailyCartStoreChange(false);
+          }
+        }}
+        onCancel={() => setDailyCartFromAddressModal(null)}
+        titleId="gp-address-daily-cart-store-title"
+      />
 
       <InsufficientWalletModal
         open={insufficientWalletModal != null}

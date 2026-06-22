@@ -10,6 +10,8 @@ import WalletImage from "../../assets/icon/Wallet.png";
 import ProfileImage from "../../assets/icon/Profile.png";
 import logo from "../../assets/All/logo.png";
 import { ProductDetailSkeleton } from "../common/PageSkeletons";
+import { pickPrimaryImageUrl } from "../../utils/pickPrimaryImageUrl";
+import { SessionCachedImage } from "../common/SessionCachedImage";
 import { IoArrowBack, IoCartOutline } from "react-icons/io5";
 import { ShareNodesIcon } from "../common/ShareNodesIcon";
 import { resolveProductShareUrl, shareProductLink } from "../../utils/productShare";
@@ -1257,19 +1259,15 @@ const StorePage: React.FC = () => {
                   >
                     <div className="relative aspect-square bg-[#f8f6f1] overflow-hidden">
                       <ProductImageTag labels={item.labels} />
-                      <img
+                      <SessionCachedImage
                         src={
-                          item.primary_image ||
+                          pickPrimaryImageUrl(item, "card") ||
                           (item.images && item.images.length > 0
                             ? item.images[0].image
                             : "/placeholder.svg")
                         }
                         alt={item.name}
-                        loading="lazy"
                         className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = "/placeholder.svg";
-                        }}
                       />
                     </div>
                     <div className="gp-store-card-scroll-inner">

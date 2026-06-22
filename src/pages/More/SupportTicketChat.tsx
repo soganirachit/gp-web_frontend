@@ -346,7 +346,6 @@ const SupportTicketChat: React.FC = () => {
       if (allOk) {
         await fetchTicketDetails(false);
         scrollToBottom();
-        toast.success('Message sent successfully');
       } else {
         toast.error('Failed to send message. Please try again.');
       }

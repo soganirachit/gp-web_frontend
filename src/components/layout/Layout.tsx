@@ -7,6 +7,7 @@ import { FeatureThemeProvider } from "../../context/FeatureThemeContext";
 import { FadingOutlet } from "../common/PageFade";
 import { trackPageView } from "../../lib/metaPixel";
 import { AppToaster } from "../ui/AppToaster";
+import { SessionImageCacheManager } from "../common/SessionImageCacheManager";
 
 const Layout: React.FC = () => {
   const location = useLocation();
@@ -80,6 +81,7 @@ const Layout: React.FC = () => {
 
   return (
     <FeatureThemeProvider>
+      <SessionImageCacheManager />
     <>
       <WebOrderPushBridge />
       <AppToaster />

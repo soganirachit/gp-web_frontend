@@ -16,7 +16,7 @@ import { customerService } from '../../services/getcustomer.service';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { MapLoadingPlaceholder } from '../../components/common/PageSkeletons';
 import { UniformPageHeader } from '../../components/layout/UniformPageHeader';
-import { GP_SEARCH_ICON_CLASSES } from '../../components/common/SearchBar';
+import { GP_MAP_SEARCH_INPUT_CLASSES, GP_SEARCH_ICON_CLASSES } from '../../components/common/SearchBar';
 import {
   GEO_MSG_NETWORK,
   GEO_MSG_UNSUPPORTED,
@@ -624,7 +624,7 @@ const AddEditAddress: React.FC = () => {
                     type="text"
                     placeholder="Search anything...."
                     defaultValue=""
-                    className="w-full rounded-xl border border-[#808080] bg-transparent p-3 pl-4 pr-10 text-left text-gray-900 placeholder:text-[#808080] focus:border-[#808080] focus:outline-none focus:ring-2"
+                    className={GP_MAP_SEARCH_INPUT_CLASSES}
                     style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
                   />
                   <div className={`absolute right-3 top-1/2 -translate-y-1/2 ${GP_SEARCH_ICON_CLASSES}`}>
@@ -651,7 +651,7 @@ const AddEditAddress: React.FC = () => {
                   type="text"
                   placeholder="Loading map..."
                   disabled
-                  className="w-full rounded-xl border border-[#808080] bg-transparent p-3 pl-4 pr-10 text-left text-gray-400"
+                  className={`${GP_MAP_SEARCH_INPUT_CLASSES} text-gray-400`}
                 />
               </div>
             )}

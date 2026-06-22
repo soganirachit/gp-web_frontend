@@ -64,7 +64,38 @@ export function isSubscriptionCartStoreChangeConfirmation(
 ): data is SubscriptionCartStoreChangeConfirmation {
   if (!data || typeof data !== "object") return false;
   const o = data as Record<string, unknown>;
-  return o.store_changed === true && o.requires_confirmation === true;
+  if (o.store_changed === true && o.requires_confirmation === true) {
+    return true;
+  }
+  const nested = o.data;
+  if (nested != null && typeof nested === "object") {
+    const inner = nested as Record<string, unknown>;
+    return (
+      inner.store_changed === true && inner.requires_confirmation === true
+    );
+  }
+  return false;
+}
+
+/** Peel nested `data` for store-change confirmation fields. */
+export function normalizeSubscriptionCartSetAddressResponse(
+  data: unknown,
+): Record<string, unknown> {
+  if (!data || typeof data !== "object") return {};
+  const top = data as Record<string, unknown>;
+  const nested = top.data;
+  if (
+    nested != null &&
+    typeof nested === "object" &&
+    ((nested as Record<string, unknown>).store_changed != null ||
+      (nested as Record<string, unknown>).new_store != null)
+  ) {
+    return {
+      ...top,
+      ...(nested as Record<string, unknown>),
+    };
+  }
+  return top;
 }
 
 /** When set-address succeeds with cart payload (not a confirmation-only response). */

@@ -94,7 +94,15 @@ const HomePage: React.FC = () => {
     storeService.getStoreIdForProducts(),
   );
 
-  const refreshOffersStoreId = useCallback(() => {
+  const refreshOffersStoreId = useCallback(async () => {
+    let next = storeService.getStoreIdForProducts();
+    if (next == null) {
+      next = await storeService.resolveStoreIdForApiAsync().catch(() => null);
+    }
+    setOffersStoreId((prev) => (prev === next ? prev : next));
+  }, []);
+
+  const syncOffersStoreIdFromCache = useCallback(() => {
     setOffersStoreId((prev) => {
       const next = storeService.getStoreIdForProducts();
       return prev === next ? prev : next;
@@ -103,10 +111,11 @@ const HomePage: React.FC = () => {
 
   // Single effect: avoids duplicate refresh on mount (was two useEffects × Strict Mode = 4 store updates).
   useEffect(() => {
-    refreshOffersStoreId();
-    window.addEventListener(GUEST_STORE_UPDATED_EVENT, refreshOffersStoreId);
-    return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, refreshOffersStoreId);
-  }, [isLoggedIn, refreshOffersStoreId]);
+    void refreshOffersStoreId();
+    window.addEventListener(GUEST_STORE_UPDATED_EVENT, syncOffersStoreIdFromCache);
+    return () =>
+      window.removeEventListener(GUEST_STORE_UPDATED_EVENT, syncOffersStoreIdFromCache);
+  }, [isLoggedIn, refreshOffersStoreId, syncOffersStoreIdFromCache]);
 
   // Function to fetch the latest address from API (only when logged in — avoids wrong JWT for guests)
   const fetchLatestAddress = useCallback(async () => {
@@ -312,7 +321,7 @@ const HomePage: React.FC = () => {
                 className="h-10 sm:h-14 w-auto mb-2 sm:mb-3"
               />
               <p className="text-gray-600 text-xs leading-snug sm:text-sm sm:leading-normal">
-                We are Genda Phool! Your partner for everyday floral needs.
+                We are Genda Phool. Your partner for daily floral needs.
               </p>
             </div>
           </motion.div>

@@ -72,6 +72,9 @@ function mapRawItemsToSubscriptionLineItems(
 ): SubscriptionLineItem[] {
   return itemsRaw.map((it) => {
     const p = (it.product as Record<string, unknown> | undefined) ?? {};
+    const productIdRaw =
+      p.id ?? it.product_id ?? it.productId;
+    const productId = Number(productIdRaw);
     const qty = Number.parseFloat(String(it.quantity ?? 1));
     const unit = Number.parseFloat(
       String(it.unit_price ?? p.current_price ?? p.sale_price ?? p.base_price ?? 0),
@@ -81,6 +84,8 @@ function mapRawItemsToSubscriptionLineItems(
     );
     const img = pickPrimaryImageUrl(p as ProductImageLike, "thumb");
     return {
+      productId:
+        Number.isFinite(productId) && productId > 0 ? productId : undefined,
       name: String(p.name ?? "Product"),
       imageUrl: img || undefined,
       quantity: Number.isFinite(qty) ? qty : 1,
@@ -235,6 +240,12 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
     nextDeliveryDate: nextDeliveryDate && !Number.isNaN(nextDeliveryDate.getTime()) ? nextDeliveryDate : undefined,
     pausedUntilDate:
       pausedUntilDate && !Number.isNaN(pausedUntilDate.getTime()) ? pausedUntilDate : undefined,
+    pauseReason: (() => {
+      const rawReason = raw.pause_reason ?? raw.pauseReason;
+      return rawReason != null && String(rawReason).trim()
+        ? String(rawReason).trim()
+        : undefined;
+    })(),
     createdAt: raw.created_at ? new Date(String(raw.created_at)) : new Date(),
     productDetails: plan
       ? {
@@ -250,6 +261,7 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
 }
 
 export interface SubscriptionLineItem {
+  productId?: number;
   name: string;
   imageUrl?: string;
   quantity: number;
@@ -313,6 +325,8 @@ export interface Subscription {
   nextDeliveryDate?: Date;
   /** Auto-resume date when status is PAUSED (`paused_until_date` from API). */
   pausedUntilDate?: Date;
+  /** Why the subscription was paused (`pause_reason` from API). */
+  pauseReason?: string;
 }
 
 export interface SubscriptionInitiateResponse {
@@ -692,6 +706,10 @@ class SubscriptionService {
       selectedDays?: string[];
       endDate?: Date;
       status?: "ACTIVE" | "PAUSED" | "CANCELLED" | "INACTIVE";
+      /** Top-level quantity (single-product subscriptions). */
+      quantity?: number;
+      /** Per-product quantities when subscription has multiple items. */
+      items?: Array<{ product_id: number; quantity: number }>;
     }
   ): Promise<Subscription> {
     const dayToInt = (d: string): number | null => {
@@ -718,6 +736,22 @@ class SubscriptionService {
     }
     if (updates.endDate != null) body.end_date = updates.endDate.toISOString().split("T")[0];
     if (updates.status != null) body.status = updates.status;
+
+    const normalizedItems =
+      updates.items != null && updates.items.length > 0
+        ? updates.items.map((row) => ({
+            product_id: row.product_id,
+            quantity: Math.max(1, Math.round(row.quantity)),
+          }))
+        : null;
+
+    if (normalizedItems != null && normalizedItems.length > 1) {
+      body.items = normalizedItems;
+    } else if (updates.quantity != null && Number.isFinite(updates.quantity)) {
+      body.quantity = Math.max(1, Math.round(updates.quantity));
+    } else if (normalizedItems?.length === 1) {
+      body.quantity = normalizedItems[0].quantity;
+    }
 
     const { data: res } = await api.patch(
       `${base()}/${subscriptionId}/update/`,

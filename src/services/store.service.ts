@@ -400,7 +400,11 @@ class StoreService {
    * Set temporary store ID for logged-out users
    */
   setTemporaryStoreId(storeId: number): void {
+    const prev = this.getTemporaryStoreId();
     localStorage.setItem("temporaryStoreId", storeId.toString());
+    if (prev !== storeId) {
+      notifyGuestTemporaryStoreUpdated();
+    }
   }
 
   /**
@@ -416,7 +420,6 @@ class StoreService {
     const sid = Number(res.store?.id);
     if (!Number.isFinite(sid) || sid <= 0) return;
     this.setTemporaryStoreId(sid);
-    notifyGuestTemporaryStoreUpdated();
   }
 
   /**
@@ -474,7 +477,6 @@ class StoreService {
           };
         }
         this.setTemporaryStoreId(zone.storeId);
-        notifyGuestTemporaryStoreUpdated();
         notifyGpsCatalogLocationUpdated();
         return {
           serviceable: true,
@@ -490,7 +492,6 @@ class StoreService {
 
     try {
       await this.resolveGuestStoreFromCoordinates(lat, lng);
-      notifyGuestTemporaryStoreUpdated();
       notifyGpsCatalogLocationUpdated();
       const storeId = this.getTemporaryStoreId();
       if (storeId == null) {
@@ -513,10 +514,9 @@ class StoreService {
    */
   getStoreIdForProducts(): number | null {
     if (localStorage.getItem("phoneNumber")) {
-      return this.getSelectedStoreId();
-    } else {
-      return this.getTemporaryStoreId();
+      return this.getSelectedStoreId() ?? this.getTemporaryStoreId();
     }
+    return this.getTemporaryStoreId();
   }
 
   /** Pinned saved address for store catalog (parity with app SecureStore). */
@@ -572,11 +572,33 @@ class StoreService {
     }
     this.setGpStoreCatalogAddressOverrideId(String(address.id));
 
+    const isGpDaily =
+      typeof window !== "undefined" &&
+      window.location.pathname.startsWith("/gp-daily");
+
     if (!localStorage.getItem("phoneNumber")) {
       await this.resolveGuestStoreFromCoordinates(lat, lng);
-      notifyGuestTemporaryStoreUpdated();
       notifyGpsCatalogLocationUpdated();
       return;
+    }
+
+    if (isGpDaily) {
+      try {
+        const zone = await resolveGpDailyZoneAtLatLng(lat, lng);
+        if (!zone.eligible || zone.storeId == null) {
+          this.setGpStoreCatalogAddressOverrideId(null);
+          throw new Error(
+            zone.message?.trim() ||
+              "Genda Phool Daily is not available at this address.",
+          );
+        }
+        this.setTemporaryStoreId(zone.storeId);
+        notifyGpsCatalogLocationUpdated();
+        return;
+      } catch (e) {
+        this.setGpStoreCatalogAddressOverrideId(null);
+        throw e;
+      }
     }
 
     const cov = await addressService.validateAddressInDeliveryArea(
@@ -635,7 +657,6 @@ class StoreService {
                 );
                 return;
               }
-              notifyGuestTemporaryStoreUpdated();
               notifyGpsCatalogLocationUpdated();
               resolve();
               return;

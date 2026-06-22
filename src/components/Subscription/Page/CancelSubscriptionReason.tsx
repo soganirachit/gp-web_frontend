@@ -4,6 +4,10 @@ import { IoArrowBack } from 'react-icons/io5';
 import { toast } from 'react-hot-toast';
 import { subscriptionService } from "../../../services/subscription.service";
 import alertIcon from '../../../assets/svg/cancelpage/alert.svg';
+import {
+  SUBSCRIPTION_CANCELLATION_TIMING_BODY,
+  SUBSCRIPTION_CANCELLATION_TIMING_TITLE,
+} from '../../../utils/subscriptionCancellationPolicy';
 
 const CancelSubscriptionReason: React.FC = () => {
     const navigate = useNavigate();
@@ -69,9 +73,17 @@ const CancelSubscriptionReason: React.FC = () => {
                     <div className="flex-shrink-0 mt-0.5">
                         <img src={alertIcon} alt="Low Balance" className="w-6 h-6" />
                     </div>
-                    <p className="text-[#D32F2F] text-sm leading-tight font-medium">
-                        Your subscription will be cancelled immediately and you won't receive any further deliveries.
-                    </p>
+                    <div>
+                        <p className="text-[#D32F2F] text-sm leading-tight font-semibold mb-2">
+                            {SUBSCRIPTION_CANCELLATION_TIMING_TITLE}
+                        </p>
+                        <p className="text-[#D32F2F] text-sm leading-relaxed font-medium">
+                            {SUBSCRIPTION_CANCELLATION_TIMING_BODY}
+                        </p>
+                        <p className="text-[#D32F2F] text-sm leading-relaxed mt-3">
+                            Your subscription will be cancelled and you won&apos;t receive further deliveries after the applicable cutoff above.
+                        </p>
+                    </div>
                 </div>
 
                 {/* White Card Content */}

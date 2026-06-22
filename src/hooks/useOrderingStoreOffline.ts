@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { GUEST_STORE_UPDATED_EVENT, storeService } from "../services/store.service";
 import { resolveGpDailyCatalogStoreId } from "../utils/gpDailyCatalogStore";
-import { isOrderingBlockedByStoreOffline } from "../utils/homeLocationHeroState";
+import {
+  invalidateOrderingOfflineCache,
+  isOrderingBlockedByStoreOffline,
+} from "../utils/homeLocationHeroState";
 
 function readDeviceCoords(): { lat: number | null; lng: number | null } {
   try {
@@ -41,7 +44,10 @@ export function useOrderingStoreOffline(cartStoreId?: number | null) {
 
   useEffect(() => {
     void refresh();
-    const onStoreChange = () => void refresh();
+    const onStoreChange = () => {
+      invalidateOrderingOfflineCache();
+      void refresh();
+    };
     window.addEventListener(GUEST_STORE_UPDATED_EVENT, onStoreChange);
     window.addEventListener("addressUpdated", onStoreChange);
     return () => {

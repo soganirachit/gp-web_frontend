@@ -299,7 +299,6 @@ const ProductPage: React.FC = () => {
   const [insufficientWalletModal, setInsufficientWalletModal] =
     useState<InsufficientWalletDetails | null>(null);
   const [existingSubscription] = useState<any>(null);
-  const [otherBasePacks, setOtherBasePacks] = useState<BasePack[]>([]);
   const [, setExoticFlowers] = useState<Product[]>([]);
   const [products, setProducts] = useState<GarlandProduct[]>([]);
   const [bestSellers, setBestSellers] = useState<any[]>([]);
@@ -458,15 +457,6 @@ const ProductPage: React.FC = () => {
         })
         .slice(0, 5);
       setCombineProducts(otherProducts);
-
-      // Optional legacy list — many deployments no longer expose GET /basepacks/ (404). Do not fail the product page.
-      try {
-        const allPacks = await basePackService.getAllBasePacks();
-        const otherPacks = allPacks.filter((pack) => String(pack.id) !== String(slug)).slice(0, 3);
-        setOtherBasePacks(otherPacks);
-      } catch {
-        setOtherBasePacks([]);
-      }
     } catch (error: any) {
       if (error.message === "Session expired. Please login again.") {
         navigate(`${basePath}/login`, {

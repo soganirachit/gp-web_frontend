@@ -2,6 +2,14 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaSearch } from 'react-icons/fa';
 
+/** Map overlay search input — solid background so map does not show through. */
+export const GP_MAP_SEARCH_INPUT_CLASSES =
+  "w-full rounded-xl border border-[#808080] bg-white p-3 pl-4 pr-10 text-left text-gray-900 shadow-sm placeholder:text-[#808080] focus:border-[#808080] focus:outline-none focus:ring-2";
+
+/** Bottom sheets align with the app content column on viewports ≥590px. */
+export const GP_SHEET_DESKTOP_ALIGN_CLASSES =
+  "min-[590px]:left-1/2 min-[590px]:right-auto min-[590px]:w-full min-[590px]:max-w-[min(800px,100vw)] min-[590px]:-translate-x-1/2";
+
 /** Shared search field chrome — map/location inputs should match these tokens. */
 export const GP_SEARCH_FIELD_WRAP_CLASSES =
   "w-full rounded-xl border border-[#808080] bg-transparent px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 text-left";

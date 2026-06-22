@@ -32,6 +32,10 @@ import {
   supportTicketEligibilityMessage,
   toCustomerOrderStatusKey,
 } from '../../utils/customerOrderStatus';
+import {
+  extractVariantNameFromOrderLineItem,
+  formatOrderItemPackDisplayName,
+} from '../../utils/orderListDisplay';
 
 interface OrderItem {
   id: number;
@@ -49,6 +53,10 @@ interface OrderItem {
   unit_price: string;
   subtotal: string;
   special_instructions: string;
+  variant_name?: string | null;
+  product_variant_name?: string | null;
+  variant?: { name?: string | null } | null;
+  product_variant?: { name?: string | null } | null;
 }
 
 interface TimelineEvent {
@@ -562,7 +570,7 @@ const OrderDetails: React.FC = () => {
           title="Order Details"
           onBack={() => navigateBackToOrderList(order)}
           padYClassName="pt-6 pb-4"
-          className="sticky top-0 z-10 bg-[#f8f6f1]"
+          className="sticky top-0 z-20 bg-[#f8f6f1]"
         />
 
         {/* Content — scroll handled by Layout main */}
@@ -581,6 +589,12 @@ const OrderDetails: React.FC = () => {
               <div className="space-y-3">
                 {order.items.map((item, index) => {
                   const slug = (item.product.slug || '').trim();
+                  const displayName = formatOrderItemPackDisplayName(
+                    item.product.name,
+                    extractVariantNameFromOrderLineItem(
+                      item as unknown as Record<string, unknown>,
+                    ),
+                  );
                   const inner = (
                     <>
                       <div className="w-16 h-16 flex-shrink-0">
@@ -594,7 +608,7 @@ const OrderDetails: React.FC = () => {
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-medium text-gray-900 truncate">
-                            {item.product.name}
+                            {displayName}
                           </p>
                         </div>
                         <div className="flex items-center justify-between">

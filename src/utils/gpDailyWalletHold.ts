@@ -87,6 +87,10 @@ export function pickActiveSubscriptionDailyUnitRupees(
   }
   const amt = sub?.amount;
   if (typeof amt === "number" && Number.isFinite(amt) && amt > 0) return amt;
+  const totalAmt = sub?.totalAmount;
+  if (typeof totalAmt === "number" && Number.isFinite(totalAmt) && totalAmt > 0) {
+    return totalAmt;
+  }
   return 0;
 }
 
@@ -136,10 +140,16 @@ function isActiveSubscriptionStatus(status: unknown): boolean {
   return s === "ACTIVE" || s === "RUNNING";
 }
 
+function isPausedSubscriptionStatus(status: unknown): boolean {
+  return String(status ?? "").toUpperCase() === "PAUSED";
+}
+
 function isWalletHoldPause(sub: Record<string, unknown>): boolean {
-  const st = String(sub.status ?? "").toUpperCase();
-  if (st !== "PAUSED") return false;
-  const reason = String(sub.pause_reason ?? sub.pauseReason ?? "").toLowerCase();
+  if (!isPausedSubscriptionStatus(sub.status)) return false;
+  const reason = String(
+    sub.pause_reason ?? sub.pauseReason ?? "",
+  ).toLowerCase();
+  if (!reason) return true;
   return reason.includes("wallet") || reason.includes("insufficient");
 }
 
@@ -167,8 +177,6 @@ function buildSubWalletContexts(
 ): SubWalletCtx[] {
   const ctxs: SubWalletCtx[] = [];
   for (const { sub, extra } of subscriptions) {
-    const rec = sub as Record<string, unknown>;
-    if (!isActiveSubscriptionStatus(rec.status)) continue;
     const dailyUnit = pickActiveSubscriptionDailyUnitRupees(
       sub as Subscription,
       extra ?? undefined,
@@ -185,6 +193,42 @@ function buildSubWalletContexts(
     ctxs.push({ dailyUnit, deliveryDayInts });
   }
   return ctxs;
+}
+
+function toSubscriptionEntries(
+  subscriptions: Array<Subscription | Record<string, unknown>>,
+  extrasBySubId?: Record<string, Record<string, unknown>>,
+): Array<{
+  sub: Subscription | Record<string, unknown>;
+  extra?: Record<string, unknown> | null;
+}> {
+  return subscriptions.map((sub) => {
+    const rec = sub as Record<string, unknown>;
+    const id = String(rec.id ?? rec.subscription_id ?? "");
+    return {
+      sub,
+      extra: extrasBySubId?.[id] ?? null,
+    };
+  });
+}
+
+/** Active subs for costing; when all are paused, use paused rows so hold/recommend UI still works. */
+export function pickSubscriptionsForWalletCosting(
+  subscriptions: Array<{
+    sub: Subscription | Record<string, unknown>;
+    extra?: Record<string, unknown> | null;
+  }>,
+): Array<{
+  sub: Subscription | Record<string, unknown>;
+  extra?: Record<string, unknown> | null;
+}> {
+  const active = subscriptions.filter(({ sub }) =>
+    isActiveSubscriptionStatus((sub as Record<string, unknown>).status),
+  );
+  if (active.length > 0) return active;
+  return subscriptions.filter(({ sub }) =>
+    isPausedSubscriptionStatus((sub as Record<string, unknown>).status),
+  );
 }
 
 function costForCalendarDay(ctxs: SubWalletCtx[], date: Date): number {
@@ -260,7 +304,7 @@ export function sumActiveSubscriptionsThreeDayTotal(
     extra?: Record<string, unknown> | null;
   }>,
 ): number {
-  const ctxs = buildSubWalletContexts(subscriptions);
+  const ctxs = buildSubWalletContexts(pickSubscriptionsForWalletCosting(subscriptions));
   return computeRequiredForNextDeliveryDays(
     ctxs,
     startOfDay(),
@@ -275,7 +319,7 @@ export function sumActiveSubscriptionsThirtyDayTotal(
     extra?: Record<string, unknown> | null;
   }>,
 ): number {
-  const ctxs = buildSubWalletContexts(subscriptions);
+  const ctxs = buildSubWalletContexts(pickSubscriptionsForWalletCosting(subscriptions));
   return computeRequiredForNextDeliveryDays(
     ctxs,
     startOfDay(),
@@ -348,25 +392,26 @@ export function computeGpDailyWalletBanner(
   const activeSubs = subs.filter((s) =>
     isActiveSubscriptionStatus((s as Record<string, unknown>).status),
   );
+  const pausedSubs = subs.filter((s) =>
+    isPausedSubscriptionStatus((s as Record<string, unknown>).status),
+  );
   const pausedForWallet = subs.some((s) =>
     isWalletHoldPause(s as Record<string, unknown>),
   );
+  const subscriptionsPausedOnly =
+    activeSubs.length === 0 && pausedSubs.length > 0;
   const hasAnySubscription = subs.some((s) => {
     const st = String((s as Record<string, unknown>).status ?? "").toUpperCase();
     return st !== "CANCELLED" && st !== "CANCELED" && st !== "INACTIVE";
   });
 
-  if (!hasAnySubscription && !pausedForWallet) return emptyBanner();
+  if (!hasAnySubscription && !pausedForWallet && !subscriptionsPausedOnly) {
+    return emptyBanner();
+  }
 
-  const subEntries = activeSubs.map((sub) => {
-    const rec = sub as Record<string, unknown>;
-    const id = String(rec.id ?? rec.subscription_id ?? "");
-    return {
-      sub: sub as Subscription,
-      extra: input.extrasBySubId?.[id] ?? null,
-    };
-  });
-  const ctxs = buildSubWalletContexts(subEntries);
+  const allEntries = toSubscriptionEntries(subs, input.extrasBySubId);
+  const costingEntries = pickSubscriptionsForWalletCosting(allEntries);
+  const ctxs = buildSubWalletContexts(costingEntries);
   const oneDayTotal = sumActiveSubscriptionsOneDayTotal(ctxs);
   const threeDayTotal = computeRequiredForNextDeliveryDays(
     ctxs,
@@ -377,7 +422,7 @@ export function computeGpDailyWalletBanner(
   const fallbackThreshold = 100;
   const balance = input.walletBalance;
 
-  if (pausedForWallet) {
+  if (pausedForWallet || subscriptionsPausedOnly) {
     return {
       kind: "on_hold",
       threeDayTotal,
@@ -388,14 +433,14 @@ export function computeGpDailyWalletBanner(
         threeDayTotal > 0 ? threeDayTotal - balance : oneDayTotal - balance,
         fallbackThreshold,
       ),
-      hasWalletHoldPause: true,
+      hasWalletHoldPause: pausedForWallet || subscriptionsPausedOnly,
       runwayLastCoveredDate: null,
       nextStoredPauseScheduleYmd: input.storedPauseScheduleYmd ?? null,
       shouldAutoPauseActiveSubs: false,
     };
   }
 
-  if (activeSubs.length === 0 || (oneDayTotal <= 0 && threeDayTotal <= 0)) {
+  if (costingEntries.length === 0 || (oneDayTotal <= 0 && threeDayTotal <= 0)) {
     return emptyBanner();
   }
 

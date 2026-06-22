@@ -2,6 +2,7 @@ import React from 'react';
 import { FaChevronRight } from 'react-icons/fa';
 import { gpDailyTitleCase } from '../../utils/gpDailyHomeDesignSystem';
 import { ProductImageTag } from './ProductImageTag';
+import { SessionCachedImage } from './SessionCachedImage';
 
 interface ProductCardProps {
   imageUrl: string;
@@ -72,10 +73,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
           showDailyButton ? "bg-[#f8f6f1]" : "bg-[#8B4513]"
         }`}
       >
-        <img
+        <SessionCachedImage
           src={imageUrl}
           alt={packName}
-          loading="lazy"
           className="w-full h-full object-cover"
         />
 

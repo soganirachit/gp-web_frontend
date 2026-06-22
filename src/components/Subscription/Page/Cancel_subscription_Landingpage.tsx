@@ -5,6 +5,10 @@ import sadSvg from '../../../assets/svg/cancelpage/sad.svg';
 import modifySvg from '../../../assets/svg/cancelpage/modify.svg';
 import vectorBadge from '../../../assets/All/Vector (1).png';
 import { IoChevronForward } from 'react-icons/io5';
+import {
+  SUBSCRIPTION_CANCELLATION_TIMING_BODY,
+  SUBSCRIPTION_CANCELLATION_TIMING_TITLE,
+} from '../../../utils/subscriptionCancellationPolicy';
 
 const CancelSubscriptionLanding: React.FC = () => {
   const navigate = useNavigate();
@@ -62,6 +66,20 @@ const CancelSubscriptionLanding: React.FC = () => {
           </h1>
           <p className="text-gray-500 text-sm px-4">
             Are you sure you want to cancel? Consider pausing instead.
+          </p>
+        </motion.div>
+
+        <motion.div
+          className="bg-[#FFF7ED] border border-[#FDE3B0] rounded-2xl p-4 mb-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+        >
+          <p className="text-sm font-semibold text-[#7C4A03] mb-1">
+            {SUBSCRIPTION_CANCELLATION_TIMING_TITLE}
+          </p>
+          <p className="text-sm text-[#92400E] leading-relaxed">
+            {SUBSCRIPTION_CANCELLATION_TIMING_BODY}
           </p>
         </motion.div>
 

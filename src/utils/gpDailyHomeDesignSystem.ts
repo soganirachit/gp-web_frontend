@@ -179,6 +179,10 @@ export const GP_DAILY_SCOOTER_HERO_IMG_CLASS =
 export const GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS =
   "pointer-events-none absolute -right-10 top-1/2 z-0 -translate-y-1/2 translate-x-8";
 
+/** Logged-out marketing hero — scooter top aligns under Namaste / intro copy. */
+export const GP_DAILY_SCOOTER_HERO_MARKETING_GUEST_WRAPPER_CLASS =
+  "pointer-events-none absolute -right-10 -top-5 z-0 translate-x-8";
+
 
 
 /** Reserve ~30% of Store hero width for truck illustration (70% text). */

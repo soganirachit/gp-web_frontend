@@ -23,9 +23,16 @@ import { useOrderingStoreOffline } from '../../../hooks/useOrderingStoreOffline'
 import {
   subscriptionCartService,
   isSubscriptionCartStoreChangeConfirmation,
+  normalizeSubscriptionCartSetAddressResponse,
   isSubscriptionCartZoneStaleError,
+  type DailyCart,
 } from '../../../services/subscriptionCart.service';
 import { notifyDailyCartUpdated } from '../../../utils/dailyCartEvents';
+import { CartConfirmModal } from '../../../components/cart/CartConfirmModal';
+import {
+  SWITCH_STORE_CONFIRM_MESSAGE,
+  SWITCH_STORE_CONFIRM_TITLE,
+} from '../../../utils/cartConfirmCopy';
 import {
   LIVE_DEVICE_ADDRESS_ID,
   resolveLiveDeviceToSavedAddress,
@@ -48,6 +55,7 @@ import { cartService, type CartData } from '../../../services/cart.service';
 import { walletService } from '../../../services/wallet.service';
 import Spinner from '../../../components/common/Spinner';
 import { CartPageSkeleton } from '../../../components/common/PageSkeletons';
+import { GP_SHEET_DESKTOP_ALIGN_CLASSES } from '../../../components/common/SearchBar';
 import api from '../../../services/api';
 import { getApiUrl } from '../../../config/api.config';
 import { useNetworkRecovery } from '../../../hooks/useNetworkRecovery';
@@ -72,6 +80,7 @@ import {
 } from '../../../utils/deliverySlotSelection';
 import { pickPrimaryImageUrl } from '../../../utils/pickPrimaryImageUrl';
 import { computeFirstSubscriptionDeliveryDateFromWeekdayInts } from '../../../utils/subscriptionFirstDeliveryDate';
+import { SUBSCRIPTION_FIRST_DELIVERY_CUTOFF_MESSAGE } from '../../../utils/subscriptionCartDeliveryMessage';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
 import deliveryTruckIcon from "../../../assets/svg/gp_daily svg/delivery_truck.svg";
 import { rechargeWalletInApp } from '../../../utils/walletRechargeCheckout';
@@ -179,6 +188,77 @@ function applyServerCartData(
   }
 }
 
+function subscriptionCartTotalsFromDailyCart(dailyCart: DailyCart): CartTotalsState {
+  const raw = dailyCart as Record<string, unknown>;
+  const id = dailyCart.delivery_address_id;
+  const couponDiscount = parseFloat(String(raw.coupon_discount ?? ''));
+  const discountAmount = parseFloat(String(raw.discount_amount ?? ''));
+  const discount =
+    Number.isFinite(couponDiscount) && couponDiscount > 0
+      ? couponDiscount
+      : Number.isFinite(discountAmount)
+        ? discountAmount
+        : 0;
+  return {
+    subtotal: parseFloat(String(dailyCart.subtotal ?? 0)) || 0,
+    taxAmount: parseFloat(String(raw.tax_amount ?? 0)) || 0,
+    deliveryFee: parseFloat(String(dailyCart.delivery_fee ?? 0)) || 0,
+    discountAmount: discount,
+    surchargeAmount: parseFloat(String(raw.surcharge_amount ?? 0)) || 0,
+    total: parseFloat(String(dailyCart.total ?? 0)) || 0,
+    deliveryAddressId: id === undefined || id === null ? null : Number(id),
+  };
+}
+
+function applySubscriptionDailyCartData(
+  dailyCart: DailyCart,
+  setTotals: React.Dispatch<React.SetStateAction<CartTotalsState | null>>,
+  setStoreName: React.Dispatch<React.SetStateAction<string>>,
+  setStoreId: React.Dispatch<React.SetStateAction<number | null>>,
+) {
+  setTotals(subscriptionCartTotalsFromDailyCart(dailyCart));
+  setStoreName((dailyCart.store_name || '').trim());
+  const sid = dailyCart.store_id;
+  if (sid == null) {
+    setStoreId(null);
+  } else {
+    const n = Number(sid);
+    setStoreId(Number.isFinite(n) ? n : null);
+  }
+}
+
+function promoDiscountFromDailyCart(dailyCart: DailyCart): number {
+  const raw = dailyCart as Record<string, unknown>;
+  const fromCoupon = parseFloat(String(raw.coupon_discount ?? ''));
+  if (Number.isFinite(fromCoupon) && fromCoupon > 0) return fromCoupon;
+  return parseFloat(String(raw.discount_amount ?? '0')) || 0;
+}
+
+function promoCodeFromDailyCart(dailyCart: DailyCart): string | null {
+  const raw = dailyCart as Record<string, unknown>;
+  const code = raw.coupon_code;
+  if (code == null || String(code).trim() === '') return null;
+  return String(code).trim();
+}
+
+function promoDiscountFromCartData(cartData: CartData): number {
+  const fromCoupon = parseFloat(String(cartData.coupon_discount ?? ''));
+  if (Number.isFinite(fromCoupon) && fromCoupon > 0) return fromCoupon;
+  return parseFloat(String(cartData.discount_amount ?? '0')) || 0;
+}
+
+function cartProductSignatureFromItems(
+  items: Array<{
+    productId?: number | string;
+    variant?: { id?: number } | null;
+  }>,
+): string {
+  return items
+    .map((it) => `${it.productId ?? 0}:${it.variant?.id ?? 0}`)
+    .sort()
+    .join('|');
+}
+
 function parseAddressCoordinates(address: Address | null): { lat: number; lng: number } | null {
   const raw = address?.coordinates?.trim();
   if (!raw) return null;
@@ -239,7 +319,10 @@ const fetchCoupons = async (): Promise<Coupon[]> => {
 
 const applyCouponAPI = async (couponCode: string): Promise<ApplyCouponResponse> => {
   try {
-    const res = await api.post(`${getApiUrl()}/cart/apply-coupon/`, { coupon_code: couponCode });
+    const res = await api.post(`${getApiUrl()}/cart/apply-coupon/`, {
+      coupon_code: couponCode,
+      for_gp_daily: true,
+    });
     const body = res.data as { data?: ApplyCouponResponse } | ApplyCouponResponse;
     return (body as { data?: ApplyCouponResponse }).data ?? (body as ApplyCouponResponse);
   } catch (error: unknown) {
@@ -368,7 +451,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({
 
       {/* Bottom sheet — bottom/maxHeight follow visualViewport so content stays above the keyboard */}
       <div
-        className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+2.5rem)] z-[99999] flex min-h-0 flex-col rounded-t-[24px] bg-white pb-[max(5.75rem,env(safe-area-inset-bottom,0px))] shadow-2xl sm:bottom-0 sm:rounded-t-[28px]"
+        className={`fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+2.5rem)] z-[99999] flex min-h-0 flex-col rounded-t-[24px] bg-white pb-[max(5.75rem,env(safe-area-inset-bottom,0px))] shadow-2xl sm:bottom-0 sm:rounded-t-[28px] ${GP_SHEET_DESKTOP_ALIGN_CLASSES}`}
         style={{ maxHeight: sheetMaxHeight }}
         role="dialog"
         aria-modal="true"
@@ -580,6 +663,10 @@ const Cart: React.FC = () => {
     addressId: number;
     message: string;
   } | null>(null);
+  const [confirmingSubscriptionStoreChange, setConfirmingSubscriptionStoreChange] =
+    useState(false);
+  /** Store label from set-address before cart reload (nested API envelope). */
+  const [pendingFulfilmentStoreName, setPendingFulfilmentStoreName] = useState('');
   const [insufficientWalletModal, setInsufficientWalletModal] =
     useState<InsufficientWalletDetails | null>(null);
   const [walletRecharging, setWalletRecharging] = useState(false);
@@ -593,6 +680,17 @@ const Cart: React.FC = () => {
       setDailyCart(cart);
       notifyDailyCartUpdated(cart);
       setLineCartStaleByItemId({});
+      applySubscriptionDailyCartData(cart, setCartTotals, setCartStoreName, setCartStoreId);
+      setPendingFulfilmentStoreName('');
+      setHasLoadedCartTotalsOnce(true);
+      const promoCode = promoCodeFromDailyCart(cart);
+      if (promoCode) {
+        setAppliedPromoCode(promoCode);
+        setPromoDiscount(promoDiscountFromDailyCart(cart));
+      } else if (!appliedPromoCodeRef.current) {
+        setAppliedPromoCode(null);
+        setPromoDiscount(0);
+      }
     } catch (e: unknown) {
       if (isSubscriptionCartZoneStaleError(e)) {
         toast.error(GP_DAILY_ZONE_STALE_TOAST, { id: 'sub-cart-zone-stale', duration: 4000 });
@@ -613,11 +711,18 @@ const Cart: React.FC = () => {
     async (addressId: number): Promise<boolean> => {
       try {
         const raw = await subscriptionCartService.setDeliveryAddress(addressId, false);
-        if (isSubscriptionCartStoreChangeConfirmation(raw)) {
+        const normalized = normalizeSubscriptionCartSetAddressResponse(raw);
+        if (isSubscriptionCartStoreChangeConfirmation(normalized)) {
+          const newStoreName = (
+            normalized as { new_store?: { name?: string } }
+          ).new_store?.name;
+          if (typeof newStoreName === 'string' && newStoreName.trim()) {
+            setPendingFulfilmentStoreName(newStoreName.trim());
+          }
           const msg =
-            typeof raw.message === 'string' && raw.message.trim()
-              ? raw.message.trim()
-              : `Your delivery address maps to ${raw.new_store?.name ?? 'a different store'}. Continuing will clear items in your daily basket that are not available there.`;
+            typeof normalized.message === 'string' && normalized.message.trim()
+              ? normalized.message.trim()
+              : `Your delivery address maps to ${(normalized as { new_store?: { name?: string } }).new_store?.name ?? 'a different store'}. Continuing will clear items in your daily basket that are not available there.`;
           return await new Promise<boolean>((resolve) => {
             pendingSubscriptionAddressResolveRef.current = resolve;
             setSubscriptionStoreChangePrompt({ addressId, message: msg });
@@ -646,8 +751,10 @@ const Cart: React.FC = () => {
     const p = subscriptionStoreChangePrompt;
     if (!p) return;
     try {
+      setConfirmingSubscriptionStoreChange(true);
       const raw = await subscriptionCartService.setDeliveryAddress(p.addressId, true);
-      if (isSubscriptionCartStoreChangeConfirmation(raw)) {
+      const normalized = normalizeSubscriptionCartSetAddressResponse(raw);
+      if (isSubscriptionCartStoreChangeConfirmation(normalized)) {
         toast.error('Could not confirm address change. Try again.', {
           id: 'sub-cart-store-change-retry',
         });
@@ -665,6 +772,8 @@ const Cart: React.FC = () => {
       pendingSubscriptionAddressResolveRef.current?.(false);
       pendingSubscriptionAddressResolveRef.current = null;
       setSubscriptionStoreChangePrompt(null);
+    } finally {
+      setConfirmingSubscriptionStoreChange(false);
     }
   }, [subscriptionStoreChangePrompt, refreshDailyCart]);
 
@@ -711,6 +820,12 @@ const Cart: React.FC = () => {
       };
     });
   }, [dailyCart]);
+
+  /** Stable basket signature — avoids effects re-firing on every cart refresh (new `items` array). */
+  const itemsSignature = useMemo(
+    () => cartProductSignatureFromItems(items),
+    [dailyCart],
+  );
 
   /** Backend may clear lines when store changes — refresh if cart store id changes. */
   useEffect(() => {
@@ -786,6 +901,9 @@ const Cart: React.FC = () => {
   // Promo code state
   const [showPromoModal, setShowPromoModal] = useState(false);
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
+  const appliedPromoCodeRef = useRef<string | null>(null);
+  const cartProductSignatureRef = useRef('');
+  const promoTotalsRefreshSigRef = useRef<string | null>(null);
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState<number>(0);
   const [promoInlineMessage, setPromoInlineMessage] = useState<{
@@ -1097,20 +1215,9 @@ const Cart: React.FC = () => {
 
       const discountAmt = parseFloat(String(response.discount_amount ?? 0));
       setPromoDiscount(Number.isFinite(discountAmt) ? discountAmt : 0);
-
-      // If the response contains updated totals, use them directly
-      if (response.total !== undefined || response.subtotal !== undefined) {
-        const d = Number.isFinite(discountAmt) ? discountAmt : 0;
-        setCartTotals((prev) => mergeTotalsFromApplyResponse(response, prev, d));
-      } else {
-        try {
-          const raw = await cartService.getCartData();
-          const cartData = await reconcileCartStoreWithAccountSelection(raw);
-          applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
-        } catch (_) { }
-      }
-
       setAppliedPromoCode(code);
+      appliedPromoCodeRef.current = code;
+      await refreshDailyCart();
       return {
         successMessage: typeof response.message === 'string' ? response.message.trim() : undefined,
       };
@@ -1130,10 +1237,9 @@ const Cart: React.FC = () => {
       setIsApplyingPromo(true);
       await removeCouponAPI();
       setAppliedPromoCode(null);
+      appliedPromoCodeRef.current = null;
       setPromoDiscount(0);
-      const raw = await cartService.getCartData();
-      const cartData = await reconcileCartStoreWithAccountSelection(raw);
-      applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
+      await refreshDailyCart();
       setPromoInlineMessage({ kind: "success", text: "Coupon removed" });
     } catch (error: any) {
       setPromoInlineMessage({
@@ -1147,14 +1253,62 @@ const Cart: React.FC = () => {
 
   // Automatically remove applied promo when leaving the basket page
   useEffect(() => {
+    appliedPromoCodeRef.current = appliedPromoCode;
+  }, [appliedPromoCode]);
+
+  useEffect(() => {
     return () => {
-      if (appliedPromoCode) {
+      if (appliedPromoCodeRef.current) {
         removeCouponAPI().catch((err) => {
           console.error('Failed to auto-remove promo code on navigation:', err);
         });
       }
     };
-  }, [appliedPromoCode]);
+  }, []);
+
+  useEffect(() => {
+    const sig = itemsSignature;
+    const prev = cartProductSignatureRef.current;
+    if (prev) {
+      const prevSet = new Set(prev.split('|').filter(Boolean));
+      const addedNew = sig
+        .split('|')
+        .filter(Boolean)
+        .some((key) => !prevSet.has(key));
+      if (addedNew && appliedPromoCodeRef.current) {
+        void handleRemovePromoCode();
+      }
+    }
+    cartProductSignatureRef.current = sig;
+  }, [itemsSignature]);
+
+  // Re-apply promo when basket contents change (qty / add / remove) — not on every cart poll.
+  useEffect(() => {
+    const sig = itemsSignature;
+    const prev = promoTotalsRefreshSigRef.current;
+    promoTotalsRefreshSigRef.current = sig;
+    if (!isLoggedIn || !prev || prev === sig) return;
+
+    const id = window.setTimeout(() => {
+      void (async () => {
+        const activeCode = appliedPromoCodeRef.current;
+        if (!activeCode) return;
+        try {
+          const response = await applyCouponAPI(activeCode);
+          const discountAmt = parseFloat(String(response.discount_amount ?? 0));
+          setPromoDiscount(Number.isFinite(discountAmt) ? discountAmt : 0);
+          await refreshDailyCart();
+        } catch {
+          await removeCouponAPI().catch(() => {});
+          setAppliedPromoCode(null);
+          appliedPromoCodeRef.current = null;
+          setPromoDiscount(0);
+          await refreshDailyCart();
+        }
+      })();
+    }, 320);
+    return () => clearTimeout(id);
+  }, [isLoggedIn, itemsSignature, refreshDailyCart]);
 
   // Preload Razorpay SDK when basket opens so checkout is not blocked on first load
   useEffect(() => {
@@ -1281,7 +1435,7 @@ const Cart: React.FC = () => {
 
   // Nearest operational store vs cart store — suggest switch (app parity; no auto-switch).
   useEffect(() => {
-    if (!isLoggedIn || !defaultAddress || isLoadingCartTotals) return;
+    if (!isLoggedIn || !defaultAddress) return;
     const addrId = String(defaultAddress.id ?? '');
     const key = `${addrId}:${cartStoreId ?? ''}`;
     if (deliveryStoreSyncKey.current === key) return;
@@ -1293,6 +1447,9 @@ const Cart: React.FC = () => {
       deliveryStoreSyncKey.current = key;
       return;
     }
+
+    // Reserve key before async work so cart loading toggles don't restart this fetch.
+    deliveryStoreSyncKey.current = key;
 
     let cancelled = false;
     void (async () => {
@@ -1373,13 +1530,14 @@ const Cart: React.FC = () => {
         if (!cancelled) {
           setDeliveryStoreOffline(false);
           setSuggestedStoreForAddress(null);
+          deliveryStoreSyncKey.current = '';
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [isLoggedIn, defaultAddress, isLoadingCartTotals, cartStoreId]);
+  }, [isLoggedIn, defaultAddress, cartStoreId]);
 
   // Sync selected profile address to server cart so delivery_fee matches checkout (distance-based).
   useEffect(() => {
@@ -1458,7 +1616,7 @@ const Cart: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isLoggedIn, cartStoreName, cartStoreId, items.length]);
+  }, [isLoggedIn, cartStoreName, cartStoreId]);
 
   // Prefill Razorpay contact/name/email from profile (state was never set before → empty mobile on Razorpay)
   useEffect(() => {
@@ -1783,18 +1941,7 @@ const Cart: React.FC = () => {
       await storeService.switchStore(target.id);
       deliveryStoreSyncKey.current = '';
       await loadCartFromAPI();
-      setIsLoadingCartTotals(true);
-      try {
-        const raw = await cartService.getCartData();
-        const cartData = await reconcileCartStoreWithAccountSelection(raw);
-        applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
-      } catch (_) {
-        setCartTotals(null);
-        setCartStoreName('');
-        setCartStoreId(null);
-      } finally {
-        setIsLoadingCartTotals(false);
-      }
+      await refreshDailyCart();
       setSuggestedStoreForAddress(null);
       setShowSuggestedStoreSwitchModal(false);
       toast.success(GP_DAILY_STORE_UPDATED_TOAST, { id: 'gp-daily-store-updated' });
@@ -2094,22 +2241,23 @@ const Cart: React.FC = () => {
     [activeDeliveryDayInts],
   );
 
-  // Order summary
+  // Order summary — totals from GET /subscriptions/cart/ only (not gp-store GET /cart/).
   const localSubtotal = items.reduce((sum, it) => sum + Number(it.price || 0) * Number(it.quantity || 0), 0);
-  const subtotal = cartTotals?.subtotal ?? localSubtotal;
+  const subscriptionTotals = dailyCart ? subscriptionCartTotalsFromDailyCart(dailyCart) : null;
+  const subtotal = subscriptionTotals?.subtotal ?? localSubtotal;
   const deliveryFee =
-    cartTotals?.deliveryFee ??
+    subscriptionTotals?.deliveryFee ??
     (subscriptionDeliveryFee ?? (Number((dailyCart as any)?.delivery_fee) || 0));
-  const tax = cartTotals?.taxAmount ?? 0;
-  const discount = cartTotals?.discountAmount ?? 0;
-  const surcharge = cartTotals?.surchargeAmount ?? 0;
+  const tax = subscriptionTotals?.taxAmount ?? 0;
+  const discount = subscriptionTotals?.discountAmount ?? 0;
+  const surcharge = subscriptionTotals?.surchargeAmount ?? 0;
   const deliveryAddressId =
-    cartTotals?.deliveryAddressId ?? (defaultAddress?.id != null ? Number(defaultAddress.id) : null);
+    subscriptionTotals?.deliveryAddressId ?? (defaultAddress?.id != null ? Number(defaultAddress.id) : null);
   const total =
-    cartTotals?.total ??
+    subscriptionTotals?.total ??
     subtotal + deliveryFee + tax + surcharge - discount;
 
-  const displayStoreName = cartStoreName.trim();
+  const displayStoreName = (pendingFulfilmentStoreName || cartStoreName).trim();
   const deliveryBlockedByCoverage = addressOutsideDelivery === true;
   const deliveryBlockedByStoreMismatch = suggestedStoreForAddress != null;
 
@@ -2136,7 +2284,6 @@ const Cart: React.FC = () => {
     isInitialLoading ||
     (isLoggedIn &&
       (isLoadingAddress ||
-        (isLoadingCartTotals && !hasLoadedCartTotalsOnce) ||
         (isSyncing && !basketHydratedOnce)));
 
   if (isPageLoading) {
@@ -2385,16 +2532,15 @@ const Cart: React.FC = () => {
                 ) : null}
               </div>
 
-              <div className="mb-2 mt-1">
-                <div className="flex flex-row items-center gap-3 rounded-[16px] border border-amber-200/80 bg-[#FFF4E5] p-4 shadow-sm">
+              <div className="my-2">
+                <div className="flex flex-row items-center gap-3 rounded-[16px] border border-amber-200/80 bg-[#FFF4E5] px-4 py-4 shadow-sm">
                   <img
                     src={deliveryTruckIcon}
                     alt=""
                     className="h-14 w-14 shrink-0 object-contain"
                   />
                   <p className="flex-1 text-sm font-semibold leading-5 text-[#111827]">
-                  Orders placed before 8 PM will be delivered next day.
-                    {/* Orders placed before 8 PM will be delivered next day. Sunday deliveries available on request. */}
+                  {SUBSCRIPTION_FIRST_DELIVERY_CUTOFF_MESSAGE}
                   </p>
                 </div>
               </div>
@@ -2657,74 +2803,25 @@ const Cart: React.FC = () => {
 
       </div>
 
-      {/* Store switch confirmation — same copy/layout as Settings */}
-      {showSuggestedStoreSwitchModal && (
-        <div className="fixed inset-0 z-[99997] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-3 text-center text-lg font-semibold text-gray-900">Switch Store?</h3>
-            <p className="mb-6 text-center text-sm text-gray-600">
-              Due to the change in store, items in your cart might get affected. Do you want to continue?
-            </p>
-            <div className="space-y-3">
-              <button
-                type="button"
-                disabled={isSwitchingSuggestedStore}
-                onClick={() => void performSwitchToSuggestedStore()}
-                className="w-full rounded-lg py-3 text-base font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                style={{
-                  backgroundColor: theme.colors.primary,
-                  color: 'black',
-                }}
-              >
-                {isSwitchingSuggestedStore ? 'Please wait…' : 'Continue'}
-              </button>
-              <button
-                type="button"
-                disabled={isSwitchingSuggestedStore}
-                onClick={cancelSuggestedStoreSwitchModal}
-                className="w-full rounded-lg py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CartConfirmModal
+        open={showSuggestedStoreSwitchModal}
+        title={SWITCH_STORE_CONFIRM_TITLE}
+        message={SWITCH_STORE_CONFIRM_MESSAGE}
+        loading={isSwitchingSuggestedStore}
+        onConfirm={() => void performSwitchToSuggestedStore()}
+        onCancel={cancelSuggestedStoreSwitchModal}
+        titleId="gp-daily-switch-store-title"
+      />
 
-      {/* Subscription cart: store change clears incompatible lines — confirm with user */}
-      {subscriptionStoreChangePrompt ? (
-        <div
-          className="fixed inset-0 z-[220] flex items-center justify-center bg-black/45 px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="gp-sub-cart-store-change-title"
-        >
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h2 id="gp-sub-cart-store-change-title" className="text-lg font-semibold text-gray-900">
-              Address changed
-            </h2>
-            <p className="mt-3 text-sm leading-relaxed text-gray-600 whitespace-pre-wrap">
-              {subscriptionStoreChangePrompt.message}
-            </p>
-            <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
-              <button
-                type="button"
-                onClick={() => void confirmSubscriptionStoreChange()}
-                className="rounded-xl bg-gray-900 py-3 text-center text-base font-semibold text-white hover:bg-gray-800"
-              >
-                Continue
-              </button>
-              <button
-                type="button"
-                onClick={cancelSubscriptionStoreChange}
-                className="rounded-xl border border-gray-200 py-3 text-center text-base font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <CartConfirmModal
+        open={subscriptionStoreChangePrompt != null}
+        title="Address changed"
+        message={subscriptionStoreChangePrompt?.message ?? ""}
+        loading={confirmingSubscriptionStoreChange}
+        onConfirm={() => void confirmSubscriptionStoreChange()}
+        onCancel={cancelSubscriptionStoreChange}
+        titleId="gp-sub-cart-store-change-title"
+      />
 
       {/* Promo Code Modal */}
       {showPromoModal && (

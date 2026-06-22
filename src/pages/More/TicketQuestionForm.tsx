@@ -4,6 +4,7 @@ import { IoArrowBack } from 'react-icons/io5';
 import { FaPaperPlane } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { supportService, TicketQuestion, PredefinedAnswers } from '../../services/support.service';
+import { errorMessageFromCatch } from '../../utils/apiErrorMessage';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { SettingsListSkeleton } from '../../components/common/PageSkeletons';
 import {
@@ -221,7 +222,9 @@ const TicketQuestionForm: React.FC = () => {
       }
     } catch (error) {
       console.error('Error creating ticket:', error);
-      toast.error('Failed to create ticket. Please try again.');
+      toast.error(
+        errorMessageFromCatch(error, 'Failed to create ticket. Please try again.'),
+      );
       setSubmitting(false);
     }
   };

@@ -12,7 +12,10 @@ import othersIcon from '../../assets/svg/adressbook/others.svg';
 import defaultIcon from '../../assets/svg/adressbook/default.svg';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { UniformPageHeader } from '../../components/layout/UniformPageHeader';
-import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
+import {
+  formatAddressReceiverNameLine,
+  formatAddressReceiverPhoneLine,
+} from '../../utils/formatAddressReceiverContact';
 import { formatCartDeliveryAddress } from '../../utils/formatCartDeliveryAddress';
 import { storeService } from '../../services/store.service';
 
@@ -214,29 +217,29 @@ const Addresses: React.FC = () => {
                               })}
                             </p>
 
-                            <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2">
+                            <div className="mb-4 flex min-w-0 flex-col gap-0.5">
                               {(() => {
-                                const digits = formatPhoneForDisplay(
+                                const receiverName = formatAddressReceiverNameLine(
+                                  address.name,
+                                );
+                                const phoneLine = formatAddressReceiverPhoneLine(
                                   address.associatedPhoneNumber,
-                                ).replace(/\D/g, '');
-                                const last10 =
-                                  digits.length >= 10 ? digits.slice(-10) : '';
-                                const hasPhone = last10.length === 10;
-                                if (!hasPhone && !isCatalogPinned) return null;
+                                );
+                                if (!receiverName && !phoneLine && !isCatalogPinned) {
+                                  return null;
+                                }
                                 return (
                                   <>
-                                    {hasPhone ? (
-                                      <p className="min-w-0 shrink text-sm font-normal text-gray-800">
-                                        +91 {last10.slice(0, 5)} {last10.slice(5)}
+                                    {receiverName ? (
+                                      <p className="min-w-0 shrink text-sm font-semibold text-gray-800">
+                                        {receiverName}
                                       </p>
                                     ) : null}
-                                    {/* {isCatalogPinned ? (
-                                      <div className="flex shrink-0 flex-wrap items-center gap-2">
-                                        <span className="rounded-2xl bg-[#E6F4EA] px-2 py-1 text-xs font-semibold text-[#1E8E3E]">
-                                          Active
-                                        </span>
-                                      </div>
-                                    ) : null} */}
+                                    {phoneLine ? (
+                                      <p className="min-w-0 shrink text-sm font-normal text-gray-800">
+                                        {phoneLine}
+                                      </p>
+                                    ) : null}
                                   </>
                                 );
                               })()}

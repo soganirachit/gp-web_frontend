@@ -1,6 +1,7 @@
 import { AxiosError } from "axios";
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
+import { pickPrimaryImageUrl } from "../utils/pickPrimaryImageUrl";
 
 // Product API endpoints - using the configured api instance
 // The api instance baseURL should be: http://185.137.122.250:8083/api/v1
@@ -206,9 +207,13 @@ export function mapGpDailyCatalogRowToProduct(
   const categoryName = String(row.category_name ?? row.category ?? "").trim();
   const id = String(row.id ?? row.slug ?? "");
   const slug = row.slug != null ? String(row.slug) : undefined;
+  const cardImage = pickPrimaryImageUrl(row, "card");
+  const thumbImage = pickPrimaryImageUrl(row, "thumb");
+  const resolvedImage = cardImage || thumbImage;
   const primary = row.primary_image;
-  const imagesUrl =
-    typeof primary === "string" && primary
+  const imagesUrl = resolvedImage
+    ? [resolvedImage]
+    : typeof primary === "string" && primary
       ? [primary]
       : Array.isArray(row.imagesUrl)
         ? (row.imagesUrl as string[])
