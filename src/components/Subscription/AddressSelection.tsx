@@ -7,6 +7,7 @@ import { toast } from "react-hot-toast";
 import { addressService, Address } from "../../services/address.service";
 import { GoogleMap } from "@react-google-maps/api";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
+import { GOOGLE_MAP_TOUCH_PAN_OPTIONS } from "../../utils/googleMapTouchPanOptions";
 import ReactDOM from "react-dom/client";
 import { orderService } from "../../services/order.service";
 import { subscriptionService } from "../../services/subscription.service";
@@ -577,8 +578,7 @@ const AddressSelection: React.FC = () => {
     let addressToUse = resolveLiveDeviceToSavedAddress(address, addresses);
 
     if (
-      String(addressToUse.id) === LIVE_DEVICE_ADDRESS_ID &&
-      !location.state?.fromHome
+      String(addressToUse.id) === LIVE_DEVICE_ADDRESS_ID
     ) {
       const coords = parseAddressCoordinates(addressToUse.coordinates);
       if (coords) {
@@ -590,12 +590,21 @@ const AddressSelection: React.FC = () => {
         if (savedMatch) {
           addressToUse = savedMatch;
         } else {
-          setFormData((prev) => ({
-            ...prev,
-            area: liveDeviceLocation?.formattedAddress || prev.area,
-            coordinates: `${coords.lat},${coords.lng}`,
-          }));
-          setShowAddForm(true);
+          navigate(`${basePath}/addresses/add`, {
+            state: {
+              fromAddressSelection: true,
+              fromHome: location.state?.fromHome === true,
+              returnUrl: location.state?.fromHome
+                ? `${basePath}/address-selection`
+                : (location.state?.returnUrl as string | undefined) ??
+                  `${basePath}/address-selection`,
+              initialCoordinates: `${coords.lat},${coords.lng}`,
+              initialFormattedAddress:
+                liveDeviceLocation?.formattedAddress ||
+                addressToUse.streetName ||
+                "",
+            },
+          });
           return;
         }
       } else {
@@ -1404,7 +1413,8 @@ const AddressSelection: React.FC = () => {
                     mapTypeControl: false,
                     streetViewControl: false,
                     fullscreenControl: false,
-                    disableDefaultUI: true
+                    disableDefaultUI: true,
+                    ...GOOGLE_MAP_TOUCH_PAN_OPTIONS,
                   }}
                 />
               ) : (

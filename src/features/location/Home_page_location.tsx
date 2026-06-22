@@ -3,6 +3,7 @@ import { GoogleMap, Autocomplete } from "@react-google-maps/api";
 import { MdLocationOn, MdMyLocation, MdArrowBack } from "react-icons/md";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
+import { GOOGLE_MAP_TOUCH_PAN_OPTIONS } from "../../utils/googleMapTouchPanOptions";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import { addressService } from "../../services/address.service";
 import { validateGpDailyDeliveryAreaFromCoordinates } from "../../services/subscriptionZone.service";
@@ -663,6 +664,7 @@ const HomePageLocation: React.FC = () => {
                 streetViewControl: false,
                 mapTypeControl: false,
                 fullscreenControl: false,
+                ...GOOGLE_MAP_TOUCH_PAN_OPTIONS,
               }}
             >
               {/* Marker */}

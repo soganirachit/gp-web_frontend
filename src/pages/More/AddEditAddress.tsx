@@ -17,12 +17,17 @@ import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { MapLoadingPlaceholder } from '../../components/common/PageSkeletons';
 import { UniformPageHeader } from '../../components/layout/UniformPageHeader';
 import { GP_MAP_SEARCH_INPUT_CLASSES, GP_SEARCH_ICON_CLASSES } from '../../components/common/SearchBar';
+import { GOOGLE_MAP_TOUCH_PAN_OPTIONS } from '../../utils/googleMapTouchPanOptions';
 import {
   GEO_MSG_NETWORK,
   GEO_MSG_UNSUPPORTED,
   isLikelyNetworkError,
   messageFromGeolocationPositionError,
 } from '../../utils/geolocationMessages';
+import {
+  validateTypedAddressMatchesMapPin,
+  type MapPinAnchor,
+} from '../../utils/validateTypedAddressMatchesMapPin';
 
 /** When Google Geocoding REST is unavailable or returns nothing, fill fields from OSM (usage policy: identify app). */
 async function reverseGeocodeWithOsm(
@@ -71,13 +76,23 @@ async function reverseGeocodeWithOsm(
   };
 }
 
+type AddEditAddressRouteState = {
+  address?: Address;
+  initialCoordinates?: string;
+  initialFormattedAddress?: string;
+  fromAddressSelection?: boolean;
+  returnUrl?: string;
+  fromHome?: boolean;
+};
+
 const AddEditAddress: React.FC = () => {
   const navigate = useNavigate();
   const { feature, theme } = useFeatureTheme();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const location = useLocation();
+  const routeState = (location.state ?? {}) as AddEditAddressRouteState;
   const isEdit = location.pathname.includes('edit');
-  const existingAddress = location.state?.address as Address | undefined;
+  const existingAddress = routeState.address ?? (location.state?.address as Address | undefined);
   const mapRef = useRef<google.maps.Map | null>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const placesSearchInputRef = useRef<HTMLInputElement | null>(null);
@@ -89,6 +104,22 @@ const AddEditAddress: React.FC = () => {
   const isLocationRequestInProgress = useRef(false);
   const lastToastMessage = useRef<string | null>(null);
   const hasInitialized = useRef(false);
+  const pendingPrefillCoords = useRef<string | null>(
+    !location.pathname.includes('edit') && routeState.initialCoordinates
+      ? routeState.initialCoordinates
+      : null,
+  );
+
+  const navigateAfterAddressAction = useCallback(() => {
+    if (routeState.fromAddressSelection && routeState.returnUrl) {
+      navigate(routeState.returnUrl, {
+        replace: true,
+        state: routeState.fromHome ? { fromHome: true } : undefined,
+      });
+      return;
+    }
+    navigate(`${basePath}/addresses`);
+  }, [basePath, navigate, routeState.fromAddressSelection, routeState.fromHome, routeState.returnUrl]);
 
   const [selectedPosition, setSelectedPosition] = useState<{ lat: number, lng: number }>({
     lat: 20.5937,
@@ -108,6 +139,7 @@ const AddEditAddress: React.FC = () => {
   });
 
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [mapAnchor, setMapAnchor] = useState<MapPinAnchor | null>(null);
 
   const [selectedType, setSelectedType] = useState<'Home' | 'Work' | 'Others'>('Home');
   const [customTypeName, setCustomTypeName] = useState('');
@@ -188,7 +220,7 @@ const AddEditAddress: React.FC = () => {
           console.error('Error parsing coordinates:', error);
         }
       }
-    } else {
+    } else if (!pendingPrefillCoords.current) {
       getCurrentLocation();
     }
 
@@ -255,6 +287,15 @@ const AddEditAddress: React.FC = () => {
     }
     if (!pincode.trim()) {
       setFormError('Please enter a zip code');
+      return false;
+    }
+    const pinCheck = validateTypedAddressMatchesMapPin(
+      formData.completeAddress,
+      pincode,
+      mapAnchor,
+    );
+    if (!pinCheck.ok) {
+      setFormError(pinCheck.message);
       return false;
     }
     return true;
@@ -331,13 +372,13 @@ const AddEditAddress: React.FC = () => {
       const addressData = {
         name: name, // Include name in payload
         associatedPhoneNumber: phone, // Use the state variable
-        city: 'unknown',
+        city: mapAnchor?.city?.trim() || 'unknown',
         coordinates: `${selectedPosition.lat},${selectedPosition.lng}`,
-        district: 'unknown',
+        district: mapAnchor?.city?.trim() || 'unknown',
         houseNo: houseNo,
         area: formData.landmark || 'unknown',
-        state: 'Unknown',
-        pincode: pincode, // Use the state variable
+        state: mapAnchor?.state?.trim() || 'Unknown',
+        pincode: pincode.trim() || mapAnchor?.pincode?.trim() || '',
         streetName: streetName,
         type: finalType as any, // Allow custom type names (e.g., "friends")
         setAsDefault: false // explicitly initialize as false
@@ -352,7 +393,7 @@ const AddEditAddress: React.FC = () => {
         await addressService.createAddress(addressData);
         toast.success('Address added successfully');
       }
-      navigate(`${basePath}/addresses`);
+      navigateAfterAddressAction();
     } catch (error) {
       console.error('Failed to save address:', error);
       setFormError(isEdit ? 'Failed to update address' : 'Failed to add address');
@@ -367,7 +408,10 @@ const AddEditAddress: React.FC = () => {
   };
 
   /** Apply a Geocoder / Places result to search box, pin line, and pincode (same shape as Autocomplete). */
-  const applyGeocodedPlaceToForm = (place: google.maps.GeocoderResult) => {
+  const applyGeocodedPlaceToForm = (
+    place: google.maps.GeocoderResult,
+    position?: { lat: number; lng: number },
+  ) => {
     const formattedAddress = place.formatted_address || '';
     setDeliveryAddress(formattedAddress);
     syncPlacesSearchInput(formattedAddress);
@@ -423,6 +467,18 @@ const AddEditAddress: React.FC = () => {
       c.types.includes('postal_code')
     )?.long_name;
     if (pin) setPincode(pin);
+
+    const lat = position?.lat ?? selectedPosition.lat;
+    const lng = position?.lng ?? selectedPosition.lng;
+    setMapAnchor({
+      lat,
+      lng,
+      formattedAddress: formattedAddress,
+      completeAddress: line,
+      pincode: pin || undefined,
+      city: addressComponents.city || undefined,
+      state: addressComponents.state || undefined,
+    });
   };
 
   const getCurrentLocation = () => {
@@ -459,7 +515,10 @@ const AddEditAddress: React.FC = () => {
               );
               const data = await response.json();
               if (data.status === 'OK' && data.results?.[0]) {
-                applyGeocodedPlaceToForm(data.results[0]);
+                applyGeocodedPlaceToForm(data.results[0], {
+                  lat: latitude,
+                  lng: longitude,
+                });
                 filled = true;
               }
             } catch (_) {
@@ -474,6 +533,13 @@ const AddEditAddress: React.FC = () => {
                 syncPlacesSearchInput(osm.formatted);
                 setFormData((prev) => ({ ...prev, completeAddress: osm.line }));
                 if (osm.pin) setPincode(osm.pin);
+                setMapAnchor({
+                  lat: latitude,
+                  lng: longitude,
+                  formattedAddress: osm.formatted,
+                  completeAddress: osm.line,
+                  pincode: osm.pin || undefined,
+                });
               }
             } catch (_) {
               /* ignore */
@@ -515,7 +581,7 @@ const AddEditAddress: React.FC = () => {
         const geocoder = new google.maps.Geocoder();
         const { results } = await geocoder.geocode({ location: { lat, lng } });
         if (results?.[0]) {
-          applyGeocodedPlaceToForm(results[0]);
+          applyGeocodedPlaceToForm(results[0], { lat, lng });
           return;
         }
       } catch (error) {
@@ -529,11 +595,40 @@ const AddEditAddress: React.FC = () => {
         syncPlacesSearchInput(osm.formatted);
         setFormData((prev) => ({ ...prev, completeAddress: osm.line }));
         if (osm.pin) setPincode(osm.pin);
+        setMapAnchor({
+          lat,
+          lng,
+          formattedAddress: osm.formatted,
+          completeAddress: osm.line,
+          pincode: osm.pin || undefined,
+        });
       }
     } catch (_) {
       /* ignore */
     }
   };
+
+  useEffect(() => {
+    if (!isLoaded || isEdit) return;
+    const raw = pendingPrefillCoords.current;
+    if (!raw) return;
+    pendingPrefillCoords.current = null;
+    const parts = raw.split(',').map((s) => parseFloat(s.trim()));
+    const lat = parts[0];
+    const lng = parts[1];
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    setSelectedPosition({ lat, lng });
+    if (routeState.initialFormattedAddress?.trim()) {
+      const formatted = routeState.initialFormattedAddress.trim();
+      setDeliveryAddress(formatted);
+      syncPlacesSearchInput(formatted);
+    }
+    if (mapRef.current) {
+      mapRef.current.panTo({ lat, lng });
+      mapRef.current.setZoom(15);
+    }
+    void reverseGeocodeMapCenter(lat, lng);
+  }, [isEdit, isLoaded, routeState.initialFormattedAddress]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -587,7 +682,7 @@ const AddEditAddress: React.FC = () => {
       <div className="max-w-[800px] mx-auto">
         <UniformPageHeader
           title="Enter Address Details"
-          onBack={() => navigate(`${basePath}/addresses`)}
+          onBack={navigateAfterAddressAction}
           padXClassName="px-0"
           padYClassName="py-4"
         />
@@ -615,7 +710,10 @@ const AddEditAddress: React.FC = () => {
                   };
                   setSelectedPosition(next);
                   panMapToPlaceResult(place, mapRef.current);
-                  applyGeocodedPlaceToForm(place as google.maps.GeocoderResult);
+                  applyGeocodedPlaceToForm(
+                    place as google.maps.GeocoderResult,
+                    next,
+                  );
                 }}
               >
                 <div className="relative">
@@ -672,10 +770,7 @@ const AddEditAddress: React.FC = () => {
               streetViewControl: false,
               fullscreenControl: false,
               disableDefaultUI: true,
-              // Allow map dragging freely (pin is fixed at center; move map to move pin)
-              draggable: true,
-              gestureHandling: 'greedy',
-              scrollwheel: true
+              ...GOOGLE_MAP_TOUCH_PAN_OPTIONS,
             }}
           />
           {/* Fixed Marker — tip at map center (matches getCenter() after drag) */}
@@ -786,12 +881,9 @@ const AddEditAddress: React.FC = () => {
 
         {/* Form Fields - Updated Layout */}
         <div className="space-y-4">
-          {deliveryAddress && (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
-              <p className="text-gray-600 text-sm mb-1">Selected map address</p>
-              <p className="text-gray-800 font-medium">{deliveryAddress}</p>
-            </div>
-          )}
+          {deliveryAddress ? (
+            <p className="text-sm leading-snug text-green-700">{deliveryAddress}</p>
+          ) : null}
 
           {/* Full Name */}
           <div>
