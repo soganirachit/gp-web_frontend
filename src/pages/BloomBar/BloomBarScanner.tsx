@@ -85,8 +85,8 @@ export default function BloomBarScanner({ onClose, onScan }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-12 pb-4">
         <div>
-          <p className="text-white font-semibold text-base">Scan Flower QR</p>
-          <p className="text-white/60 text-xs mt-0.5">Point at any product QR code</p>
+          <p className="text-white font-semibold text-base">Add Flowers to Basket</p>
+          <p className="text-white/60 text-xs mt-0.5">Scan a QR code to add it to your basket</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -147,7 +147,7 @@ export default function BloomBarScanner({ onClose, onScan }: Props) {
         {error ? (
           <p className="text-red-400 text-sm">{error}</p>
         ) : (
-          <p className="text-white/60 text-xs">Align the QR code within the frame</p>
+          <p className="text-white/60 text-xs">Align the product QR code within the frame</p>
         )}
       </div>
     </motion.div>

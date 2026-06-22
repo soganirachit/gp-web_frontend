@@ -5,7 +5,7 @@ import BloomBarCoBrandHeader from './components/BloomBarCoBrandHeader';
 import BloomBarProductCard, { BloomBarProduct as Product } from './components/BloomBarProductCard';
 import BloomBarLoadingSkeleton from './components/BloomBarLoadingSkeleton';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ScanLine, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function BloomBarProductPage() {
@@ -129,28 +129,12 @@ export default function BloomBarProductPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-10">
+    <div className="min-h-screen bg-genda-cream">
       <BloomBarCoBrandHeader hotel={hotel as { name?: string } | null} />
-
-      {kioskId && (
-        <motion.div
-          initial={{ opacity: 0, y: -5 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-center gap-2 mb-3 pt-3"
-        >
-          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-full px-3 py-1.5 premium-shadow">
-            <ScanLine size={14} className="text-genda-green" />
-            <span className="text-xs text-gray-500">Kiosk Scan</span>
-            {campaign !== 'direct' && (
-              <span className="text-xs font-medium text-genda-gold">{campaign}</span>
-            )}
-          </div>
-        </motion.div>
-      )}
 
       {product && (
         <AnimatePresence mode="wait">
-          <motion.div key={product.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <motion.div key={product.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="pt-4">
             <BloomBarProductCard
               product={product}
               hotel={hotel as { name?: string } | null}

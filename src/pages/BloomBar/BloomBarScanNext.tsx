@@ -83,7 +83,6 @@ export default function BloomBarScanNext() {
     setLastAdded({ product: prod, quantity: qty });
     setProduct(null);
     setView('added');
-    setTimeout(() => { setScanKey(k => k + 1); setView('scanning'); }, 2000);
   }, []);
 
   const scanAgain = () => { setScanKey(k => k + 1); setView('scanning'); };
@@ -160,7 +159,7 @@ export default function BloomBarScanNext() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="text-center"
+              className="text-center mb-8"
             >
               <h1 className="font-playfair text-2xl font-semibold mb-1">
                 {lastAdded.product.name} Added! 🌸
@@ -169,9 +168,38 @@ export default function BloomBarScanNext() {
                 {lastAdded.quantity > 1 && (
                   <span className="font-semibold text-gray-800">{lastAdded.quantity}× </span>
                 )}
-                Added to your basket · Opening scanner…
+                Added to your basket
               </p>
+              <p className="text-xs text-gray-400 mt-1">{itemCount} item{itemCount !== 1 ? 's' : ''} · ₹{total.toLocaleString('en-IN')}</p>
             </motion.div>
+
+            <div className="w-full max-w-sm space-y-3">
+              <motion.button
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={scanAgain}
+                className="w-full py-4 genda-gradient text-white font-semibold text-base rounded-2xl premium-shadow flex items-center justify-center gap-2"
+              >
+                <QrCode size={20} />
+                Scan Another Flower
+              </motion.button>
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.28 }}
+              >
+                <Link
+                  to="/bloombar/basket"
+                  className="w-full py-4 rounded-2xl border-2 border-genda-green text-genda-green font-semibold text-base flex items-center justify-center gap-2"
+                >
+                  <ShoppingBag size={18} />
+                  View Basket · ₹{total.toLocaleString('en-IN')}
+                  <ArrowRight size={16} />
+                </Link>
+              </motion.div>
+            </div>
           </motion.div>
         )}
 

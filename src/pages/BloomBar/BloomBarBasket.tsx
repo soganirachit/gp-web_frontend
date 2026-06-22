@@ -46,18 +46,25 @@ export default function BloomBarBasket() {
       return;
     }
 
-    const order = await base44.entities.Order.create({
-      hotel_id: hotelContext?.hotelId || '',
-      kiosk_id: hotelContext?.kioskId || '',
-      campaign: hotelContext?.campaign || 'direct',
-      customer_name: form.name,
-      customer_email: form.email,
-      customer_whatsapp: form.whatsapp,
-      items,
-      subtotal: total,
-      total_amount: grandTotal,
-      status: 'pending',
-    });
+    let order;
+    try {
+      order = await base44.entities.Order.create({
+        hotel_id: hotelContext?.hotelId || '',
+        kiosk_id: hotelContext?.kioskId || '',
+        campaign: hotelContext?.campaign || 'direct',
+        customer_name: form.name,
+        customer_email: form.email,
+        customer_whatsapp: form.whatsapp,
+        items,
+        subtotal: total,
+        total_amount: grandTotal,
+        status: 'pending',
+      });
+    } catch {
+      setLoading(false);
+      alert('Could not create order. Please check your connection and try again.');
+      return;
+    }
 
     const options = {
       key: order.key,
@@ -68,32 +75,41 @@ export default function BloomBarBasket() {
       description: `Flowers from ${(hotelContext?.hotel as { name?: string })?.name || 'Kiosk'}`,
       image: 'https://images.unsplash.com/photo-1490750967868-88df5691cc2b?w=100&h=100&fit=crop',
       handler: async (response: RazorpayResponse) => {
-        // session_id lets the backend mark the matching scan event as converted
-        // (conversion + revenue are recorded server-side in payments/verify).
-        await base44.entities.Order.update(order.id as string, {
-          status: 'paid',
-          payment_id: response.razorpay_payment_id,
-          razorpay_order_id: response.razorpay_order_id,
-          razorpay_signature: response.razorpay_signature,
-          session_id: sessionId,
-        });
-        clearCart();
-        setCustomerName(form.name);
-        setOrderId(order.id as string);
-        setLoading(false);
+        try {
+          await base44.entities.Order.update(order.id as string, {
+            status: 'paid',
+            payment_id: response.razorpay_payment_id,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_signature: response.razorpay_signature,
+            session_id: sessionId,
+          });
+          clearCart();
+          setCustomerName(form.name);
+          setOrderId(order.id as string);
+        } catch {
+          alert('Payment received but verification failed. Please contact support with your payment ID: ' + response.razorpay_payment_id);
+        } finally {
+          setLoading(false);
+        }
       },
       prefill: { name: form.name, email: form.email, contact: `+91${form.whatsapp}` },
       theme: { color: '#1d4d2a' },
       modal: {
         ondismiss: async () => {
-          await base44.entities.Order.update(order.id as string, { status: 'cancelled' });
+          await base44.entities.Order.update(order.id as string, { status: 'cancelled' }).catch(() => {});
           setLoading(false);
         },
       },
     };
 
-    const rzp = new window.Razorpay(options);
-    rzp.open();
+    try {
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', () => { setLoading(false); });
+      rzp.open();
+    } catch {
+      setLoading(false);
+      alert('Could not open payment gateway. Please try again.');
+    }
   };
 
   if (orderId) return <BloomBarConfirmation orderId={orderId} customerName={customerName} />;
