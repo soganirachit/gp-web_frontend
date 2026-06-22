@@ -133,7 +133,7 @@ export default function BloomBarBasket() {
   }
 
   return (
-    <div className="min-h-screen bg-genda-cream pb-40">
+    <div className="min-h-screen bg-genda-cream pb-40 max-w-lg mx-auto">
       {/* Header */}
       <div className="sticky top-0 z-30 bg-white border-b border-gray-200 px-5 py-4 flex items-center gap-3">
         <Link to="/bloombar" className="p-1.5 rounded-full hover:bg-gray-100">
@@ -322,7 +322,8 @@ export default function BloomBarBasket() {
       </div>
 
       {/* Sticky Pay Button */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 px-5 py-4">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 px-5 py-4 z-40">
+        <div className="max-w-lg mx-auto">
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handlePayment}
@@ -342,6 +343,7 @@ export default function BloomBarBasket() {
           )}
         </motion.button>
         <p className="text-center text-xs text-gray-500 mt-2">Powered by Razorpay · 256-bit SSL</p>
+        </div>
       </div>
     </div>
   );

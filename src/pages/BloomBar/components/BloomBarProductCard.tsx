@@ -41,14 +41,14 @@ export default function BloomBarProductCard({ product, hotel, onAdded }: Props) 
   };
 
   return (
-    <div className="px-4 pb-28">
-      {/* Product image — fixed height so content stays visible without scrolling */}
-      <div className="w-full h-56 rounded-2xl overflow-hidden bg-genda-cream mb-4">
+    <div className="w-full max-w-lg mx-auto px-4 pb-28">
+      {/* Product image — capped height on all screen sizes */}
+      <div className="w-full h-52 sm:h-64 rounded-2xl overflow-hidden bg-white mb-4 border border-gray-100">
         {product.image_url ? (
           <img
             src={product.image_url}
             alt={product.name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain p-2"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-7xl">🌸</div>
@@ -57,7 +57,7 @@ export default function BloomBarProductCard({ product, hotel, onAdded }: Props) 
 
       {/* Info card */}
       <div className="bg-white rounded-2xl p-4 premium-shadow">
-        <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-start justify-between gap-3 mb-2">
           <div className="flex-1 min-w-0">
             {product.category && (
               <span className="text-xs font-medium text-genda-gold bg-genda-gold/10 px-2 py-0.5 rounded-full inline-block mb-1.5">
@@ -68,7 +68,7 @@ export default function BloomBarProductCard({ product, hotel, onAdded }: Props) 
               {product.name}
             </h1>
           </div>
-          <p className="text-xl font-bold text-genda-green whitespace-nowrap">
+          <p className="text-xl font-bold text-genda-green whitespace-nowrap shrink-0">
             ₹{product.price.toLocaleString('en-IN')}
           </p>
         </div>
@@ -82,22 +82,22 @@ export default function BloomBarProductCard({ product, hotel, onAdded }: Props) 
         )}
       </div>
 
-      {/* Sticky add-to-basket — quantity + button in one row */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-1 py-1">
+      {/* Sticky add-to-basket — full width, respects desktop centering */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 px-4 py-3 z-40">
+        <div className="w-full max-w-lg mx-auto flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-gray-100 rounded-xl px-1 py-1 shrink-0">
             <button
               onClick={() => setQty(q => Math.max(1, q - 1))}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-600"
+              className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-200"
             >
-              <Minus size={14} />
+              <Minus size={15} />
             </button>
-            <span className="font-semibold w-5 text-center text-sm">{qty}</span>
+            <span className="font-semibold w-7 text-center text-sm">{qty}</span>
             <button
               onClick={() => setQty(q => q + 1)}
-              className="w-8 h-8 rounded-lg genda-gradient text-white flex items-center justify-center"
+              className="w-9 h-9 rounded-lg genda-gradient text-white flex items-center justify-center"
             >
-              <Plus size={14} />
+              <Plus size={15} />
             </button>
           </div>
           <motion.button

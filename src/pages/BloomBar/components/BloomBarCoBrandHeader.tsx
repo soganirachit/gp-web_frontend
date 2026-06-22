@@ -12,7 +12,7 @@ interface Props {
 
 export default function BloomBarCoBrandHeader({ hotel }: Props) {
   return (
-    <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-gray-200">
+    <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-gray-200 sticky top-0 z-30">
       <div className="flex items-center gap-2">
         <div className="w-8 h-8 rounded-lg bg-genda-cream flex items-center justify-center p-1 flex-shrink-0">
           <img src={LOGO_URL} alt="Genda Phool" className="w-full h-full object-contain" />
