@@ -121,7 +121,7 @@ export default function BloomBarProductPage() {
             {addedItem.quantity > 1 && (
               <span className="font-semibold text-gray-800">{addedItem.quantity}× </span>
             )}
-            Added to your basket · Opening scanner…
+            Added to your basket · Taking you to next step…
           </p>
         </motion.div>
       </div>
@@ -129,7 +129,7 @@ export default function BloomBarProductPage() {
   }
 
   return (
-    <div className="min-h-screen bg-genda-cream">
+    <div className="bg-genda-cream">
       <BloomBarCoBrandHeader hotel={hotel as { name?: string } | null} />
 
       {product && (

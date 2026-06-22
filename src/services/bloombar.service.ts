@@ -111,7 +111,7 @@ async function createOrder(data: OrderCreateInput): Promise<OrderCreateResult> {
     order_number: order.order_number,
     total_amount: order.total_amount,
     razorpay_order_id: payment.razorpay_order_id,
-    key: payment.key_id,
+    key: payment.key_id || (import.meta.env.VITE_RAZORPAY_KEY as string),
     amount: payment.amount,
   };
 }
