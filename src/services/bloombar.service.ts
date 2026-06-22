@@ -4,7 +4,7 @@
  */
 import api from './api';
 
-const BASE = '/api/v1/bloombar';
+const BASE = '/bloombar';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

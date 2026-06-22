@@ -1,0 +1,151 @@
+BloomBar Backend Plan
+What the Frontend Needs (mapped from JSX files)
+Frontend call	What it does
+base44.entities.Product.filter({ id })	Fetch single product by ID
+base44.entities.Product.list('-created_date', 1)	Fetch latest product (fallback)
+base44.entities.Hotel.filter({ id })	Fetch hotel info by ID
+base44.entities.Hotel.list()	List all hotels (admin)
+base44.entities.Kiosk.list()	List all kiosks (admin)
+base44.entities.QRScanEvent.create({...})	Track a QR scan (analytics)
+base44.entities.QRMapping.filter({...})	Find QR mapping for scan count
+base44.entities.QRMapping.update(id, {scan_count})	Increment scan count
+base44.entities.Order.create({...})	Create a BloomBar order pre-payment
+base44.entities.Order.update(id, {status, payment_id})	Mark order paid/cancelled
+New Django App: apps/bloombar/
+Models
+1. Hotel
+
+
+name, code, address, city, state
+logo_url, is_active
+# timestamps
+2. Kiosk
+
+
+hotel         # FK → Hotel
+name          # e.g. "Lobby Kiosk"
+location_description   # "Near reception"
+is_active
+# timestamps
+3. QRMapping — links a product to a kiosk, carries its own QR
+
+
+hotel         # FK → Hotel
+kiosk         # FK → Kiosk
+product       # FK → products.Product
+campaign      # CharField (default='direct')
+scan_count    # IntegerField (auto-incremented on scan)
+is_active
+# timestamps
+# QR URL computed: /bloombar/product?hotel={id}&kiosk={id}&product={id}&campaign={campaign}
+4. QRScanEvent — analytics per scan
+
+
+hotel         # FK → Hotel (nullable)
+kiosk         # FK → Kiosk (nullable)
+product       # FK → products.Product (nullable)
+campaign      # CharField
+session_id    # CharField
+user_agent    # TextField
+converted     # BooleanField (default False)
+revenue       # DecimalField (set when converted)
+# timestamp
+5. BloomBarOrder
+
+
+order_number       # auto: BB-{YYYYMMDD}-{seq}
+hotel              # FK → Hotel (nullable)
+kiosk              # FK → Kiosk (nullable)
+campaign           # CharField
+session_id         # CharField
+
+# Guest customer info (no user account needed)
+customer_name      # CharField
+customer_email     # EmailField (blank=True)
+customer_whatsapp  # CharField
+
+# Pricing
+subtotal           # DecimalField
+tax_amount         # DecimalField
+delivery_fee       # DecimalField
+total_amount       # DecimalField
+
+# Status
+status             # pending | paid | cancelled | refunded
+payment_method     # razorpay | cash (default=razorpay)
+
+# Razorpay (stored inline, no FK to Payment needed for guest orders)
+razorpay_order_id      # CharField (blank=True)
+razorpay_payment_id    # CharField (blank=True)
+razorpay_signature     # CharField (blank=True)
+
+# timestamps
+6. BloomBarOrderItem — snapshot of cart at time of order
+
+
+order         # FK → BloomBarOrder (CASCADE)
+product       # FK → products.Product (SET_NULL, nullable — keep record if product deleted)
+product_name  # CharField (snapshot)
+product_image # CharField (snapshot)
+unit_price    # DecimalField
+quantity      # PositiveIntegerField
+subtotal      # DecimalField (auto = unit_price × quantity)
+API Endpoints
+All under /api/v1/bloombar/. Auth split: public = no JWT; admin = IsAdminUser.
+
+Public (no auth required)
+Method	URL	Purpose
+GET	/bloombar/products/{product_id}/	Fetch product for QR scan
+GET	/bloombar/hotels/{hotel_id}/	Hotel info for co-branding
+POST	/bloombar/scan-events/	Record a QR scan (fire-and-forget)
+POST	/bloombar/orders/	Create BloomBar order (pre-payment)
+POST	/bloombar/payments/create-razorpay-order/	Get Razorpay order_id + key
+POST	/bloombar/payments/verify/	Verify signature → mark order paid
+GET	/bloombar/orders/{order_id}/	Poll order status post-payment
+Admin (JWT, IsAdminUser)
+Method	URL	Purpose
+GET/POST	/bloombar/hotels/	List / create hotels
+GET/PUT/DELETE	/bloombar/hotels/{id}/	Hotel detail / edit / deactivate
+GET/POST	/bloombar/kiosks/	List / create kiosks
+GET/PUT/DELETE	/bloombar/kiosks/{id}/	Kiosk detail / edit
+GET/POST	/bloombar/qr-mappings/	List / create QR mappings
+GET/PUT/DELETE	/bloombar/qr-mappings/{id}/	QR mapping detail / edit
+GET	/bloombar/admin/orders/	All BloomBar orders (filterable)
+GET	/bloombar/admin/analytics/	P&L: revenue, scans, conversions
+Payment Flow (reuses existing RazorpayService)
+
+1. POST /bloombar/payments/create-razorpay-order/
+   body: { order_id }   ← BloomBarOrder already created
+   → calls RazorpayService.create_order(amount)
+   → saves razorpay_order_id on BloomBarOrder
+   → returns { razorpay_order_id, amount, currency, key_id }
+
+2. Frontend opens Razorpay modal (client-side SDK)
+
+3. POST /bloombar/payments/verify/
+   body: { order_id, razorpay_order_id, razorpay_payment_id, razorpay_signature }
+   → calls RazorpayService.verify_payment(...)
+   → marks BloomBarOrder.status = 'paid'
+   → triggers WhatsApp/email confirmation (existing notifications app)
+   → updates linked QRScanEvent.converted = True, revenue = total_amount
+Frontend Changes Required
+Create src/services/bloombar.service.ts — maps every base44.entities.* call to the new GP backend endpoints using the existing api axios instance.
+
+Update src/api/base44Client.ts — either delete it or make it a thin re-export of bloombar.service.ts so the BloomBar pages don't need import changes.
+
+BloomBarCartContext.tsx — no change needed (stays client-side / localStorage).
+
+BloomBarCheckout / BloomBarBasket — the two-step payment call (Order.create → Order.update) becomes the new three-step flow (POST /orders/ → POST /payments/create-razorpay-order/ → POST /payments/verify/).
+
+What Reuses Existing Backend (no changes)
+products.Product — BloomBar products are just existing products tagged with a bloombar label or linked via QRMapping
+apps/payments/services.py — RazorpayService reused as-is
+apps/notifications/ — existing WhatsApp/email notification system for order confirmation
+JWT auth setup — admin endpoints reuse existing JWT middleware
+Implementation Order
+apps/bloombar/ — models + migrations
+Serializers (Product public serializer already exists, needs Hotel/Kiosk/Order ones)
+Views + URL registration in config/urls.py
+bloombar.service.ts on the frontend
+Wire frontend pages to new service (remove base44Client dependency)
+Want me to start implementing any of these — backend app first, or the frontend service layer?
