@@ -9,23 +9,22 @@ import { CheckCircle2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function BloomBarProductPage() {
-  const { setHotelContext, sessionId } = useCart();
+  const { setKioskContext, sessionId } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
-  const [hotel, setHotel] = useState<Record<string, unknown> | null>(null);
+  const [kiosk, setKiosk] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [addedItem, setAddedItem] = useState<{ product: Product; quantity: number } | null>(null);
   const navigate = useNavigate();
 
   const params = new URLSearchParams(window.location.search);
-  const hotelId = params.get('hotel') || params.get('h') || '';
   const kioskId = params.get('kiosk') || params.get('k') || '';
   const productId = params.get('product') || params.get('p') || '';
   const campaign = params.get('campaign') || params.get('c') || 'direct';
 
   useEffect(() => {
     loadData();
-  }, [productId, hotelId]);
+  }, [productId, kioskId]);
 
   const loadData = async () => {
     setLoading(true);
@@ -49,12 +48,12 @@ export default function BloomBarProductPage() {
     }
 
     // Kiosk is branding-only — never block the product page if it fails
-    if (hotelId) {
+    if (kioskId) {
       try {
-        const hotels = await base44.entities.Hotel.filter({ id: hotelId });
-        if (hotels.length > 0) {
-          setHotel(hotels[0]);
-          setHotelContext({ hotelId, kioskId, campaign, hotel: hotels[0] });
+        const kiosks = await base44.entities.Kiosk.filter({ id: kioskId });
+        if (kiosks.length > 0) {
+          setKiosk(kiosks[0]);
+          setKioskContext({ kioskId, campaign, kiosk: kiosks[0] });
         }
       } catch {
         // kiosk fetch failed (inactive/deleted) — show product without co-brand header
@@ -65,7 +64,6 @@ export default function BloomBarProductPage() {
       // Record the scan with the shared session id so the backend can attribute
       // a later conversion (payment) back to this scan, and bump scan_count.
       base44.entities.QRScanEvent.create({
-        hotel_id: hotelId,
         kiosk_id: kioskId,
         product_id: productId,
         campaign,
@@ -129,15 +127,20 @@ export default function BloomBarProductPage() {
   }
 
   return (
-    <div className="bg-genda-cream">
-      <BloomBarCoBrandHeader hotel={hotel as { name?: string } | null} />
+    <div className="bg-genda-cream min-h-screen flex flex-col">
+      <BloomBarCoBrandHeader kiosk={kiosk as { name?: string } | null} />
 
       {product && (
         <AnimatePresence mode="wait">
-          <motion.div key={product.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="pt-4">
+          <motion.div
+            key={product.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex-1 flex flex-col py-4 min-h-0"
+          >
             <BloomBarProductCard
               product={product}
-              hotel={hotel as { name?: string } | null}
+              kiosk={kiosk as { name?: string } | null}
               onAdded={handleAdded}
             />
           </motion.div>

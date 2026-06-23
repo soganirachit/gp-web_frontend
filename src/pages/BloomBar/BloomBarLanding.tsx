@@ -49,7 +49,7 @@ export default function BloomBarLanding() {
             Premium Flowers,<br />Instantly.
           </h1>
           <p className="text-white/70 text-sm leading-relaxed">
-            Scan any flower QR at our hotel kiosks to add fresh blooms to your basket.
+            Scan any flower QR at our kiosks to add fresh blooms to your basket.
           </p>
         </motion.div>
       </div>

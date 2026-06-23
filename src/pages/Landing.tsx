@@ -125,7 +125,7 @@ const Landing: React.FC = () => {
               Premium Flowers,<br />Instantly.
             </motion.h1>
             <motion.p variants={itemVariants} className="text-lg sm:text-xl mb-8 text-green-50 max-w-2xl mx-auto">
-              Scan any flower QR at our hotel kiosks to add fresh blooms to your basket.
+              Scan any flower QR at our kiosks to add fresh blooms to your basket.
             </motion.p>
             <motion.button
               variants={itemVariants}
@@ -147,7 +147,7 @@ const Landing: React.FC = () => {
             {[
               { icon: MdQrCode, title: 'Scan a Flower QR', desc: 'Opens camera scanner instantly' },
               { icon: MdShoppingBasket, title: 'My Basket', desc: 'View and manage your items' },
-              { icon: MdAdminPanelSettings, title: 'Admin Dashboard', desc: 'Hotels, kiosks & analytics' },
+              { icon: MdAdminPanelSettings, title: 'Admin Dashboard', desc: 'Kiosks & analytics' },
             ].map((action, idx) => (
               <motion.div
                 key={idx}

@@ -30,7 +30,7 @@ async function fetchProduct(id: string | number) {
   return normalizeProduct(unwrap<Record<string, unknown>>(res));
 }
 
-// ── Kiosk (mapped from "Hotel" in base44) ───────────────────────────────────
+// ── Kiosk ──────────────────────────────────────────────────────────────────
 
 async function fetchKiosk(id: string | number) {
   const res = await api.get(`${BASE}/kiosks/${id}/`);
@@ -50,7 +50,6 @@ async function createScanEvent(data: Record<string, unknown>) {
 // ── Order ────────────────────────────────────────────────────────────────────
 
 interface OrderCreateInput {
-  hotel_id?: string;
   kiosk_id?: string;
   campaign?: string;
   session_id?: string;
@@ -77,7 +76,7 @@ interface OrderCreateResult {
 }
 
 async function createOrder(data: OrderCreateInput): Promise<OrderCreateResult> {
-  const kioskId = data.kiosk_id || data.hotel_id || '';
+  const kioskId = data.kiosk_id || '';
 
   // Step 1 — create BloomBar order
   const orderRes = await api.post(`${BASE}/orders/`, {
@@ -168,8 +167,7 @@ export const base44 = {
       },
     },
 
-    /** base44 called this "Hotel" but it maps to our BloomBarKiosk */
-    Hotel: {
+    Kiosk: {
       async filter(params: Record<string, unknown>) {
         if (params.id) {
           const k = await fetchKiosk(params.id as string);
@@ -177,13 +175,6 @@ export const base44 = {
         }
         return [];
       },
-      async list() {
-        const res = await api.get(`${BASE}/admin/kiosks/`);
-        return unwrap<Record<string, unknown>[]>(res) ?? [];
-      },
-    },
-
-    Kiosk: {
       async list() {
         const res = await api.get(`${BASE}/admin/kiosks/`);
         return unwrap<Record<string, unknown>[]>(res) ?? [];

@@ -12,7 +12,7 @@ import BloomBarConfirmation from './BloomBarConfirmation';
 const TAX_RATE = 0.05;
 
 export default function BloomBarBasket() {
-  const { items, itemCount, total, updateQuantity, removeItem, clearCart, hotelContext, sessionId } =
+  const { items, itemCount, total, updateQuantity, removeItem, clearCart, kioskContext, sessionId } =
     useCart();
   const [form, setForm] = useState({ name: '', email: '', whatsapp: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -49,9 +49,8 @@ export default function BloomBarBasket() {
     let order;
     try {
       order = await base44.entities.Order.create({
-        hotel_id: hotelContext?.hotelId || '',
-        kiosk_id: hotelContext?.kioskId || '',
-        campaign: hotelContext?.campaign || 'direct',
+        kiosk_id: kioskContext?.kioskId || '',
+        campaign: kioskContext?.campaign || 'direct',
         customer_name: form.name,
         customer_email: form.email,
         customer_whatsapp: form.whatsapp,
@@ -60,9 +59,15 @@ export default function BloomBarBasket() {
         total_amount: grandTotal,
         status: 'pending',
       });
-    } catch {
+    } catch (err) {
       setLoading(false);
-      alert('Could not create order. Please check your connection and try again.');
+      const resp = (err as { response?: { data?: { message?: string; errors?: Record<string, unknown> } } })
+        ?.response?.data;
+      const detail =
+        resp?.message ||
+        (resp?.errors ? Object.values(resp.errors).flat().join(' ') : '') ||
+        'Please check your connection and try again.';
+      alert(`Could not create order. ${detail}`);
       return;
     }
 
@@ -72,7 +77,7 @@ export default function BloomBarBasket() {
       currency: 'INR',
       order_id: order.razorpay_order_id,
       name: 'Genda Phool',
-      description: `Flowers from ${(hotelContext?.hotel as { name?: string })?.name || 'Kiosk'}`,
+      description: `Flowers from ${(kioskContext?.kiosk as { name?: string })?.name || 'Kiosk'}`,
       image: 'https://images.unsplash.com/photo-1490750967868-88df5691cc2b?w=100&h=100&fit=crop',
       handler: async (response: RazorpayResponse) => {
         try {

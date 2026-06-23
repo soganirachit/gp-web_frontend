@@ -1,16 +1,16 @@
 const LOGO_URL =
   'https://media.base44.com/images/public/6a19710a955d0c68cf58358a/4b879ad11_logo-GP-Black.png';
 
-interface Hotel {
+interface Kiosk {
   name?: string;
   [key: string]: unknown;
 }
 
 interface Props {
-  hotel?: Hotel | null;
+  kiosk?: Kiosk | null;
 }
 
-export default function BloomBarCoBrandHeader({ hotel }: Props) {
+export default function BloomBarCoBrandHeader({ kiosk }: Props) {
   return (
     <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-gray-200 sticky top-0 z-30">
       <div className="flex items-center gap-2">
@@ -20,10 +20,10 @@ export default function BloomBarCoBrandHeader({ hotel }: Props) {
         <span className="font-playfair font-semibold text-sm">BloomBar</span>
         <span className="text-xs text-gray-400">by Genda Phool</span>
       </div>
-      {hotel?.name && (
+      {kiosk?.name && (
         <div className="flex items-center gap-1 text-xs text-gray-500">
           <span>at</span>
-          <span className="font-medium text-gray-800">{hotel.name}</span>
+          <span className="font-medium text-gray-800">{kiosk.name}</span>
         </div>
       )}
     </div>

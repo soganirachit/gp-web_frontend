@@ -8,11 +8,10 @@ export interface BloomBarCartItem {
   image_url?: string;
 }
 
-export interface BloomBarHotelContext {
-  hotelId: string;
-  kioskId?: string;
+export interface BloomBarKioskContext {
+  kioskId: string;
   campaign: string;
-  hotel?: Record<string, unknown>;
+  kiosk?: Record<string, unknown>;
 }
 
 interface CartContextValue {
@@ -23,14 +22,15 @@ interface CartContextValue {
   removeItem: (productId: string) => void;
   addItem: (item: BloomBarCartItem) => void;
   clearCart: () => void;
-  hotelContext: BloomBarHotelContext | null;
-  setHotelContext: (ctx: BloomBarHotelContext) => void;
+  kioskContext: BloomBarKioskContext | null;
+  setKioskContext: (ctx: BloomBarKioskContext) => void;
   sessionId: string;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
 
 const STORAGE_KEY = 'bloombar_cart';
+const KIOSK_KEY = 'bloombar_kiosk_context';
 const SESSION_KEY = 'bloombar_session_id';
 
 /** One stable session id per device, persisted so scan → order → payment all share it
@@ -58,11 +58,22 @@ export function BloomBarCartProvider({ children }: { children: React.ReactNode }
       return [];
     }
   });
-  const [hotelContext, setHotelContextState] = useState<BloomBarHotelContext | null>(null);
+  const [kioskContext, setKioskContextState] = useState<BloomBarKioskContext | null>(() => {
+    try {
+      const raw = localStorage.getItem(KIOSK_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }, [items]);
+
+  useEffect(() => {
+    if (kioskContext) localStorage.setItem(KIOSK_KEY, JSON.stringify(kioskContext));
+  }, [kioskContext]);
 
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
   const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
@@ -100,8 +111,8 @@ export function BloomBarCartProvider({ children }: { children: React.ReactNode }
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  const setHotelContext = useCallback((ctx: BloomBarHotelContext) => {
-    setHotelContextState(ctx);
+  const setKioskContext = useCallback((ctx: BloomBarKioskContext) => {
+    setKioskContextState(ctx);
   }, []);
 
   return (
@@ -114,8 +125,8 @@ export function BloomBarCartProvider({ children }: { children: React.ReactNode }
         updateQuantity,
         removeItem,
         clearCart,
-        hotelContext,
-        setHotelContext,
+        kioskContext,
+        setKioskContext,
         sessionId: SESSION_ID,
       }}
     >

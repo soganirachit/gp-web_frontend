@@ -14,18 +14,18 @@ export interface BloomBarProduct {
   [key: string]: unknown;
 }
 
-interface Hotel {
+interface Kiosk {
   name?: string;
   [key: string]: unknown;
 }
 
 interface Props {
   product: BloomBarProduct;
-  hotel?: Hotel | null;
+  kiosk?: Kiosk | null;
   onAdded: (product: BloomBarProduct, quantity: number) => void;
 }
 
-export default function BloomBarProductCard({ product, hotel, onAdded }: Props) {
+export default function BloomBarProductCard({ product, kiosk, onAdded }: Props) {
   const { addItem } = useCart();
   const [qty, setQty] = useState(1);
 
@@ -41,9 +41,9 @@ export default function BloomBarProductCard({ product, hotel, onAdded }: Props) 
   };
 
   return (
-    <div className="w-full max-w-lg mx-auto px-4 pb-28">
-      {/* Product image — capped height on all screen sizes */}
-      <div className="w-full h-52 sm:h-64 rounded-2xl overflow-hidden bg-white mb-4 border border-gray-100">
+    <div className="w-full max-w-lg mx-auto px-4 pb-28 flex-1 flex flex-col min-h-0">
+      {/* Product image — grows to fill the space between header and info card */}
+      <div className="w-full flex-1 min-h-[12rem] rounded-2xl overflow-hidden bg-white mb-4 border border-gray-100">
         {product.image_url ? (
           <img
             src={product.image_url}
@@ -75,9 +75,9 @@ export default function BloomBarProductCard({ product, hotel, onAdded }: Props) 
         {product.description && (
           <p className="text-sm text-gray-500 leading-relaxed">{product.description}</p>
         )}
-        {hotel?.name && (
+        {kiosk?.name && (
           <p className="text-xs text-gray-400 mt-2">
-            at <span className="font-medium text-gray-600">{hotel.name}</span>
+            at <span className="font-medium text-gray-600">{kiosk.name}</span>
           </p>
         )}
       </div>

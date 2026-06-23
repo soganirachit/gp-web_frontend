@@ -16,11 +16,11 @@ interface ScanParams {
 }
 
 export default function BloomBarScanNext() {
-  const { items, itemCount, total, setHotelContext, sessionId } = useCart();
+  const { items, itemCount, total, setKioskContext, sessionId } = useCart();
   const [view, setView] = useState<View>('scanning');
   const [scanKey, setScanKey] = useState(0);
   const [product, setProduct] = useState<BloomBarProduct | null>(null);
-  const [hotel, setHotel] = useState<Record<string, unknown> | null>(null);
+  const [kiosk, setKiosk] = useState<Record<string, unknown> | null>(null);
   const [lastAdded, setLastAdded] = useState<{ product: BloomBarProduct; quantity: number } | null>(
     null
   );
@@ -32,7 +32,6 @@ export default function BloomBarScanNext() {
       setLoadError(null);
 
       const productId = params.product || params.p;
-      const hotelId = params.hotel || params.h || '';
       const kioskId = params.kiosk || params.k || '';
       const campaign = params.campaign || params.c || 'direct';
 
@@ -48,19 +47,16 @@ export default function BloomBarScanNext() {
           else throw new Error('No products available');
         }
 
-        let resolvedHotel = hotel;
-        if (hotelId) {
-          const hotels = await base44.entities.Hotel.filter({ id: hotelId });
-          if (hotels.length > 0) {
-            resolvedHotel = hotels[0];
-            setHotel(hotels[0]);
-            setHotelContext({ hotelId, kioskId, campaign, hotel: hotels[0] });
+        if (kioskId) {
+          const kiosks = await base44.entities.Kiosk.filter({ id: kioskId });
+          if (kiosks.length > 0) {
+            setKiosk(kiosks[0]);
+            setKioskContext({ kioskId, campaign, kiosk: kiosks[0] });
           }
         }
 
         if (productId) {
           base44.entities.QRScanEvent.create({
-            hotel_id: hotelId,
             kiosk_id: kioskId,
             product_id: productId,
             campaign,
@@ -76,7 +72,7 @@ export default function BloomBarScanNext() {
         setView('prompt');
       }
     },
-    [hotel, setHotelContext]
+    [kiosk, setKioskContext]
   );
 
   const handleAdded = useCallback((prod: BloomBarProduct, qty: number) => {
@@ -129,10 +125,10 @@ export default function BloomBarScanNext() {
             exit={{ opacity: 0 }}
           >
             <div className="pb-10">
-              <BloomBarCoBrandHeader hotel={hotel as { name?: string } | null} />
+              <BloomBarCoBrandHeader kiosk={kiosk as { name?: string } | null} />
               <BloomBarProductCard
                 product={product}
-                hotel={hotel as { name?: string } | null}
+                kiosk={kiosk as { name?: string } | null}
                 onAdded={handleAdded}
               />
             </div>
