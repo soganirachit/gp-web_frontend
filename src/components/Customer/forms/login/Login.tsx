@@ -10,6 +10,7 @@ import {
 } from "../../../../services/auth.service";
 import { useFeatureTheme } from "../../../../context/FeatureThemeContext";
 import Spinner from "../../../common/Spinner";
+import { openPrivacyPolicy, openTermsOfService } from "../../../../utils/openLegalDocument";
 import { errorMessageFromCatch } from "../../../../utils/apiErrorMessage";
 
 const Login = () => {
@@ -231,8 +232,21 @@ const Login = () => {
 
                     <p className="text-xs sm:text-sm text-center text-gray-500 mt-4 sm:mt-6 px-2">
                         By continuing, you agree to our{" "}
-                        <span className="text-gray-700 underline">Terms of Service</span> and{" "}
-                        <span className="text-gray-700 underline">Privacy Policy</span>
+                        <button
+                            type="button"
+                            onClick={openTermsOfService}
+                            className="text-gray-700 underline hover:text-gray-900"
+                        >
+                            Terms of Service
+                        </button>{" "}
+                        and{" "}
+                        <button
+                            type="button"
+                            onClick={openPrivacyPolicy}
+                            className="text-gray-700 underline hover:text-gray-900"
+                        >
+                            Privacy Policy
+                        </button>
                     </p>
                 </div>
             </motion.div>

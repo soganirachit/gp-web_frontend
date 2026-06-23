@@ -95,6 +95,7 @@ const NameInput: React.FC = () => {
           state: {
             fromNameInput: true,
             returnUrl: returnUrl ?? basePath,
+            fromCart: locState.fromCart,
           },
         });
       } else {
