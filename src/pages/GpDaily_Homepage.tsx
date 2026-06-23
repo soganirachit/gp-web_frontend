@@ -69,6 +69,7 @@ import {
 import alertIcon from "../assets/svg/gp_daily svg/lowbalance.svg";
 import {
   buildNamasteTodayOrderSlides,
+  formatNamastePackNamesLine,
   type NamasteTodayOrderSlide,
 } from "../utils/namasteTodayOrderSlides";
 import {
@@ -1146,20 +1147,19 @@ const Home2: React.FC = () => {
             {slide.heading}
           </span>
         </div>
-        {slide.packNames.map((packName, packIdx) => (
-          <div
-            key={`${keySuffix}-pack-${packIdx}`}
-            className={gpDailyHome.namasteDetailRow}
-          >
+        {slide.packNames.length > 0 ? (
+          <div className={gpDailyHome.namasteDetailRow}>
             <img
               src={flowerIcon}
               alt=""
               className={gpDailyHome.namasteIcon}
               aria-hidden
             />
-            <span className={gpDailyHome.namasteDetail}>{packName}</span>
+            <span className={gpDailyHome.namasteDetail}>
+              {formatNamastePackNamesLine(slide.packNames)}
+            </span>
           </div>
-        ))}
+        ) : null}
       </div>
     </div>
   );

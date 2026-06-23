@@ -9,6 +9,7 @@ import {
   whatsappOtpLikelyDelivered,
 } from '../../../../services/auth.service';
 import { addressService } from '../../../../services/address.service';
+import { customerService } from '../../../../services/getcustomer.service';
 import { useAuth } from '../../../../context/AuthContext';
 import { useCart } from '../../../../context/CartContext';
 import { FaWhatsapp } from 'react-icons/fa';
@@ -179,6 +180,27 @@ const OTPVerification: React.FC = () => {
         const backendSaysNew = response.is_new_user || !response.userExists;
         const isNewOrIncomplete = backendSaysNew || !hasFullName;
 
+        const hydrateProfileFromApi = async (): Promise<boolean> => {
+          const [addresses, customers] = await Promise.all([
+            addressService.getAllAddresses(),
+            customerService.getAllCustomers(),
+          ]);
+          const customer = customers[0];
+          if (customer) {
+            const displayName = [customer.firstName, customer.lastName]
+              .filter(Boolean)
+              .join(' ')
+              .trim();
+            if (displayName) {
+              localStorage.setItem('userName', displayName);
+            }
+            if (customer.emailAddress) {
+              localStorage.setItem('userEmail', customer.emailAddress);
+            }
+          }
+          return !!(addresses && addresses.length > 0);
+        };
+
         if (isNewOrIncomplete) {
           navigate(`${basePath}/name-input`, {
             state: { returnUrl, fromCart },
@@ -186,39 +208,41 @@ const OTPVerification: React.FC = () => {
           return;
         }
 
-        // If coming from cart checkout, redirect back to cart
-        if (fromCart && returnUrl) {
-          navigate(returnUrl);
-          return;
-        }
+        const resolvedReturnUrl =
+          returnUrl?.trim() && returnUrl.trim() !== basePath
+            ? returnUrl.trim()
+            : basePath;
 
-        // Return to the page user came from (e.g. product detail after "login to add")
-        if (returnUrl && returnUrl.trim() && returnUrl !== basePath) {
-          navigate(returnUrl.trim(), { replace: true });
-          return;
-        }
-
-        // Existing user with a complete profile — route by saved addresses.
         try {
-          const addresses = await addressService.getAllAddresses();
-          if (addresses && addresses.length > 0) {
-            navigate(basePath, {
-              state: {
-                returnUrl: basePath,
-              },
-            });
-          } else {
+          const hasAddresses = await hydrateProfileFromApi();
+
+          if (!hasAddresses) {
             navigate(`${basePath}/location`, {
               state: {
-                returnUrl: basePath,
+                returnUrl: resolvedReturnUrl,
+                fromCart,
               },
             });
+            return;
           }
+
+          if (fromCart && returnUrl) {
+            navigate(returnUrl);
+            return;
+          }
+
+          if (returnUrl?.trim() && returnUrl.trim() !== basePath) {
+            navigate(returnUrl.trim(), { replace: true });
+            return;
+          }
+
+          navigate(basePath);
         } catch (error) {
-          console.error("Error checking addresses:", error);
+          console.error('Error checking profile after login:', error);
           navigate(`${basePath}/location`, {
             state: {
-              returnUrl: basePath,
+              returnUrl: resolvedReturnUrl,
+              fromCart,
             },
           });
         }

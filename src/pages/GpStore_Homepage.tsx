@@ -15,6 +15,7 @@ import {
   getBasePrice,
   showStrikeBaseOnCard,
   PRODUCT_AVAILABILITY_STORE,
+  resolveProductImageUrl,
 } from "../services/product.service";
 import {
   GUEST_STORE_UPDATED_EVENT,
@@ -80,6 +81,7 @@ import {
   HOME_HEADER_PROFILE_OFFSET,
 } from "../constants/homeHeaderLayout";
 import { ProductImageTag } from "../components/common/ProductImageTag";
+import { SessionCachedImage } from "../components/common/SessionCachedImage";
 import { formatNamasteGreeting, hasRealUserFirstName } from "../utils/namasteGreeting";
 import { OffersBannerCarousel } from "../components/OffersBannerCarousel";
 import { HorizontalScrollSection } from "../components/common/HorizontalScrollSection";
@@ -439,14 +441,6 @@ const GpStore_Homepage: React.FC = () => {
         navigate(`${basePath}/product/${bestSeller.slug}`, { state: { product: bestSeller } });
     };
 
-    const getImageUrl = (image?: string | string[] | null): string => {
-        if (!image) return "/placeholder.svg";
-        if (Array.isArray(image)) {
-            return image[0] || "/placeholder.svg";
-        }
-        return image;
-    };
-
     const isPageLoading = isLoadingAddress || isLoadingProducts || isLoadingCategories || isLoadingBestSellers;
 
     if (isPageLoading) {
@@ -657,10 +651,11 @@ const GpStore_Homepage: React.FC = () => {
                                         onClick={() => handleProductClick(product)}
                                     >
                                         <div className="aspect-square bg-[#f8f6f1] overflow-hidden">
-                                            <img
-                                                src={getImageUrl(product.primary_image)}
+                                            <SessionCachedImage
+                                                src={resolveProductImageUrl(product as unknown as Record<string, unknown>)}
                                                 alt={product.name}
                                                 className="w-full h-full object-cover"
+                                                loading="lazy"
                                             />
                                         </div>
                                         <div className="gp-store-card-scroll-inner">
@@ -716,14 +711,11 @@ const GpStore_Homepage: React.FC = () => {
                                     >
                                         <div className="relative aspect-square bg-[#f8f6f1] overflow-hidden">
                                             <ProductImageTag labels={bestSeller.labels} />
-                                            <img
-                                                src={bestSeller.primary_image || "/placeholder.svg"}
+                                            <SessionCachedImage
+                                                src={resolveProductImageUrl(bestSeller as unknown as Record<string, unknown>)}
                                                 alt={bestSeller.name}
                                                 loading="lazy"
                                                 className="w-full h-full object-cover"
-                                                onError={(e) => {
-                                                    (e.target as HTMLImageElement).src = "/placeholder.svg";
-                                                }}
                                             />
                                         </div>
                                         <div className="gp-store-card-scroll-inner">
@@ -781,10 +773,11 @@ const GpStore_Homepage: React.FC = () => {
                                 >
                                     <div className="relative aspect-square bg-[#f8f6f1] overflow-hidden">
                                         <ProductImageTag labels={product.labels} />
-                                        <img
-                                            src={getImageUrl(product.primary_image)}
+                                        <SessionCachedImage
+                                            src={resolveProductImageUrl(product as unknown as Record<string, unknown>)}
                                             alt={product.name}
                                             className="w-full h-full object-cover"
+                                            loading="lazy"
                                         />
                                     </div>
                                     <div className="gp-store-card-scroll-inner">

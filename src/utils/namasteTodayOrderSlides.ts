@@ -89,6 +89,10 @@ function resolvePackLabel(order: Record<string, unknown>): string | null {
   return label || firstName || null;
 }
 
+export function formatNamastePackNamesLine(packNames: string[]): string {
+  return packNames.map((name) => name.trim()).filter(Boolean).join(", ");
+}
+
 export function buildNamasteTodayOrderSlides(
   orders: Record<string, unknown>[],
 ): NamasteTodayOrderSlide[] {

@@ -23,9 +23,10 @@ import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
 import { ProfileAvatarDisplay } from '../../components/common/ProfileAvatarButton';
 import {
-  GENDA_PHOOL_PRIVACY_POLICY_URL,
-  GENDA_PHOOL_TERMS_OF_SERVICE_URL,
+  GENDA_PHOOL_PRIVACY_POLICY_PATH,
+  GENDA_PHOOL_TERMS_OF_SERVICE_PATH,
 } from '../../config/legalUrls';
+import { openLegalDocument } from '../../utils/openLegalDocument';
 
 // Import SVG icons
 import subscriptionIcon from '../../assets/icon/subscription.svg';
@@ -513,8 +514,10 @@ const Settings: React.FC = () => {
     }
   };
 
-  const openLegalLink = (url: string) => {
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const openLegalLink = (path: string) => {
+    openLegalDocument(
+      path as typeof GENDA_PHOOL_PRIVACY_POLICY_PATH | typeof GENDA_PHOOL_TERMS_OF_SERVICE_PATH,
+    );
   };
 
   const formatPhoneNumber = (phone: string) => {
@@ -547,7 +550,7 @@ const Settings: React.FC = () => {
                 <button
                   type="button"
                   className="text-gray-500 underline"
-                  onClick={() => openLegalLink(GENDA_PHOOL_TERMS_OF_SERVICE_URL)}
+                  onClick={() => openLegalLink(GENDA_PHOOL_TERMS_OF_SERVICE_PATH)}
                 >
                   Terms of Service
                 </button>{' '}
@@ -555,7 +558,7 @@ const Settings: React.FC = () => {
                 <button
                   type="button"
                   className="text-gray-500 underline"
-                  onClick={() => openLegalLink(GENDA_PHOOL_PRIVACY_POLICY_URL)}
+                  onClick={() => openLegalLink(GENDA_PHOOL_PRIVACY_POLICY_PATH)}
                 >
                   Privacy Policy
                 </button>
@@ -884,7 +887,7 @@ const Settings: React.FC = () => {
               <button
                 type="button"
                 className="text-gray-500 underline"
-                onClick={() => openLegalLink(GENDA_PHOOL_TERMS_OF_SERVICE_URL)}
+                onClick={() => openLegalLink(GENDA_PHOOL_TERMS_OF_SERVICE_PATH)}
               >
                 Terms of Service
               </button>{' '}
@@ -892,7 +895,7 @@ const Settings: React.FC = () => {
               <button
                 type="button"
                 className="text-gray-500 underline"
-                onClick={() => openLegalLink(GENDA_PHOOL_PRIVACY_POLICY_URL)}
+                onClick={() => openLegalLink(GENDA_PHOOL_PRIVACY_POLICY_PATH)}
               >
                 Privacy Policy
               </button>

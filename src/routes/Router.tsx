@@ -62,8 +62,7 @@ const StorePage = lazy(() => import('../components/StoreProductsPage/storeProduc
 const ManageMyStoreProducts = lazy(() => import('../components/StoreProductsPage/manageMyStoreProducts'));
 const Cart = lazy(() => import('../features/cart/components/Cart'));
 const CartDaily = lazy(() => import('../features/cart/components/CartDaily'));
-const Terms = lazy(() => import('../pages/Terms'));
-const Privacy = lazy(() => import('../pages/Privacy'));
+import StaticLegalPageRedirect from '../components/legal/StaticLegalPageRedirect';
 const ProductDeepLinkPage = lazy(() => import('../pages/ProductDeepLinkPage'));
 
 const PageLoader = () => <PageFadeFallback />;
@@ -176,8 +175,8 @@ const router = createBrowserRouter(
       { path: '/customer-support/chat', element: <ProtectedRoute><SupportTicketChat /></ProtectedRoute> },
       { path: '/faq', element: <ProtectedRoute><FAQ /></ProtectedRoute> },
       { path: '/products/:slug', element: <ProductDeepLinkPage /> },
-      { path: '/terms', element: <Terms /> },
-      { path: '/privacy', element: <Privacy /> },
+      { path: '/terms', element: <StaticLegalPageRedirect path="/terms_of_service.html" /> },
+      { path: '/privacy', element: <StaticLegalPageRedirect path="/privacy-policy.html" /> },
     ],
   },
   ],
