@@ -1,8 +1,8 @@
-const LOGO_URL =
-  'https://media.base44.com/images/public/6a19710a955d0c68cf58358a/4b879ad11_logo-GP-Black.png';
+import { motion } from 'framer-motion';
 
 interface Kiosk {
   name?: string;
+  logo_url?: string;
   [key: string]: unknown;
 }
 
@@ -12,20 +12,38 @@ interface Props {
 
 export default function BloomBarCoBrandHeader({ kiosk }: Props) {
   return (
-    <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-gray-200 sticky top-0 z-30">
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-lg bg-genda-cream flex items-center justify-center p-1 flex-shrink-0">
-          <img src={LOGO_URL} alt="Genda Phool" className="w-full h-full object-contain" />
-        </div>
-        <span className="font-playfair font-semibold text-sm">BloomBar</span>
-        <span className="text-xs text-gray-400">by Genda Phool</span>
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-center justify-center gap-4 py-5 px-6 bg-white"
+    >
+      {/* Kiosk side */}
+      <div className="text-center">
+        {kiosk?.logo_url ? (
+          <img
+            src={kiosk.logo_url}
+            alt={kiosk.name}
+            className="h-10 w-auto object-contain mx-auto"
+          />
+        ) : (
+          <p className="font-playfair text-lg font-semibold text-gray-900 truncate max-w-[130px]">
+            {kiosk?.name || 'Kiosk'}
+          </p>
+        )}
       </div>
-      {kiosk?.name && (
-        <div className="flex items-center gap-1 text-xs text-gray-500">
-          <span>at</span>
-          <span className="font-medium text-gray-800">{kiosk.name}</span>
-        </div>
-      )}
-    </div>
+
+      {/* Divider */}
+      <div className="flex flex-col items-center gap-0.5">
+        <div className="w-px h-5 bg-gray-200" />
+        <span className="text-xs text-gray-400 font-light">×</span>
+        <div className="w-px h-5 bg-gray-200" />
+      </div>
+
+      {/* Genda Phool side */}
+      <div className="text-center">
+        <p className="font-playfair text-lg font-semibold text-genda-green">Genda Phool</p>
+        <p className="text-xs text-gray-400 font-light">Fresh Flowers</p>
+      </div>
+    </motion.div>
   );
 }

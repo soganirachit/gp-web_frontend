@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCart } from './BloomBarCartContext';
 import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,7 +9,7 @@ import BloomBarOrderSummaryRow from './components/BloomBarOrderSummaryRow';
 import BloomBarConfirmation from './BloomBarConfirmation';
 
 
-const TAX_RATE = 0.05;
+
 
 export default function BloomBarBasket() {
   const { items, itemCount, total, updateQuantity, removeItem, clearCart, kioskContext, sessionId } =
@@ -20,8 +20,42 @@ export default function BloomBarBasket() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState('');
 
-  const tax = Math.round(total * TAX_RATE);
-  const grandTotal = total + tax;
+  // Totals come from the backend (admin-configured tax) — same source-of-truth
+  // pattern as the store/daily cart. No local fallback: if the backend doesn't
+  // return totals, they stay null and we never fabricate a tax/total.
+  type Totals = { subtotal: number; tax: number; total: number };
+  const [totals, setTotals] = useState<Totals | null>(null);
+
+  const itemsKey = items.map(i => `${i.product_id}:${i.quantity}`).join(',');
+
+  useEffect(() => {
+    if (items.length === 0) {
+      setTotals(null);
+      return;
+    }
+    let cancelled = false;
+    setTotals(null);
+    (async () => {
+      try {
+        const t = await base44.entities.Cart.getTotals({
+          kiosk_id: kioskContext?.kioskId || '',
+          campaign: kioskContext?.campaign || 'direct',
+          items: items.map(i => ({ product_id: i.product_id, quantity: i.quantity })),
+        });
+        if (!cancelled) setTotals({ subtotal: t.subtotal, tax: t.tax_amount, total: t.total_amount });
+      } catch {
+        // Backend totals unavailable — leave null, do not invent any amount.
+        if (!cancelled) setTotals(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsKey, kioskContext?.kioskId, kioskContext?.campaign]);
+
+  const tax = totals?.tax ?? null;
+  const grandTotal = totals?.total ?? null;
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -36,6 +70,10 @@ export default function BloomBarBasket() {
 
   const handlePayment = async () => {
     if (!validate()) return;
+    if (grandTotal == null) {
+      alert('Could not load the order total. Please try again in a moment.');
+      return;
+    }
     setLoading(true);
 
     try {
@@ -56,7 +94,7 @@ export default function BloomBarBasket() {
         customer_whatsapp: form.whatsapp,
         items,
         subtotal: total,
-        total_amount: grandTotal,
+        total_amount: grandTotal ?? undefined,
         status: 'pending',
       });
     } catch (err) {
@@ -236,10 +274,13 @@ export default function BloomBarBasket() {
           <div className="space-y-2">
             <BloomBarOrderSummaryRow label="Subtotal" value={`₹${total.toLocaleString('en-IN')}`} />
 
-            <BloomBarOrderSummaryRow label="Tax (5%)" value={`₹${tax}`} />
+            <BloomBarOrderSummaryRow
+              label="Tax"
+              value={tax != null ? `₹${tax.toLocaleString('en-IN')}` : '—'}
+            />
             <BloomBarOrderSummaryRow
               label="Total"
-              value={`₹${grandTotal.toLocaleString('en-IN')}`}
+              value={grandTotal != null ? `₹${grandTotal.toLocaleString('en-IN')}` : '—'}
               isTotal
             />
           </div>
@@ -332,13 +373,18 @@ export default function BloomBarBasket() {
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handlePayment}
-          disabled={loading}
+          disabled={loading || grandTotal == null}
           className="w-full py-4 genda-gradient text-white font-semibold text-base rounded-2xl premium-shadow flex items-center justify-center gap-2 disabled:opacity-60"
         >
           {loading ? (
             <>
               <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
               <span>Processing...</span>
+            </>
+          ) : grandTotal == null ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              <span>Calculating total…</span>
             </>
           ) : (
             <>

@@ -138,6 +138,50 @@ async function updateOrder(id: string, data: OrderUpdateInput) {
   return { id };
 }
 
+// ── Cart totals (backend is the source of truth — mirrors store/daily) ───────
+
+export interface BloomBarTotals {
+  subtotal: number;
+  tax_amount: number;
+  total_amount: number;
+  /** Tax % the backend used (from admin config). Optional, for display. */
+  tax_rate?: number;
+}
+
+interface TotalsInput {
+  kiosk_id?: string;
+  campaign?: string;
+  items: { product_id: string; quantity: number }[];
+}
+
+/**
+ * Ask the backend to compute subtotal / tax / total for the current basket,
+ * exactly like the store/daily `GET /cart/` flow. The tax here comes from the
+ * admin tax configuration on the server — NOT a hardcoded frontend rate.
+ */
+async function fetchTotals(data: TotalsInput): Promise<BloomBarTotals> {
+  const res = await api.post(`${BASE}/orders/calculate/`, {
+    kiosk_id: data.kiosk_id ? Number(data.kiosk_id) : undefined,
+    campaign: data.campaign || 'direct',
+    items: data.items.map((i) => ({
+      product_id: Number(i.product_id),
+      quantity: i.quantity,
+    })),
+  });
+  const t = unwrap<{
+    subtotal: number | string;
+    tax_amount: number | string;
+    total_amount: number | string;
+    tax_rate?: number | string;
+  }>(res);
+  return {
+    subtotal: Number(t.subtotal) || 0,
+    tax_amount: Number(t.tax_amount) || 0,
+    total_amount: Number(t.total_amount) || 0,
+    tax_rate: t.tax_rate !== undefined ? Number(t.tax_rate) : undefined,
+  };
+}
+
 // ── Entity stubs (kept for API compatibility with existing page imports) ─────
 
 const QRMapping = {
@@ -189,6 +233,12 @@ export const base44 = {
     },
 
     QRMapping,
+
+    Cart: {
+      async getTotals(data: TotalsInput) {
+        return fetchTotals(data);
+      },
+    },
 
     Order: {
       async create(data: Record<string, unknown>) {
