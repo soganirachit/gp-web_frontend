@@ -35,6 +35,7 @@ import { gpDailyHome } from "../../utils/gpDailyHomeDesignSystem";
 import { ProductImageTag } from "../common/ProductImageTag";
 import { HorizontalScrollSection } from "../common/HorizontalScrollSection";
 import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
+import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
 import {
   extractCartStockApiMessage,
   formatCartStockInlineMessage,
@@ -465,7 +466,7 @@ const StorePage: React.FC = () => {
       toast.success("Message saved", { id: "pdp-message-saved" });
     } catch (error: unknown) {
       toast.error(
-        errorMessageFromCatch(error, "Failed to save message. Please try again."),
+        errorMessageFromCatch(error, REQUIRED_TOAST.COULD_NOT_SAVE_MESSAGE),
         { id: "pdp-message-save-error" },
       );
     } finally {
@@ -501,7 +502,7 @@ const StorePage: React.FC = () => {
       } else {
         const basketErrMsg =
           apiMessage.trim() ||
-          errorMessageFromCatch(error, "Failed to update basket quantity. Please try again.");
+          errorMessageFromCatch(error, REQUIRED_TOAST.COULD_NOT_UPDATE_QUANTITY);
         toast.error(basketErrMsg, { id: basketErrMsg });
       }
     } finally {

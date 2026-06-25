@@ -4,12 +4,17 @@ import { motion } from 'framer-motion';
 import { GoogleMap, Marker } from '@react-google-maps/api';
 import { FaBox, FaCheck, FaClock, FaMapMarkerAlt, FaRupeeSign } from 'react-icons/fa';
 import { useGoogleMaps } from '../../hooks/useGoogleMaps';
-import Spinner from '../common/Spinner';
 import { OrderConfirmationSkeleton } from '../common/PageSkeletons';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { orderService } from '../../services/order.service';
-import { format } from 'date-fns';
 import { formatDeliveryAddressOrFallback } from '../../utils/formatDeliveryAddress';
+import {
+  formatDeliverySchedule,
+  type DeliverySlotInfo,
+  type OrderConfirmationSnapshot,
+} from '../../utils/orderConfirmationDisplay';
+import { formatOrderListProductLabel } from '../../utils/orderListDisplay';
+
 interface DeliveryAddress {
   address_type?: string;
   address_line1?: string;
@@ -28,10 +33,10 @@ interface DeliveryAddress {
 }
 
 function parseCoordString(raw: unknown): { lat: number; lng: number } | null {
-  if (typeof raw !== "string") return null;
+  if (typeof raw !== 'string') return null;
   const s = raw.trim();
   if (!s) return null;
-  const parts = s.split(",").map((x) => Number(String(x).trim()));
+  const parts = s.split(',').map((x) => Number(String(x).trim()));
   if (parts.length >= 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
     return { lat: parts[0], lng: parts[1] };
   }
@@ -59,15 +64,19 @@ function pickLatLngFromDeliveryAddress(
   let r = tryObj(a as Record<string, unknown>);
   if (r) return r;
   const loc = a.location;
-  if (loc && typeof loc === "object") {
+  if (loc && typeof loc === 'object') {
     r = tryObj(loc as Record<string, unknown>);
   }
   return r;
 }
 
 interface OrderItem {
-  product: { name: string };
+  product?: {
+    name?: string;
+    category_name?: string;
+  };
   quantity: number;
+  special_instructions?: string;
 }
 
 interface OrderDetails {
@@ -75,43 +84,93 @@ interface OrderDetails {
   delivery_address?: DeliveryAddress | null;
   delivery_date?: string | null;
   delivery_time_slot?: string;
+  delivery_slot_info?: DeliverySlotInfo;
   items: OrderItem[];
   total_amount?: string;
-  subtotal?: string;
-  discount_amount?: string;
   created_at?: string;
 }
 
-const SuccessCheckmark: React.FC = () => {
-  return (
-    <motion.div
-      className="relative w-20 h-20 mx-auto mb-2"
-      initial={{ scale: 0, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{
-        type: 'spring',
-        stiffness: 260,
-        damping: 20,
-        delay: 0.2,
-      }}
-    >
-      <div className="w-20 h-20 rounded-full bg-[#19411f] flex items-center justify-center">
-        <FaCheck className="text-white text-3xl" />
-      </div>
-    </motion.div>
-  );
+type LocationState = {
+  orderNumber?: string;
+  orderId?: string;
+  amount?: number;
+  snapshot?: OrderConfirmationSnapshot;
 };
 
-const MapView: React.FC<{ deliveryAddress: DeliveryAddress | null | undefined; themeColor: string }> = ({
+type DisplayModel = {
+  delivery_address: DeliveryAddress | null;
+  deliverySchedule: string;
+  items: Array<{
+    key: string;
+    name: string;
+    message?: string;
+  }>;
+  total_amount: string;
+};
+
+function formatRupeeAmount(raw: string | number | undefined | null): string {
+  const n = typeof raw === 'string' ? parseFloat(raw) : Number(raw);
+  if (!Number.isFinite(n)) return '0.00';
+  return n.toFixed(2);
+}
+
+function modelFromSnapshot(snapshot: OrderConfirmationSnapshot): DisplayModel {
+  return {
+    delivery_address: (snapshot.delivery_address as DeliveryAddress) ?? null,
+    deliverySchedule: formatDeliverySchedule(
+      snapshot.delivery_date,
+      snapshot.delivery_slot_info ?? null,
+      snapshot.delivery_time_slot,
+    ),
+    items: (snapshot.items ?? []).map((item, i) => ({
+      key: `snap-${i}`,
+      name: item.name || 'Product',
+      message: item.customizedMessage?.trim() || undefined,
+    })),
+    total_amount: formatRupeeAmount(snapshot.total_amount),
+  };
+}
+
+function modelFromOrder(order: OrderDetails): DisplayModel {
+  return {
+    delivery_address: order.delivery_address ?? null,
+    deliverySchedule: formatDeliverySchedule(
+      order.delivery_date,
+      order.delivery_slot_info ?? null,
+      order.delivery_time_slot,
+      order.created_at,
+    ),
+    items: (order.items ?? []).map((item, i) => ({
+      key: `api-${item.product?.name ?? i}`,
+      name: item.product?.name || 'Product',
+      message: item.special_instructions?.trim() || undefined,
+    })),
+    total_amount: formatRupeeAmount(order.total_amount),
+  };
+}
+
+const SuccessCheckmark: React.FC = () => (
+  <motion.div
+    className="relative w-20 h-20 mx-auto mb-2"
+    initial={{ scale: 0, opacity: 0 }}
+    animate={{ scale: 1, opacity: 1 }}
+    transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.2 }}
+  >
+    <div className="w-20 h-20 rounded-full bg-[#19411f] flex items-center justify-center">
+      <FaCheck className="text-white text-3xl" />
+    </div>
+  </motion.div>
+);
+
+const MapView: React.FC<{ deliveryAddress: DeliveryAddress | null | undefined }> = ({
   deliveryAddress,
-  themeColor: _themeColor,
 }) => {
   const { isLoaded, loadError } = useGoogleMaps();
 
   if (!isLoaded) {
     return (
       <div className="w-full h-[170px] bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-        <Spinner size={32} />
+        <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
       </div>
     );
   }
@@ -135,7 +194,7 @@ const MapView: React.FC<{ deliveryAddress: DeliveryAddress | null | undefined; t
   return (
     <div className="w-full h-[170px] rounded-lg overflow-hidden relative">
       <GoogleMap
-        mapContainerStyle={{ width: "100%", height: "100%" }}
+        mapContainerStyle={{ width: '100%', height: '100%' }}
         center={center}
         zoom={hasValidCoords ? 16 : 4}
         options={{
@@ -147,7 +206,7 @@ const MapView: React.FC<{ deliveryAddress: DeliveryAddress | null | undefined; t
           scrollwheel: false,
           disableDoubleClickZoom: true,
           disableDefaultUI: true,
-          gestureHandling: "none",
+          gestureHandling: 'none',
           clickableIcons: false,
         }}
       >
@@ -161,19 +220,15 @@ const MapView: React.FC<{ deliveryAddress: DeliveryAddress | null | undefined; t
 const StoreOrderConfirmation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { feature, theme } = useFeatureTheme();
+  const { feature } = useFeatureTheme();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
 
-  const state = (location.state ?? {}) as {
-    orderNumber?: string;
-    orderId?: string;
-    amount?: number;
-  };
-
+  const state = (location.state ?? {}) as LocationState;
   const orderNumber = state.orderNumber || state.orderId;
+  const initialSnapshot = state.snapshot ?? null;
 
   const [order, setOrder] = useState<OrderDetails | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(!initialSnapshot);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -185,52 +240,57 @@ const StoreOrderConfirmation: React.FC = () => {
         return;
       }
       try {
-        setLoading(true);
+        if (!initialSnapshot) setLoading(true);
         setError(null);
         const data = await orderService.getOrderByOrderNumber(orderNumber);
         if (!cancelled) {
-          setOrder(data as OrderDetails | null);
-          if (!data) setError('Order not found.');
+          if (data) {
+            setOrder(data as OrderDetails);
+          } else if (!initialSnapshot) {
+            setError('Order not found.');
+          }
         }
-      } catch (e: any) {
-        if (!cancelled) {
-          setError(e?.message || 'Failed to load order confirmation.');
+      } catch (e: unknown) {
+        if (!cancelled && !initialSnapshot) {
+          setError(e instanceof Error ? e.message : 'Failed to load order confirmation.');
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
-    load();
+    void load();
     return () => {
       cancelled = true;
     };
-  }, [orderNumber]);
+  }, [orderNumber, initialSnapshot]);
+
+  const display = useMemo((): DisplayModel | null => {
+    if (order) return modelFromOrder(order);
+    if (initialSnapshot) return modelFromSnapshot(initialSnapshot);
+    return null;
+  }, [order, initialSnapshot]);
+
+  const productSummary = useMemo(() => {
+    if (!display?.items.length) return '';
+    const firstName = display.items[0]?.name?.trim() || 'Product';
+    return formatOrderListProductLabel(firstName, display.items.length);
+  }, [display?.items]);
 
   const addressText = useMemo(() => {
-    if (!order?.delivery_address) return '';
-    const a = order.delivery_address;
+    if (!display?.delivery_address) return '';
+    const a = display.delivery_address;
     const body = formatDeliveryAddressOrFallback(a as Record<string, unknown>);
-    const typePrefix = a.address_type ? `${a.address_type === 'work' ? 'Work' : 'Home'}: ` : '';
+    const typePrefix = a.address_type
+      ? `${a.address_type === 'work' ? 'Work' : 'Home'}: `
+      : '';
     return `${typePrefix}${body}`.trim();
-  }, [order?.delivery_address]);
+  }, [display?.delivery_address]);
 
-  const deliveryDateLabel = useMemo(() => {
-    const raw = order?.delivery_date || order?.created_at || '';
-    if (!raw) return '';
-    try {
-      return format(new Date(raw), 'd MMM yyyy');
-    } catch {
-      return raw;
-    }
-  }, [order?.delivery_date, order?.created_at]);
-
-  const firstItem = order?.items?.[0];
-
-  if (loading) {
+  if (loading && !display) {
     return <OrderConfirmationSkeleton />;
   }
 
-  if (error || !order) {
+  if ((error || !display) && !order && !initialSnapshot) {
     return (
       <div className="min-h-screen bg-[#f8f6f1] flex flex-col items-center justify-center p-6 text-center">
         <p className="text-gray-700 mb-4">{error || 'Order not found'}</p>
@@ -244,13 +304,15 @@ const StoreOrderConfirmation: React.FC = () => {
     );
   }
 
+  if (!display) return <OrderConfirmationSkeleton />;
+
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
       <div className="mx-auto w-full max-w-[min(800px,100vw)] px-4 pt-6 pb-nav-bottom">
         <div className="pt-8 pb-4 text-center">
           <SuccessCheckmark />
           <motion.h1
-            className="text-2xl font-bold text-gray-900 mb-2"
+            className="font-ibm-plex-serif text-[28px] font-semibold leading-8 text-gray-900 mb-2"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
@@ -267,48 +329,41 @@ const StoreOrderConfirmation: React.FC = () => {
           </motion.p>
         </div>
 
-        {/* Main confirmation card */}
         <motion.div
           className="bg-white rounded-[18px] mx-auto shadow-sm p-4 sm:p-5"
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
         >
-          {/* Address + Map */}
           <div className="flex items-start gap-3">
             <FaMapMarkerAlt className="text-[#19411F] mt-0.5 flex-shrink-0" />
             <div className="min-w-0 flex-1">
-              <div className="text-gray-900 text-sm font-semibold">{addressText || 'Address not available'}</div>
+              <div className="text-gray-900 text-sm font-semibold">
+                {addressText || 'Address not available'}
+              </div>
             </div>
           </div>
           <div className="mt-3 -mx-4 sm:-mx-5">
-            <MapView
-              deliveryAddress={order.delivery_address}
-              themeColor={theme.colors.primary}
-            />
+            <MapView deliveryAddress={display.delivery_address} />
           </div>
 
-          {/* Delivery + Item + Total */}
           <div className="mt-4 space-y-3">
             <div className="flex items-start gap-3">
               <FaClock className="text-gray-600 mt-0.5 flex-shrink-0" />
               <div className="min-w-0">
-                <div className="text-gray-600 text-xs font-semibold">Delivery date & Time slot</div>
+                <div className="text-gray-600 text-xs font-semibold">Delivery date &amp; time slot</div>
                 <div className="text-gray-900 text-sm font-semibold">
-                  {deliveryDateLabel}
-                  {order.delivery_time_slot ? `, ${order.delivery_time_slot}` : ''}
+                  {display.deliverySchedule || '—'}
                 </div>
               </div>
             </div>
 
-            {firstItem && (
+            {productSummary && (
               <div className="flex items-start gap-3">
                 <FaBox className="text-gray-600 mt-0.5 flex-shrink-0" />
-                <div className="min-w-0">
-                  <div className="text-gray-600 text-xs font-semibold">Charh Bouquet</div>
-                  <div className="text-gray-900 text-sm font-semibold">
-                    {firstItem.product?.name || 'Product'} &nbsp;x {firstItem.quantity}
-                  </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-gray-600 text-xs font-semibold">Order items</div>
+                  <div className="text-gray-900 text-sm font-semibold">{productSummary}</div>
                 </div>
               </div>
             )}
@@ -317,13 +372,12 @@ const StoreOrderConfirmation: React.FC = () => {
               <FaRupeeSign className="text-gray-600 mt-0.5 flex-shrink-0" />
               <div className="min-w-0">
                 <div className="text-gray-600 text-xs font-semibold">Total Amount</div>
-                <div className="text-gray-900 text-sm font-semibold">₹{order.total_amount}</div>
+                <div className="text-gray-900 text-sm font-semibold">₹{display.total_amount}</div>
               </div>
             </div>
           </div>
         </motion.div>
 
-        {/* Explore more — spacing from confirmation card above */}
         <div className="px-2 mt-6">
           <button
             onClick={() => navigate(`${basePath}/products`)}
@@ -332,15 +386,9 @@ const StoreOrderConfirmation: React.FC = () => {
             Explore More
           </button>
         </div>
-
-        {/* <p className="text-center text-gray-600 text-xs mt-3">
-          Our customer care is available 24/7
-        </p> */}
-
       </div>
     </div>
   );
 };
 
 export default StoreOrderConfirmation;
-

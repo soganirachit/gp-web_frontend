@@ -4,6 +4,7 @@ import { IoArrowBack } from 'react-icons/io5';
 import { FaPaperPlane } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { supportService, TicketQuestion, PredefinedAnswers } from '../../services/support.service';
+import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
 import { errorMessageFromCatch } from '../../utils/apiErrorMessage';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import { SettingsListSkeleton } from '../../components/common/PageSkeletons';
@@ -11,6 +12,10 @@ import {
   UNIFORM_PAGE_HEADER_BACK_BUTTON_CLASS,
   UNIFORM_PAGE_HEADER_TITLE_CLASS,
 } from '../../components/layout/UniformPageHeader';
+import {
+  resolveSupportBackNavigation,
+  type SupportNavState,
+} from '../../utils/supportNavigation';
 
 interface ChatMessage {
   id: string;
@@ -45,6 +50,17 @@ const TicketQuestionForm: React.FC = () => {
 
   const orderId = searchParams.get('order_id');
   const orderNumber = searchParams.get('order_number');
+  const supportNavState = (location.state ?? {}) as SupportNavState;
+  const returnTo = supportNavState.returnTo;
+
+  const goBackFromQuestions = () => {
+    const { path, replace } = resolveSupportBackNavigation({
+      returnTo,
+      orderNumber,
+      basePath: supportBasePath,
+    });
+    navigate(path, { replace });
+  };
 
   const [questions, setQuestions] = useState<TicketQuestion[]>([]);
   const [answers, setAnswers] = useState<PredefinedAnswers>({});
@@ -212,9 +228,17 @@ const TicketQuestionForm: React.FC = () => {
       const ticket = await supportService.createTicket(parseInt(orderId), finalAnswers);
       
       if (ticket) {
-        // Navigate to chat screen
+        toast.success(REQUIRED_TOAST.MESSAGE_SENT);
+        const navState: SupportNavState = {
+          returnTo:
+            returnTo ||
+            (orderNumber
+              ? `${supportBasePath}/orders/${encodeURIComponent(orderNumber)}`
+              : undefined),
+        };
         navigate(
           `${supportBasePath}/customer-support/chat?ticket=${ticket.ticket_number}`,
+          { replace: true, state: navState },
         );
       } else {
         toast.error('Failed to create ticket. Please try again.');
@@ -239,7 +263,7 @@ const TicketQuestionForm: React.FC = () => {
         <div className="text-center">
           <p className="text-gray-600 mb-4">Order information is missing</p>
           <button
-            onClick={() => navigate(`${supportBasePath}/customer-support`)}
+            onClick={goBackFromQuestions}
             className="px-4 py-2 bg-[#166534] text-white rounded-lg"
           >
             Go Back
@@ -255,7 +279,7 @@ const TicketQuestionForm: React.FC = () => {
         <div className="text-center">
           <p className="text-gray-600 mb-4">No questions available</p>
           <button
-            onClick={() => navigate(`${supportBasePath}/customer-support`)}
+            onClick={goBackFromQuestions}
             className="px-4 py-2 bg-[#166534] text-white rounded-lg"
           >
             Go Back
@@ -279,7 +303,7 @@ const TicketQuestionForm: React.FC = () => {
           <div className="flex items-center gap-3 mb-2">
             <button
               type="button"
-              onClick={() => navigate(`${supportBasePath}/customer-support`)}
+              onClick={goBackFromQuestions}
               className={[
                 UNIFORM_PAGE_HEADER_BACK_BUTTON_CLASS,
                 isDailySupport ? "text-[#FAA222]" : "",

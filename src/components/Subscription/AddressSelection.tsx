@@ -4,6 +4,7 @@ import { FaArrowLeft, FaCheck, FaPen, FaTimes, FaTrash } from "react-icons/fa";
 import { MdLocationOn, MdMyLocation } from "react-icons/md";
 import { IoArrowBack } from "react-icons/io5";
 import { toast } from "react-hot-toast";
+import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
 import { addressService, Address } from "../../services/address.service";
 import { GoogleMap } from "@react-google-maps/api";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
@@ -608,11 +609,7 @@ const AddressSelection: React.FC = () => {
           return;
         }
       } else {
-        toast.error(
-          location.state?.fromCart
-            ? "Save your current location as an address to use it for checkout."
-            : "Save your current location as an address to use it for delivery.",
-        );
+        toast.error(REQUIRED_TOAST.GPS_NOT_SAVED);
         return;
       }
     }
@@ -641,7 +638,7 @@ const AddressSelection: React.FC = () => {
         const msg =
           err instanceof Error
             ? err.message
-            : "Could not update location. Try again.";
+            : REQUIRED_TOAST.FAILED_SWITCH_ADDRESS;
         toast.error(msg);
       }
       return;

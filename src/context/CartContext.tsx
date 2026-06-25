@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef, ReactNode } fro
 import toast from 'react-hot-toast';
 import { cartService } from '../services/cart.service';
 import { storeService } from '../services/store.service';
+import { REQUIRED_TOAST } from '../constants/requiredToastMessages';
 import { errorMessageFromCatch } from '../utils/apiErrorMessage';
 
 export interface CartItem {
@@ -169,11 +170,15 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       
       if (token && existingItem.apiCartItemId) {
         try {
-          await cartService.updateCartItem(existingItem.apiCartItemId, newQuantity);
+          await cartService.updateCartItem(
+            existingItem.apiCartItemId,
+            newQuantity,
+            existingItem.customizedMessage,
+          );
         } catch (error) {
           console.error('Error updating cart item in API:', error);
           setItems(snapshot);
-          toast.error(errorMessageFromCatch(error, 'Could not update basket'));
+          toast.error(errorMessageFromCatch(error, REQUIRED_TOAST.COULD_NOT_UPDATE_BASKET));
         }
       } else if (token && existingItem.productId) {
         try {
@@ -187,7 +192,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             console.error('Store ID not available - item updated in local cart only');
             console.log('Token exists:', !!token, 'ProductId:', existingItem.productId);
             setItems(snapshot);
-            toast.error('Choose a store to update your basket');
+            toast.error(REQUIRED_TOAST.CHOOSE_STORE_BEFORE_BASKET);
             return;
           }
           console.log('Adding to cart with storeId:', storeId, 'productId:', existingItem.productId);
@@ -203,7 +208,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         } catch (error) {
           console.error('Error adding cart item to API:', error);
           setItems(snapshot);
-          toast.error(errorMessageFromCatch(error, 'Could not update basket'));
+          toast.error(errorMessageFromCatch(error, REQUIRED_TOAST.COULD_NOT_UPDATE_BASKET));
         }
       }
     } else {
@@ -235,7 +240,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             console.log('Token exists:', !!token, 'SelectedStoreId:', storeService.getSelectedStoreId(), 'TemporaryStoreId:', storeService.getTemporaryStoreId());
             pendingAddsRef.current.delete(newItem.id);
             setItems((prev) => prev.filter((i) => i.id !== newItem.id));
-            toast.error('Choose a store to add items to your basket');
+            toast.error(REQUIRED_TOAST.CHOOSE_STORE_BEFORE_BASKET);
             return;
           }
           console.log('Calling addToCart API with storeId:', storeId, 'productId:', newItem.productId, 'quantity:', newItem.quantity);
@@ -271,7 +276,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
           console.error('Error adding cart item to API:', error);
           pendingAddsRef.current.delete(newItem.id);
           setItems((prev) => prev.filter((i) => i.id !== newItem.id));
-          toast.error(errorMessageFromCatch(error, 'Could not add to basket'));
+          toast.error(errorMessageFromCatch(error, REQUIRED_TOAST.FAILED_ADD_TO_BASKET));
         }
       }
     }
@@ -631,7 +636,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
           // Item exists in API - update it
           const cartItemId = item.apiCartItemId || apiItem!.cart_item_id;
           try {
-            await cartService.updateCartItem(cartItemId, item.quantity);
+            await cartService.updateCartItem(
+              cartItemId,
+              item.quantity,
+              item.customizedMessage,
+            );
             // Update local item with API cart item ID if not set
             if (!item.apiCartItemId) {
               setItems(prevItems =>

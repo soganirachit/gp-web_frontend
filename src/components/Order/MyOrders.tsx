@@ -21,6 +21,7 @@ import {
   looksLikeOrderNumberLabel,
   resolveOrderListCardTitle,
 } from '../../utils/orderListDisplay';
+import { hydrateMissingCustomerOrders } from '../../utils/customerOrderHistoryCache';
 import { OrderListThumb } from './OrderListThumb';
 
 const ORDER_LIST_PAGE_SIZE = 6;
@@ -167,7 +168,13 @@ const MyOrders: React.FC = () => {
       const { orders: raw, nextUrl } = await orderService.getOrdersFirstPage(
         subscriptionListOnly ? { order_type: "subscription" } : undefined,
       );
-      const rawRecords = ((raw || []) as Record<string, unknown>[]);
+      const hydratedRaw = subscriptionListOnly
+        ? raw
+        : await hydrateMissingCustomerOrders(
+            (raw || []) as Record<string, unknown>[],
+            (num) => orderService.getOrderByOrderNumber(num),
+          );
+      const rawRecords = (hydratedRaw || []) as Record<string, unknown>[];
       await enrichOrdersForList(rawRecords);
       const transformedOrders = mapRawToOrders(rawRecords);
       const sortedOrders = transformedOrders.sort(

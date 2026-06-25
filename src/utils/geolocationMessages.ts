@@ -1,10 +1,13 @@
 /**
  * User-facing copy for browser geolocation + map flows (web vs device GPS).
- * Web logins often get coarse / VPN / wrong positions — guide users to search instead of crashing silently.
  */
 
-export const GEO_MSG_PERMISSION =
-  "We can't access your location. Allow location in your browser settings, or search and pick your address on the map.";
+import { REQUIRED_TOAST } from "../constants/requiredToastMessages";
+
+export const GEO_MSG_PERMISSION = REQUIRED_TOAST.LOCATION_PERMISSION_DENIED_STILL_MANUAL;
+export const GEO_MSG_PERMISSION_SHORT = REQUIRED_TOAST.LOCATION_PERMISSION_DENIED_MANUAL;
+export const GEO_MSG_TURN_ON = REQUIRED_TOAST.TURN_ON_LOCATION;
+export const GEO_MSG_COULD_NOT_USE = REQUIRED_TOAST.COULD_NOT_USE_CURRENT_LOCATION;
 
 export const GEO_MSG_TIMEOUT =
   "Location timed out (often a weak network). Try again, or search for your address on the map.";
@@ -21,20 +24,22 @@ export const GEO_MSG_NETWORK =
 export const GEO_MSG_GEOCODE_EMPTY =
   "We couldn't resolve that spot to an address. Move the pin or search for your address — web location can be inaccurate.";
 
-/** `GeolocationPositionError.code`: 1 PERMISSION_DENIED, 2 POSITION_UNAVAILABLE, 3 TIMEOUT */
 export function messageFromGeolocationPositionError(
   err: Pick<GeolocationPositionError, "code"> | null | undefined,
+  variant: "address_form" | "choose_location" = "address_form",
 ): string {
-  if (err == null) return GEO_MSG_UNAVAILABLE;
+  if (err == null) return REQUIRED_TOAST.FAILED_GET_LOCATION;
   switch (err.code) {
     case 1:
-      return GEO_MSG_PERMISSION;
+      return variant === "choose_location"
+        ? REQUIRED_TOAST.TURN_ON_LOCATION
+        : REQUIRED_TOAST.LOCATION_PERMISSION_DENIED_STILL_MANUAL;
     case 2:
-      return GEO_MSG_UNAVAILABLE;
+      return REQUIRED_TOAST.FAILED_GET_LOCATION;
     case 3:
-      return GEO_MSG_TIMEOUT;
+      return REQUIRED_TOAST.FAILED_GET_LOCATION;
     default:
-      return GEO_MSG_UNAVAILABLE;
+      return REQUIRED_TOAST.FAILED_GET_LOCATION;
   }
 }
 

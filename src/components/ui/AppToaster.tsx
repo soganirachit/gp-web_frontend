@@ -28,24 +28,34 @@ export function AppToaster() {
       __reviewPolicyPatched?: boolean;
       __origSuccess?: typeof toast.success;
       __origError?: typeof toast.error;
+      __origToast?: (message: any, options?: ToastOptions) => string;
     };
     if (bag.__reviewPolicyPatched) return;
 
     bag.__origSuccess = toast.success.bind(toast);
     bag.__origError = toast.error.bind(toast);
+    bag.__origToast = toast.bind(toast);
+
+    const guardMessage = (message: unknown): boolean =>
+      typeof message !== 'string' || isApprovedGlobalToastMessage(message);
 
     toast.success = (message: any, options?: ToastOptions) => {
-      if (typeof message === 'string' && !isApprovedGlobalToastMessage(message)) {
-        return '' as any;
-      }
+      if (!guardMessage(message)) return '' as any;
       return bag.__origSuccess!(message, options);
     };
     toast.error = (message: any, options?: ToastOptions) => {
-      if (typeof message === 'string' && !isApprovedGlobalToastMessage(message)) {
-        return '' as any;
-      }
+      if (!guardMessage(message)) return '' as any;
       return bag.__origError!(message, options);
     };
+
+    const guardedDefault = (message: any, options?: ToastOptions) => {
+      if (!guardMessage(message)) return '' as any;
+      return bag.__origToast!(message, options);
+    };
+    Object.assign(guardedDefault, toast);
+    guardedDefault.success = toast.success;
+    guardedDefault.error = toast.error;
+    Object.assign(toast, guardedDefault);
 
     bag.__reviewPolicyPatched = true;
   }, []);

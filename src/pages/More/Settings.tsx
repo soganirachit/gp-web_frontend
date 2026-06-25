@@ -18,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { cartService, CartSwitchStoreResponse } from '../../services/cart.service';
 import { toast } from 'react-hot-toast';
+import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
 import { editCustomerService } from '../../services/editcustomer.service';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
@@ -471,7 +472,7 @@ const Settings: React.FC = () => {
           console.error('Cart switch-store:', cartErr);
           const msg =
             cartErr instanceof Error ? cartErr.message : 'Cart could not be updated for this store.';
-          toast.error(`${msg} Try opening your basket to refresh.`);
+          toast.error(REQUIRED_TOAST.COULD_NOT_UPDATE_BASKET_STORE);
           await loadCartFromAPI().catch(() => {});
           setShowStoreSwitchWarning(false);
           setPendingStoreId(null);
@@ -492,7 +493,8 @@ const Settings: React.FC = () => {
       setPendingStoreName('');
     } catch (err: any) {
       console.error("Error switching store:", err);
-      setError(err.message || "Failed to switch store");
+      toast.error(err.message || REQUIRED_TOAST.FAILED_SWITCH_STORE);
+      setError(err.message || REQUIRED_TOAST.FAILED_SWITCH_STORE);
       setShowStoreSwitchWarning(false);
       setPendingStoreId(null);
       setPendingStoreName('');

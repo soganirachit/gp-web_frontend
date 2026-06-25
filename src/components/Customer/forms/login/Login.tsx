@@ -12,6 +12,8 @@ import { useFeatureTheme } from "../../../../context/FeatureThemeContext";
 import Spinner from "../../../common/Spinner";
 import { openPrivacyPolicy, openTermsOfService } from "../../../../utils/openLegalDocument";
 import { errorMessageFromCatch } from "../../../../utils/apiErrorMessage";
+import { toast } from "react-hot-toast";
+import { REQUIRED_TOAST } from "../../../../constants/requiredToastMessages";
 
 const Login = () => {
     const [phoneNumber, setPhoneNumber] = useState("");
@@ -74,14 +76,17 @@ const Login = () => {
             }
 
             if (result.whatsapp_status === "failed") {
-                setError(result.message || "OTP delivery failed. Please tap Resend in a moment.");
+                setError(result.message || REQUIRED_TOAST.OTP_DELIVERY_FAILED);
+                toast(REQUIRED_TOAST.OTP_DELIVERY_FAILED, { id: "otp-delivery-failed" });
             } else if (result.whatsapp_status === "not_configured") {
                 setError(
                     result.message ||
                         "WhatsApp is not configured. If you do not receive a code, tap Resend or try another number.",
                 );
             } else {
-                setFieldNote(result.message || "OTP sent to your WhatsApp");
+                const sentMsg = result.message || REQUIRED_TOAST.OTP_SENT_WHATSAPP;
+                setFieldNote(sentMsg);
+                toast.success(REQUIRED_TOAST.OTP_SENT_WHATSAPP);
             }
 
             const otpPath = `${basePath}/otp-verification`;
@@ -105,7 +110,7 @@ const Login = () => {
                 if (match) {
                     const seconds = parseInt(match[1]);
                     const minutes = Math.ceil(seconds / 60);
-                    errorMessage = `Too many requests. Please wait ${minutes} minute${minutes > 1 ? 's' : ''} before requesting another OTP.`;
+                    errorMessage = REQUIRED_TOAST.TOO_MANY_REQUESTS;
                 } else {
                     errorMessage = "Too many OTP requests. Please wait a few minutes before trying again.";
                 }

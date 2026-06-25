@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { authService } from "../../../../services/auth.service";
 import { FaStar, FaRedo, FaHeadset, FaTag } from "react-icons/fa";
+import { toast } from "react-hot-toast";
+import { REQUIRED_TOAST } from "../../../../constants/requiredToastMessages";
 import { useFeatureTheme } from "../../../../context/FeatureThemeContext";
 
 const NameInput: React.FC = () => {
@@ -25,36 +27,41 @@ const NameInput: React.FC = () => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
   };
 
+  const showValidationError = (message: string) => {
+    setError(message);
+    toast.error(message);
+  };
+
   const handleSubmit = async () => {
     console.log("handleSubmit called");
 
     if (!firstName.trim()) {
-      setError("Please enter your first name");
+      showValidationError(REQUIRED_TOAST.ENTER_FIRST_NAME);
       return;
     }
 
     if (!lastName.trim()) {
-      setError("Please enter your last name");
+      showValidationError(REQUIRED_TOAST.ENTER_LAST_NAME);
       return;
     }
 
     if (!email.trim()) {
-      setError("Please enter your email");
+      showValidationError(REQUIRED_TOAST.ENTER_EMAIL);
       return;
     }
 
     if (!isValidEmail(email)) {
-      setError("Enter valid email");
+      showValidationError(REQUIRED_TOAST.ENTER_EMAIL);
       return;
     }
 
     if (!gender) {
-      setError("Please select your gender");
+      showValidationError(REQUIRED_TOAST.SELECT_GENDER);
       return;
     }
 
     if (gender === "other" && !customGender.trim()) {
-      setError("Please specify your gender");
+      showValidationError(REQUIRED_TOAST.SPECIFY_GENDER);
       return;
     }
 
@@ -103,14 +110,15 @@ const NameInput: React.FC = () => {
       }
     } catch (err: any) {
       console.log("Error in onboarding:", err);
-      let errorMessage =
-        err.message || "Failed to save details. Please try again.";
+      let errorMessage = err.message || REQUIRED_TOAST.FAILED_SAVE_DETAILS;
 
       // Backend may return a generic "validation error" for invalid email.
       if (typeof errorMessage === "string" && errorMessage.toLowerCase().includes("validation error")) {
-        errorMessage = "Enter valid email";
+        errorMessage = REQUIRED_TOAST.ENTER_EMAIL;
       }
+
       setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

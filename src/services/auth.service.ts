@@ -1,4 +1,5 @@
 import axios from "axios";
+import { REQUIRED_TOAST } from "../constants/requiredToastMessages";
 import { errorMessageFromParsedBody, errorMessageFromCatch } from "../utils/apiErrorMessage";
 
 const API_URL = import.meta.env.VITE_API_BASE_URL
@@ -63,8 +64,9 @@ export interface OtpDeliveryStatusData {
   message?: string;
 }
 
-export const OTP_NOT_ON_WHATSAPP_MESSAGE =
-  "This number is not registered on WhatsApp. Please use a WhatsApp-enabled number to log in.";
+export const OTP_NOT_ON_WHATSAPP_MESSAGE = REQUIRED_TOAST.NOT_ON_WHATSAPP_LOGIN;
+
+export const OTP_NOT_ON_WHATSAPP_POLL_MESSAGE = REQUIRED_TOAST.NOT_ON_WHATSAPP_POLL;
 
 function getNotOnWhatsappMessage(message?: string): string {
   const msg = (message || "").trim();

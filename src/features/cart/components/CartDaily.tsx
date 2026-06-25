@@ -42,7 +42,10 @@ import {
   GP_DAILY_ZONE_CHECK_ERROR_TOAST,
   GP_DAILY_ZONE_STALE_TOAST,
   GP_DAILY_STORE_UPDATED_TOAST,
+  GP_DAILY_ADDRESS_OUTSIDE_ZONE_TOAST,
+  GP_DAILY_DELIVERY_DETAILS_ERROR_TOAST,
 } from '../../../utils/gpDailyCustomerMessages';
+import { REQUIRED_TOAST } from '../../../constants/requiredToastMessages';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow, startOfDay } from 'date-fns';
@@ -304,7 +307,7 @@ interface Coupon {
   eligible_for_gp_daily?: boolean;
 }
 
-const DAILY_PROMO_INVALID_MESSAGE = "This promo is not valid on Genda Phool Daily.";
+const DAILY_PROMO_INVALID_MESSAGE = REQUIRED_TOAST.PROMO_NOT_VALID_DAILY;
 const DAILY_PROMO_INVALID_CODE = "PROMO_NOT_VALID_DAILY";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -732,7 +735,7 @@ const Cart: React.FC = () => {
         return true;
       } catch (e: unknown) {
         toast.error(
-          errorMessageFromCatch(e, 'Could not set delivery address for subscription cart.'),
+          errorMessageFromCatch(e, GP_DAILY_DELIVERY_DETAILS_ERROR_TOAST),
           { id: `sub-cart-set-address:${addressId}` },
         );
         return false;
@@ -1218,6 +1221,7 @@ const Cart: React.FC = () => {
       setAppliedPromoCode(code);
       appliedPromoCodeRef.current = code;
       await refreshDailyCart();
+      toast.success(REQUIRED_TOAST.COUPON_APPLIED);
       return {
         successMessage: typeof response.message === 'string' ? response.message.trim() : undefined,
       };
@@ -1225,7 +1229,7 @@ const Cart: React.FC = () => {
       if (error?.message === DAILY_PROMO_INVALID_CODE) {
         throw new Error(DAILY_PROMO_INVALID_MESSAGE);
       }
-      throw new Error(error?.message || 'Failed to apply promo code');
+      throw new Error(error?.message || REQUIRED_TOAST.COUPON_NOT_APPLICABLE);
     } finally {
       setIsApplyingPromo(false);
     }
@@ -1240,12 +1244,15 @@ const Cart: React.FC = () => {
       appliedPromoCodeRef.current = null;
       setPromoDiscount(0);
       await refreshDailyCart();
-      setPromoInlineMessage({ kind: "success", text: "Coupon removed" });
+      setPromoInlineMessage({ kind: "success", text: REQUIRED_TOAST.COUPON_REMOVED });
+      toast.success(REQUIRED_TOAST.COUPON_REMOVED);
     } catch (error: any) {
+      const promoMsg = error.message || REQUIRED_TOAST.FAILED_REMOVE_PROMO;
       setPromoInlineMessage({
         kind: "error",
-        text: error.message || "Failed to remove promo code.",
+        text: promoMsg,
       });
+      toast.error(promoMsg);
     } finally {
       setIsApplyingPromo(false);
     }
@@ -1904,7 +1911,7 @@ const Cart: React.FC = () => {
         }));
       } else {
         toast.error(
-          apiMessage.trim() || errorMessageFromCatch(error, 'Could not update quantity.'),
+          apiMessage.trim() || errorMessageFromCatch(error, REQUIRED_TOAST.COULD_NOT_UPDATE_ITEM),
         );
       }
     }
@@ -1963,6 +1970,10 @@ const Cart: React.FC = () => {
 
   const handleCheckout = async () => {
     setCheckoutInlineError(null);
+    if (!navigator.onLine) {
+      toast.error(REQUIRED_TOAST.OFFLINE_CHECKOUT);
+      return;
+    }
     if (items.length === 0) { toast.error('Your cart is empty'); return; }
     if (hasStaleDailyLine) {
       toast.error('Remove unavailable items from your basket before checkout.');
@@ -1970,7 +1981,8 @@ const Cart: React.FC = () => {
     }
     if (activeDeliveryDayInts.length === 0) { toast.error('Please select delivery days'); return; }
     if (deliveryFrequency === 'Customize' && activeDeliveryDayInts.length < 3) {
-      setCheckoutInlineError('Please select at least 3 delivery days.');
+      setCheckoutInlineError(REQUIRED_TOAST.SELECT_THREE_DAYS);
+      toast.error(REQUIRED_TOAST.SELECT_THREE_DAYS);
       return;
     }
     if (!isLoggedIn) {
@@ -1979,18 +1991,26 @@ const Cart: React.FC = () => {
     }
 
     if (!defaultAddress) {
-      setCheckoutInlineError('Please add a delivery address from Address Book.');
+      setCheckoutInlineError(REQUIRED_TOAST.ADD_ADDRESS_FROM_BOOK);
+      toast.error(REQUIRED_TOAST.ADD_ADDRESS_FROM_BOOK);
       navigate(`${basePath}/addresses`);
       return;
     }
 
+    if (String(defaultAddress.id) === LIVE_DEVICE_ADDRESS_ID) {
+      toast.error(REQUIRED_TOAST.GPS_NOT_SAVED);
+      return;
+    }
+
     if (addressOutsideDelivery === true) {
+      toast.error(GP_DAILY_ADDRESS_OUTSIDE_ZONE_TOAST);
+      setCheckoutInlineError(GP_DAILY_ADDRESS_OUTSIDE_ZONE_TOAST);
       return;
     }
 
     if (storeOfflineBlocked) {
-      toast.error(STORE_OFFLINE_CART_BODY);
-      setCheckoutInlineError(STORE_OFFLINE_CART_BODY);
+      toast.error(REQUIRED_TOAST.STORE_OFFLINE);
+      setCheckoutInlineError(REQUIRED_TOAST.STORE_OFFLINE);
       return;
     }
 
@@ -2019,6 +2039,7 @@ const Cart: React.FC = () => {
           activeDeliveryDays: [...activeDeliveryDays],
         });
         setIsProcessingPayment(false);
+        toast.error(REQUIRED_TOAST.WALLET_LOW_SUBSCRIPTION);
         setInsufficientWalletModal({
           currentBalance: walletBalance,
           requiredAmount: cartAmount,
@@ -2179,7 +2200,7 @@ const Cart: React.FC = () => {
       if (!recovered) {
         // Payment was taken by Razorpay but we couldn't confirm the order.
         // Keep the pending payment in localStorage so it can be retried on next app load.
-        toast.error('Paid — order not confirmed. Check Orders or support.');
+        toast.error(REQUIRED_TOAST.PAYMENT_NOT_CONFIRMED);
       }
     }
 
@@ -2225,7 +2246,11 @@ const Cart: React.FC = () => {
   }, []);
 
   const handlePaymentError = (error: Error) => {
-    toast.error(error.message || 'Payment failed. Please try again.');
+    const cancelledByUser = /cancel/i.test(error.message || '');
+    if (!cancelledByUser) {
+      const msg = error.message?.trim() || REQUIRED_TOAST.PAYMENT_NOT_COMPLETED;
+      toast.error(/not charged|no charge/i.test(msg) ? REQUIRED_TOAST.PAYMENT_NOT_CHARGED : msg);
+    }
     setIsProcessingPayment(false);
     setIsConfirmingOrder(false);
     setShouldTriggerPayment(false);

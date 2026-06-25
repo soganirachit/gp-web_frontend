@@ -52,13 +52,14 @@ export function classifyNotificationModule(type: string): NotificationModule {
   ) {
     return "subscriptions";
   }
-  if (
-    t.includes("wallet") ||
-    t.includes("payment") ||
-    t.includes("recharge") ||
-    t.includes("credit")
-  ) {
+  if (t.includes("wallet") || t.includes("payment") || t.includes("recharge") || t.includes("credit")) {
     return "payments";
+  }
+  if (t.startsWith("payment_")) {
+    return "payments";
+  }
+  if (t.includes("feedback")) {
+    return "support";
   }
   if (t.includes("support") || t.includes("ticket")) return "support";
   if (t.includes("cart") || t.includes("abandon") || t.includes("basket")) {
@@ -69,6 +70,21 @@ export function classifyNotificationModule(type: string): NotificationModule {
   }
   if (t.includes("promo") || t.includes("campaign") || t.includes("marketing")) {
     return t.includes("campaign") ? "campaigns" : "marketing";
+  }
+  if (
+    t.includes("engagement") ||
+    t.startsWith("engagement_") ||
+    t.includes("we_miss_you") ||
+    t.includes("reorder_reminder") ||
+    t.includes("inactive_customer")
+  ) {
+    return "marketing";
+  }
+  if (t.includes("festival") || t.startsWith("festival_")) {
+    return "campaigns";
+  }
+  if (t.startsWith("marketing_")) {
+    return "marketing";
   }
   if (t.includes("deliver") || t.includes("out_for") || t.includes("shipped")) {
     return "delivery";
@@ -130,6 +146,11 @@ export function routeNotificationDeepLink(
 
   if (module === "payments" || t.includes("wallet")) {
     go(`${root}/wallet`);
+    return true;
+  }
+
+  if (t.startsWith("subscription_") || t === "subscription") {
+    go(`${root}/manage-my-subscription`);
     return true;
   }
 

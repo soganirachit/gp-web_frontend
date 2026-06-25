@@ -20,6 +20,8 @@ import {
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow, startOfDay } from 'date-fns';
+import { rememberCustomerOrderNumber } from '../../../utils/customerOrderHistoryCache';
+import type { OrderConfirmationSnapshot } from '../../../utils/orderConfirmationDisplay';
 import toast from 'react-hot-toast';
 import CartRazorpayPayment from '../../../components/Payment/Razorpay/CartRazorpayPayment';
 import { paymentService } from '../../../services/payment.service';
@@ -49,6 +51,8 @@ import {
   isCartStockOrAvailabilityInlineError,
 } from '../../../utils/cartStockInlineMessage';
 import { DELIVERY_DATE_MAX_DAYS_FROM_TODAY } from '../../../constants/deliveryBooking';
+import { REQUIRED_TOAST } from '../../../constants/requiredToastMessages';
+import { LIVE_DEVICE_ADDRESS_ID } from '../../../utils/addressCoordinates';
 import {
   getSlotWindowMinutes,
   isDeliverySlotSelectableForDate,
@@ -60,8 +64,7 @@ import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
  * navigation that includes `addressUpdated`, then still clear location.state.
  */
 let addressUpdatedToastConsumed = false;
-const DELIVERY_DATE_LIMIT_MESSAGE_TEMPLATE =
-  'Please choose a delivery date within the next {N} days.';
+const DELIVERY_DATE_LIMIT_MESSAGE_TEMPLATE = REQUIRED_TOAST.DELIVERY_DATE_WITHIN_N;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -556,6 +559,8 @@ const Cart: React.FC = () => {
   const [razorpayAmount, setRazorpayAmount] = useState<number>(0);
   const [customerInfo, setCustomerInfo] = useState<{ name?: string; email?: string; contact?: string }>({});
   const paymentButtonRef = useRef<HTMLButtonElement | null>(null);
+  const checkoutInFlightRef = useRef(false);
+  const pendingConfirmationRef = useRef<OrderConfirmationSnapshot | null>(null);
 
   // Promo code state
   const [showPromoModal, setShowPromoModal] = useState(false);
@@ -776,16 +781,19 @@ const Cart: React.FC = () => {
       }
 
       setAppliedPromoCode(code);
-      setPromoInlineMessage({ kind: 'success', text: 'Coupon applied successfully' });
+      setPromoInlineMessage({ kind: 'success', text: REQUIRED_TOAST.COUPON_APPLIED });
+      toast.success(REQUIRED_TOAST.COUPON_APPLIED);
       return {
         successMessage: typeof response.message === 'string' ? response.message.trim() : undefined,
       };
     } catch (error: any) {
+      const promoMsg = error?.message || REQUIRED_TOAST.COUPON_NOT_APPLICABLE;
       setPromoInlineMessage({
         kind: 'error',
-        text: error?.message || 'Failed to apply promo code',
+        text: promoMsg,
       });
-      throw new Error(error?.message || 'Failed to apply promo code');
+      toast.error(promoMsg);
+      throw new Error(promoMsg);
     } finally {
       setIsApplyingPromo(false);
     }
@@ -801,12 +809,15 @@ const Cart: React.FC = () => {
       const raw = await cartService.getCartData();
       const cartData = await reconcileCartStoreWithAccountSelection(raw);
       applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
-      setPromoInlineMessage({ kind: 'success', text: 'Coupon removed' });
+      setPromoInlineMessage({ kind: 'success', text: REQUIRED_TOAST.COUPON_REMOVED });
+      toast.success(REQUIRED_TOAST.COUPON_REMOVED);
     } catch (error: any) {
+      const promoMsg = error.message || REQUIRED_TOAST.FAILED_REMOVE_PROMO;
       setPromoInlineMessage({
         kind: 'error',
-        text: error.message || 'Failed to remove promo code',
+        text: promoMsg,
       });
+      toast.error(promoMsg);
     } finally {
       setIsApplyingPromo(false);
     }
@@ -852,16 +863,33 @@ const Cart: React.FC = () => {
   useEffect(() => {
     if (!shouldTriggerPayment) return;
     let cancelled = false;
+    const openRazorpay = (attempt = 0) => {
+      if (cancelled) return;
+      const btn = paymentButtonRef.current;
+      if (btn && !btn.disabled) {
+        btn.click();
+        return;
+      }
+      if (attempt < 8) {
+        window.setTimeout(() => openRazorpay(attempt + 1), 50);
+      } else {
+        toast.error('Payment could not start. Please tap Checkout again.');
+        setShouldTriggerPayment(false);
+        setIsProcessingPayment(false);
+        checkoutInFlightRef.current = false;
+      }
+    };
     (async () => {
       try {
         await loadRazorpayScript();
         if (cancelled) return;
-        requestAnimationFrame(() => paymentButtonRef.current?.click());
+        requestAnimationFrame(() => openRazorpay());
       } catch (e) {
         if (cancelled) return;
         toast.error(e instanceof Error ? e.message : 'Payment could not start. Please try again.');
         setShouldTriggerPayment(false);
         setIsProcessingPayment(false);
+        checkoutInFlightRef.current = false;
       }
     })();
     return () => {
@@ -1444,7 +1472,11 @@ const Cart: React.FC = () => {
       setEditingItemId(null);
       toast.success('Message updated');
     } catch (error: unknown) {
-      toast.error(errorMessageFromCatch(error, "Failed to update message. Please try again."));
+      const fallback =
+        feature === 'gpStore'
+          ? REQUIRED_TOAST.FAILED_UPDATE_MESSAGE
+          : REQUIRED_TOAST.COULD_NOT_UPDATE_MESSAGE;
+      toast.error(errorMessageFromCatch(error, fallback));
     }
   };
 
@@ -1484,7 +1516,7 @@ const Cart: React.FC = () => {
     const next = Math.max(1, item.quantity + delta);
     if (next === item.quantity && delta < 0) return;
     try {
-      await updateQuantity(itemId, next, item.customizedMessage || '');
+      await updateQuantity(itemId, next, item.customizedMessage);
       setLineCartStaleByItemId((prev) => {
         const n = { ...prev };
         delete n[itemId];
@@ -1513,7 +1545,7 @@ const Cart: React.FC = () => {
         }));
       } else {
         toast.error(
-          apiMessage.trim() || errorMessageFromCatch(error, 'Could not update quantity.'),
+          apiMessage.trim() || errorMessageFromCatch(error, REQUIRED_TOAST.COULD_NOT_UPDATE_ITEM),
         );
       }
     }
@@ -1576,9 +1608,48 @@ const Cart: React.FC = () => {
     setShowSuggestedStoreSwitchModal(false);
   };
 
+  const buildConfirmationSnapshot = (
+    deliveryDateFormatted: string | undefined,
+    orderTotal: number,
+  ): OrderConfirmationSnapshot => {
+    const slot =
+      selectedSlotId != null
+        ? availableSlots.find((s) => s.id === selectedSlotId)
+        : undefined;
+    return {
+      items: items.map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        categoryName: item.categorySlug
+          ? item.categorySlug.replace(/-/g, ' ')
+          : undefined,
+        customizedMessage: item.customizedMessage,
+      })),
+      delivery_address: defaultAddress
+        ? (defaultAddress as unknown as Record<string, unknown>)
+        : null,
+      delivery_date: deliveryDateFormatted ?? null,
+      delivery_time_slot: selectedTimeSlot || slot?.slot_name || null,
+      delivery_slot_info: slot
+        ? {
+            id: slot.id,
+            slot_name: slot.slot_name,
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+          }
+        : null,
+      total_amount: orderTotal.toFixed(2),
+    };
+  };
+
   const handleCheckout = async () => {
+    if (checkoutInFlightRef.current || isProcessingPayment || isConfirmingOrder) return;
     setCheckoutInlineError(null);
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
+    if (!navigator.onLine) {
+      toast.error(REQUIRED_TOAST.OFFLINE_CHECKOUT);
+      return;
+    }
     if (items.length === 0) { toast.error('Your cart is empty'); return; }
     if (hasStaleCartLine) {
       toast.error('Remove unavailable items from your basket before checkout.');
@@ -1606,29 +1677,35 @@ const Cart: React.FC = () => {
       return;
     }
 
-    if (!defaultAddress) { toast.error('Please add a delivery address'); navigate(`${basePath}/addresses`); return; }
+    if (!defaultAddress) {
+      toast.error(REQUIRED_TOAST.CHOOSE_DELIVERY_ADDRESS_CHECKOUT);
+      navigate(`${basePath}/addresses`);
+      return;
+    }
+
+    if (String(defaultAddress.id) === LIVE_DEVICE_ADDRESS_ID) {
+      toast.error(REQUIRED_TOAST.GPS_NOT_SAVED);
+      return;
+    }
 
     if (addressOutsideDelivery === true) {
-      toast.error(
-        'We are not delivering to this address from your current store. Open Account to change store, or choose a different address.',
-      );
+      toast.error(REQUIRED_TOAST.NOT_DELIVERING_FROM_STORE);
       return;
     }
 
     if (suggestedStoreForAddress) {
-      toast.error(
-        'Use "Switch store" below for this delivery address, or choose another address.',
-      );
+      toast.error(REQUIRED_TOAST.USE_SWITCH_STORE);
       return;
     }
     if (deliveryStoreOffline) {
-      toast.error(STORE_OFFLINE_CART_BODY);
-      setCheckoutInlineError(STORE_OFFLINE_CART_BODY);
+      toast.error(REQUIRED_TOAST.STORE_OFFLINE);
+      setCheckoutInlineError(REQUIRED_TOAST.STORE_OFFLINE);
       return;
     }
 
     if (!selectedSlotId) {
-      setCheckoutInlineError('Please choose an available delivery time slot.');
+      setCheckoutInlineError(REQUIRED_TOAST.CHOOSE_TIME_SLOT);
+      toast.error(REQUIRED_TOAST.CHOOSE_TIME_SLOT);
       return;
     }
 
@@ -1677,9 +1754,7 @@ const Cart: React.FC = () => {
           );
           const currentRow = storesList.find((s) => s.id === storeIdForCheckout);
           if (!(currentRow && storeIsWithinDeliveryRadius(currentRow))) {
-            toast.error(
-              'Use "Switch store" below for this delivery address, or choose another address.',
-            );
+            toast.error(REQUIRED_TOAST.USE_SWITCH_STORE);
             return;
           }
         }
@@ -1696,9 +1771,7 @@ const Cart: React.FC = () => {
         const nearestAny = sorted[0];
         if (nearestAny?.is_online === false) {
           setDeliveryStoreOffline(true);
-          toast.error(
-            'Sorry — the nearest store for this address is offline.',
-          );
+          toast.error(REQUIRED_TOAST.NEAREST_STORE_OFFLINE);
           return;
         }
         setDeliveryStoreOffline(false);
@@ -1711,7 +1784,7 @@ const Cart: React.FC = () => {
       const storeRow = storesNearAddress.find((s) => s.id === storeIdForCheckout);
       if (storeRow && storeRow.is_online === false) {
         setDeliveryStoreOffline(true);
-        toast.error('Sorry — this store is currently offline.');
+        toast.error(REQUIRED_TOAST.STORE_OFFLINE);
         return;
       }
     } catch (e: unknown) {
@@ -1719,6 +1792,7 @@ const Cart: React.FC = () => {
       return;
     }
 
+    checkoutInFlightRef.current = true;
     try {
       setIsProcessingPayment(true);
       let deliveryDateFormatted: string | undefined;
@@ -1728,17 +1802,11 @@ const Cart: React.FC = () => {
         try { deliveryDateFormatted = format(new Date(deliveryInfo.deliveryDate), 'yyyy-MM-dd'); }
         catch { deliveryDateFormatted = format(addDays(new Date(), 1), 'yyyy-MM-dd'); }
       }
-      const customerNotesFromCart = items
-        .map((i) => (i.customizedMessage || '').trim())
-        .filter(Boolean)
-        .join('\n');
-
       const checkoutData = {
         delivery_address_id: Number(defaultAddress.id),
         delivery_slot_id: selectedSlotId,
         delivery_date: deliveryDateFormatted,
         delivery_instructions: '',
-        customer_notes: customerNotesFromCart,
       };
       const checkoutResponse = await paymentService.createCheckoutOrder(checkoutData);
       const normalizedRazorpayOrderId = checkoutResponse.razorpay_order_id || (checkoutResponse as any).order?.id || checkoutResponse.order_id;
@@ -1746,6 +1814,10 @@ const Cart: React.FC = () => {
       const rpKey = checkoutResponse.key_id || import.meta.env.VITE_RAZORPAY_KEY || '';
       if (!rpKey) throw new Error('Razorpay key not found.');
       if (!normalizedRazorpayOrderId) throw new Error('Failed to start payment: missing Razorpay order id.');
+      pendingConfirmationRef.current = buildConfirmationSnapshot(
+        deliveryDateFormatted,
+        total,
+      );
       setRazorpayOrderId(normalizedRazorpayOrderId);
       setRazorpayKey(rpKey);
       setRazorpayAmount(typeof normalizedAmount === 'number' ? normalizedAmount : Math.round(total * 100));
@@ -1763,22 +1835,29 @@ const Cart: React.FC = () => {
           : 'Failed to initiate payment. Please try again.';
       toast.error(msg);
       setIsProcessingPayment(false);
+      checkoutInFlightRef.current = false;
     }
   };
 
   // Shared logic: given verified order/payment data, clear cart and navigate to success
   const finalizeOrder = (orderNumber: string, amount: number) => {
+    checkoutInFlightRef.current = false;
+    rememberCustomerOrderNumber(orderNumber);
     // Pixel: Purchase — fired once per successful order
     trackPurchase(
       orderNumber,
       items.map(item => ({ id: item.productId, price: item.price, quantity: item.quantity })),
       amount
     );
+    const snapshot =
+      pendingConfirmationRef.current ??
+      buildConfirmationSnapshot(undefined, amount);
+    pendingConfirmationRef.current = null;
     clearCart();
     toast.success('Order placed successfully!');
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
     navigate(`${basePath}/payment-success`, {
-      state: { orderId: orderNumber, orderNumber, amount },
+      state: { orderId: orderNumber, orderNumber, amount, snapshot },
     });
   };
 
@@ -1847,7 +1926,7 @@ const Cart: React.FC = () => {
       if (!recovered) {
         // Payment was taken by Razorpay but we couldn't confirm the order.
         // Keep the pending payment in localStorage so it can be retried on next app load.
-        toast.error('Paid — order not confirmed. Check Orders or support.');
+        toast.error(REQUIRED_TOAST.PAYMENT_NOT_CONFIRMED);
       }
     }
 
@@ -1893,10 +1972,17 @@ const Cart: React.FC = () => {
   }, []);
 
   const handlePaymentError = (error: Error) => {
-    toast.error(error.message || 'Payment failed. Please try again.');
+    const cancelledByUser = /cancel/i.test(error.message || '');
+    if (!cancelledByUser) {
+      const msg = error.message?.trim() || REQUIRED_TOAST.PAYMENT_NOT_COMPLETED;
+      toast.error(
+        /not charged|no charge/i.test(msg) ? REQUIRED_TOAST.PAYMENT_NOT_CHARGED : msg,
+      );
+    }
     setIsProcessingPayment(false);
     setIsConfirmingOrder(false);
     setShouldTriggerPayment(false);
+    checkoutInFlightRef.current = false;
   };
 
   // Order summary
@@ -2458,14 +2544,7 @@ const Cart: React.FC = () => {
                     </div>
                   )}
                   <div className="flex justify-between text-sm text-gray-700">
-                    <span className="inline-flex flex-col gap-0.5">
-                      <span>Delivery fee</span>
-                      {deliveryFee === 0 && deliveryAddressId === null && (
-                        <span className="text-[11px] font-normal text-gray-400">
-                          Confirmed when your delivery address is set on this cart.
-                        </span>
-                      )}
-                    </span>
+                    <span>Delivery fee</span>
                     <span>₹{deliveryFee.toLocaleString('en-IN')}</span>
                   </div>
                   <div className="flex justify-between text-sm text-gray-700">

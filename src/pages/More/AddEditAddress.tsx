@@ -24,6 +24,7 @@ import {
   isLikelyNetworkError,
   messageFromGeolocationPositionError,
 } from '../../utils/geolocationMessages';
+import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
 import type { MapPinAnchor } from '../../utils/validateTypedAddressMatchesMapPin';
 
 /** When Google Geocoding REST is unavailable or returns nothing, fill fields from OSM (usage policy: identify app). */
@@ -268,22 +269,29 @@ const AddEditAddress: React.FC = () => {
     mapRef.current = null;
   }, []);
 
+  const showValidationToast = (message: string) => {
+    setFormError(message);
+    toast.error(message);
+  };
+
   const validateForm = () => {
     setFormError(null);
     if (!name.trim()) {
-      setFormError('Please enter your full name');
+      showValidationToast(REQUIRED_TOAST.ENTER_FULL_NAME);
       return false;
     }
-    if (!phone.trim()) {
-      setFormError('Please enter your phone number');
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 10) {
+      showValidationToast(REQUIRED_TOAST.PHONE_TEN_DIGITS);
       return false;
     }
     if (!formData.completeAddress.trim()) {
-      setFormError('Please enter a complete address');
+      showValidationToast(REQUIRED_TOAST.VALID_COMPLETE_ADDRESS);
       return false;
     }
-    if (!pincode.trim()) {
-      setFormError('Please enter a zip code');
+    const pinDigits = pincode.replace(/\D/g, '');
+    if (pinDigits.length !== 6) {
+      showValidationToast(REQUIRED_TOAST.PIN_SIX_DIGITS);
       return false;
     }
     return true;
@@ -312,8 +320,9 @@ const AddEditAddress: React.FC = () => {
         }
         setLocationValidation({
           isValid: false,
-          message: validation.message || 'Address is outside delivery area',
+          message: validation.message || REQUIRED_TOAST.ADDRESS_OUTSIDE_DELIVERY,
         });
+        toast.error(validation.message || REQUIRED_TOAST.ADDRESS_OUTSIDE_DELIVERY);
         return false;
       }
 
@@ -324,7 +333,8 @@ const AddEditAddress: React.FC = () => {
       return true;
     } catch (error) {
       console.error('Error validating location:', error);
-      setLocationValidation({ isValid: false, message: 'Failed to validate address location' });
+      setLocationValidation({ isValid: false, message: REQUIRED_TOAST.FAILED_VALIDATE_ADDRESS });
+      toast.error(REQUIRED_TOAST.FAILED_VALIDATE_ADDRESS);
       return false;
     } finally {
       setIsValidatingLocation(false);
@@ -376,15 +386,19 @@ const AddEditAddress: React.FC = () => {
         // Exclude setAsDefault for update if it causes issues, or the backend doesn't support it on update
         const { setAsDefault, ...updateData } = addressData;
         await addressService.updateAddress(existingAddress.id, updateData);
-        toast.success('Address updated successfully');
+        toast.success(REQUIRED_TOAST.ADDRESS_UPDATED);
       } else {
         await addressService.createAddress(addressData);
-        toast.success('Address added successfully');
+        toast.success(REQUIRED_TOAST.ADDRESS_ADDED);
       }
       navigateAfterAddressAction();
     } catch (error) {
       console.error('Failed to save address:', error);
-      setFormError(isEdit ? 'Failed to update address' : 'Failed to add address');
+      const failMsg = isEdit
+        ? REQUIRED_TOAST.FAILED_UPDATE_ADDRESS
+        : REQUIRED_TOAST.FAILED_ADD_ADDRESS;
+      setFormError(failMsg);
+      toast.error(failMsg);
     } finally {
       setIsSubmitting(false);
     }
