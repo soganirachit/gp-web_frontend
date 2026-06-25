@@ -154,6 +154,7 @@ const AddEditAddress: React.FC = () => {
     isValid: boolean;
     message?: string;
   } | null>(null);
+  const [locationValidationShakeKey, setLocationValidationShakeKey] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -344,9 +345,14 @@ const AddEditAddress: React.FC = () => {
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
+    const hadInvalidLocation = locationValidation?.isValid === false;
+
     // Validate location before saving
     const isLocationValid = await validateLocation();
     if (!isLocationValid) {
+      if (hadInvalidLocation) {
+        setLocationValidationShakeKey((key) => key + 1);
+      }
       return;
     }
 
@@ -500,6 +506,7 @@ const AddEditAddress: React.FC = () => {
     panMapToPlaceResult(place as google.maps.places.PlaceResult, mapRef.current);
     applyGeocodedPlaceToForm(place as google.maps.GeocoderResult, position);
     setLocationValidation(null);
+    setLocationValidationShakeKey(0);
   };
 
   const handlePlacesAutocompleteSelection = (
@@ -704,6 +711,7 @@ const AddEditAddress: React.FC = () => {
         };
         setSelectedPosition(newPosition);
         setLocationValidation(null);
+        setLocationValidationShakeKey(0);
         void reverseGeocodeMapCenter(newPosition.lat, newPosition.lng);
       }
     }
@@ -885,25 +893,6 @@ const AddEditAddress: React.FC = () => {
           </div>
         )}
 
-        {locationValidation && (
-          <div
-            className={`mb-4 rounded-xl border p-3 text-sm ${
-              locationValidation.isValid
-                ? 'border-green-200 bg-green-50 text-green-800'
-                : 'border-red-200 bg-red-50 text-red-800'
-            }`}
-            role="status"
-          >
-            <div className="flex items-center gap-2">
-              <span
-                className={`inline-block h-2 w-2 rounded-full ${
-                  locationValidation.isValid ? 'bg-green-500' : 'bg-red-500'
-                }`}
-              />
-              {locationValidation.message}
-            </div>
-          </div>
-        )}
         {formError ? (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {formError}
@@ -1124,6 +1113,21 @@ const AddEditAddress: React.FC = () => {
 
         {/* Confirm Button */}
         <div className="mt-6 mb-24">
+          {locationValidation && !locationValidation.isValid ? (
+            <div
+              key={locationValidationShakeKey}
+              className={[
+                'mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800',
+                locationValidationShakeKey > 0 ? 'gp-address-validation-shake' : '',
+              ].join(' ')}
+              role="alert"
+            >
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-2 w-2 flex-shrink-0 rounded-full bg-red-500" />
+                <span>{locationValidation.message}</span>
+              </div>
+            </div>
+          ) : null}
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || isValidatingLocation}

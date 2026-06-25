@@ -169,6 +169,32 @@
     scrollbar-width: none;
   }
 
+  @keyframes gp-address-validation-shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    15% {
+      transform: translateX(-7px);
+    }
+    30% {
+      transform: translateX(7px);
+    }
+    45% {
+      transform: translateX(-5px);
+    }
+    60% {
+      transform: translateX(5px);
+    }
+    75% {
+      transform: translateX(-3px);
+    }
+  }
+
+  .gp-address-validation-shake {
+    animation: gp-address-validation-shake 0.45s ease-in-out;
+  }
+
   .line-clamp-1 {
     display: -webkit-box;
     -webkit-line-clamp: 1;

@@ -96,6 +96,7 @@ const AddressSelection: React.FC = () => {
     isValid: boolean;
     message?: string;
   } | null>(null);
+  const [locationValidationShakeKey, setLocationValidationShakeKey] = useState(0);
   /** Brief on-map hint when GPS / geocode succeeds (replaces toast) */
   const [showMapLocationHint, setShowMapLocationHint] = useState(false);
   /** After saving a new address, show on-screen confirmation (replaces toast) */
@@ -389,6 +390,7 @@ const AddressSelection: React.FC = () => {
     }
 
     if (isGuestEntry) {
+      const hadInvalidLocation = locationValidation?.isValid === false;
       try {
         setIsValidatingAddress(true);
         const line = [formData.houseNo, formData.streetName, formData.area, formData.landmark]
@@ -417,6 +419,9 @@ const AddressSelection: React.FC = () => {
           isValid: false,
           message: result.message || GUEST_NOT_SERVICEABLE_BODY,
         });
+        if (hadInvalidLocation) {
+          setLocationValidationShakeKey((key) => key + 1);
+        }
         toast.error(GUEST_NOT_SERVICEABLE_TITLE);
       } catch {
         toast.error(GUEST_NOT_SERVICEABLE_TITLE);
@@ -427,6 +432,7 @@ const AddressSelection: React.FC = () => {
     }
 
     // Then validate delivery area
+    const hadInvalidLocation = locationValidation?.isValid === false;
     try {
       setIsValidatingAddress(true);
       const validation =
@@ -449,6 +455,9 @@ const AddressSelection: React.FC = () => {
           isValid: false,
           message: validation.message || "Address is outside delivery area",
         });
+        if (hadInvalidLocation) {
+          setLocationValidationShakeKey((key) => key + 1);
+        }
         return;
       }
 
@@ -1339,6 +1348,7 @@ const AddressSelection: React.FC = () => {
     const lng = center.lng();
     setSelectedPosition({ lat, lng });
     setLocationValidation(null);
+    setLocationValidationShakeKey(0);
 
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
@@ -1441,26 +1451,6 @@ const AddressSelection: React.FC = () => {
               )}
             </div>
 
-            {/* Location Validation Status */}
-            {locationValidation && (
-              <div
-                className={`p-3 rounded-lg text-sm ${
-                  locationValidation.isValid
-                    ? "bg-green-50 text-green-700 border border-green-200"
-                    : "bg-red-50 text-red-700 border border-red-200"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      locationValidation.isValid ? "bg-green-500" : "bg-red-500"
-                    }`}
-                  />
-                  <span>{locationValidation.message}</span>
-                </div>
-              </div>
-            )}
-
             {/* Form Fields */}
             <div className="space-y-4">
               <div>
@@ -1529,6 +1519,22 @@ const AddressSelection: React.FC = () => {
                     </label>
                   </div>
                 </>
+              ) : null}
+
+              {locationValidation && !locationValidation.isValid ? (
+                <div
+                  key={locationValidationShakeKey}
+                  className={[
+                    'rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700',
+                    locationValidationShakeKey > 0 ? 'gp-address-validation-shake' : '',
+                  ].join(' ')}
+                  role="alert"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 flex-shrink-0 rounded-full bg-red-500" />
+                    <span>{locationValidation.message}</span>
+                  </div>
+                </div>
               ) : null}
 
               <button
