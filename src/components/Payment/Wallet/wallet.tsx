@@ -5,6 +5,7 @@ import { IoWalletOutline, IoTimeOutline, IoRefresh } from "react-icons/io5";
 import { motion, AnimatePresence } from "framer-motion";
 import { walletService } from "../../../services/wallet.service";
 import { GP_DAILY_SUBSCRIPTION_WALLET_RECHARGE_HINT } from "../../../utils/gpDailyWalletRechargeRedirect";
+import { REQUIRED_TOAST } from "../../../constants/requiredToastMessages";
 import { toast } from "react-hot-toast";
 import { useAuth } from "../../../context/AuthContext";
 import { useFeatureTheme } from "../../../context/FeatureThemeContext";
@@ -420,8 +421,11 @@ const Wallet = () => {
   };
 
   const validateAmount = (amount: number): string | null => {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return REQUIRED_TOAST.VALID_TOP_UP_AMOUNT;
+    }
     if (amount < MIN_AMOUNT) {
-      return `Minimum amount is ₹${MIN_AMOUNT}`;
+      return REQUIRED_TOAST.VALID_TOP_UP_AMOUNT;
     }
     if (amount > MAX_AMOUNT) {
       return `Maximum amount is ₹${MAX_AMOUNT.toLocaleString()}`;
@@ -861,7 +865,9 @@ const Wallet = () => {
                 // Payment verified successfully, remove from pending
                 removePendingPayment(pendingPaymentId);
 
-                setPaymentFieldMessage("Payment successful");
+                setPaymentFieldMessage(REQUIRED_TOAST.PAYMENT_SUCCESSFUL);
+                toast.success(REQUIRED_TOAST.PAYMENT_SUCCESSFUL);
+                toast.success(REQUIRED_TOAST.MONEY_ADDED_WALLET);
                 await fetchWalletBalance();
                 const completed = await tryCompleteGpDailyPendingSubscriptionAfterRecharge(
                   (path, opts) => navigate(path, opts),

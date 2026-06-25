@@ -150,19 +150,25 @@ export const CUSTOMER_HIDDEN_TIMELINE_STATUSES = new Set([
   "pending",
 ]);
 
-const SUPPORT_TICKET_DELIVERED_WINDOW_MS = 12 * 60 * 60 * 1000;
+const SUPPORT_TICKET_WINDOW_MS = 12 * 60 * 60 * 1000;
 
-/** Preparing / ready / out for delivery anytime; delivered only within 12h; all other statuses always. */
+const TERMINAL_SUPPORT_WINDOW_STATUSES = new Set(["delivered", "cancelled"]);
+
+function isWithinSupportTicketWindow(anchorAtIso?: string | null): boolean {
+  if (!anchorAtIso) return false;
+  const anchorMs = new Date(String(anchorAtIso)).getTime();
+  if (!Number.isFinite(anchorMs) || anchorMs <= 0) return false;
+  return Date.now() - anchorMs < SUPPORT_TICKET_WINDOW_MS;
+}
+
+/** In-progress statuses anytime; delivered / cancelled only within 12h of that update. */
 export function canRaiseSupportTicketForOrder(
   rawStatus: string,
-  deliveredAtIso?: string | null,
+  statusAnchorAtIso?: string | null,
 ): boolean {
   const k = normalizeOrderStatusKey(rawStatus);
-  if (k === "delivered") {
-    if (!deliveredAtIso) return false;
-    const deliveredMs = new Date(String(deliveredAtIso)).getTime();
-    if (!Number.isFinite(deliveredMs) || deliveredMs <= 0) return false;
-    return Date.now() - deliveredMs < SUPPORT_TICKET_DELIVERED_WINDOW_MS;
+  if (TERMINAL_SUPPORT_WINDOW_STATUSES.has(k)) {
+    return isWithinSupportTicketWindow(statusAnchorAtIso);
   }
   return true;
 }
@@ -171,6 +177,9 @@ export function supportTicketEligibilityMessage(rawStatus: string): string {
   const k = normalizeOrderStatusKey(rawStatus);
   if (k === "delivered") {
     return "Support requests can only be raised within 12 hours after delivery.";
+  }
+  if (k === "cancelled") {
+    return "Support requests can only be raised within 12 hours after cancellation.";
   }
   return "Need help with this order? You can raise a support ticket anytime.";
 }

@@ -8,6 +8,7 @@ import { FadingOutlet } from "../common/PageFade";
 import { trackPageView } from "../../lib/metaPixel";
 import { AppToaster } from "../ui/AppToaster";
 import { SessionImageCacheManager } from "../common/SessionImageCacheManager";
+import { useDoubleBackToExit } from "../../hooks/useDoubleBackToExit";
 
 const Layout: React.FC = () => {
   const location = useLocation();
@@ -58,6 +59,11 @@ const Layout: React.FC = () => {
   );
 
   const isGpDailyRoute = location.pathname.startsWith("/gp-daily");
+  const isGpStoreHome =
+    location.pathname === "/gp-store" || location.pathname === "/gp-store/";
+  const isGpDailyHome =
+    location.pathname === "/gp-daily" || location.pathname === "/gp-daily/";
+  useDoubleBackToExit(isGpStoreHome || isGpDailyHome);
   const dailyHeadingsClass = isGpDailyRoute ? " gp-daily-headings" : "";
   const showBottomNav = !isAuthRoute && !shouldHideBottomNav;
 

@@ -24,6 +24,7 @@ import {
   isLikelyNetworkError,
   messageFromGeolocationPositionError,
 } from '../../utils/geolocationMessages';
+import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
 import type { MapPinAnchor } from '../../utils/validateTypedAddressMatchesMapPin';
 
 /** When Google Geocoding REST is unavailable or returns nothing, fill fields from OSM (usage policy: identify app). */
@@ -153,6 +154,7 @@ const AddEditAddress: React.FC = () => {
     isValid: boolean;
     message?: string;
   } | null>(null);
+  const [locationValidationShakeKey, setLocationValidationShakeKey] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -268,22 +270,29 @@ const AddEditAddress: React.FC = () => {
     mapRef.current = null;
   }, []);
 
+  const showValidationToast = (message: string) => {
+    setFormError(message);
+    toast.error(message);
+  };
+
   const validateForm = () => {
     setFormError(null);
     if (!name.trim()) {
-      setFormError('Please enter your full name');
+      showValidationToast(REQUIRED_TOAST.ENTER_FULL_NAME);
       return false;
     }
-    if (!phone.trim()) {
-      setFormError('Please enter your phone number');
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 10) {
+      showValidationToast(REQUIRED_TOAST.PHONE_TEN_DIGITS);
       return false;
     }
     if (!formData.completeAddress.trim()) {
-      setFormError('Please enter a complete address');
+      showValidationToast(REQUIRED_TOAST.VALID_COMPLETE_ADDRESS);
       return false;
     }
-    if (!pincode.trim()) {
-      setFormError('Please enter a zip code');
+    const pinDigits = pincode.replace(/\D/g, '');
+    if (pinDigits.length !== 6) {
+      showValidationToast(REQUIRED_TOAST.PIN_SIX_DIGITS);
       return false;
     }
     return true;
@@ -312,8 +321,9 @@ const AddEditAddress: React.FC = () => {
         }
         setLocationValidation({
           isValid: false,
-          message: validation.message || 'Address is outside delivery area',
+          message: validation.message || REQUIRED_TOAST.ADDRESS_OUTSIDE_DELIVERY,
         });
+        toast.error(validation.message || REQUIRED_TOAST.ADDRESS_OUTSIDE_DELIVERY);
         return false;
       }
 
@@ -324,7 +334,8 @@ const AddEditAddress: React.FC = () => {
       return true;
     } catch (error) {
       console.error('Error validating location:', error);
-      setLocationValidation({ isValid: false, message: 'Failed to validate address location' });
+      setLocationValidation({ isValid: false, message: REQUIRED_TOAST.FAILED_VALIDATE_ADDRESS });
+      toast.error(REQUIRED_TOAST.FAILED_VALIDATE_ADDRESS);
       return false;
     } finally {
       setIsValidatingLocation(false);
@@ -334,9 +345,14 @@ const AddEditAddress: React.FC = () => {
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
+    const hadInvalidLocation = locationValidation?.isValid === false;
+
     // Validate location before saving
     const isLocationValid = await validateLocation();
     if (!isLocationValid) {
+      if (hadInvalidLocation) {
+        setLocationValidationShakeKey((key) => key + 1);
+      }
       return;
     }
 
@@ -376,15 +392,19 @@ const AddEditAddress: React.FC = () => {
         // Exclude setAsDefault for update if it causes issues, or the backend doesn't support it on update
         const { setAsDefault, ...updateData } = addressData;
         await addressService.updateAddress(existingAddress.id, updateData);
-        toast.success('Address updated successfully');
+        toast.success(REQUIRED_TOAST.ADDRESS_UPDATED);
       } else {
         await addressService.createAddress(addressData);
-        toast.success('Address added successfully');
+        toast.success(REQUIRED_TOAST.ADDRESS_ADDED);
       }
       navigateAfterAddressAction();
     } catch (error) {
       console.error('Failed to save address:', error);
-      setFormError(isEdit ? 'Failed to update address' : 'Failed to add address');
+      const failMsg = isEdit
+        ? REQUIRED_TOAST.FAILED_UPDATE_ADDRESS
+        : REQUIRED_TOAST.FAILED_ADD_ADDRESS;
+      setFormError(failMsg);
+      toast.error(failMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -486,6 +506,7 @@ const AddEditAddress: React.FC = () => {
     panMapToPlaceResult(place as google.maps.places.PlaceResult, mapRef.current);
     applyGeocodedPlaceToForm(place as google.maps.GeocoderResult, position);
     setLocationValidation(null);
+    setLocationValidationShakeKey(0);
   };
 
   const handlePlacesAutocompleteSelection = (
@@ -690,6 +711,7 @@ const AddEditAddress: React.FC = () => {
         };
         setSelectedPosition(newPosition);
         setLocationValidation(null);
+        setLocationValidationShakeKey(0);
         void reverseGeocodeMapCenter(newPosition.lat, newPosition.lng);
       }
     }
@@ -871,25 +893,6 @@ const AddEditAddress: React.FC = () => {
           </div>
         )}
 
-        {locationValidation && (
-          <div
-            className={`mb-4 rounded-xl border p-3 text-sm ${
-              locationValidation.isValid
-                ? 'border-green-200 bg-green-50 text-green-800'
-                : 'border-red-200 bg-red-50 text-red-800'
-            }`}
-            role="status"
-          >
-            <div className="flex items-center gap-2">
-              <span
-                className={`inline-block h-2 w-2 rounded-full ${
-                  locationValidation.isValid ? 'bg-green-500' : 'bg-red-500'
-                }`}
-              />
-              {locationValidation.message}
-            </div>
-          </div>
-        )}
         {formError ? (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {formError}
@@ -1110,6 +1113,21 @@ const AddEditAddress: React.FC = () => {
 
         {/* Confirm Button */}
         <div className="mt-6 mb-24">
+          {locationValidation && !locationValidation.isValid ? (
+            <div
+              key={locationValidationShakeKey}
+              className={[
+                'mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800',
+                locationValidationShakeKey > 0 ? 'gp-address-validation-shake' : '',
+              ].join(' ')}
+              role="alert"
+            >
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-2 w-2 flex-shrink-0 rounded-full bg-red-500" />
+                <span>{locationValidation.message}</span>
+              </div>
+            </div>
+          ) : null}
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || isValidatingLocation}

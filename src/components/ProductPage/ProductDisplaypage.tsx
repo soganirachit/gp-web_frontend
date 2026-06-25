@@ -36,6 +36,7 @@ import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { storeService } from "../../services/store.service";
 import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
+import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
 import {
   extractCartStockApiMessage,
   formatCartStockInlineMessage,
@@ -1036,7 +1037,7 @@ const ProductPage: React.FC = () => {
       } else {
         const basketErrMsg =
           apiMessage.trim() ||
-          errorMessageFromCatch(error, "Failed to update basket quantity. Please try again.");
+          errorMessageFromCatch(error, REQUIRED_TOAST.COULD_NOT_UPDATE_QUANTITY);
         toast.error(basketErrMsg, { id: basketErrMsg });
       }
     } finally {

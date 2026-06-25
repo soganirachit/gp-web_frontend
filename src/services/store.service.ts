@@ -1,5 +1,6 @@
 import axios, { AxiosError, type AxiosResponse } from "axios";
 import api from "./api";
+import { REQUIRED_TOAST } from "../constants/requiredToastMessages";
 import { getApiUrl } from "../config/api.config";
 import { addressService, type Address } from "./address.service";
 import { cartService } from "./cart.service";
@@ -614,7 +615,7 @@ class StoreService {
     const store = await this.getSelectableNearestStore(lat, lng);
     if (!store) {
       this.setGpStoreCatalogAddressOverrideId(null);
-      throw new Error("No store is available for this location right now.");
+      throw new Error(REQUIRED_TOAST.NOT_DELIVERING_LOCATION);
     }
     const current = this.getSelectedStoreId();
     if (current === store.id) {
@@ -674,7 +675,7 @@ class StoreService {
               longitude,
             );
             if (!store) {
-              throw new Error("No store is available for this location right now.");
+              throw new Error(REQUIRED_TOAST.NOT_DELIVERING_LOCATION);
             }
             const current = this.getSelectedStoreId();
             if (current === store.id) {

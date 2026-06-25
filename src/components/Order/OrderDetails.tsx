@@ -14,6 +14,7 @@ import {
   type SupportTicket,
 } from '../../services/support.service';
 import { toast } from 'react-hot-toast';
+import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
 import { format } from 'date-fns';
 import { OrderDetailSkeleton } from '../common/PageSkeletons';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
@@ -29,6 +30,7 @@ import {
   canRaiseSupportTicketForOrder,
   getCustomerOrderStatusBadgeClass,
   getCustomerOrderStatusLabel,
+  normalizeOrderStatusKey,
   supportTicketEligibilityMessage,
   toCustomerOrderStatusKey,
 } from '../../utils/customerOrderStatus';
@@ -36,6 +38,9 @@ import {
   extractVariantNameFromOrderLineItem,
   formatOrderItemPackDisplayName,
 } from '../../utils/orderListDisplay';
+import { resolveOrderLineCustomMessage } from '../../utils/orderConfirmationDisplay';
+import { isActiveSupportTicketStatus } from '../../utils/supportTicketStatus';
+import type { SupportNavState } from '../../utils/supportNavigation';
 
 interface OrderItem {
   id: number;
@@ -309,9 +314,15 @@ const OrderDetails: React.FC = () => {
   }, [order?.order_number]);
 
   const openInvoicePdf = useCallback(() => {
-    if (!invoiceInfo?.pdf_file || !order) return;
+    if (!invoiceInfo?.pdf_file || !order) {
+      toast.error(REQUIRED_TOAST.CANNOT_OPEN_INVOICE);
+      return;
+    }
     const href = resolveMediaUrl(invoiceInfo.pdf_file);
-    if (!href) return;
+    if (!href) {
+      toast.error(REQUIRED_TOAST.CANNOT_OPEN_INVOICE);
+      return;
+    }
     const a = document.createElement('a');
     a.href = href;
     a.target = '_blank';
@@ -364,12 +375,22 @@ const OrderDetails: React.FC = () => {
   const normalizeOrderNumber = (n: string | null | undefined) =>
     String(n ?? "").trim().toLowerCase();
 
+  const activeSupportTicket =
+    existingSupportTicket &&
+    isActiveSupportTicketStatus(existingSupportTicket.status)
+      ? existingSupportTicket
+      : null;
+
   const handleSupportTicketAction = async () => {
     if (!order?.id || !order.order_number) return;
 
-    if (existingSupportTicket?.ticket_number) {
+    const returnTo = `${basePath}/orders/${encodeURIComponent(order.order_number)}`;
+    const navState: SupportNavState = { returnTo };
+
+    if (activeSupportTicket?.ticket_number) {
       navigate(
-        `${basePath}/customer-support/chat?ticket=${encodeURIComponent(existingSupportTicket.ticket_number)}`,
+        `${basePath}/customer-support/chat?ticket=${encodeURIComponent(activeSupportTicket.ticket_number)}`,
+        { state: navState },
       );
       return;
     }
@@ -378,6 +399,7 @@ const OrderDetails: React.FC = () => {
       setOpeningSupportChat(true);
       navigate(
         `${basePath}/customer-support/questions?order_id=${order.id}&order_number=${encodeURIComponent(order.order_number)}`,
+        { state: navState },
       );
     } catch (err) {
       console.error("Failed to open support", err);
@@ -557,10 +579,19 @@ const OrderDetails: React.FC = () => {
     }
   }
 
-  const supportDeliveredAtIso = order.delivered_at || deliveredEvent?.created_at || null;
+  const supportStatusAnchorIso = (() => {
+    const k = normalizeOrderStatusKey(order.status);
+    if (k === "cancelled") {
+      return order.cancelled_at || cancelledEvent?.created_at || null;
+    }
+    if (k === "delivered") {
+      return order.delivered_at || deliveredEvent?.created_at || null;
+    }
+    return null;
+  })();
   const showSupportTicketSection =
-    !!existingSupportTicket ||
-    canRaiseSupportTicketForOrder(order.status, supportDeliveredAtIso);
+    !!activeSupportTicket ||
+    canRaiseSupportTicketForOrder(order.status, supportStatusAnchorIso);
   const supportTicketHint = supportTicketEligibilityMessage(order.status);
 
   return (
@@ -589,6 +620,11 @@ const OrderDetails: React.FC = () => {
               <div className="space-y-3">
                 {order.items.map((item, index) => {
                   const slug = (item.product.slug || '').trim();
+                  const customMessage = resolveOrderLineCustomMessage(
+                    item,
+                    order.items,
+                    order.customer_notes,
+                  );
                   const displayName = formatOrderItemPackDisplayName(
                     item.product.name,
                     extractVariantNameFromOrderLineItem(
@@ -615,6 +651,14 @@ const OrderDetails: React.FC = () => {
                           <p className="text-xs text-gray-600">x{item.quantity}</p>
                           <p className="text-sm font-semibold text-gray-900">₹{item.subtotal}</p>
                         </div>
+                        {customMessage ? (
+                          <p className="text-xs text-gray-600 mt-1">
+                            <span className="font-semibold text-gray-700 not-italic">
+                              Custom message:{' '}
+                            </span>
+                            <span className="italic">&ldquo;{customMessage}&rdquo;</span>
+                          </p>
+                        ) : null}
                       </div>
                     </>
                   );
@@ -962,7 +1006,7 @@ const OrderDetails: React.FC = () => {
               </button>
             </div>
 
-            {/* Support — preparing / out for delivery anytime; delivered within 12h */}
+            {/* Support — in-progress anytime; delivered / cancelled within 12h */}
             {showSupportTicketSection && (
               <div className="bg-white rounded-2xl p-4 shadow-sm">
                 <div className="mb-3 flex items-start gap-3">
@@ -984,7 +1028,7 @@ const OrderDetails: React.FC = () => {
                   >
                     {openingSupportChat
                       ? "Opening…"
-                      : existingSupportTicket
+                      : activeSupportTicket
                         ? "Support Chat"
                         : "Raise a Support Ticket"}
                   </button>

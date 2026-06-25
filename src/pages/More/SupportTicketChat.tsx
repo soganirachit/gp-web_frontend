@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
 import { FaPaperPlane, FaImage, FaPhone, FaUser } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
@@ -15,6 +15,11 @@ import { format } from 'date-fns';
 import { SettingsListSkeleton } from '../../components/common/PageSkeletons';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
+import {
+  resolveSupportBackNavigation,
+  type SupportNavState,
+} from '../../utils/supportNavigation';
+import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
 
 const MESSAGE_IMAGE_ROW = 200;
 const MESSAGE_IMAGE_GAP = 2;
@@ -200,12 +205,14 @@ function MessageAttachmentGrid({ uris, onOpen }: AttachmentGridProps) {
 
 const SupportTicketChat: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { feature } = useFeatureTheme();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const isDailySupport = feature === 'gpDaily';
   /** App `SupportTicketDetailScreen` daily: #FFB043 bubble, #1a1a1a text, rgba(0,0,0,0.55) time. */
   const DAILY_SUPPORT_ORANGE = '#FFB043';
+  const supportNavState = (location.state ?? {}) as SupportNavState;
 
   const ticketNumber = searchParams.get('ticket');
 
@@ -226,6 +233,20 @@ const SupportTicketChat: React.FC = () => {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleSupportBack = (ticketClosed: boolean) => {
+    const orderNum =
+      ticket?.order_number ??
+      searchParams.get('order_number') ??
+      undefined;
+    const { path, replace } = resolveSupportBackNavigation({
+      returnTo: supportNavState.returnTo,
+      orderNumber: orderNum,
+      basePath,
+      replace: ticketClosed,
+    });
+    navigate(path, { replace });
   };
 
   useEffect(() => {
@@ -277,6 +298,26 @@ const SupportTicketChat: React.FC = () => {
     }
   };
 
+  const handleAttachImageClick = async () => {
+    const input = fileInputRef.current;
+    if (!input) return;
+    try {
+      const pickerInput = input as HTMLInputElement & {
+        showPicker?: () => Promise<void>;
+      };
+      if (typeof pickerInput.showPicker === 'function') {
+        await pickerInput.showPicker();
+      } else {
+        input.click();
+      }
+    } catch (e: unknown) {
+      const name = (e as DOMException)?.name;
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        toast.error(REQUIRED_TOAST.ALLOW_PHOTOS_SUPPORT);
+      }
+    }
+  };
+
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files;
     if (!list?.length) return;
@@ -284,7 +325,7 @@ const SupportTicketChat: React.FC = () => {
     for (let i = 0; i < list.length; i++) {
       const file = list[i];
       if (file.size > 5 * 1024 * 1024) {
-        toast.error('Each image must be under 5MB');
+        toast.error(REQUIRED_TOAST.IMAGE_UNDER_5MB);
         if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
@@ -444,7 +485,7 @@ const SupportTicketChat: React.FC = () => {
         <div className="text-center">
           <p className="text-gray-600 mb-4">Ticket not found</p>
           <button
-            onClick={() => navigate(`${basePath}/customer-support`)}
+            onClick={() => handleSupportBack(true)}
             className={
               isDailySupport
                 ? "px-4 py-2 bg-[#FFB043] text-[#222222] rounded-lg font-medium"
@@ -468,7 +509,7 @@ const SupportTicketChat: React.FC = () => {
           <div className="px-4 pt-4 pb-3">
             <div className="flex items-start gap-3 mb-3">
               <button
-                onClick={() => navigate(`${basePath}/customer-support`)}
+                onClick={() => handleSupportBack(isSupportTicketClosedLike(ticketSt))}
                 className="-ml-2 mr-3 mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#374151] transition-colors hover:bg-gray-100"
                 type="button"
                 aria-label="Go back"
@@ -728,7 +769,7 @@ const SupportTicketChat: React.FC = () => {
               />
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => void handleAttachImageClick()}
                 className="rounded-xl bg-gray-100 p-3 text-gray-700 transition-colors hover:bg-gray-200"
                 disabled={sending || !ticketNumber}
               >

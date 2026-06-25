@@ -19,6 +19,8 @@ import {
   notifyGpsCatalogLocationUpdated,
 } from "../../services/store.service";
 import { findSavedAddressAtCoordinates } from "../../utils/addressCoordinates";
+import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
+import { messageFromGeolocationPositionError } from "../../utils/geolocationMessages";
 import {
   formatAddressReceiverNameLine,
   formatAddressReceiverPhoneLine,
@@ -106,13 +108,13 @@ const ChooseLocation: React.FC = () => {
     try {
       setApplyInProgress(true);
       await storeService.applyBrowseAddressForCatalog(address);
-      toast.success("Delivery location updated");
+      toast.success(REQUIRED_TOAST.DELIVERY_ADDRESS_UPDATED);
       navigate(-1);
     } catch (e: unknown) {
       const m =
         e instanceof Error
           ? e.message
-          : "Could not update location. Try again.";
+          : REQUIRED_TOAST.FAILED_SWITCH_ADDRESS;
       toast.error(m, { id: m });
     } finally {
       setApplyInProgress(false);
@@ -124,7 +126,7 @@ const ChooseLocation: React.FC = () => {
     setGpsBusy(true);
     try {
       if (!navigator.geolocation) {
-        throw new Error("Geolocation is not supported on this device.");
+        throw new Error(REQUIRED_TOAST.TURN_ON_LOCATION);
       }
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -156,10 +158,13 @@ const ChooseLocation: React.FC = () => {
         navigate(-1);
       }
     } catch (e: unknown) {
+      const geoErr = e as GeolocationPositionError;
       const m =
-        e instanceof Error
-          ? e.message
-          : "Could not use current location";
+        geoErr?.code != null
+          ? messageFromGeolocationPositionError(geoErr, "choose_location")
+          : e instanceof Error
+            ? e.message
+            : REQUIRED_TOAST.COULD_NOT_USE_CURRENT_LOCATION;
       toast.error(m, { id: m });
     } finally {
       setGpsBusy(false);
@@ -185,9 +190,9 @@ const ChooseLocation: React.FC = () => {
       }
       setAddresses((prev) => prev.filter((a) => a.id !== deleteId));
       setDeleteId(null);
-      toast.success("Address deleted");
+      toast.success(REQUIRED_TOAST.ADDRESS_DELETED_FULL);
     } catch {
-      // silent
+      toast.error(REQUIRED_TOAST.FAILED_DELETE_ADDRESS);
     } finally {
       setActionInProgress(false);
     }

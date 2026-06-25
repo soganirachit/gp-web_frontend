@@ -1,3 +1,5 @@
+import { REQUIRED_TOAST } from "../constants/requiredToastMessages";
+
 /**
  * Normalize Django / DRF / ResponseFormatter error payloads into a user-visible string.
  */
@@ -95,12 +97,41 @@ export function isCartLineUnavailableMessage(message: string): boolean {
   return m.includes("product") && m.includes("not found");
 }
 
+function globalHttpStatusToast(status: number | undefined): string | null {
+  if (status === 429) return REQUIRED_TOAST.TOO_MANY_REQUESTS;
+  if (status === 502 || status === 503 || status === 504) return REQUIRED_TOAST.SERVICE_UNAVAILABLE;
+  return null;
+}
+
+function globalNetworkToast(err: { response?: { status?: number }; message?: string; code?: string }): string | null {
+  if (err.response?.status != null) return globalHttpStatusToast(err.response.status);
+  const msg = String(err.message ?? "").toLowerCase();
+  if (
+    !err.response &&
+    (msg.includes("network error") ||
+      msg.includes("failed to fetch") ||
+      err.code === "ECONNABORTED" ||
+      msg.includes("timeout"))
+  ) {
+    return REQUIRED_TOAST.NETWORK_ISSUE;
+  }
+  return null;
+}
+
 export function errorMessageFromCatch(err: unknown, fallback: string): string {
-  const ax = err as { response?: { data?: unknown }; message?: string };
+  const ax = err as { response?: { data?: unknown; status?: number }; message?: string; code?: string };
+  const globalToast = globalNetworkToast(ax);
   const data = ax?.response?.data;
   if (data !== undefined) {
-    return errorMessageFromParsedBody(data, typeof ax.message === "string" && ax.message ? ax.message : fallback);
+    const parsed = errorMessageFromParsedBody(
+      data,
+      typeof ax.message === "string" && ax.message ? ax.message : fallback,
+    );
+    if (!parsed.trim() && globalToast) return globalToast;
+    if (globalToast && ax.response?.status === 429) return globalToast;
+    return parsed || globalToast || fallback;
   }
+  if (globalToast) return globalToast;
   if (err instanceof Error && err.message) return err.message;
   if (err && typeof err === "object" && err !== null && !("response" in err)) {
     return errorMessageFromParsedBody(err, fallback);

@@ -39,6 +39,7 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
 }, ref) => {
   const [isLoading, setIsLoading] = useState(false);
   const isMountedRef = useRef(true);
+  const paymentOpeningRef = useRef(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -46,6 +47,8 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
   }, []);
 
   const handlePayment = async () => {
+    if (disabled || isLoading || paymentOpeningRef.current) return;
+    paymentOpeningRef.current = true;
     try {
       setIsLoading(true);
       await loadRazorpayScript();
@@ -66,6 +69,7 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
           color: "#2A6B28",
         },
         handler: function (response: RazorpayResponse) {
+          paymentOpeningRef.current = false;
           // Payment completed successfully on Razorpay side
           onSuccess({
             razorpay_payment_id: response.razorpay_payment_id,
@@ -76,6 +80,7 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
         },
         modal: {
           ondismiss: function () {
+            paymentOpeningRef.current = false;
             // Payment modal was closed by user
             if (isMountedRef.current) {
               setIsLoading(false);
@@ -89,10 +94,14 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
         throw new Error('Payment gateway is not ready. Please try again.');
       }
 
-      const razorpayInstance = new window.Razorpay(options);
+      const razorpayInstance = new RazorpayConstructor(options);
+      razorpayInstance.on('payment.failed', () => {
+        paymentOpeningRef.current = false;
+      });
       razorpayInstance.open();
       setIsLoading(false);
     } catch (error) {
+      paymentOpeningRef.current = false;
       setIsLoading(false);
       onError(
         error instanceof Error

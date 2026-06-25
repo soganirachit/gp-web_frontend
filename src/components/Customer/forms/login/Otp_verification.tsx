@@ -17,6 +17,8 @@ import { MdEdit } from 'react-icons/md';
 import { useFeatureTheme } from '../../../../context/FeatureThemeContext';
 import Spinner from '../../../common/Spinner';
 import { errorMessageFromCatch } from '../../../../utils/apiErrorMessage';
+import { toast } from 'react-hot-toast';
+import { REQUIRED_TOAST } from '../../../../constants/requiredToastMessages';
 
 interface LocationState {
   phoneNumber: string;
@@ -287,14 +289,16 @@ const OTPVerification: React.FC = () => {
       }
 
       if (result.whatsapp_status === 'failed') {
-        setInlineError(result.message || "OTP delivery failed. Please tap Resend in a moment.");
+        setInlineError(result.message || REQUIRED_TOAST.OTP_DELIVERY_FAILED);
+        toast(REQUIRED_TOAST.OTP_DELIVERY_FAILED, { id: 'otp-delivery-failed' });
       } else if (result.whatsapp_status === 'not_configured') {
         setInlineError(
           result.message ||
             "WhatsApp is not configured. If you still do not receive a code, edit your number and try again.",
         );
       } else {
-        setInlineInfo(result.message || 'OTP sent to your WhatsApp');
+        setInlineInfo(result.message || REQUIRED_TOAST.OTP_SENT_WHATSAPP);
+        toast.success(REQUIRED_TOAST.OTP_SENT_WHATSAPP);
       }
 
       setWhatsappDeliveryOk(whatsappOtpLikelyDelivered(result));
@@ -308,7 +312,7 @@ const OTPVerification: React.FC = () => {
         if (match) {
           const seconds = parseInt(match[1]);
           const minutes = Math.ceil(seconds / 60);
-          errorMessage = `Too many requests. Please wait ${minutes} minute${minutes > 1 ? 's' : ''} before requesting another OTP.`;
+          errorMessage = REQUIRED_TOAST.TOO_MANY_REQUESTS;
         } else {
           errorMessage = "Too many OTP requests. Please wait a few minutes before trying again.";
         }

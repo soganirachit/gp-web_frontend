@@ -95,7 +95,7 @@ const CustomerSupport: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Fetch eligible orders (preparing/OOD anytime; delivered within 12h)
+      // Fetch eligible orders (in-progress anytime; delivered / cancelled within 12h)
       const eligibleOrders = await supportService.getEligibleOrders();
       console.log('Fetched eligible orders:', eligibleOrders);
       setOrders(eligibleOrders);

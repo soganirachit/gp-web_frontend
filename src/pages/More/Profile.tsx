@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaUser, FaCamera } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
+import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [showPhotoOptions, setShowPhotoOptions] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({
     fullName: '',
@@ -47,6 +51,58 @@ const Profile: React.FC = () => {
     }
   };
 
+  const openPhotoPicker = async (
+    input: HTMLInputElement | null,
+    deniedToast: string,
+  ) => {
+    if (!input) return;
+    try {
+      if ('showPicker' in input) {
+        await (input as HTMLInputElement & { showPicker: () => Promise<void> }).showPicker();
+      } else {
+        input.click();
+      }
+    } catch (e: unknown) {
+      const name = (e as DOMException)?.name;
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        toast.error(deniedToast);
+      }
+    }
+  };
+
+  const handleChooseFromLibrary = () => {
+    setShowPhotoOptions(false);
+    void openPhotoPicker(galleryInputRef.current, REQUIRED_TOAST.ALLOW_PHOTOS_PROFILE);
+  };
+
+  const handleTakePhoto = async () => {
+    setShowPhotoOptions(false);
+    try {
+      if (navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user' },
+        });
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      void openPhotoPicker(cameraInputRef.current, REQUIRED_TOAST.ALLOW_CAMERA_PROFILE);
+    } catch (e: unknown) {
+      const name = (e as DOMException)?.name;
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        toast.error(REQUIRED_TOAST.ALLOW_CAMERA_PROFILE);
+      } else {
+        void openPhotoPicker(cameraInputRef.current, REQUIRED_TOAST.ALLOW_CAMERA_PROFILE);
+      }
+    }
+  };
+
+  const handlePhotoSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      toast.success('Profile picture updated');
+    }
+    e.target.value = '';
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -79,9 +135,49 @@ const Profile: React.FC = () => {
             <FaUser className="text-green-600 text-3xl" />
           </div>
           {isEditing && (
-            <button className="absolute bottom-0 right-0 bg-green-600 text-white p-2 rounded-full">
-              <FaCamera size={16} />
-            </button>
+            <>
+              <button
+                type="button"
+                className="absolute bottom-0 right-0 bg-green-600 text-white p-2 rounded-full"
+                onClick={() => setShowPhotoOptions((v) => !v)}
+                aria-label="Change profile picture"
+              >
+                <FaCamera size={16} />
+              </button>
+              {showPhotoOptions ? (
+                <div className="absolute top-full mt-2 right-0 z-20 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[10rem] overflow-hidden">
+                  <button
+                    type="button"
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                    onClick={handleChooseFromLibrary}
+                  >
+                    Photo library
+                  </button>
+                  <button
+                    type="button"
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 border-t"
+                    onClick={() => void handleTakePhoto()}
+                  >
+                    Take photo
+                  </button>
+                </div>
+              ) : null}
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoSelected}
+              />
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handlePhotoSelected}
+              />
+            </>
           )}
         </div>
       </div>
