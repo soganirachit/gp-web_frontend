@@ -31,7 +31,7 @@ function intsToShortLabels(ints: number[]): string[] {
 const ModifySubscription: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { theme } = useFeatureTheme();
+  const { theme, basePath } = useFeatureTheme();
   const primary = theme.colors.primary;
 
   const subscriptionFromNav =
@@ -583,11 +583,11 @@ const ModifySubscription: React.FC = () => {
           const details = insufficientWalletModal;
           setInsufficientWalletModal(null);
           if (!details) return;
-          navigateToGpDailyWalletForRecharge(navigate, theme.basePath, {
+          navigateToGpDailyWalletForRecharge(navigate, basePath, {
             shortageAmount: details.shortageAmount,
             currentBalance: details.currentBalance,
             totalRequired: details.requiredAmount,
-            returnUrl: `${theme.basePath}/subscription/modify`,
+            returnUrl: `${basePath}/modify-subscription`,
           });
         }}
       />
