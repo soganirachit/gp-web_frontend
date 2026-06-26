@@ -10,8 +10,10 @@ import { useFeatureTheme } from "../../../context/FeatureThemeContext";
 import {
   InsufficientWalletModal,
   computeMinimumSubscriptionWalletRecharge,
+  type InsufficientWalletDetails,
 } from "../../../components/daily/InsufficientWalletModal";
-import { REQUIRED_TOAST } from "../../../utils/requiredFieldToast";
+import { REQUIRED_TOAST } from "../../../constants/requiredToastMessages";
+import { navigateToGpDailyWalletForRecharge } from "../../../utils/gpDailyWalletRechargeRedirect";
 
 const WEEK_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
@@ -43,11 +45,8 @@ const ModifySubscription: React.FC = () => {
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [insufficientWalletModal, setInsufficientWalletModal] = useState<{
-    currentBalance: number;
-    requiredAmount: number;
-    shortageAmount: number;
-  } | null>(null);
+  const [insufficientWalletModal, setInsufficientWalletModal] =
+    useState<InsufficientWalletDetails | null>(null);
   const initialLineQuantitiesRef = useRef<number[]>([]);
   const initialDeliveryTypeRef = useRef<"daily" | "custom">("daily");
   const initialSelectedDaysRef = useRef<string[]>([]);
@@ -576,18 +575,22 @@ const ModifySubscription: React.FC = () => {
           </button>
         </div>
       </div>
-      {insufficientWalletModal && (
-        <InsufficientWalletModal
-          currentBalance={insufficientWalletModal.currentBalance}
-          requiredAmount={insufficientWalletModal.requiredAmount}
-          shortageAmount={insufficientWalletModal.shortageAmount}
-          onClose={() => setInsufficientWalletModal(null)}
-          onRecharge={() => {
-            setInsufficientWalletModal(null);
-            navigate("/wallet");
-          }}
-        />
-      )}
+      <InsufficientWalletModal
+        open={insufficientWalletModal != null}
+        details={insufficientWalletModal}
+        onClose={() => setInsufficientWalletModal(null)}
+        onRecharge={() => {
+          const details = insufficientWalletModal;
+          setInsufficientWalletModal(null);
+          if (!details) return;
+          navigateToGpDailyWalletForRecharge(navigate, theme.basePath, {
+            shortageAmount: details.shortageAmount,
+            currentBalance: details.currentBalance,
+            totalRequired: details.requiredAmount,
+            returnUrl: `${theme.basePath}/subscription/modify`,
+          });
+        }}
+      />
     </div>
   );
 };

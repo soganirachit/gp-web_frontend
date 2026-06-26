@@ -94,7 +94,7 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
         throw new Error('Payment gateway is not ready. Please try again.');
       }
 
-      const razorpayInstance = new RazorpayConstructor(options);
+      const razorpayInstance = new window.Razorpay(options);
       razorpayInstance.on('payment.failed', () => {
         paymentOpeningRef.current = false;
       });
