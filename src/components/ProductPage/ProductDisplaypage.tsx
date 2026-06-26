@@ -12,10 +12,13 @@ import {
   PRODUCT_AVAILABILITY_STORE,
   getEffectivePrice,
   getBasePrice,
+  getDiscoveryEffectivePrice,
+  getDiscoveryBasePrice,
   resolveProductImageUrl,
   buildCatalogPdpGalleryImages,
   formatRupeePdpAmount,
   showStrikeBaseOnCard,
+  showStrikeBaseOnDiscoveryCard,
 } from "../../services/product.service";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { gpDailyHome } from "../../utils/gpDailyHomeDesignSystem";
@@ -1807,10 +1810,10 @@ const ProductPage: React.FC = () => {
                       </div>
                       <div className="mt-auto flex items-center justify-between gap-2">
                         <p className="text-base font-bold text-gray-900">
-                          <span>₹{getEffectivePrice(item)}</span>
-                          {showStrikeBaseOnCard(item) && (
+                          <span>₹{getDiscoveryEffectivePrice(item)}</span>
+                          {showStrikeBaseOnDiscoveryCard(item) && (
                             <span className="ml-1 font-medium text-gray-500 line-through">
-                              ₹{getBasePrice(item)}
+                              ₹{getDiscoveryBasePrice(item)}
                             </span>
                           )}
                         </p>

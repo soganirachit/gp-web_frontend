@@ -303,8 +303,7 @@ interface Coupon {
   first_order_only: boolean;
   scope: string;
   discount_label: string;  // e.g. "10% off (up to ₹100)" – use this directly
-  /** GP Daily cart — must match mobile `eligible_for_gp_daily`. */
-  eligible_for_gp_daily?: boolean;
+  applicable_to?: "store" | "daily" | "both";
 }
 
 const DAILY_PROMO_INVALID_MESSAGE = REQUIRED_TOAST.PROMO_NOT_VALID_DAILY;
@@ -313,21 +312,18 @@ const DAILY_PROMO_INVALID_CODE = "PROMO_NOT_VALID_DAILY";
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
 const fetchCoupons = async (): Promise<Coupon[]> => {
-  const storeId = storeService.getStoreIdForProducts();
-  if (storeId == null) return [];
-  const res = await api.get(`${getApiUrl()}/cart/coupons/?store_id=${storeId}`);
-  const json = res.data;
-  return Array.isArray(json) ? json : (json.data ?? json.results ?? json.coupons ?? []);
+  try {
+    const list = await subscriptionCartService.listCoupons();
+    return list as Coupon[];
+  } catch {
+    return [];
+  }
 };
 
 const applyCouponAPI = async (couponCode: string): Promise<ApplyCouponResponse> => {
   try {
-    const res = await api.post(`${getApiUrl()}/cart/apply-coupon/`, {
-      coupon_code: couponCode,
-      for_gp_daily: true,
-    });
-    const body = res.data as { data?: ApplyCouponResponse } | ApplyCouponResponse;
-    return (body as { data?: ApplyCouponResponse }).data ?? (body as ApplyCouponResponse);
+    const cart = await subscriptionCartService.applyCoupon(couponCode);
+    return cart as ApplyCouponResponse;
   } catch (error: unknown) {
     throw new Error(errorMessageFromCatch(error, "Invalid or expired promo code"));
   }
@@ -335,7 +331,7 @@ const applyCouponAPI = async (couponCode: string): Promise<ApplyCouponResponse> 
 
 const removeCouponAPI = async (): Promise<void> => {
   try {
-    await api.post(`${getApiUrl()}/cart/remove-coupon/`, {});
+    await subscriptionCartService.removeCoupon();
   } catch (error: unknown) {
     throw new Error(errorMessageFromCatch(error, "Failed to remove promo code"));
   }
@@ -436,7 +432,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({
       const match = coupons.find(
         (c) => String(c.code).trim().toUpperCase() === code,
       );
-      if (match && match.eligible_for_gp_daily !== true) {
+      if (match && match.applicable_to === "store") {
         setApplyHint({
           kind: "error",
           text: "This promo is not valid on Genda Phool Daily.",
@@ -554,7 +550,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({
                 {coupons.map((coupon) => {
                   const isApplied = appliedCode === coupon.code;
                   const ineligibleDaily =
-                    isDailyMode && coupon.eligible_for_gp_daily !== true;
+                    isDailyMode && coupon.applicable_to === "store";
                   return (
                     <div
                       key={coupon.id}
@@ -1211,7 +1207,7 @@ const Cart: React.FC = () => {
       const match = list.find(
         (c) => String(c.code).trim().toUpperCase() === upper,
       );
-      if (match && match.eligible_for_gp_daily !== true) {
+      if (match && match.applicable_to === "store") {
         throw new Error(DAILY_PROMO_INVALID_CODE);
       }
       const response = await applyCouponAPI(code);

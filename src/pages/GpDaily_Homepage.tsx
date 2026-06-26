@@ -1338,7 +1338,7 @@ const Home2: React.FC = () => {
       <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
         <div className="mx-auto w-full max-w-[min(800px,100vw)]">
           <div
-            className="relative px-4 pt-4 pb-1 rounded-b-2xl overflow-hidden"
+            className={`relative px-4 pt-4 rounded-b-2xl overflow-hidden ${showNamasteMarketing ? "pb-0" : "pb-1"}`}
             style={{
               background:
                 "linear-gradient(90deg, rgba(250, 193, 20, 0.4) 0%, rgba(250, 193, 20, 0.2) 100%)",
@@ -1448,7 +1448,7 @@ const Home2: React.FC = () => {
                   }
                 />
               ) : (
-              <div className="relative mt-5 sm:mt-6">
+              <div className={`relative ${showNamasteMarketing ? "mt-2 sm:mt-3" : "mt-5 sm:mt-6"}`}>
                 <div className={`mb-1.5 flex items-center justify-between gap-2 ${gpDailyHome.namasteHeroInset}`}>
                   <h2 className={gpDailyHome.greeting}>
                     {formatNamasteGreeting(isLoggedIn, userFirstName)}
@@ -1563,7 +1563,7 @@ const Home2: React.FC = () => {
                     </div>
                   </div>
                 ) : showNamasteMarketing ? (
-                  <div className="relative min-h-[6rem] pb-1 sm:min-h-[4.5rem]">
+                  <div className="relative pb-0 sm:pb-0">
                     <div
                       className={`relative z-10 min-w-0 ${GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS} ${gpDailyHome.namasteHeroInset}`}
                     >
@@ -1594,7 +1594,7 @@ const Home2: React.FC = () => {
           </div>
 
           <div
-            className={`${gpDailyHome.homeContentArea} flex flex-col ${gpDailyHome.homeSectionStackGap}`}
+            className={`${gpDailyHome.homeContentArea} flex flex-col ${gpDailyHome.homeSectionStackGap}${showNamasteMarketing ? " !pt-2" : ""}`}
           >
             <OffersBannerCarousel
               storeId={dailyBannerStoreId ?? undefined}
@@ -1677,10 +1677,11 @@ const Home2: React.FC = () => {
                   <div className="h-36 animate-pulse rounded-xl bg-gray-200/80" aria-hidden />
                 ) : (
                   <HorizontalScrollSection trackClassName={gpDailyHome.productStrip}>
-                    {allPackProducts.map((pack) => (
+                    {allPackProducts.map((pack, packIdx) => (
                       <div key={pack.id} className={gpDailyHome.productCol}>
                         <ProductCard
                           compact
+                          imagePriority={packIdx < 4}
                           imageUrl={getImageUrl(pack.imagesUrl)}
                           packName={pack.name}
                           categoryName={pack.categoryName}

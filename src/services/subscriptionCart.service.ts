@@ -243,5 +243,36 @@ export const subscriptionCartService = {
       throw new Error(errorMessageFromCatch(e, "Checkout failed"));
     }
   },
+
+  async listCoupons(): Promise<unknown[]> {
+    try {
+      const res = await api.get(`${getApiUrl()}/subscriptions/cart/coupons/`);
+      const body = res.data as { data?: unknown[] } | unknown[];
+      if (Array.isArray(body)) return body;
+      return Array.isArray(body.data) ? body.data : [];
+    } catch (e: unknown) {
+      throw new Error(errorMessageFromCatch(e, "Failed to load promo codes"));
+    }
+  },
+
+  async applyCoupon(couponCode: string): Promise<DailyCart> {
+    try {
+      const res = await api.post(`${getApiUrl()}/subscriptions/cart/apply-coupon/`, {
+        coupon_code: couponCode,
+      });
+      return unwrap<DailyCart>(res.data);
+    } catch (e: unknown) {
+      throw new Error(errorMessageFromCatch(e, "Invalid or expired promo code"));
+    }
+  },
+
+  async removeCoupon(): Promise<DailyCart> {
+    try {
+      const res = await api.post(`${getApiUrl()}/subscriptions/cart/remove-coupon/`, {});
+      return unwrap<DailyCart>(res.data);
+    } catch (e: unknown) {
+      throw new Error(errorMessageFromCatch(e, "Failed to remove promo code"));
+    }
+  },
 };
 

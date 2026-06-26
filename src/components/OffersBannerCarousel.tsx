@@ -14,6 +14,7 @@ import { gpDailyHome } from '../utils/gpDailyHomeDesignSystem';
 import { DesktopHorizontalNavButtons } from './common/HorizontalScrollSection';
 import { GP_LANDING_SECTION_HEADING_CLASS } from '../utils/landingHomeTypography';
 import { SessionCachedImage } from './common/SessionCachedImage';
+import { preloadSessionImage, isSessionImageLoaded, markSessionImageLoaded } from '../utils/sessionImageCache';
 
 interface Props {
   /** Resolved store (guest temp / logged-in selected). Omit or null = no banners request. */
@@ -95,6 +96,7 @@ export function OffersBannerCarousel({
   const [banners, setBanners] = useState<Banner[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [bannerImagesReady, setBannerImagesReady] = useState(false);
   const [imgErrors, setImgErrors] = useState<Record<number, boolean>>({});
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const touchStartX = useRef<number | null>(null);
@@ -148,6 +150,41 @@ export function OffersBannerCarousel({
     };
   }, [storeId, placement]);
 
+  useEffect(() => {
+    banners.forEach((b) => {
+      if (b.image_url) preloadSessionImage(b.image_url);
+    });
+    if (banners.length === 0) {
+      setBannerImagesReady(true);
+      return;
+    }
+    let cancelled = false;
+    setBannerImagesReady(false);
+    Promise.all(
+      banners.map((b) => {
+        const url = (b.image_url ?? "").trim();
+        if (!url) return Promise.resolve();
+        if (isSessionImageLoaded(url)) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          const img = new Image();
+          img.decoding = "sync";
+          img.loading = "eager";
+          img.onload = () => {
+            markSessionImageLoaded(url);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = url;
+        });
+      }),
+    ).then(() => {
+      if (!cancelled) setBannerImagesReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [banners]);
+
   const startAutoSlide = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (banners.length <= 1) return;
@@ -195,7 +232,7 @@ export function OffersBannerCarousel({
     touchEndX.current = null;
   };
 
-  if (loading) {
+  if (loading || !bannerImagesReady) {
     return (
       <div className={`${sectionMarginClass}`}>
         <div
@@ -266,7 +303,8 @@ export function OffersBannerCarousel({
           <SessionCachedImage
             src={banner.image_url!}
             alt={banner.title}
-            className="absolute inset-0 h-full w-full object-contain object-center bg-[#f8f6f1]"
+            priority
+            className="absolute inset-0 h-full w-full object-cover object-center bg-[#f8f6f1]"
             onError={() => setImgErrors(prev => ({ ...prev, [banner.id]: true }))}
           />
         ) : (

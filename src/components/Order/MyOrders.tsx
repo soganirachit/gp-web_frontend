@@ -68,6 +68,8 @@ interface Order {
   order_type?: string;
   status: string;
   createdAt: string;
+  cancelled_at?: string | null;
+  status_updated_at?: string | null;
   deliveryDate?: string;
   deliveryTime?: string;
   total_amount?: string;
@@ -125,13 +127,15 @@ const MyOrders: React.FC = () => {
         enrichedLabel ||
         formatOrderListProductLabel(firstItemName, itemsCount) ||
         undefined;
-      const lineName = firstItemName || productListLabel || "Order";
+      const lineName = firstItemName || productListLabel || "Pack";
       return {
         id: order.id?.toString() || order.order_number || Math.random().toString(),
         order_number: order.order_number || `Order #${order.id}`,
         order_type: String(order.order_type ?? order.orderType ?? "").trim() || undefined,
         status: order.status || "pending",
         createdAt: order.created_at || order.createdAt || new Date().toISOString(),
+        cancelled_at: order.cancelled_at ?? null,
+        status_updated_at: order.status_updated_at ?? null,
         deliveryDate: order.delivery_date || order.deliveryDate,
         deliveryTime: order.delivery_time_slot || order.deliveryTime,
         total_amount: order.total_amount || order.total || "0",
@@ -152,6 +156,18 @@ const MyOrders: React.FC = () => {
             : undefined),
       };
     });
+
+  const dedupeOrdersByNumber = (list: Order[]): Order[] => {
+    const seen = new Set<string>();
+    const out: Order[] = [];
+    for (const o of list) {
+      const key = (o.order_number || o.id || '').trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(o);
+    }
+    return out;
+  };
 
   const filterOrdersForFeature = (sorted: Order[]): Order[] => {
     const isSubscriptionRow = (o: Order) =>
@@ -181,7 +197,7 @@ const MyOrders: React.FC = () => {
         (a: Order, b: Order) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
-      let merged = filterOrdersForFeature(sortedOrders);
+      let merged = dedupeOrdersByNumber(filterOrdersForFeature(sortedOrders));
       let url = nextUrl;
       let prefetchGuard = 0;
       while (
@@ -198,25 +214,26 @@ const MyOrders: React.FC = () => {
         const batchRaw = (raw2 || []) as Record<string, unknown>[];
         await enrichOrdersForList(batchRaw);
         const batch = mapRawToOrders(batchRaw);
-        const filteredBatch = filterOrdersForFeature(
+        const filteredBatch = dedupeOrdersByNumber(
+          filterOrdersForFeature(
           batch.sort(
             (a: Order, b: Order) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
           ),
-        );
-        merged = [...merged, ...filteredBatch].sort(
+        ));
+        merged = dedupeOrdersByNumber([...merged, ...filteredBatch].sort(
           (a: Order, b: Order) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        );
+        ));
       }
       setOrders(merged);
       setNextPageUrl(url);
+      setDisplayLimit(url ? ORDER_LIST_PAGE_SIZE : merged.length);
     } catch (error) {
       console.error("Failed to fetch orders", error);
       setOrders([]);
       setNextPageUrl(null);
     } finally {
-      setDisplayLimit(ORDER_LIST_PAGE_SIZE);
       setLoading(false);
     }
   };
@@ -287,7 +304,10 @@ const MyOrders: React.FC = () => {
 
   const getStatusText = (order: Order) => {
     const s = normalizeOrderStatusKey(order.status ?? '');
-    const date = format(new Date(order.createdAt), 'MMM d');
+    const cancelDateRaw = order.cancelled_at || order.status_updated_at;
+    const date = s.includes('cancel') && cancelDateRaw
+      ? format(new Date(cancelDateRaw), 'MMM d')
+      : format(new Date(order.createdAt), 'MMM d');
 
     if (s === 'delivered') return `Delivered on ${date}`;
     if (s.includes('cancel')) return `Canceled on ${date}`;
@@ -359,7 +379,7 @@ const MyOrders: React.FC = () => {
         noIndex={true}
       />
       <div className="max-w-[800px] mx-auto min-h-screen flex flex-col">
-        <div className="sticky top-0 z-10 bg-[#f8f6f1] px-4 pt-6">
+        <div className="px-4 pt-6">
           <UniformPageHeader
             title="My Order"
             onBack={() => navigate(`${basePath}/account`)}
@@ -369,8 +389,8 @@ const MyOrders: React.FC = () => {
             titleClassName={MY_ORDER_HEADER_TITLE_CLASS}
           />
 
-          {/* Search Bar — unified styling, order suggestions as you type */}
-          <div className="flex gap-3">
+          {/* Search Bar — scrolls with list (not sticky) */}
+          <div className="flex gap-3 pb-4">
             <div className="flex-1">
               <SearchBar
                 mode="order"
@@ -425,7 +445,7 @@ const MyOrders: React.FC = () => {
 
                 return (
                   <div
-                    key={order.id || index}
+                    key={order.order_number || order.id || index}
                     role="button"
                     tabIndex={0}
                     onClick={() =>

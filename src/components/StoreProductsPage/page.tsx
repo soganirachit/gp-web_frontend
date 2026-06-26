@@ -6,9 +6,9 @@ import { IoSwapVerticalOutline } from "react-icons/io5";
 import {
   productService,
   Category,
-  getEffectivePrice,
-  getBasePrice,
-  showStrikeBaseOnCard,
+  getDiscoveryEffectivePrice,
+  getDiscoveryBasePrice,
+  showStrikeBaseOnDiscoveryCard,
   availabilityTypeForChannel,
   type ProductAvailabilityChannel,
 } from "../../services/product.service";
@@ -144,7 +144,7 @@ const StoreProductsPages: React.FC = () => {
     void fetchData();
   }, [categorySlug, stateCategoryName, isLoggedIn, guestStoreEpoch, sortBy, availabilityChannel]);
 
-  const getItemPrice = (item: any): number => getEffectivePrice(item);
+  const getItemPrice = (item: any): number => getDiscoveryEffectivePrice(item);
 
   const sortProducts = (items: any[], sortType: string) => {
     return [...items].sort((a, b) => {
@@ -542,8 +542,8 @@ const StoreProductsPages: React.FC = () => {
                       <div className="mt-auto flex items-center justify-between gap-2">
                         <p className="text-gray-900 text-base font-bold">
                           <span>₹{getItemPrice(item)}</span>
-                          {showStrikeBaseOnCard(item) && (
-                            <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(item)}</span>
+                          {showStrikeBaseOnDiscoveryCard(item) && (
+                            <span className="text-gray-500 font-medium line-through ml-1">₹{getDiscoveryBasePrice(item)}</span>
                           )}
                         </p>
                         <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />

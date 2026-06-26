@@ -17,7 +17,8 @@ export function preloadSessionImage(url: string | null | undefined): void {
   if (!u || typeof window === "undefined") return;
   if (loadedUrls.has(u) || preloadCache.has(u)) return;
   const img = new Image();
-  img.decoding = "async";
+  img.decoding = "sync";
+  img.loading = "eager";
   img.onload = () => markSessionImageLoaded(u);
   img.onerror = () => {
     preloadCache.delete(u);

@@ -11,9 +11,9 @@ import {
   productService,
   Category,
   BestSeller,
-  getEffectivePrice,
-  getBasePrice,
-  showStrikeBaseOnCard,
+  getDiscoveryEffectivePrice,
+  getDiscoveryBasePrice,
+  showStrikeBaseOnDiscoveryCard,
   PRODUCT_AVAILABILITY_STORE,
   resolveProductImageUrl,
 } from "../services/product.service";
@@ -644,7 +644,7 @@ const GpStore_Homepage: React.FC = () => {
                     >
                         <HorizontalScrollSection trackClassName={gpDailyHome.productStrip}>
                             {products.length > 0 ? (
-                                products.map((product) => (
+                                products.map((product, productIdx) => (
                                     <div
                                         key={product.id}
                                         className="gp-store-card-scroll"
@@ -655,7 +655,7 @@ const GpStore_Homepage: React.FC = () => {
                                                 src={resolveProductImageUrl(product as unknown as Record<string, unknown>)}
                                                 alt={product.name}
                                                 className="w-full h-full object-cover"
-                                                loading="lazy"
+                                                priority={productIdx < 4}
                                             />
                                         </div>
                                         <div className="gp-store-card-scroll-inner">
@@ -671,9 +671,9 @@ const GpStore_Homepage: React.FC = () => {
                                             </div>
                                             <div className="mt-auto flex items-center justify-between gap-2">
                                                 <p className="text-gray-900 text-base font-bold">
-                                                    <span>₹{getEffectivePrice(product)}</span>
-                                                    {showStrikeBaseOnCard(product) && (
-                                                        <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(product)}</span>
+                                                    <span>₹{getDiscoveryEffectivePrice(product)}</span>
+                                                    {showStrikeBaseOnDiscoveryCard(product) && (
+                                                        <span className="text-gray-500 font-medium line-through ml-1">₹{getDiscoveryBasePrice(product)}</span>
                                                     )}
                                                 </p>
                                                 <FaChevronRight className="mr-1.5 text-gray-400 text-sm flex-shrink-0" />
@@ -703,7 +703,7 @@ const GpStore_Homepage: React.FC = () => {
                     >
                         <HorizontalScrollSection trackClassName={gpDailyHome.productStrip}>
                             {filteredBestSellers.length > 0 ? (
-                                filteredBestSellers.map((bestSeller) => (
+                                filteredBestSellers.map((bestSeller, bestSellerIdx) => (
                                     <div
                                         key={bestSeller.id}
                                         className="relative gp-store-card-scroll"
@@ -714,8 +714,8 @@ const GpStore_Homepage: React.FC = () => {
                                             <SessionCachedImage
                                                 src={resolveProductImageUrl(bestSeller as unknown as Record<string, unknown>)}
                                                 alt={bestSeller.name}
-                                                loading="lazy"
                                                 className="w-full h-full object-cover"
+                                                priority={bestSellerIdx < 4}
                                             />
                                         </div>
                                         <div className="gp-store-card-scroll-inner">
@@ -731,9 +731,9 @@ const GpStore_Homepage: React.FC = () => {
                                             </div>
                                             <div className="mt-auto flex items-center justify-between gap-2">
                                                 <p className="text-gray-900 text-base font-bold">
-                                                    <span>₹{getEffectivePrice(bestSeller)}</span>
-                                                    {showStrikeBaseOnCard(bestSeller) && (
-                                                        <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(bestSeller)}</span>
+                                                    <span>₹{getDiscoveryEffectivePrice(bestSeller)}</span>
+                                                    {showStrikeBaseOnDiscoveryCard(bestSeller) && (
+                                                        <span className="text-gray-500 font-medium line-through ml-1">₹{getDiscoveryBasePrice(bestSeller)}</span>
                                                     )}
                                                 </p>
                                                 <FaChevronRight className="mr-1.5 text-gray-400 text-sm flex-shrink-0" />
@@ -765,7 +765,7 @@ const GpStore_Homepage: React.FC = () => {
                     >
                         <HorizontalScrollSection trackClassName={gpDailyHome.productStrip}>
                             {premiumProducts.length > 0 ? (
-                                premiumProducts.map((product) => (
+                                premiumProducts.map((product, premiumIdx) => (
                                 <div
                                     key={product.id}
                                     className="gp-store-card-scroll"
@@ -777,7 +777,7 @@ const GpStore_Homepage: React.FC = () => {
                                             src={resolveProductImageUrl(product as unknown as Record<string, unknown>)}
                                             alt={product.name}
                                             className="w-full h-full object-cover"
-                                            loading="lazy"
+                                            priority={premiumIdx < 4}
                                         />
                                     </div>
                                     <div className="gp-store-card-scroll-inner">
@@ -793,9 +793,9 @@ const GpStore_Homepage: React.FC = () => {
                                         </div>
                                         <div className="mt-auto flex items-center justify-between gap-2">
                                             <p className="text-gray-900 text-base font-bold">
-                                                <span>₹{getEffectivePrice(product)}</span>
-                                                {showStrikeBaseOnCard(product) && (
-                                                    <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(product)}</span>
+                                                <span>₹{getDiscoveryEffectivePrice(product)}</span>
+                                                {showStrikeBaseOnDiscoveryCard(product) && (
+                                                    <span className="text-gray-500 font-medium line-through ml-1">₹{getDiscoveryBasePrice(product)}</span>
                                                 )}
                                             </p>
                                             <FaChevronRight className="mr-1.5 text-gray-400 text-sm flex-shrink-0" />

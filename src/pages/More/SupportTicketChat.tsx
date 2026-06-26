@@ -245,6 +245,7 @@ const SupportTicketChat: React.FC = () => {
       orderNumber: orderNum,
       basePath,
       replace: ticketClosed,
+      ticketClosed,
     });
     navigate(path, { replace });
   };

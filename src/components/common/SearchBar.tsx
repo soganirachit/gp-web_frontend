@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaSearch } from 'react-icons/fa';
+import { getDiscoveryEffectivePrice } from '../../services/product.service';
 
 /** Map overlay search input — solid background so map does not show through. */
 export const GP_MAP_SEARCH_INPUT_CLASSES =
@@ -310,7 +311,10 @@ export function SearchBar({
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900 truncate">{item.name}</p>
                   <p className="text-xs text-gray-600">
-                    ₹{item.effective_price ?? item.current_price ?? item.sellingPrice ?? '—'}
+                    ₹{(() => {
+                      const p = getDiscoveryEffectivePrice(item);
+                      return p > 0 ? p : '—';
+                    })()}
                   </p>
                 </div>
               </button>
