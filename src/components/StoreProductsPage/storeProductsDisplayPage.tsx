@@ -18,9 +18,9 @@ import { resolveProductShareUrl, shareProductLink } from "../../utils/productSha
 import { FaChevronRight, FaMinus, FaPlus } from "react-icons/fa";
 import {
   productService,
-  getEffectivePrice,
-  getBasePrice,
-  showStrikeBaseOnCard,
+  getDiscoveryEffectivePrice,
+  getDiscoveryBasePrice,
+  showStrikeBaseOnDiscoveryCard,
   PRODUCT_AVAILABILITY_STORE,
   formatRupeePdpAmount,
   buildCatalogPdpGalleryImages,
@@ -1284,9 +1284,9 @@ const StorePage: React.FC = () => {
                       </div>
                       <div className="mt-auto flex items-center justify-between gap-2">
                         <p className="text-base font-bold text-gray-900">
-                          <span>₹{getEffectivePrice(item)}</span>
-                          {showStrikeBaseOnCard(item) && (
-                            <span className="text-gray-500 font-medium line-through ml-1">₹{getBasePrice(item)}</span>
+                          <span>₹{getDiscoveryEffectivePrice(item)}</span>
+                          {showStrikeBaseOnDiscoveryCard(item) && (
+                            <span className="text-gray-500 font-medium line-through ml-1">₹{getDiscoveryBasePrice(item)}</span>
                           )}
                         </p>
                         <FaChevronRight className="text-gray-400 text-sm flex-shrink-0" />

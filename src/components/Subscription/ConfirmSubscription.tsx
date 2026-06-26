@@ -1251,19 +1251,33 @@ const ConfirmSubscription: React.FC = () => {
 
               {/* Items */}
               <div className="space-y-2 mb-4">
-                {checkoutItems.map((it) => (
-                  <div key={String(it?.id ?? Math.random())} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img src={ordercnfSvg} alt="Box" className="w-6 h-6 opacity-80" />
-                      <span className="text-gray-900 text-sm font-medium truncate">
-                        {String(it?.product?.name ?? 'Pack')} x {Number(it?.quantity ?? 1)}
+                {checkoutItems.map((it) => {
+                  const unitPrice = Number(it?.unit_price ?? 0);
+                  const unitLabel = String(it?.product?.unit ?? 'Pack');
+                  const qty = Number(it?.quantity ?? 1);
+                  const productName = String(it?.product?.name ?? 'Pack');
+                  return (
+                    <div
+                      key={String(it?.id ?? productName)}
+                      className="flex items-start justify-between gap-3"
+                    >
+                      <div className="flex min-w-0 flex-1 items-start gap-2">
+                        <img
+                          src={ordercnfSvg}
+                          alt=""
+                          className="mt-0.5 h-5 w-5 shrink-0 opacity-80"
+                          aria-hidden
+                        />
+                        <span className="min-w-0 text-xs font-medium leading-snug text-gray-900 line-clamp-2">
+                          {productName} x {qty}
+                        </span>
+                      </div>
+                      <span className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-900">
+                        ₹{unitPrice}/{unitLabel}
                       </span>
                     </div>
-                    <span className="text-gray-900 text-sm font-medium">
-                      ₹{Number(it?.unit_price ?? 0)}/{String(it?.product?.unit ?? 'Pack')}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
                 <div className="flex items-center justify-between pt-2 border-t">
                   <span className="text-gray-600 text-sm">Delivery fee</span>
                   <span className="text-gray-900 text-sm font-medium">₹{fee}</span>

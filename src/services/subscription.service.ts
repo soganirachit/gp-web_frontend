@@ -240,6 +240,7 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
     nextDeliveryDate: nextDeliveryDate && !Number.isNaN(nextDeliveryDate.getTime()) ? nextDeliveryDate : undefined,
     pausedUntilDate:
       pausedUntilDate && !Number.isNaN(pausedUntilDate.getTime()) ? pausedUntilDate : undefined,
+    paymentMethod: String(raw.payment_method ?? raw.paymentMethod ?? "wallet").toLowerCase(),
     pauseReason: (() => {
       const rawReason = raw.pause_reason ?? raw.pauseReason;
       return rawReason != null && String(rawReason).trim()
@@ -323,6 +324,8 @@ export interface Subscription {
   totalAmount?: number;
   deliveryFee?: number;
   nextDeliveryDate?: Date;
+  /** wallet | cod from API `payment_method`. */
+  paymentMethod?: string;
   /** Auto-resume date when status is PAUSED (`paused_until_date` from API). */
   pausedUntilDate?: Date;
   /** Why the subscription was paused (`pause_reason` from API). */

@@ -154,6 +154,7 @@ interface OrderDetails {
   cancelled_at: string | null;
   cancellation_reason: string;
   created_at: string;
+  status_updated_at?: string | null;
   /** Optional — when API returns invoice metadata for footer line */
   invoice_number?: string;
   invoice_date?: string;
@@ -582,10 +583,20 @@ const OrderDetails: React.FC = () => {
   const supportStatusAnchorIso = (() => {
     const k = normalizeOrderStatusKey(order.status);
     if (k === "cancelled") {
-      return order.cancelled_at || cancelledEvent?.created_at || null;
+      return (
+        order.cancelled_at ||
+        cancelledEvent?.created_at ||
+        order.status_updated_at ||
+        null
+      );
     }
     if (k === "delivered") {
-      return order.delivered_at || deliveredEvent?.created_at || null;
+      return (
+        order.delivered_at ||
+        deliveredEvent?.created_at ||
+        order.status_updated_at ||
+        null
+      );
     }
     return null;
   })();

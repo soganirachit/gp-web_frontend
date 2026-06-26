@@ -345,12 +345,12 @@ const AddEditAddress: React.FC = () => {
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
-    const hadInvalidLocation = locationValidation?.isValid === false;
+    const shouldShakeInvalidLocation = locationValidation?.isValid === false;
 
     // Validate location before saving
     const isLocationValid = await validateLocation();
     if (!isLocationValid) {
-      if (hadInvalidLocation) {
+      if (shouldShakeInvalidLocation) {
         setLocationValidationShakeKey((key) => key + 1);
       }
       return;

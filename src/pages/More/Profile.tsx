@@ -57,10 +57,11 @@ const Profile: React.FC = () => {
   ) => {
     if (!input) return;
     try {
-      if ('showPicker' in input) {
-        await (input as HTMLInputElement & { showPicker: () => Promise<void> }).showPicker();
+      const picker = input as HTMLInputElement & { showPicker?: () => Promise<void> };
+      if (typeof picker.showPicker === 'function') {
+        await picker.showPicker();
       } else {
-        input.click();
+        picker.click();
       }
     } catch (e: unknown) {
       const name = (e as DOMException)?.name;

@@ -19,6 +19,8 @@ interface ProductCardProps {
   compact?: boolean;
   /** Optional API labels (shown on image top-left; overrides showBestsellerTag when set) */
   labels?: { name?: string; slug?: string }[];
+  /** Eager-load above-the-fold product thumbnails without progressive paint. */
+  imagePriority?: boolean;
   onClick?: () => void;
   className?: string;
 }
@@ -34,6 +36,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   showBestsellerTag = false,
   compact = false,
   labels,
+  imagePriority = false,
   onClick,
   className = ''
 }) => {
@@ -77,6 +80,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           src={imageUrl}
           alt={packName}
           className="w-full h-full object-cover"
+          priority={imagePriority}
         />
 
         {(labels && labels.length > 0) ? (

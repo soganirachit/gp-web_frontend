@@ -3,9 +3,9 @@ import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { IoArrowBack } from "react-icons/io5";
 import {
   productService,
-  getEffectivePrice,
-  getBasePrice,
-  showStrikeBaseOnCard,
+  getDiscoveryEffectivePrice,
+  getDiscoveryBasePrice,
+  showStrikeBaseOnDiscoveryCard,
   PRODUCT_AVAILABILITY_DAILY,
   PRODUCT_AVAILABILITY_STORE,
 } from "../../services/product.service";
@@ -264,9 +264,9 @@ const ExploreMore: React.FC = () => {
   };
 
   const renderCard = (item: any, index: number) => {
-    const effective = getEffectivePrice(item);
-    const base = getBasePrice(item);
-    const showStrike = showStrikeBaseOnCard(item);
+    const effective = getDiscoveryEffectivePrice(item);
+    const base = getDiscoveryBasePrice(item);
+    const showStrike = showStrikeBaseOnDiscoveryCard(item);
     const price = effective > 0 ? `₹${effective}` : "";
 
     const imageUrl = item.primary_image || getImageUrl(item.imagesUrl);

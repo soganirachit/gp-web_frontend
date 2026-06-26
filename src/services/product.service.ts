@@ -218,13 +218,7 @@ export function mapGpDailyCatalogRowToProduct(
       : Array.isArray(row.imagesUrl)
         ? (row.imagesUrl as string[])
         : undefined;
-  const price = Number(
-    row.current_price ??
-      row.sale_price ??
-      row.base_price ??
-      row.sellingPrice ??
-      0,
-  );
+  const price = getDiscoveryEffectivePrice(row);
   const desc = String(
     row.short_description ?? row.description ?? "",
   ).trim();
@@ -307,6 +301,9 @@ export interface BestSeller {
   unit: string;
   labels: ProductLabel[];
   in_stock: boolean;
+  /** Present when list API includes variant summary (see backend note). */
+  variants?: Array<Record<string, unknown>>;
+  min_variant_final_price?: number | string;
 }
 
 export const productService = {
@@ -667,6 +664,11 @@ export const productService = {
       p.current_price != null ? Number(p.current_price) : p.sellingPrice != null ? Number(p.sellingPrice) : 0;
     const effective_price =
       p.effective_price != null ? String(p.effective_price) : String(current_price);
+    const discoveryPrice = getDiscoveryEffectivePrice({
+      ...p,
+      current_price,
+      effective_price,
+    });
     return {
       id,
       name,
@@ -678,8 +680,8 @@ export const productService = {
       availability_type: p.availability_type ?? 'store',
       base_price,
       sale_price: p.sale_price ?? null,
-      current_price,
-      effective_price,
+      current_price: discoveryPrice,
+      effective_price: String(discoveryPrice),
       discount_percentage: p.discount_percentage ?? 0,
       primary_image,
       is_featured: p.is_featured ?? false,
@@ -688,6 +690,10 @@ export const productService = {
       unit: p.unit ?? 'pack',
       labels: Array.isArray(p.labels) ? p.labels : [],
       in_stock: p.in_stock ?? true,
+      ...(Array.isArray(p.variants) ? { variants: p.variants } : {}),
+      ...(p.min_variant_final_price != null
+        ? { min_variant_final_price: p.min_variant_final_price }
+        : {}),
     };
   },
 
@@ -932,4 +938,113 @@ export function showStrikeBaseOnCard(item: any): boolean {
   if (effective >= 1000) return false;
   const priceText = `₹${effective}`;
   return priceText.length <= 7;
+}
+
+/** Active catalog variants (list/detail payloads). */
+export function getActiveProductVariants(item: any): any[] {
+  if (item == null) return [];
+  const variants = item.variants;
+  if (!Array.isArray(variants) || variants.length === 0) return [];
+  return variants.filter((v: any) => v?.is_active !== false);
+}
+
+/** Resolve one variant's payable price (final_price or product effective + adjustment). */
+export function parseVariantFinalPrice(variant: any, product?: any): number {
+  if (variant == null) return NaN;
+  const raw =
+    variant.final_price ??
+    variant.price ??
+    variant.sale_price ??
+    variant.current_price;
+  const direct = raw != null ? parseFloat(String(raw)) : NaN;
+  if (Number.isFinite(direct) && direct >= 0) return direct;
+  if (product != null && variant.price_adjustment != null) {
+    const adj = parseFloat(String(variant.price_adjustment));
+    const base = getEffectivePrice(product);
+    if (Number.isFinite(adj) && Number.isFinite(base)) return base + adj;
+  }
+  return NaN;
+}
+
+/**
+ * Lowest active variant price when variant data is present on the payload.
+ * Also reads precomputed list fields once the catalog API exposes them.
+ */
+export function getMinVariantFinalPrice(item: any): number | null {
+  if (item == null) return null;
+  for (const key of [
+    "min_variant_final_price",
+    "min_variant_price",
+    "lowest_variant_price",
+  ] as const) {
+    if (item[key] != null) {
+      const n = parseFloat(String(item[key]));
+      if (Number.isFinite(n) && n >= 0) return n;
+    }
+  }
+  const variants = getActiveProductVariants(item);
+  if (variants.length === 0) return null;
+  let min = Infinity;
+  for (const v of variants) {
+    const p = parseVariantFinalPrice(v, item);
+    if (Number.isFinite(p) && p >= 0 && p < min) min = p;
+  }
+  return min === Infinity ? null : min;
+}
+
+/** Discovery/listing cards — show lowest variant price when the product has variants. */
+export function getDiscoveryEffectivePrice(item: any): number {
+  const minVariant = getMinVariantFinalPrice(item);
+  if (minVariant != null) return minVariant;
+  return getEffectivePrice(item);
+}
+
+/** MRP for the cheapest variant (for struck-through price on discovery cards). */
+export function getDiscoveryBasePrice(item: any): number {
+  const variants = getActiveProductVariants(item);
+  if (variants.length === 0) return getBasePrice(item);
+
+  let minVariant: any = null;
+  let min = Infinity;
+  for (const v of variants) {
+    const p = parseVariantFinalPrice(v, item);
+    if (Number.isFinite(p) && p >= 0 && p < min) {
+      min = p;
+      minVariant = v;
+    }
+  }
+
+  if (minVariant) {
+    const rawBase =
+      minVariant.base_price ??
+      minVariant.list_price ??
+      minVariant.mrp ??
+      minVariant.original_price;
+    if (rawBase != null && String(rawBase).trim() !== "") {
+      const b = parseFloat(String(rawBase));
+      if (Number.isFinite(b) && b > 0) return b;
+    }
+    const productBase = getBasePrice(item);
+    const adj =
+      minVariant.price_adjustment != null
+        ? parseFloat(String(minVariant.price_adjustment))
+        : 0;
+    if (Number.isFinite(productBase) && productBase > 0 && Number.isFinite(adj)) {
+      return productBase + adj;
+    }
+  }
+
+  return getBasePrice(item);
+}
+
+/** Strikethrough MRP on discovery cards — uses cheapest variant pricing when applicable. */
+export function showStrikeBaseOnDiscoveryCard(item: any): boolean {
+  const base = getDiscoveryBasePrice(item);
+  const effective = getDiscoveryEffectivePrice(item);
+  const hasDiscount =
+    (item?.discount_percentage != null && item.discount_percentage > 0) ||
+    (base > 0 && effective < base);
+  if (!hasDiscount) return false;
+  if (effective >= 1000) return false;
+  return `₹${effective}`.length <= 7;
 }

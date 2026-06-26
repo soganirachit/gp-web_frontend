@@ -1,11 +1,17 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { IoArrowBack } from "react-icons/io5";
 
 import { subscriptionService, type Subscription } from "../../../services/subscription.service";
+import { walletService } from "../../../services/wallet.service";
 import { SubscriptionFlowSkeleton } from "../../../components/common/PageSkeletons";
 import { useFeatureTheme } from "../../../context/FeatureThemeContext";
+import {
+  InsufficientWalletModal,
+  computeMinimumSubscriptionWalletRecharge,
+} from "../../../components/daily/InsufficientWalletModal";
+import { REQUIRED_TOAST } from "../../../utils/requiredFieldToast";
 
 const WEEK_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
@@ -37,6 +43,14 @@ const ModifySubscription: React.FC = () => {
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [insufficientWalletModal, setInsufficientWalletModal] = useState<{
+    currentBalance: number;
+    requiredAmount: number;
+    shortageAmount: number;
+  } | null>(null);
+  const initialLineQuantitiesRef = useRef<number[]>([]);
+  const initialDeliveryTypeRef = useRef<"daily" | "custom">("daily");
+  const initialSelectedDaysRef = useRef<string[]>([]);
 
   const lineItems = useMemo(() => {
     if (!subscription) return [];
@@ -156,6 +170,11 @@ const ModifySubscription: React.FC = () => {
       return Number.isFinite(q) && q >= 1 ? Math.round(q) : 1;
     });
     setLineQuantities(qtys.length > 0 ? qtys : [1]);
+    initialLineQuantitiesRef.current = qtys.length > 0 ? [...qtys] : [1];
+    initialDeliveryTypeRef.current = isCustom ? "custom" : "daily";
+    initialSelectedDaysRef.current = isCustom
+      ? (shorts.length ? [...shorts] : [...WEEK_SHORT])
+      : [...WEEK_SHORT];
   }, [subscription, lineItems]);
 
   const subscribedDaysDisplay = useMemo(() => {
@@ -194,6 +213,56 @@ const ModifySubscription: React.FC = () => {
     if (deliveryType === "custom" && selectedDays.length < 3) {
       toast.error("Please select at least 3 delivery days");
       return;
+    }
+
+    const paymentMethod = (subscription.paymentMethod ?? "wallet").toLowerCase();
+    const deliveryFee = Number(subscription.deliveryFee ?? 0);
+    const newProductTotal = lineItems.reduce((sum, li, idx) => {
+      const unit = Number(li.unitPrice ?? 0);
+      const qty = lineQuantities[idx] ?? li.quantity ?? 1;
+      return sum + unit * qty;
+    }, 0);
+    const newDailyTotal = newProductTotal + deliveryFee;
+    const oldProductTotal = lineItems.reduce((sum, li, idx) => {
+      const unit = Number(li.unitPrice ?? 0);
+      const qty = initialLineQuantitiesRef.current[idx] ?? li.quantity ?? 1;
+      return sum + unit * qty;
+    }, 0);
+    const oldDailyTotal = oldProductTotal + deliveryFee;
+    const daysIncreased =
+      deliveryType === "custom" &&
+      initialDeliveryTypeRef.current === "custom" &&
+      selectedDays.length > initialSelectedDaysRef.current.length;
+    const qtyIncreased = lineQuantities.some(
+      (q, idx) => q > (initialLineQuantitiesRef.current[idx] ?? 1),
+    );
+    const switchedToDaily =
+      deliveryType === "daily" && initialDeliveryTypeRef.current === "custom";
+
+    if (
+      paymentMethod === "wallet" &&
+      (qtyIncreased || daysIncreased || switchedToDaily || newDailyTotal > oldDailyTotal)
+    ) {
+      try {
+        const { balance: walletBalance } = await walletService.getWalletBalance();
+        const { threeDayRequiredAmount } = computeMinimumSubscriptionWalletRecharge(
+          newDailyTotal,
+          0,
+        );
+        if (walletBalance < threeDayRequiredAmount) {
+          const shortage = Math.max(0, threeDayRequiredAmount - walletBalance);
+          toast.error(REQUIRED_TOAST.WALLET_LOW_SUBSCRIPTION);
+          setInsufficientWalletModal({
+            currentBalance: walletBalance,
+            requiredAmount: newDailyTotal,
+            shortageAmount: shortage,
+          });
+          return;
+        }
+      } catch {
+        toast.error("Could not verify wallet balance. Please try again.");
+        return;
+      }
     }
 
     try {
@@ -507,6 +576,18 @@ const ModifySubscription: React.FC = () => {
           </button>
         </div>
       </div>
+      {insufficientWalletModal && (
+        <InsufficientWalletModal
+          currentBalance={insufficientWalletModal.currentBalance}
+          requiredAmount={insufficientWalletModal.requiredAmount}
+          shortageAmount={insufficientWalletModal.shortageAmount}
+          onClose={() => setInsufficientWalletModal(null)}
+          onRecharge={() => {
+            setInsufficientWalletModal(null);
+            navigate("/wallet");
+          }}
+        />
+      )}
     </div>
   );
 };

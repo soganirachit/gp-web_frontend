@@ -89,7 +89,7 @@ export function resolveOrderListCardTitle(order: {
     return fromProduct;
   }
 
-  return "Order";
+  return "Pack";
 }
 
 function imageFromProductRecord(

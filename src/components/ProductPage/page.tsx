@@ -6,9 +6,9 @@ import { SEO } from "../SEO";
 import {
   productService,
   type Category,
-  getEffectivePrice,
-  getBasePrice,
-  showStrikeBaseOnCard,
+  getDiscoveryEffectivePrice,
+  getDiscoveryBasePrice,
+  showStrikeBaseOnDiscoveryCard,
   resolveProductImageUrl,
   availabilityTypeForChannel,
   mapGpDailyCatalogRowToProduct,
@@ -177,7 +177,7 @@ const ProductBrowsePage: React.FC = () => {
     return [...items].sort((a, b) => {
       switch (sortType) {
         case "Price": {
-          return getEffectivePrice(a) - getEffectivePrice(b);
+          return getDiscoveryEffectivePrice(a) - getDiscoveryEffectivePrice(b);
         }
         case "Popularity":
           return 0;
@@ -524,7 +524,7 @@ const ProductBrowsePage: React.FC = () => {
                   {visibleProducts.map((item) => {
                     const row = item as Record<string, unknown>;
                     const key = row.id ?? row.slug ?? String(row.name);
-                    const eff = getEffectivePrice(item);
+                    const eff = getDiscoveryEffectivePrice(item);
                     const labels = (Array.isArray(row.labels) && row.labels.length > 0
                       ? row.labels
                       : null) as { name?: string; slug?: string }[] | null;
@@ -594,9 +594,9 @@ const ProductBrowsePage: React.FC = () => {
                               <span>
                                 ₹{Math.round(eff)}
                               </span>
-                              {showStrikeBaseOnCard(item) && (
+                              {showStrikeBaseOnDiscoveryCard(item) && (
                                 <span className="ml-1 text-gray-500 font-medium line-through">
-                                  ₹{getBasePrice(item)}
+                                  ₹{getDiscoveryBasePrice(item)}
                                 </span>
                               )}
                             </p>

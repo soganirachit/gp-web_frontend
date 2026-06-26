@@ -842,11 +842,11 @@ const ManageMySubscription: React.FC = () => {
 
   if (subscriptions.length === 0) {
     return (
-      <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
-        <div className="max-w-md mx-auto p-4">
-          <div className="bg-white rounded-lg p-6 shadow-sm text-center">
+      <div className="flex min-h-[calc(100dvh-var(--gp-nav-height,4rem))] flex-col bg-[#f8f6f1] pb-nav-bottom">
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-8">
+          <div className="w-full rounded-lg bg-white p-6 text-center shadow-sm">
             <svg
-              className="w-16 h-16 text-gray-300 mx-auto mb-4"
+              className="mx-auto mb-4 h-16 w-16 text-gray-300"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -858,14 +858,15 @@ const ManageMySubscription: React.FC = () => {
                 d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
               />
             </svg>
-            <h2 className="text-xl font-semibold mb-2">No Subscriptions</h2>
-            <p className="text-gray-600 mb-6">
+            <h2 className="mb-2 text-xl font-semibold">No Subscriptions</h2>
+            <p className="mb-6 text-gray-600">
               You don't have any subscriptions. Subscribe to a base pack to get
               started.
             </p>
             <button
+              type="button"
               onClick={() => navigate("/gp-daily/products?category=pujaflowers")}
-              className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium"
+              className="rounded-lg bg-[#FAA222] px-6 py-3 font-medium text-[#111827] transition-opacity hover:opacity-90"
             >
               Browse Subscribe Packs
             </button>

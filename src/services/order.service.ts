@@ -7,6 +7,7 @@ import {
     formatOrderListProductLabel,
     resolveOrderItemsCount,
 } from "../utils/orderListDisplay";
+import { normalizeOrderStatusKey } from "../utils/customerOrderStatus";
 
 const MAX_ORDER_LIST_PAGES = 40;
 
@@ -296,7 +297,10 @@ class OrderService {
                 );
                 const missingSecond =
                     count > 1 && !extractSecondItemImageFromOrderRaw(o);
-                return !fromList || missingSecond;
+                const isCancelled = normalizeOrderStatusKey(
+                    String(o.status ?? ""),
+                ).includes("cancel");
+                return !fromList || missingSecond || isCancelled;
             })
             .slice(0, maxFetches);
 

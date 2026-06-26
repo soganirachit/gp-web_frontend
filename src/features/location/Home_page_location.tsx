@@ -68,6 +68,11 @@ const HomePageLocation: React.FC = () => {
   } | null>(null);
   const [, setIsLoadingLocation] = useState(false);
   const [isLocationServiced, setIsLocationServiced] = useState(true);
+  const [locationValidation, setLocationValidation] = useState<{
+    isValid: boolean;
+    message?: string;
+  } | null>(null);
+  const [locationValidationShakeKey, setLocationValidationShakeKey] = useState(0);
   const [isValidatingDeliveryZone, setIsValidatingDeliveryZone] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   // const [useRegularMarker, setUseRegularMarker] = useState(false);
@@ -334,9 +339,26 @@ const HomePageLocation: React.FC = () => {
             ? await addressService.validateAddressInDeliveryArea(coordinates)
             : await validateGpDailyDeliveryAreaFromCoordinates(coordinates);
         setIsLocationServiced(validation.isValid);
+        if (validation.isValid) {
+          setLocationValidation({
+            isValid: true,
+            message: validation.message || "We deliver to this location.",
+          });
+        } else {
+          setLocationValidation({
+            isValid: false,
+            message:
+              validation.message ||
+              "This location is outside our delivery area.",
+          });
+        }
       } catch (error) {
         console.error("Error validating delivery zone:", error);
         setIsLocationServiced(false);
+        setLocationValidation({
+          isValid: false,
+          message: "This location is outside our delivery area.",
+        });
       } finally {
         setIsValidatingDeliveryZone(false);
       }
@@ -354,6 +376,8 @@ const HomePageLocation: React.FC = () => {
     try {
       // Clear previous errors
       setError(null);
+
+      const shouldShakeInvalidLocation = locationValidation?.isValid === false;
 
       // Basic validation
       if (!addressDetails.houseNo.trim()) {
@@ -382,6 +406,13 @@ const HomePageLocation: React.FC = () => {
         return;
       }
 
+      if (!isLocationServiced) {
+        if (shouldShakeInvalidLocation) {
+          setLocationValidationShakeKey((key) => key + 1);
+        }
+        return;
+      }
+
       // If we reach here, all validations passed
       const addressData = {
         houseNo: addressDetails.houseNo,
@@ -402,12 +433,8 @@ const HomePageLocation: React.FC = () => {
       // Notify parent components about the address update
       window.dispatchEvent(new Event('addressUpdated'));
       
-      // Navigate if location is serviced
-      if (isLocationServiced) {
-        navigate(returnUrl);
-      } else {
-        setShowLocationModal(true);
-      }
+      // Navigate when location is serviceable
+      navigate(returnUrl);
       
     } catch (error) {
       console.error("Error saving address:", error);
@@ -683,15 +710,7 @@ const HomePageLocation: React.FC = () => {
                 <Spinner size={16} />
                 <span>Checking delivery zone...</span>
               </div>
-            ) : (
-              <div className={`text-sm px-2 py-1 rounded-full ${
-                isLocationServiced 
-                  ? 'bg-green-100 text-green-700' 
-                  : 'bg-red-100 text-red-700'
-              }`}>
-                {isLocationServiced ? '✓ Delivery Available' : '✗ Outside Delivery Area'}
-              </div>
-            )}
+            ) : null}
           </div>
           <div className="grid md:grid-cols-2 gap-4">
             <input
@@ -783,6 +802,21 @@ const HomePageLocation: React.FC = () => {
 
         {/* Confirm Button */}
         <div className="mt-4 w-full md:mt-6">
+          {locationValidation && !locationValidation.isValid ? (
+            <div
+              key={locationValidationShakeKey}
+              className={[
+                'mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800',
+                locationValidationShakeKey > 0 ? 'gp-address-validation-shake' : '',
+              ].join(' ')}
+              role="alert"
+            >
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-2 w-2 flex-shrink-0 rounded-full bg-red-500" />
+                <span>{locationValidation.message}</span>
+              </div>
+            </div>
+          ) : null}
           <button
             onClick={handleSaveLocation}
             className={`w-full py-3 rounded-3xl font-medium transition-colors ${theme.classes.primaryButton} ${theme.classes.primaryButtonHover}`}
