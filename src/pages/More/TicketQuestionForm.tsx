@@ -54,12 +54,7 @@ const TicketQuestionForm: React.FC = () => {
   const returnTo = supportNavState.returnTo;
 
   const goBackFromQuestions = () => {
-    const { path, replace } = resolveSupportBackNavigation({
-      returnTo,
-      orderNumber,
-      basePath: supportBasePath,
-    });
-    navigate(path, { replace });
+    navigate(`${supportBasePath}/customer-support`, { replace: false });
   };
 
   const [questions, setQuestions] = useState<TicketQuestion[]>([]);

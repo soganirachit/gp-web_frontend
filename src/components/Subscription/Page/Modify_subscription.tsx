@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { IoArrowBack } from "react-icons/io5";
@@ -9,9 +9,12 @@ import { SubscriptionFlowSkeleton } from "../../../components/common/PageSkeleto
 import { useFeatureTheme } from "../../../context/FeatureThemeContext";
 import {
   InsufficientWalletModal,
+  InsufficientWalletRechargeCard,
   computeMinimumSubscriptionWalletRecharge,
+  type InsufficientWalletDetails,
 } from "../../../components/daily/InsufficientWalletModal";
-import { REQUIRED_TOAST } from "../../../utils/requiredFieldToast";
+import { REQUIRED_TOAST } from "../../../constants/requiredToastMessages";
+import { rechargeWalletInApp } from "../../../utils/walletRechargeCheckout";
 
 const WEEK_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
@@ -43,11 +46,10 @@ const ModifySubscription: React.FC = () => {
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [insufficientWalletModal, setInsufficientWalletModal] = useState<{
-    currentBalance: number;
-    requiredAmount: number;
-    shortageAmount: number;
-  } | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [walletRecharging, setWalletRecharging] = useState(false);
+  const [insufficientWalletModal, setInsufficientWalletModal] =
+    useState<InsufficientWalletDetails | null>(null);
   const initialLineQuantitiesRef = useRef<number[]>([]);
   const initialDeliveryTypeRef = useRef<"daily" | "custom">("daily");
   const initialSelectedDaysRef = useRef<string[]>([]);
@@ -184,6 +186,105 @@ const ModifySubscription: React.FC = () => {
     return formatDayListShort(selectedDays);
   }, [deliveryType, selectedDays]);
 
+  const deliveryFee = Number(subscription?.deliveryFee ?? 0);
+
+  const projectedDailyTotal = useMemo(() => {
+    let productTotal = lineItems.reduce((sum, li, idx) => {
+      const qty = lineQuantities[idx] ?? li.quantity ?? 1;
+      let unit = Number(li.unitPrice ?? 0);
+      if (unit <= 0 && qty > 0 && Number(li.subtotal) > 0) {
+        unit = Number(li.subtotal) / qty;
+      }
+      return sum + unit * qty;
+    }, 0);
+    if (productTotal <= 0 && subscription?.totalAmount) {
+      productTotal = Number(subscription.totalAmount) - deliveryFee;
+    }
+    if (productTotal <= 0 && subscription?.amount) {
+      productTotal = Number(subscription.amount);
+    }
+    return Math.max(0, productTotal + deliveryFee);
+  }, [lineItems, lineQuantities, deliveryFee, subscription?.totalAmount, subscription?.amount]);
+
+  const isCodPayment =
+    (subscription?.paymentMethod ?? "wallet").toLowerCase() === "cod";
+
+  const hasCostIncrease = useMemo(() => {
+    const oldProductTotal = lineItems.reduce((sum, li, idx) => {
+      const unit = Number(li.unitPrice ?? 0);
+      const qty = initialLineQuantitiesRef.current[idx] ?? li.quantity ?? 1;
+      return sum + unit * qty;
+    }, 0);
+    const oldDailyTotal = oldProductTotal + deliveryFee;
+    const daysIncreased =
+      deliveryType === "custom" &&
+      initialDeliveryTypeRef.current === "custom" &&
+      selectedDays.length > initialSelectedDaysRef.current.length;
+    const qtyIncreased = lineQuantities.some(
+      (q, idx) => q > (initialLineQuantitiesRef.current[idx] ?? 1),
+    );
+    const switchedToDaily =
+      deliveryType === "daily" && initialDeliveryTypeRef.current === "custom";
+    return (
+      qtyIncreased ||
+      daysIncreased ||
+      switchedToDaily ||
+      projectedDailyTotal > oldDailyTotal
+    );
+  }, [lineItems, lineQuantities, deliveryFee, deliveryType, selectedDays, projectedDailyTotal]);
+
+  const refreshWalletBalance = useCallback(async () => {
+    if (isCodPayment) return;
+    try {
+      const { balance } = await walletService.getWalletBalance();
+      setWalletBalance(balance);
+    } catch {
+      setWalletBalance(null);
+    }
+  }, [isCodPayment]);
+
+  useEffect(() => {
+    void refreshWalletBalance();
+  }, [refreshWalletBalance]);
+
+  useEffect(() => {
+    if (isCodPayment) return;
+    void refreshWalletBalance();
+  }, [lineQuantities, selectedDays, deliveryType, isCodPayment, refreshWalletBalance]);
+
+  const walletShortageDetails = useMemo((): InsufficientWalletDetails | null => {
+    if (isCodPayment || walletBalance == null) return null;
+    const { threeDayRequiredAmount } = computeMinimumSubscriptionWalletRecharge(
+      projectedDailyTotal,
+      0,
+    );
+    if (walletBalance >= threeDayRequiredAmount) return null;
+    return {
+      currentBalance: walletBalance,
+      requiredAmount: projectedDailyTotal,
+      shortageAmount: Math.max(0, threeDayRequiredAmount - walletBalance),
+      contextLabel:
+        "Please recharge your wallet before saving subscription changes.",
+    };
+  }, [isCodPayment, walletBalance, projectedDailyTotal]);
+
+  const handleWalletRecharge = async (amount: number) => {
+    try {
+      setWalletRecharging(true);
+      await rechargeWalletInApp(amount);
+      toast.success("Wallet recharged successfully");
+      setInsufficientWalletModal(null);
+      const { balance } = await walletService.getWalletBalance();
+      setWalletBalance(balance);
+    } catch (e: unknown) {
+      const msg =
+        e instanceof Error ? e.message : "Recharge failed. Please try again.";
+      toast.error(msg);
+    } finally {
+      setWalletRecharging(false);
+    }
+  };
+
   const handleDayToggle = (day: string) => {
     if (deliveryType === "daily") return;
     if (selectedDays.includes(day)) {
@@ -216,35 +317,21 @@ const ModifySubscription: React.FC = () => {
     }
 
     const paymentMethod = (subscription.paymentMethod ?? "wallet").toLowerCase();
-    const deliveryFee = Number(subscription.deliveryFee ?? 0);
-    const newProductTotal = lineItems.reduce((sum, li, idx) => {
-      const unit = Number(li.unitPrice ?? 0);
-      const qty = lineQuantities[idx] ?? li.quantity ?? 1;
-      return sum + unit * qty;
-    }, 0);
-    const newDailyTotal = newProductTotal + deliveryFee;
-    const oldProductTotal = lineItems.reduce((sum, li, idx) => {
-      const unit = Number(li.unitPrice ?? 0);
-      const qty = initialLineQuantitiesRef.current[idx] ?? li.quantity ?? 1;
-      return sum + unit * qty;
-    }, 0);
-    const oldDailyTotal = oldProductTotal + deliveryFee;
-    const daysIncreased =
-      deliveryType === "custom" &&
-      initialDeliveryTypeRef.current === "custom" &&
-      selectedDays.length > initialSelectedDaysRef.current.length;
-    const qtyIncreased = lineQuantities.some(
-      (q, idx) => q > (initialLineQuantitiesRef.current[idx] ?? 1),
-    );
-    const switchedToDaily =
-      deliveryType === "daily" && initialDeliveryTypeRef.current === "custom";
+
+    if (walletShortageDetails && hasCostIncrease) {
+      toast.error(REQUIRED_TOAST.WALLET_LOW_SUBSCRIPTION);
+      setInsufficientWalletModal(walletShortageDetails);
+      return;
+    }
 
     if (
       paymentMethod === "wallet" &&
-      (qtyIncreased || daysIncreased || switchedToDaily || newDailyTotal > oldDailyTotal)
+      hasCostIncrease
     ) {
       try {
         const { balance: walletBalance } = await walletService.getWalletBalance();
+        setWalletBalance(walletBalance);
+        const newDailyTotal = projectedDailyTotal;
         const { threeDayRequiredAmount } = computeMinimumSubscriptionWalletRecharge(
           newDailyTotal,
           0,
@@ -252,11 +339,14 @@ const ModifySubscription: React.FC = () => {
         if (walletBalance < threeDayRequiredAmount) {
           const shortage = Math.max(0, threeDayRequiredAmount - walletBalance);
           toast.error(REQUIRED_TOAST.WALLET_LOW_SUBSCRIPTION);
-          setInsufficientWalletModal({
+          const details: InsufficientWalletDetails = {
             currentBalance: walletBalance,
             requiredAmount: newDailyTotal,
             shortageAmount: shortage,
-          });
+            contextLabel:
+              "Please recharge your wallet before saving subscription changes.",
+          };
+          setInsufficientWalletModal(details);
           return;
         }
       } catch {
@@ -352,7 +442,7 @@ const ModifySubscription: React.FC = () => {
     <div className="min-h-screen bg-white font-sans text-gray-900">
       <div className="mx-auto max-w-lg px-5 pb-nav-bottom pt-5 md:px-6 md:pt-6">
         {/* Header — IBM Plex Serif title + back (matches Orders / reference) */}
-        <header className="mb-7 flex items-center gap-3">
+        <header className="mb-5 flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -367,80 +457,96 @@ const ModifySubscription: React.FC = () => {
         </header>
 
         {/* Packs in this subscription */}
-        <section className="mb-8">
+        <section className="mb-5">
           <h2 className="text-sm font-bold tracking-wide text-[#1A1A1A]">
             PACKS ({lineItems.length})
           </h2>
-          <div className="mt-3 space-y-2">
+          <div className="mt-2 space-y-2">
             {lineItems.map((li, idx) => (
               <div
                 key={`modify-pack-${idx}-${li.name}`}
-                className="flex gap-3 rounded-xl bg-[#F3F4F6] p-3"
+                className="rounded-xl bg-[#F3F4F6] p-2.5"
               >
-                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-white">
-                  {li.imageUrl ? (
-                    <img
-                      src={li.imageUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-base font-semibold text-gray-400">
-                      {li.name.charAt(0)}
+                <div className="flex gap-2.5">
+                  <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-white md:h-12 md:w-12">
+                    {li.imageUrl ? (
+                      <img
+                        src={li.imageUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-gray-400">
+                        {li.name.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-bold leading-snug text-black md:text-base">
+                        {li.name}
+                      </p>
+                      <p className="shrink-0 text-sm font-bold text-[#1A1A1A]">
+                        ₹
+                        {formatRupees(
+                          (lineQuantities[idx] ?? li.quantity) * (li.unitPrice || 0),
+                        )}
+                      </p>
                     </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-base font-bold leading-snug text-black">
-                    {li.name}
-                  </p>
-                  <p className="mt-0.5 text-xs text-[#6B7280]">
-                    Qty: {formatQty(lineQuantities[idx] ?? li.quantity)} × ₹
-                    {formatRupees(li.unitPrice)}
-                  </p>
-                  <div className="mt-3 flex items-center justify-between gap-4">
-                    <span className="shrink-0 text-sm font-semibold text-black">
-                      Quantity
-                    </span>
-                    <div className="flex shrink-0 items-center gap-4">
-                      <button
-                        type="button"
-                        onClick={() => handleQuantityChange(idx, -1)}
-                        disabled={(lineQuantities[idx] ?? 1) <= 1}
-                        className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full border-0 bg-gray-100 p-0 transition-colors hover:bg-gray-200 disabled:opacity-50"
-                        aria-label="Decrease quantity"
-                      >
-                        <span className="text-[18px] font-normal leading-none text-black">
-                          −
-                        </span>
-                      </button>
-                      <span className="min-w-[1.25rem] text-center text-sm font-bold tabular-nums text-black">
-                        {lineQuantities[idx] ?? li.quantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleQuantityChange(idx, 1)}
-                        className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full border-0 p-0 transition-opacity hover:opacity-90"
-                        style={{ backgroundColor: primary }}
-                        aria-label="Increase quantity"
-                      >
-                        <span className="text-[18px] font-normal leading-none text-black">
-                          +
-                        </span>
-                      </button>
-                    </div>
+                    <p className="mt-0.5 text-xs text-[#6B7280]">
+                      Qty: {formatQty(lineQuantities[idx] ?? li.quantity)} × ₹
+                      {formatRupees(li.unitPrice)}
+                    </p>
                   </div>
                 </div>
-                <div className="shrink-0 self-start text-sm font-bold text-[#1A1A1A]">
-                  ₹
-                  {formatRupees(
-                    (lineQuantities[idx] ?? li.quantity) * (li.unitPrice || 0),
-                  )}
+                <div className="mt-2.5 flex w-full items-center justify-between gap-3 border-t border-gray-200/80 pt-2.5">
+                  <span className="shrink-0 text-xs font-semibold text-black md:text-sm">
+                    Quantity
+                  </span>
+                  <div className="ml-auto flex shrink-0 items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityChange(idx, -1)}
+                      disabled={(lineQuantities[idx] ?? 1) <= 1}
+                      className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border-0 bg-gray-100 p-0 transition-colors hover:bg-gray-200 disabled:opacity-50 md:size-[30px]"
+                      aria-label="Decrease quantity"
+                    >
+                      <span className="text-base font-normal leading-none text-black md:text-[18px]">
+                        −
+                      </span>
+                    </button>
+                    <span className="min-w-[1.25rem] text-center text-sm font-bold tabular-nums text-black">
+                      {lineQuantities[idx] ?? li.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityChange(idx, 1)}
+                      className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border-0 p-0 transition-opacity hover:opacity-90 md:size-[30px]"
+                      style={{ backgroundColor: primary }}
+                      aria-label="Increase quantity"
+                    >
+                      <span className="text-base font-normal leading-none text-black md:text-[18px]">
+                        +
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </section>
+
+        {!isCodPayment && walletShortageDetails ? (
+          <section className="mb-5">
+            <InsufficientWalletRechargeCard
+              details={walletShortageDetails}
+              onRecharge={handleWalletRecharge}
+              recharging={walletRecharging}
+              variant="inline"
+              amountInputId="modify-subscription-wallet-amount"
+            />
+          </section>
+        ) : null}
 
         {/* Delivery schedule — heading first, then subscribed-days card, then options */}
         <section>
@@ -452,7 +558,7 @@ const ModifySubscription: React.FC = () => {
           </p>
 
           <div
-            className="mt-5 rounded-2xl border px-4 py-3.5"
+            className="mt-4 rounded-2xl border px-3 py-3"
             style={{
               backgroundColor: "#FFFBE6",
               borderColor: "rgba(250, 162, 34, 0.55)",
@@ -464,14 +570,14 @@ const ModifySubscription: React.FC = () => {
             </p>
           </div>
 
-          <div className="mt-5 space-y-4">
+          <div className="mt-4 space-y-3">
             <button
               type="button"
               onClick={() => {
                 setDeliveryType("daily");
                 setSelectedDays([...WEEK_SHORT]);
               }}
-              className="flex w-full cursor-pointer items-center justify-between rounded-2xl border bg-white px-5 py-4 text-left transition-colors"
+              className="flex w-full cursor-pointer items-center justify-between rounded-2xl border bg-white px-4 py-3 text-left transition-colors"
               style={{
                 borderColor: deliveryType === "daily" ? primary : "#e5e7eb",
                 borderWidth: deliveryType === "daily" ? 2 : 1,
@@ -496,7 +602,7 @@ const ModifySubscription: React.FC = () => {
             <button
               type="button"
               onClick={() => setDeliveryType("custom")}
-              className="flex w-full cursor-pointer items-center justify-between rounded-2xl border bg-white p-4 text-left transition-colors"
+              className="flex w-full cursor-pointer items-center justify-between rounded-2xl border bg-white px-4 py-3 text-left transition-colors"
               style={{
                 borderColor: deliveryType === "custom" ? primary : "#e5e7eb",
                 borderWidth: deliveryType === "custom" ? 2 : 1,
@@ -522,7 +628,7 @@ const ModifySubscription: React.FC = () => {
 
         {/* Select days — custom only; orange fill + white label on selected */}
         {deliveryType === "custom" ? (
-          <section className="mt-9">
+          <section className="mt-6">
             <h3 className="text-base font-semibold text-black">Select Days</h3>
             <p className="mt-1 text-sm text-gray-500">
               Minimum 3 days are required
@@ -556,8 +662,8 @@ const ModifySubscription: React.FC = () => {
           </section>
         ) : null}
 
-        {/* Footer — ~12px radius */}
-        <div className="mt-11 flex gap-3 pb-nav-bottom">
+        {/* Footer */}
+        <div className="mt-8 flex gap-3 pb-nav-bottom">
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -568,7 +674,7 @@ const ModifySubscription: React.FC = () => {
           <button
             type="button"
             onClick={handleSaveChanges}
-            disabled={isUpdating}
+            disabled={isUpdating || (hasCostIncrease && walletShortageDetails != null)}
             className="flex-1 rounded-xl py-3.5 text-sm font-bold text-black transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
             style={{ backgroundColor: primary }}
           >
@@ -576,18 +682,13 @@ const ModifySubscription: React.FC = () => {
           </button>
         </div>
       </div>
-      {insufficientWalletModal && (
-        <InsufficientWalletModal
-          currentBalance={insufficientWalletModal.currentBalance}
-          requiredAmount={insufficientWalletModal.requiredAmount}
-          shortageAmount={insufficientWalletModal.shortageAmount}
-          onClose={() => setInsufficientWalletModal(null)}
-          onRecharge={() => {
-            setInsufficientWalletModal(null);
-            navigate("/wallet");
-          }}
-        />
-      )}
+      <InsufficientWalletModal
+        open={insufficientWalletModal != null}
+        details={insufficientWalletModal}
+        recharging={walletRecharging}
+        onClose={() => setInsufficientWalletModal(null)}
+        onRecharge={handleWalletRecharge}
+      />
     </div>
   );
 };

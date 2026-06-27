@@ -149,10 +149,11 @@ export interface EligibleOrder {
   id: number;
   order_number: string;
   status: string;
-  delivered_at: string;
+  delivered_at: string | null;
+  delivery_date?: string | null;
   total_amount: string;
-  items_preview?: string; // Preview of items in the order
-  created_at: string;
+  items_preview?: string;
+  created_at?: string | null;
 }
 
 /**

@@ -156,12 +156,41 @@ const CustomerSupport: React.FC = () => {
     navigate(`${basePath}/customer-support/chat?ticket=${ticketNumber}`);
   };
 
-  const formatDate = (dateString: string) => {
+  const formatTicketDate = (dateString: string) => {
     try {
-      return format(new Date(dateString), 'MMM d, yyyy');
+      const d = new Date(dateString);
+      if (Number.isNaN(d.getTime()) || d.getFullYear() < 2000) return dateString;
+      return format(d, "MMM d, yyyy");
     } catch {
       return dateString;
     }
+  };
+
+  const formatOrderDate = (order: EligibleOrder) => {
+    const deliveredRaw = order.delivered_at;
+    if (deliveredRaw) {
+      const delivered = new Date(deliveredRaw);
+      if (!Number.isNaN(delivered.getTime()) && delivered.getFullYear() >= 2000) {
+        try {
+          return format(delivered, "MMM d, yyyy");
+        } catch {
+          /* fall through */
+        }
+      }
+    }
+    const fallbackCandidates = [order.delivery_date, order.created_at];
+    for (const raw of fallbackCandidates) {
+      if (!raw) continue;
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime()) || d.getFullYear() < 2000) continue;
+      try {
+        return format(d, "MMM d, yyyy");
+      } catch {
+        continue;
+      }
+    }
+    const status = String(order.status ?? "").replace(/_/g, " ");
+    return status ? status.charAt(0).toUpperCase() + status.slice(1) : "In progress";
   };
 
   const getStatusColor = (status: string) => {
@@ -274,7 +303,7 @@ const CustomerSupport: React.FC = () => {
                     onClick={() => setIsOrderDropdownOpen(false)}
                   />
                   <div 
-                    className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
+                    className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-auto"
                   >
                     <button
                       type="button"
@@ -291,7 +320,7 @@ const CustomerSupport: React.FC = () => {
                       Select an order to create support ticket
                     </button>
                     {orders.map((order) => {
-                      const orderDate = formatDate(order.delivered_at);
+                      const orderDate = formatOrderDate(order);
                       const blocked = blockedOrderNumbers.has(
                         normalizeOrderNumber(order.order_number),
                       );
@@ -304,7 +333,7 @@ const CustomerSupport: React.FC = () => {
                             if (blocked) return;
                             handleOrderSelect(order);
                           }}
-                          className={`w-full text-left px-3 sm:px-4 py-3 text-sm sm:text-base transition-colors ${
+                          className={`w-full text-left px-3 sm:px-4 py-2.5 text-sm sm:text-base transition-colors ${
                             blocked
                               ? 'opacity-50 cursor-not-allowed text-gray-500'
                               : selectedOrderNumber === order.order_number
@@ -386,7 +415,7 @@ const CustomerSupport: React.FC = () => {
                           </p>
                         )}
                         <p className="text-xs text-gray-500">
-                          Created: {formatDate(ticket.created_at)}
+                          Created: {formatTicketDate(ticket.created_at)}
                         </p>
                       </div>
                       <span

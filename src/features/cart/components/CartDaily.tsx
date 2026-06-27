@@ -304,6 +304,7 @@ interface Coupon {
   scope: string;
   discount_label: string;  // e.g. "10% off (up to ₹100)" – use this directly
   applicable_to?: "store" | "daily" | "both";
+  eligible_for_gp_daily?: boolean;
 }
 
 const DAILY_PROMO_INVALID_MESSAGE = REQUIRED_TOAST.PROMO_NOT_VALID_DAILY;
