@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
 import { FaPaperPlane, FaImage, FaPhone, FaUser } from 'react-icons/fa';
@@ -20,6 +20,7 @@ import {
   type SupportNavState,
 } from '../../utils/supportNavigation';
 import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
+import { useSupportChatWebSocket } from '../../hooks/useSupportChatWebSocket';
 
 const MESSAGE_IMAGE_ROW = 200;
 const MESSAGE_IMAGE_GAP = 2;
@@ -230,6 +231,7 @@ const SupportTicketChat: React.FC = () => {
   const [showCloseTicketModal, setShowCloseTicketModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [accessToken] = useState(() => localStorage.getItem('access_token'));
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -266,6 +268,13 @@ const SupportTicketChat: React.FC = () => {
     }
   }, [messages]);
 
+  const appendIncomingMessage = useCallback((msg: SupportMessage) => {
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === msg.id)) return prev;
+      return [...prev, msg];
+    });
+  }, []);
+
   const fetchTicketDetails = async (showLoading: boolean = true) => {
     try {
       if (showLoading) {
@@ -286,6 +295,27 @@ const SupportTicketChat: React.FC = () => {
       }
     }
   };
+
+  useSupportChatWebSocket({
+    enabled: Boolean(ticketNumber && ticket && !loading),
+    ticketNumber,
+    token: accessToken,
+    onMessage: appendIncomingMessage,
+    onStatusChange: (payload) => {
+      setTicket((prev) =>
+        prev ? { ...prev, status: payload.status } : prev,
+      );
+    },
+  });
+
+  /** Poll as fallback when WebSocket is unavailable (same pattern as admin panel). */
+  useEffect(() => {
+    if (!ticketNumber || loading) return;
+    const id = window.setInterval(() => {
+      void fetchTicketDetails(false);
+    }, 10000);
+    return () => window.clearInterval(id);
+  }, [ticketNumber, loading]);
 
   const clearFilePreviews = (urls: string[]) => {
     for (const u of urls) {
@@ -659,10 +689,10 @@ const SupportTicketChat: React.FC = () => {
                     className={`flex ${isUserMessage ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`w-full min-w-0 max-w-[75%] rounded-2xl px-3 py-2 shadow-sm transition-all ${userBubbleClasses}`}
+                      className={`w-fit max-w-[min(75%,20rem)] rounded-2xl px-3 py-2 shadow-sm transition-all ${userBubbleClasses}`}
                       style={userBubbleStyle}
                     >
-                      <div className="flex w-full min-w-0 flex-col gap-2">
+                      <div className="flex flex-col gap-2">
                         {imageUris.length > 0 ? (
                           <MessageAttachmentGrid
                             uris={imageUris}
@@ -675,7 +705,7 @@ const SupportTicketChat: React.FC = () => {
                           <div className="flex items-end gap-2">
                             {message.message ? (
                               <p
-                                className={`min-w-0 flex-1 whitespace-pre-wrap text-sm leading-relaxed ${
+                                className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${
                                   isUserMessage && isDailySupport
                                     ? 'text-[#1a1a1a]'
                                     : isUserMessage

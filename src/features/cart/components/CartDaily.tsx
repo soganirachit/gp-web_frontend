@@ -2099,6 +2099,23 @@ const Cart: React.FC = () => {
           product: firstItem ? { name: firstItem.name, sellingPrice: firstItem.price } : undefined,
           selectedAddress,
           subscriptionDetails,
+          couponCode: appliedPromoCode,
+          couponDiscount: promoDiscount > 0 ? promoDiscount : discount,
+          orderSummary: {
+            lines: items.map((item) => ({
+              productName: item.name,
+              variantName: item.variant?.name,
+              quantity: item.quantity,
+              unitPrice: item.price,
+              unitLabel: "piece",
+              lineSubtotal: item.price * item.quantity,
+            })),
+            subtotal,
+            deliveryFee,
+            couponCode: appliedPromoCode,
+            couponDiscount: promoDiscount > 0 ? promoDiscount : discount,
+            total,
+          },
         },
         replace: true,
       });

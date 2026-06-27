@@ -1338,7 +1338,7 @@ const Home2: React.FC = () => {
       <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
         <div className="mx-auto w-full max-w-[min(800px,100vw)]">
           <div
-            className={`relative px-4 pt-4 rounded-b-2xl overflow-hidden ${showNamasteMarketing ? "pb-0" : "pb-1"}`}
+            className={`relative px-4 pt-4 rounded-b-2xl overflow-visible ${showNamasteMarketing ? "pb-0" : "pb-1"}`}
             style={{
               background:
                 "linear-gradient(90deg, rgba(250, 193, 20, 0.4) 0%, rgba(250, 193, 20, 0.2) 100%)",

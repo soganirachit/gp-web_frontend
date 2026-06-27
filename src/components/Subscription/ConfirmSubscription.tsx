@@ -26,6 +26,31 @@ import {
   type InsufficientWalletDetails,
 } from "../daily/InsufficientWalletModal";
 
+export type SubscriptionConfirmOrderLine = {
+  productName: string;
+  variantName?: string;
+  quantity: number;
+  unitPrice: number;
+  unitLabel?: string;
+  lineSubtotal: number;
+};
+
+export type SubscriptionConfirmOrderSummary = {
+  lines: SubscriptionConfirmOrderLine[];
+  subtotal: number;
+  deliveryFee: number;
+  couponCode?: string | null;
+  couponDiscount: number;
+  total: number;
+};
+
+function formatConfirmRupee(amount: number): string {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return "0";
+  const rounded = Math.round(n * 100) / 100;
+  return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(2);
+}
+
 interface SubscriptionDetails {
   basePackId: string;
   type: "DAILY" | "CUSTOM" | "Daily" | "custom";
@@ -1024,6 +1049,8 @@ const ConfirmSubscription: React.FC = () => {
   }
 
   const checkoutSub = confirmedSubscriptionData || location?.state?.subscription;
+  const orderSummary = (location?.state as { orderSummary?: SubscriptionConfirmOrderSummary })
+    ?.orderSummary;
   const checkoutAddr = (checkoutSub?.delivery_address ?? checkoutSub?.address) || null;
   const checkoutItems: any[] = Array.isArray(checkoutSub?.items) ? checkoutSub.items : [];
   const deliveryDaysInts: number[] = Array.isArray(checkoutSub?.delivery_days)
@@ -1032,9 +1059,59 @@ const ConfirmSubscription: React.FC = () => {
   const deliveryDaysDisplay: string[] = Array.isArray(checkoutSub?.delivery_days_display)
     ? checkoutSub.delivery_days_display
     : [];
-  const fee = Number(checkoutSub?.delivery_fee ?? 0) || 0;
-  const itemsTotal = checkoutItems.reduce((sum, it) => sum + (Number(it?.subtotal ?? it?.unit_price ?? 0) || 0), 0);
-  const grandTotal = itemsTotal + fee;
+  const fee = orderSummary
+    ? Number(orderSummary.deliveryFee) || 0
+    : Number(checkoutSub?.delivery_fee ?? 0) || 0;
+  const itemsTotal = orderSummary
+    ? Number(orderSummary.subtotal) || 0
+    : checkoutItems.reduce((sum, it) => {
+        const lineSubtotal = Number(it?.subtotal);
+        if (Number.isFinite(lineSubtotal) && lineSubtotal > 0) return sum + lineSubtotal;
+        const qty = Number(it?.quantity ?? 1);
+        const unit = Number(it?.unit_price ?? 0);
+        return sum + qty * unit;
+      }, 0);
+  const couponDiscount = Math.max(
+    0,
+    Number(
+      orderSummary?.couponDiscount ??
+        (location?.state as { couponDiscount?: number })?.couponDiscount ??
+        checkoutSub?.coupon_discount ??
+        0,
+    ) || 0,
+  );
+  const couponCode =
+    orderSummary?.couponCode ??
+    (location?.state as { couponCode?: string })?.couponCode ??
+    checkoutSub?.coupon_code ??
+    null;
+  const grandTotal = orderSummary
+    ? Math.max(0, Number(orderSummary.total) || 0)
+    : Math.max(0, itemsTotal + fee - couponDiscount);
+
+  const displayLines: SubscriptionConfirmOrderLine[] = orderSummary?.lines?.length
+    ? orderSummary.lines
+    : checkoutItems.map((it) => {
+        const qty = Number(it?.quantity ?? 1);
+        const unitPrice = Number(it?.unit_price ?? 0);
+        const lineSubtotal = Number(it?.subtotal);
+        const productName = String(it?.product?.name ?? "Pack");
+        const variantName =
+          it?.variant_name != null && String(it.variant_name).trim()
+            ? String(it.variant_name).trim()
+            : undefined;
+        return {
+          productName,
+          variantName,
+          quantity: qty,
+          unitPrice,
+          unitLabel: String(it?.product?.unit ?? "Pack"),
+          lineSubtotal:
+            Number.isFinite(lineSubtotal) && lineSubtotal > 0
+              ? lineSubtotal
+              : qty * unitPrice,
+        };
+      });
 
   const nextDeliveryDisplayLine =
     deliveryDaysInts.length > 0
@@ -1251,14 +1328,14 @@ const ConfirmSubscription: React.FC = () => {
 
               {/* Items */}
               <div className="space-y-2 mb-4">
-                {checkoutItems.map((it) => {
-                  const unitPrice = Number(it?.unit_price ?? 0);
-                  const unitLabel = String(it?.product?.unit ?? 'Pack');
-                  const qty = Number(it?.quantity ?? 1);
-                  const productName = String(it?.product?.name ?? 'Pack');
+                {displayLines.map((line, idx) => {
+                  const unitLabel = line.unitLabel || "Pack";
+                  const label = line.variantName
+                    ? `${line.productName} (${line.variantName})`
+                    : line.productName;
                   return (
                     <div
-                      key={String(it?.id ?? productName)}
+                      key={`${label}-${idx}`}
                       className="flex items-start justify-between gap-3"
                     >
                       <div className="flex min-w-0 flex-1 items-start gap-2">
@@ -1269,19 +1346,29 @@ const ConfirmSubscription: React.FC = () => {
                           aria-hidden
                         />
                         <span className="min-w-0 text-xs font-medium leading-snug text-gray-900 line-clamp-2">
-                          {productName} x {qty}
+                          {label} x {line.quantity}
                         </span>
                       </div>
                       <span className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-900">
-                        ₹{unitPrice}/{unitLabel}
+                        ₹{formatConfirmRupee(line.unitPrice)}/{unitLabel}
                       </span>
                     </div>
                   );
                 })}
                 <div className="flex items-center justify-between pt-2 border-t">
                   <span className="text-gray-600 text-sm">Delivery fee</span>
-                  <span className="text-gray-900 text-sm font-medium">₹{fee}</span>
+                  <span className="text-gray-900 text-sm font-medium">₹{formatConfirmRupee(fee)}</span>
                 </div>
+                {couponDiscount > 0 ? (
+                  <div className="flex items-center justify-between pt-2">
+                    <span className="text-gray-600 text-sm">
+                      Promo{couponCode ? ` (${couponCode})` : ""}
+                    </span>
+                    <span className="text-sm font-medium text-green-700">
+                      -₹{formatConfirmRupee(couponDiscount)}
+                    </span>
+                  </div>
+                ) : null}
               </div>
 
               {/* Total Amount */}
@@ -1291,7 +1378,7 @@ const ConfirmSubscription: React.FC = () => {
                   <span className="text-gray-900 text-sm font-medium">Total Amount</span>
                 </div>
                 <span className="text-gray-900 text-lg font-medium">
-                  ₹{grandTotal}
+                  ₹{formatConfirmRupee(grandTotal)}
                 </span>
               </div>
             </motion.div>
