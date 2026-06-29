@@ -52,6 +52,17 @@ import {
   formatOrderListStatusTimeLabel,
   resolveOrderStatusUpdatedAt,
 } from "../../utils/orderStatusUpdatedAt";
+import { walletService } from "../../services/wallet.service";
+import {
+  InsufficientWalletModal,
+  computeMinimumSubscriptionWalletRecharge,
+  type InsufficientWalletDetails,
+} from "../daily/InsufficientWalletModal";
+import { pickActiveSubscriptionDailyUnitRupees } from "../../utils/gpDailyWalletHold";
+import { isSubscriptionPausedForInsufficientWallet } from "../../utils/gpDailySubscriptionWalletPause";
+import { resolveSubscriptionPerDeliveryDisplayTotal } from "../../utils/gpDailySubscriptionPricingSnapshot";
+import { navigateToGpDailyWalletForRecharge } from "../../utils/gpDailyWalletRechargeRedirect";
+import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
 const GP_DAILY_BASE = "/gp-daily";
 
 function historyOrderDelivered(o: Record<string, unknown>): boolean {
@@ -131,15 +142,9 @@ const ManageMySubscription: React.FC = () => {
 
   const [selectedSubscription, setSelectedSubscription] =
     useState<Subscription | null>(null);
-  const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
-    useState(false);
-  const [balanceDetails] = useState({
-    currentBalance: 0,
-    requiredAmount: 0,
-    shortageAmount: 0,
-    subscriptionType: "Daily" as "DAILY" | "CUSTOM",
-    days: 7,
-  });
+  const [insufficientWalletModal, setInsufficientWalletModal] =
+    useState<InsufficientWalletDetails | null>(null);
+  const [walletRecharging, setWalletRecharging] = useState(false);
 
   // const [cancellationReason, setCancellationReason] = useState("");
   // const [, setShowReasonError] = useState(false);
@@ -398,7 +403,37 @@ const ManageMySubscription: React.FC = () => {
   ) => {
     e.preventDefault();
     e.stopPropagation();
+
+    const subscription = subscriptions.find((s) => String(s.id) === subId);
+    if (!subscription) return;
+
+    const perDeliveryTotal = pickActiveSubscriptionDailyUnitRupees(subscription);
+    const walletHoldPause = isSubscriptionPausedForInsufficientWallet(subscription);
+    const usesWallet =
+      String(subscription.paymentMethod ?? "wallet").toLowerCase() !== "cod";
+
     try {
+      if (usesWallet && perDeliveryTotal > 0) {
+        const { balance: walletBalance } = await walletService.getWalletBalance();
+        const { threeDayRequiredAmount } = computeMinimumSubscriptionWalletRecharge(
+          perDeliveryTotal,
+          0,
+        );
+        const walletTooLow = walletBalance < threeDayRequiredAmount;
+        if (walletHoldPause && walletTooLow) {
+          const shortage = Math.max(0, threeDayRequiredAmount - walletBalance);
+          setSelectedSubscription(subscription);
+          toast.error(REQUIRED_TOAST.WALLET_LOW_SUBSCRIPTION);
+          setInsufficientWalletModal({
+            currentBalance: walletBalance,
+            requiredAmount: perDeliveryTotal,
+            shortageAmount: shortage,
+            contextLabel: "Recharge your wallet to resume deliveries",
+          });
+          return;
+        }
+      }
+
       setResumingSubId(subId);
       await subscriptionService.toggleSubscriptionStatus(subId);
       toast.success("Subscription resumed");
@@ -484,19 +519,21 @@ const ManageMySubscription: React.FC = () => {
   //   }
   // };
 
-  const handleRechargeWallet = () => {
-    setShowInsufficientBalanceModal(false);
-    navigate("/gp-daily/wallet", {
-      state: {
-        requiredAmount: balanceDetails.shortageAmount,
-        currentBalance: balanceDetails.currentBalance,
-        returnUrl: `/product/${selectedSubscription?.id}`,
-        subscriptionType: selectedSubscription?.type,
-        minimumDays: 7,
-        maximumDays: selectedSubscription?.type === "DAILY" ? 30 : 14,
-        totalRequired: balanceDetails.requiredAmount,
-      },
-    });
+  const handleRechargeWallet = async (amount: number) => {
+    if (!insufficientWalletModal) return;
+    setWalletRecharging(true);
+    try {
+      navigateToGpDailyWalletForRecharge(navigate, GP_DAILY_BASE, {
+        shortageAmount: amount,
+        currentBalance: insufficientWalletModal.currentBalance,
+        totalRequired: insufficientWalletModal.requiredAmount,
+        returnUrl: `${GP_DAILY_BASE}/manage-my-subscription`,
+        subscriptionRechargePrompt: true,
+      });
+      setInsufficientWalletModal(null);
+    } finally {
+      setWalletRecharging(false);
+    }
   };
 
   const renderSubscriptionCard = (subscription: Subscription) => {
@@ -523,13 +560,22 @@ const ManageMySubscription: React.FC = () => {
           ];
 
     const itemsSubtotal = lineItems.reduce((s, li) => s + li.subtotal, 0);
+    const pricingDisplay = resolveSubscriptionPerDeliveryDisplayTotal(subscription);
     const totalDisplay =
-      subscription.totalAmount != null && Number.isFinite(subscription.totalAmount)
-        ? subscription.totalAmount
-        : itemsSubtotal;
+      pricingDisplay.total > 0
+        ? pricingDisplay.total
+        : subscription.totalAmount != null && Number.isFinite(subscription.totalAmount)
+          ? subscription.totalAmount
+          : itemsSubtotal;
+    const preDiscountTotal = pricingDisplay.preDiscountTotal;
 
     const formatRupees = (n: number) =>
-      Number.isFinite(n) ? Math.round(n).toLocaleString("en-IN") : "0";
+      Number.isFinite(n)
+        ? n.toLocaleString("en-IN", {
+            minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+            maximumFractionDigits: 2,
+          })
+        : "0";
 
     const formatQty = (q: number) => {
       if (!Number.isFinite(q)) return "1";
@@ -781,10 +827,25 @@ const ManageMySubscription: React.FC = () => {
         </div>
 
         <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
-          <span className="text-sm text-[#4B5563]">Total Amount</span>
-          <span className="text-base font-bold text-[#1A1A1A]">
-            ₹{formatRupees(totalDisplay)}
+          <span className="text-sm text-[#4B5563]">
+            {pricingDisplay.couponCode ? "Amount per delivery" : "Total Amount"}
           </span>
+          <div className="text-right">
+            {preDiscountTotal != null &&
+            preDiscountTotal > totalDisplay + 0.009 ? (
+              <span className="mr-2 text-sm text-gray-400 line-through">
+                ₹{formatRupees(preDiscountTotal)}
+              </span>
+            ) : null}
+            <span className="text-base font-bold text-[#1A1A1A]">
+              ₹{formatRupees(totalDisplay)}
+            </span>
+            {pricingDisplay.couponCode ? (
+              <p className="mt-0.5 text-[11px] font-medium text-[#166534]">
+                Promo {pricingDisplay.couponCode} applied
+              </p>
+            ) : null}
+          </div>
         </div>
 
         <div className="mt-4">
@@ -1414,48 +1475,13 @@ const ManageMySubscription: React.FC = () => {
           )}
         </AnimatePresence> */}
 
-        {/* Insufficient Balance Modal */}
-        <AnimatePresence>
-          {showInsufficientBalanceModal && (
-            <motion.div
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <motion.div
-                className="bg-white rounded-xl w-full max-w-xs sm:max-w-sm p-4"
-                initial={{ scale: 0.95 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0.95 }}
-              >
-                <h2 className="text-lg font-semibold mb-3">
-                  Insufficient Balance
-                </h2>
-                <p className="text-sm text-gray-600 mb-4">
-                  Your current balance is insufficient to subscribe. Please
-                  recharge your wallet.
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleRechargeWallet}
-                    className="flex-1 bg-green-600 text-white py-2.5 rounded-xl text-sm font-medium
-                      hover:bg-green-700 transition-colors"
-                  >
-                    Recharge Wallet
-                  </button>
-                  <button
-                    onClick={() => setShowInsufficientBalanceModal(false)}
-                    className="flex-1 border-2 border-gray-300 py-2.5 rounded-xl text-sm font-medium
-                      hover:bg-gray-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <InsufficientWalletModal
+          open={insufficientWalletModal != null}
+          details={insufficientWalletModal}
+          onClose={() => setInsufficientWalletModal(null)}
+          onRecharge={handleRechargeWallet}
+          recharging={walletRecharging}
+        />
 
         {/* Edit Subscription Modal */}
         {/* <AnimatePresence>

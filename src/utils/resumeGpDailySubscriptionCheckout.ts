@@ -13,6 +13,7 @@ import {
   getGpDailyPendingSubscriptionCheckout,
   type GpDailyPendingSubscriptionCheckout,
 } from "./gpDailyPendingSubscriptionCheckout";
+import { saveGpDailySubscriptionPricingSnapshot } from "./gpDailySubscriptionPricingSnapshot";
 
 export type ResumeCheckoutResult =
   | {
@@ -77,6 +78,16 @@ async function resumeSubscriptionCartCheckout(
     payment_method: "wallet",
     delivery_days: pending.deliveryDayInts,
   });
+
+  const checkoutPayload =
+    (checkoutRes as { data?: Record<string, unknown> })?.data ??
+    (checkoutRes as Record<string, unknown>);
+  const createdSubId = String(checkoutPayload?.id ?? "").trim();
+  if (createdSubId && Number.isFinite(pending.cartAmount) && pending.cartAmount > 0) {
+    saveGpDailySubscriptionPricingSnapshot(createdSubId, {
+      perDeliveryTotal: pending.cartAmount,
+    });
+  }
 
   try {
     const cart = await subscriptionCartService.getDailyCart();

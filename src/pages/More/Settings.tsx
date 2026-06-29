@@ -20,6 +20,8 @@ import { cartService, CartSwitchStoreResponse } from '../../services/cart.servic
 import { toast } from 'react-hot-toast';
 import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
 import { editCustomerService } from '../../services/editcustomer.service';
+import { orderService } from '../../services/order.service';
+import { checkAccountDeletionAllowed } from '../../utils/accountDeletionGuards';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
 import { ProfileAvatarDisplay } from '../../components/common/ProfileAvatarButton';
@@ -60,6 +62,8 @@ const Settings: React.FC = () => {
   const [hasEmail, setHasEmail] = useState(true);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
+  const [isCheckingDeleteEligibility, setIsCheckingDeleteEligibility] = useState(false);
+  const [deleteBlockMessage, setDeleteBlockMessage] = useState<string | null>(null);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -390,8 +394,23 @@ const Settings: React.FC = () => {
     setShowLogoutDialog(false);
   };
 
-  const handleDeleteAccountClick = () => {
-    setShowDeleteAccountDialog(true);
+  const handleDeleteAccountClick = async () => {
+    setDeleteBlockMessage(null);
+    setIsCheckingDeleteEligibility(true);
+    try {
+      const orders = await orderService.getOrders();
+      const check = checkAccountDeletionAllowed(orders as Array<Record<string, unknown>>);
+      if (check.blocked) {
+        setDeleteBlockMessage(check.message);
+        toast.error(check.message, { duration: 8000 });
+        return;
+      }
+      setShowDeleteAccountDialog(true);
+    } catch {
+      toast.error('Could not verify your orders. Please try again in a moment.');
+    } finally {
+      setIsCheckingDeleteEligibility(false);
+    }
   };
 
   const handleDeleteAccountConfirm = async () => {
@@ -424,6 +443,7 @@ const Settings: React.FC = () => {
 
   const handleDeleteAccountCancel = () => {
     setShowDeleteAccountDialog(false);
+    setDeleteBlockMessage(null);
   };
 
   /** Backend GET /stores/ sets is_online; missing field treated as online */
@@ -873,13 +893,17 @@ const Settings: React.FC = () => {
 
           {/* Delete Account Link - Show only when logged in */}
           {isLoggedIn && (
-            <div className="mb-2 text-center">
+            <div className="mb-2 text-center space-y-2">
               <button
-                onClick={handleDeleteAccountClick}
-                className="text-red-500 text-[15px] hover:text-red-700 transition-colors underline"
+                onClick={() => void handleDeleteAccountClick()}
+                disabled={isCheckingDeleteEligibility || isDeletingAccount}
+                className="text-red-500 text-[15px] hover:text-red-700 transition-colors underline disabled:opacity-50 disabled:no-underline"
               >
-                Delete Account
+                {isCheckingDeleteEligibility ? 'Checking orders…' : 'Delete Account'}
               </button>
+              {deleteBlockMessage ? (
+                <p className="text-xs text-red-600 px-4 leading-relaxed">{deleteBlockMessage}</p>
+              ) : null}
             </div>
           )}
 

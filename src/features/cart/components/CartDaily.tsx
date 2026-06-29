@@ -28,6 +28,7 @@ import {
   type DailyCart,
 } from '../../../services/subscriptionCart.service';
 import { notifyDailyCartUpdated } from '../../../utils/dailyCartEvents';
+import { saveGpDailySubscriptionPricingSnapshot } from '../../../utils/gpDailySubscriptionPricingSnapshot';
 import { CartConfirmModal } from '../../../components/cart/CartConfirmModal';
 import {
   SWITCH_STORE_CONFIRM_MESSAGE,
@@ -2061,6 +2062,21 @@ const Cart: React.FC = () => {
       });
       toast.success('Subscription created successfully!');
       clearCart();
+      const checkoutPayload =
+        (checkoutRes as { data?: Record<string, unknown> })?.data ??
+        (checkoutRes as Record<string, unknown>);
+      const createdSubId = String(checkoutPayload?.id ?? '').trim();
+      if (createdSubId && Number.isFinite(Number(total)) && Number(total) > 0) {
+        saveGpDailySubscriptionPricingSnapshot(createdSubId, {
+          perDeliveryTotal: Number(total),
+          preDiscountTotal: subtotal + deliveryFee + tax + surcharge,
+          couponDiscount: discount > 0 ? discount : undefined,
+          couponCode:
+            dailyCart != null
+              ? promoCodeFromDailyCart(dailyCart) ?? undefined
+              : undefined,
+        });
+      }
       const firstItem = items[0];
       const subscriptionDetails = {
         basePackId: String(firstItem?.productId ?? ''),

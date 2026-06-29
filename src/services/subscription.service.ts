@@ -180,12 +180,40 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
   const itemsSubtotal = lineItems.reduce((s, li) => s + li.subtotal, 0);
   const deliveryFeeParsed = Number.parseFloat(String(raw.delivery_fee ?? 0));
   const deliveryFee = Number.isFinite(deliveryFeeParsed) ? deliveryFeeParsed : 0;
+  const couponCodeRaw = raw.coupon_code ?? raw.couponCode;
+  const couponCode =
+    couponCodeRaw != null && String(couponCodeRaw).trim()
+      ? String(couponCodeRaw).trim()
+      : undefined;
+  const couponDiscountParsed = Number.parseFloat(
+    String(raw.coupon_discount ?? raw.couponDiscount ?? 0),
+  );
+  const couponDiscount =
+    Number.isFinite(couponDiscountParsed) && couponDiscountParsed > 0
+      ? couponDiscountParsed
+      : undefined;
+  const dailyAmountBeforeParsed = Number.parseFloat(
+    String(raw.daily_amount_before_discount ?? raw.dailyAmountBeforeDiscount ?? ""),
+  );
+  const dailyAmountBeforeDiscount =
+    Number.isFinite(dailyAmountBeforeParsed) && dailyAmountBeforeParsed > 0
+      ? dailyAmountBeforeParsed
+      : undefined;
+  const dailyAmountParsed = Number.parseFloat(
+    String(raw.daily_amount ?? raw.dailyAmount ?? ""),
+  );
+  const dailyAmount =
+    Number.isFinite(dailyAmountParsed) && dailyAmountParsed >= 0
+      ? dailyAmountParsed
+      : undefined;
   const totalAmount =
-    lineItems.length > 0
-      ? itemsSubtotal + deliveryFee
-      : Number.isFinite(Number(raw.total))
-        ? Number(raw.total)
-        : undefined;
+    dailyAmount != null
+      ? dailyAmount
+      : lineItems.length > 0
+        ? Math.max(0, itemsSubtotal + deliveryFee - (couponDiscount ?? 0))
+        : Number.isFinite(Number(raw.total))
+          ? Number(raw.total)
+          : undefined;
 
   const nextRaw = raw.next_delivery_date ?? raw.nextDeliveryDate;
   const nextDeliveryDate =
@@ -236,6 +264,10 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
           : Number(raw.amount ?? raw.price) || undefined,
     totalAmount: totalAmount != null && Number.isFinite(totalAmount) ? totalAmount : undefined,
     deliveryFee: lineItems.length > 0 ? deliveryFee : undefined,
+    couponCode,
+    couponDiscount,
+    dailyAmount,
+    dailyAmountBeforeDiscount,
     lineItems: lineItems.length > 0 ? lineItems : undefined,
     nextDeliveryDate: nextDeliveryDate && !Number.isNaN(nextDeliveryDate.getTime()) ? nextDeliveryDate : undefined,
     pausedUntilDate:
@@ -247,6 +279,9 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
         ? String(rawReason).trim()
         : undefined;
     })(),
+    pausedByInsufficientWallet: Boolean(
+      raw.paused_by_insufficient_wallet ?? raw.pausedByInsufficientWallet,
+    ),
     createdAt: raw.created_at ? new Date(String(raw.created_at)) : new Date(),
     productDetails: plan
       ? {
@@ -323,6 +358,10 @@ export interface Subscription {
   lineItems?: SubscriptionLineItem[];
   totalAmount?: number;
   deliveryFee?: number;
+  couponCode?: string;
+  couponDiscount?: number;
+  dailyAmount?: number;
+  dailyAmountBeforeDiscount?: number;
   nextDeliveryDate?: Date;
   /** wallet | cod from API `payment_method`. */
   paymentMethod?: string;
@@ -330,6 +369,8 @@ export interface Subscription {
   pausedUntilDate?: Date;
   /** Why the subscription was paused (`pause_reason` from API). */
   pauseReason?: string;
+  /** True when auto-paused for low wallet (`paused_by_insufficient_wallet`). */
+  pausedByInsufficientWallet?: boolean;
 }
 
 export interface SubscriptionInitiateResponse {
