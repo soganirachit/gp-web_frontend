@@ -246,7 +246,7 @@ export default function BloomBarBasket() {
                       <Minus size={12} />
                     )}
                   </button>
-                  <span className="font-semibold w-4 text-center">{item.quantity}</span>
+                  <span className="font-semibold min-w-[1.5rem] text-center tabular-nums">{item.quantity}</span>
                   <button
                     onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
                     className="w-8 h-8 rounded-full genda-gradient text-white flex items-center justify-center"

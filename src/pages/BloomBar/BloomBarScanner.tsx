@@ -31,7 +31,7 @@ export default function BloomBarScanner({ onClose, onScan }: Props) {
     scanner
       .start(
         { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 240, height: 240 } },
+        { fps: 10 },
         (decodedText) => {
           if (didScan.current) return;
           didScan.current = true;

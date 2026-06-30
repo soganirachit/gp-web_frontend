@@ -86,9 +86,9 @@ export default function BloomBarProductPage() {
         <AnimatePresence mode="wait">
           <motion.div
             key={product.id}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ type: 'spring', damping: 24, stiffness: 250 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
             className="w-full max-w-full overflow-x-hidden"
           >
             <BloomBarProductCard
