@@ -28,36 +28,24 @@ export default function BloomBarProductPage() {
     setLoading(true);
     setError(null);
     try {
-      let resolvedProduct: Product | undefined;
-      if (productId) {
-        const products = await base44.entities.Product.filter({ id: productId });
-        if (products.length > 0) resolvedProduct = products[0] as unknown as Product;
-        else throw new Error('Product not found or unavailable');
-      } else {
-        const products = await base44.entities.Product.list('-created_date', 1);
-        if (products.length > 0) resolvedProduct = products[0] as unknown as Product;
-        else throw new Error('No products available');
+      if (!productId) throw new Error('No product specified');
+      // Single gate: validates the product, kiosk, and per-QR mapping's active
+      // state together. Throws the backend's friendly message (e.g. "This QR
+      // code is currently inactive.") when the QR or kiosk has been switched off.
+      const { product: resolvedProduct, kiosk: resolvedKiosk } =
+        await base44.entities.BloomBar.resolve({ product: productId, kiosk: kioskId, campaign });
+      setProduct(resolvedProduct as unknown as Product);
+      if (resolvedKiosk) {
+        setKiosk(resolvedKiosk);
+        setKioskContext({ kioskId, campaign, kiosk: resolvedKiosk });
       }
-      setProduct(resolvedProduct!);
     } catch (e) {
       setError((e as Error).message);
       setLoading(false);
       return;
     }
 
-    // Kiosk fetch — branding only, never blocks the product page
-    if (kioskId) {
-      try {
-        const kiosks = await base44.entities.Kiosk.filter({ id: kioskId });
-        if (kiosks.length > 0) {
-          setKiosk(kiosks[0]);
-          setKioskContext({ kioskId, campaign, kiosk: kiosks[0] });
-        }
-      } catch {
-        // kiosk failed — show product without co-brand header
-      }
-    }
-
+    // Scan event fires only for an active QR (inactive scans return above).
     if (productId) {
       base44.entities.QRScanEvent.create({
         kiosk_id: kioskId,

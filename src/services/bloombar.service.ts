@@ -37,6 +37,40 @@ async function fetchKiosk(id: string | number) {
   return unwrap<Record<string, unknown>>(res);
 }
 
+// ── Resolve (scan gate) ──────────────────────────────────────────────────────
+
+export interface BloomBarResolveResult {
+  product: Record<string, unknown>;
+  kiosk: Record<string, unknown> | null;
+}
+
+/**
+ * Authoritative scan gate. Validates the product, kiosk, and per-QR mapping's
+ * active state in one call and returns the product + kiosk branding. Throws an
+ * Error carrying the backend's friendly message ("This QR code is currently
+ * inactive." etc.) when the QR or kiosk has been switched off in admin.
+ */
+async function resolveScan(params: {
+  product?: string;
+  kiosk?: string;
+  campaign?: string;
+}): Promise<BloomBarResolveResult> {
+  const qs = new URLSearchParams();
+  if (params.product) qs.set('product', String(params.product));
+  if (params.kiosk) qs.set('kiosk', String(params.kiosk));
+  if (params.campaign) qs.set('campaign', params.campaign);
+  try {
+    const res = await api.get(`${BASE}/resolve/?${qs.toString()}`);
+    const data = unwrap<{ product: Record<string, unknown>; kiosk: Record<string, unknown> | null }>(res);
+    return { product: normalizeProduct(data.product), kiosk: data.kiosk ?? null };
+  } catch (err) {
+    const message =
+      (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+      'This QR code is not available right now.';
+    throw new Error(message);
+  }
+}
+
 // ── Scan event ───────────────────────────────────────────────────────────────
 
 async function createScanEvent(data: Record<string, unknown>) {
@@ -229,6 +263,12 @@ export const base44 = {
       async create(data: Record<string, unknown>) {
         await createScanEvent(data);
         return {};
+      },
+    },
+
+    BloomBar: {
+      async resolve(params: { product?: string; kiosk?: string; campaign?: string }) {
+        return resolveScan(params);
       },
     },
 
