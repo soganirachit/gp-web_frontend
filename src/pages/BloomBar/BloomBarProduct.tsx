@@ -74,8 +74,9 @@ export default function BloomBarProductPage() {
     );
   }
 
-  const handleAdded = (_prod: Product, _qty: number) => {
-    navigate('/bloombar/scan-next');
+  const handleAdded = (prod: Product, qty: number) => {
+    // Hand the just-added flower + qty to scan-next so its notification pops from the first scan.
+    navigate('/bloombar/scan-next', { state: { addedName: prod.name, addedQty: qty } });
   };
 
   return (

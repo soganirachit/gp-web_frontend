@@ -84,19 +84,22 @@ export default function BloomBarBasket() {
       return;
     }
 
-    let order;
+    // Deferred-order pattern: this only opens a Razorpay order. The BloomBar order
+    // is created by the backend on successful verify (see handler below), so an
+    // abandoned or declined payment never leaves a stuck "Pending" order.
+    const checkout = {
+      kiosk_id: kioskContext?.kioskId || '',
+      campaign: kioskContext?.campaign || 'direct',
+      customer_name: form.name,
+      customer_email: form.email,
+      customer_whatsapp: form.whatsapp,
+      items,
+      session_id: sessionId,
+    };
+
+    let init;
     try {
-      order = await base44.entities.Order.create({
-        kiosk_id: kioskContext?.kioskId || '',
-        campaign: kioskContext?.campaign || 'direct',
-        customer_name: form.name,
-        customer_email: form.email,
-        customer_whatsapp: form.whatsapp,
-        items,
-        subtotal: total,
-        total_amount: grandTotal ?? undefined,
-        status: 'pending',
-      });
+      init = await base44.entities.Order.create(checkout);
     } catch (err) {
       setLoading(false);
       const resp = (err as { response?: { data?: { message?: string; errors?: Record<string, unknown> } } })
@@ -105,43 +108,40 @@ export default function BloomBarBasket() {
         resp?.message ||
         (resp?.errors ? Object.values(resp.errors).flat().join(' ') : '') ||
         'Please check your connection and try again.';
-      alert(`Could not create order. ${detail}`);
+      alert(`Could not start payment. ${detail}`);
       return;
     }
 
     const options = {
-      key: order.key,
-      amount: order.amount,
+      key: init.key,
+      amount: init.amount,
       currency: 'INR',
-      order_id: order.razorpay_order_id,
+      order_id: init.razorpay_order_id,
       name: 'Genda Phool',
       description: `Flowers from ${(kioskContext?.kiosk as { name?: string })?.name || 'Kiosk'}`,
       image: 'https://images.unsplash.com/photo-1490750967868-88df5691cc2b?w=100&h=100&fit=crop',
       handler: async (response: RazorpayResponse) => {
         try {
-          await base44.entities.Order.update(order.id as string, {
-            status: 'paid',
-            payment_id: response.razorpay_payment_id,
+          const order = await base44.entities.Order.verify({
+            ...checkout,
             razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
-            session_id: sessionId,
           });
           clearCart();
           setCustomerName(form.name);
-          setOrderId(order.id as string);
+          setOrderId(order.order_number || order.id);
         } catch {
-          alert('Payment received but verification failed. Please contact support with your payment ID: ' + response.razorpay_payment_id);
+          alert('Payment received but confirmation failed. Please contact support with your payment ID: ' + response.razorpay_payment_id);
         } finally {
           setLoading(false);
         }
       },
       prefill: { name: form.name, email: form.email, contact: `+91${form.whatsapp}` },
       theme: { color: '#1d4d2a' },
+      // Abandon/decline: no order was ever created, so just stop the spinner.
       modal: {
-        ondismiss: async () => {
-          await base44.entities.Order.update(order.id as string, { status: 'cancelled' }).catch(() => {});
-          setLoading(false);
-        },
+        ondismiss: () => { setLoading(false); },
       },
     };
 

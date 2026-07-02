@@ -11,9 +11,11 @@ interface ScanParams {
 interface Props {
   onClose?: () => void;
   onScan?: (params: ScanParams, raw: string) => void;
+  /** When set, the header shows the just-added flower instead of the default prompt. */
+  lastAddedName?: string | null;
 }
 
-export default function BloomBarScanner({ onClose, onScan }: Props) {
+export default function BloomBarScanner({ onClose, onScan, lastAddedName }: Props) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerId = useRef(`bb-qr-${Date.now()}`);
   const [error, setError] = useState<string | null>(null);
@@ -85,8 +87,17 @@ export default function BloomBarScanner({ onClose, onScan }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-12 pb-4">
         <div>
-          <p className="text-white font-semibold text-base">Add Flowers to Basket</p>
-          <p className="text-white/60 text-xs mt-0.5">Scan a QR code to add it to your basket</p>
+          {lastAddedName ? (
+            <>
+              <p className="text-white font-semibold text-base">{lastAddedName} added to basket 🌸</p>
+              <p className="text-white/60 text-xs mt-0.5">Scan more flowers to add</p>
+            </>
+          ) : (
+            <>
+              <p className="text-white font-semibold text-base">Add Flowers to Basket</p>
+              <p className="text-white/60 text-xs mt-0.5">Scan a QR code to add it to your basket</p>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <button

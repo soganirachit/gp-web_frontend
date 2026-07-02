@@ -81,9 +81,15 @@ async function createScanEvent(data: Record<string, unknown>) {
   }
 }
 
-// ── Order ────────────────────────────────────────────────────────────────────
+// ── Order (deferred-order pattern — mirrors the store checkout) ───────────────
+//
+// No BloomBar order exists until payment is verified. `createOrder` only spins up
+// a Razorpay order from the validated basket; the real order is CREATED by the
+// backend inside `verifyOrder` once payment succeeds — and lands already
+// delivered/paid. If the customer abandons the sheet or the bank declines, no
+// order is ever created, so nothing can get stuck in "Pending".
 
-interface OrderCreateInput {
+interface CheckoutInput {
   kiosk_id?: string;
   campaign?: string;
   session_id?: string;
@@ -91,85 +97,89 @@ interface OrderCreateInput {
   customer_email?: string;
   customer_whatsapp: string;
   items: { product_id: string; quantity: number }[];
-  subtotal?: number;
-  total_amount?: number;
-  status?: string;
 }
 
-interface OrderCreateResult {
-  /** Our internal order id — pass to Razorpay step */
-  id: string;
-  order_number: string;
-  total_amount: number;
-  /** Razorpay order id from create-razorpay-order step */
-  razorpay_order_id: string;
-  /** Razorpay publishable key */
-  key: string;
-  /** Amount in paise */
-  amount: number;
-}
-
-async function createOrder(data: OrderCreateInput): Promise<OrderCreateResult> {
-  const kioskId = data.kiosk_id || '';
-
-  // Step 1 — create BloomBar order
-  const orderRes = await api.post(`${BASE}/orders/`, {
+/** Shape the basket into the backend checkout payload (sent to both steps). */
+function toBackendCheckout(data: CheckoutInput) {
+  return {
     customer_name: data.customer_name,
     customer_whatsapp: data.customer_whatsapp,
     customer_email: data.customer_email || '',
-    kiosk_id: Number(kioskId),
+    kiosk_id: Number(data.kiosk_id || 0),
     campaign: data.campaign || 'direct',
     session_id: data.session_id || '',
     items: data.items.map((i) => ({
       product_id: Number(i.product_id),
       quantity: i.quantity,
     })),
-  });
+  };
+}
 
-  const order = unwrap<{ order_id: number; order_number: string; total_amount: number }>(orderRes);
+interface RazorpayInitResult {
+  /** Razorpay order id to hand to the Razorpay SDK */
+  razorpay_order_id: string;
+  /** Razorpay publishable key */
+  key: string;
+  /** Amount in paise (locked by Razorpay) */
+  amount: number;
+  /** Total in rupees (server-computed) */
+  total_amount: number;
+}
 
-  // Step 2 — create Razorpay order (get real key + amount)
-  const payRes = await api.post(`${BASE}/payments/create-razorpay-order/`, {
-    order_id: order.order_id,
-  });
+/** Step 1 — create the Razorpay order. No local order is created yet. */
+async function createOrder(data: CheckoutInput): Promise<RazorpayInitResult> {
+  const res = await api.post(`${BASE}/payments/create-razorpay-order/`, toBackendCheckout(data));
   const payment = unwrap<{
     razorpay_order_id: string;
     amount: number;
     currency: string;
     key_id: string;
-  }>(payRes);
-
+    total_amount: number;
+  }>(res);
   return {
-    id: String(order.order_id),
-    order_number: order.order_number,
-    total_amount: order.total_amount,
     razorpay_order_id: payment.razorpay_order_id,
     key: payment.key_id || (import.meta.env.VITE_RAZORPAY_KEY as string),
     amount: payment.amount,
+    total_amount: payment.total_amount,
   };
 }
 
-interface OrderUpdateInput {
-  status?: string;
-  payment_id?: string;
-  razorpay_order_id?: string;
-  razorpay_signature?: string;
-  session_id?: string;
+interface VerifyInput extends CheckoutInput {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
 }
 
-async function updateOrder(id: string, data: OrderUpdateInput) {
-  if (data.status === 'paid') {
-    const res = await api.post(`${BASE}/payments/verify/`, {
-      order_id: Number(id),
-      razorpay_order_id: data.razorpay_order_id,
-      razorpay_payment_id: data.payment_id,
-      razorpay_signature: data.razorpay_signature,
-      session_id: data.session_id || '',
-    });
-    return unwrap<Record<string, unknown>>(res);
-  }
-  // cancelled or other status — no-op (we don't cancel via API for now)
-  return { id };
+interface VerifiedOrder {
+  id: string;
+  order_number: string;
+  status: string;
+  payment_status: string;
+  total_amount: number;
+}
+
+/** Step 2 — verify the payment; the backend creates the order (delivered/paid). */
+async function verifyOrder(data: VerifyInput): Promise<VerifiedOrder> {
+  const res = await api.post(`${BASE}/payments/verify/`, {
+    ...toBackendCheckout(data),
+    razorpay_order_id: data.razorpay_order_id,
+    razorpay_payment_id: data.razorpay_payment_id,
+    razorpay_signature: data.razorpay_signature,
+  });
+  const o = unwrap<{
+    id: number;
+    order_number: string;
+    status: string;
+    payment_status: string;
+    total_amount: number | string;
+  }>(res);
+  return {
+    id: String(o.id),
+    order_number: o.order_number,
+    status: o.status,
+    payment_status: o.payment_status,
+    total_amount: Number(o.total_amount) || 0,
+  };
 }
 
 // ── Cart totals (backend is the source of truth — mirrors store/daily) ───────
@@ -282,10 +292,10 @@ export const base44 = {
 
     Order: {
       async create(data: Record<string, unknown>) {
-        return createOrder(data as unknown as OrderCreateInput);
+        return createOrder(data as unknown as CheckoutInput);
       },
-      async update(id: string, data: Record<string, unknown>) {
-        return updateOrder(id, data as unknown as OrderUpdateInput);
+      async verify(data: Record<string, unknown>) {
+        return verifyOrder(data as unknown as VerifyInput);
       },
     },
   },
