@@ -85,7 +85,7 @@ export default function BloomBarScanner({ onClose, onScan, lastAddedName }: Prop
       className="fixed inset-0 z-50 bg-black flex flex-col"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-12 pb-4">
+      <div className="flex items-center justify-between px-5 pt-[calc(3rem+env(safe-area-inset-top))] pb-4">
         <div>
           {lastAddedName ? (
             <>
@@ -154,7 +154,7 @@ export default function BloomBarScanner({ onClose, onScan, lastAddedName }: Prop
       </div>
 
       {/* Footer */}
-      <div className="px-5 pb-12 pt-4 text-center">
+      <div className="px-5 pb-[calc(3rem+env(safe-area-inset-bottom))] pt-4 text-center">
         {error ? (
           <p className="text-red-400 text-sm">{error}</p>
         ) : (

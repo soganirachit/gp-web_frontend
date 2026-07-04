@@ -45,7 +45,7 @@ export default function BloomBarConfirmation({ orderId, customerName }: Props) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-genda-cream flex flex-col">
+    <div className="min-h-[100dvh] bg-genda-cream flex flex-col">
       <AnimatePresence>
         {showPetals &&
           PETALS.map((p, i) => <FallingPetal key={i} petal={p} index={i} />)}
@@ -211,7 +211,7 @@ export default function BloomBarConfirmation({ orderId, customerName }: Props) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.95 }}
-          className="pb-6"
+          className="pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
         >
           <a
             href="/bloombar/scan-next"

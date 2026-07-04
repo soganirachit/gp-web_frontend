@@ -1,6 +1,6 @@
 export default function BloomBarLoadingSkeleton() {
   return (
-    <div className="min-h-screen bg-white animate-pulse">
+    <div className="min-h-[100dvh] bg-white animate-pulse">
       {/* Header */}
       <div className="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-5">
         <div className="h-5 w-32 bg-gray-200 rounded-full" />

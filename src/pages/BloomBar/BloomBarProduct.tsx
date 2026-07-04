@@ -63,7 +63,7 @@ export default function BloomBarProductPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center bg-genda-cream">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 text-center bg-genda-cream">
         <span className="text-6xl mb-4">🌸</span>
         <h2 className="font-playfair text-2xl font-semibold mb-2">Oops!</h2>
         <p className="text-gray-500 mb-6">{error}</p>
@@ -80,7 +80,7 @@ export default function BloomBarProductPage() {
   };
 
   return (
-    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-white">
+    <div className="min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-white">
       <BloomBarCoBrandHeader kiosk={kiosk as { name?: string } | null} />
 
       {product && (

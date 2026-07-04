@@ -22,7 +22,7 @@ export default function BloomBarLanding() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-genda-cream flex flex-col">
+    <div className="min-h-[100dvh] bg-genda-cream flex flex-col">
       {/* Hero */}
       <div className="genda-gradient relative overflow-hidden px-6 pt-14 pb-14 text-white">
         {['🌸', '🌺', '🌼', '🌷', '🌹', '🌻', '🌸', '🌺'].map((p, i) => (
@@ -250,7 +250,7 @@ export default function BloomBarLanding() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.45 }}
-          className="pb-8"
+          className="pb-[calc(2rem+env(safe-area-inset-bottom))]"
         >
           <p className="text-xs text-gray-500 text-center mb-3">BloomBar available at premium venues</p>
           <div className="flex items-center justify-center gap-3 flex-wrap">

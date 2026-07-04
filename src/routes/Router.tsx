@@ -18,6 +18,7 @@ const BloomBarLayout = lazy(() => import('../pages/BloomBar/BloomBarLayout'));
 const BloomBarLanding = lazy(() => import('../pages/BloomBar/BloomBarLanding'));
 const BloomBarScanner = lazy(() => import('../pages/BloomBar/BloomBarScanner'));
 const BloomBarProduct = lazy(() => import('../pages/BloomBar/BloomBarProduct'));
+const BloomBarStore = lazy(() => import('../pages/BloomBar/BloomBarStore'));
 const BloomBarBasket = lazy(() => import('../pages/BloomBar/BloomBarBasket'));
 const BloomBarScanNext = lazy(() => import('../pages/BloomBar/BloomBarScanNext'));
 const BloomBarConfirmation = lazy(() => import('../pages/BloomBar/BloomBarConfirmation'));
@@ -102,6 +103,9 @@ const router = createBrowserRouter(
           { path: 'basket', element: <BloomBarBasket /> },
           { path: 'checkout', element: <Navigate to="/bloombar/basket" replace /> },
           { path: 'confirmation', element: <BloomBarConfirmation /> },
+          // Store QR: `/bloombar/<code>_products`. Kept last so the static routes
+          // above (scanner, product, basket, …) always win over this dynamic slug.
+          { path: ':storeSlug', element: <BloomBarStore /> },
         ],
       },
       {

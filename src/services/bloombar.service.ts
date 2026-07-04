@@ -37,6 +37,34 @@ async function fetchKiosk(id: string | number) {
   return unwrap<Record<string, unknown>>(res);
 }
 
+// ── Store (store-QR catalog) ─────────────────────────────────────────────────
+
+export interface BloomBarStoreCatalog {
+  store: Record<string, unknown>;
+  products: Record<string, unknown>[];
+}
+
+/**
+ * Load a store's BloomBar catalog for a scanned store QR: the store branding plus
+ * every product mapped to the store's active kiosks. Throws an Error carrying the
+ * backend's friendly message when the store is unknown or unavailable.
+ */
+async function fetchStoreCatalog(code: string): Promise<BloomBarStoreCatalog> {
+  try {
+    const res = await api.get(`${BASE}/store/${encodeURIComponent(code)}/products/`);
+    const data = unwrap<{ store: Record<string, unknown>; products: Record<string, unknown>[] }>(res);
+    return {
+      store: data.store,
+      products: (data.products ?? []).map(normalizeProduct),
+    };
+  } catch (err) {
+    const message =
+      (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+      'This store is not available right now.';
+    throw new Error(message);
+  }
+}
+
 // ── Resolve (scan gate) ──────────────────────────────────────────────────────
 
 export interface BloomBarResolveResult {
@@ -90,22 +118,28 @@ async function createScanEvent(data: Record<string, unknown>) {
 // order is ever created, so nothing can get stuck in "Pending".
 
 interface CheckoutInput {
+  /** Kiosk-QR flow. Exactly one of kiosk_id / store_id must be set. */
   kiosk_id?: string;
+  /** Store-QR flow (whole-store catalog). Carries a room instead of a single kiosk. */
+  store_id?: string;
   campaign?: string;
   session_id?: string;
   customer_name: string;
   customer_email?: string;
   customer_whatsapp: string;
+  /** Room / table — required by the backend for a store-QR order. */
+  customer_room?: string;
   items: { product_id: string; quantity: number }[];
 }
 
-/** Shape the basket into the backend checkout payload (sent to both steps). */
+/** Shape the basket into the backend checkout payload (sent to both steps).
+ *  The backend accepts exactly one entry point, so we send store_id + room for a
+ *  store-QR basket, or kiosk_id for a kiosk-QR basket — never both. */
 function toBackendCheckout(data: CheckoutInput) {
-  return {
+  const base = {
     customer_name: data.customer_name,
     customer_whatsapp: data.customer_whatsapp,
     customer_email: data.customer_email || '',
-    kiosk_id: Number(data.kiosk_id || 0),
     campaign: data.campaign || 'direct',
     session_id: data.session_id || '',
     items: data.items.map((i) => ({
@@ -113,6 +147,10 @@ function toBackendCheckout(data: CheckoutInput) {
       quantity: i.quantity,
     })),
   };
+  if (data.store_id) {
+    return { ...base, store_id: Number(data.store_id), customer_room: data.customer_room || '' };
+  }
+  return { ...base, kiosk_id: Number(data.kiosk_id || 0) };
 }
 
 interface RazorpayInitResult {
@@ -194,6 +232,7 @@ export interface BloomBarTotals {
 
 interface TotalsInput {
   kiosk_id?: string;
+  store_id?: string;
   campaign?: string;
   items: { product_id: string; quantity: number }[];
 }
@@ -202,16 +241,19 @@ interface TotalsInput {
  * Ask the backend to compute subtotal / tax / total for the current basket,
  * exactly like the store/daily `GET /cart/` flow. The tax here comes from the
  * admin tax configuration on the server — NOT a hardcoded frontend rate.
+ * Sends store_id for a store-QR basket, kiosk_id for a kiosk-QR basket.
  */
 async function fetchTotals(data: TotalsInput): Promise<BloomBarTotals> {
-  const res = await api.post(`${BASE}/orders/calculate/`, {
-    kiosk_id: data.kiosk_id ? Number(data.kiosk_id) : undefined,
+  const payload: Record<string, unknown> = {
     campaign: data.campaign || 'direct',
     items: data.items.map((i) => ({
       product_id: Number(i.product_id),
       quantity: i.quantity,
     })),
-  });
+  };
+  if (data.store_id) payload.store_id = Number(data.store_id);
+  else if (data.kiosk_id) payload.kiosk_id = Number(data.kiosk_id);
+  const res = await api.post(`${BASE}/orders/calculate/`, payload);
   const t = unwrap<{
     subtotal: number | string;
     tax_amount: number | string;
@@ -279,6 +321,13 @@ export const base44 = {
     BloomBar: {
       async resolve(params: { product?: string; kiosk?: string; campaign?: string }) {
         return resolveScan(params);
+      },
+    },
+
+    Store: {
+      /** Store-QR catalog: store branding + all products across its active kiosks. */
+      async catalog(code: string): Promise<BloomBarStoreCatalog> {
+        return fetchStoreCatalog(code);
       },
     },
 

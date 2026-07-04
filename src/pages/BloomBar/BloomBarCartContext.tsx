@@ -14,6 +14,11 @@ export interface BloomBarKioskContext {
   kiosk?: Record<string, unknown>;
 }
 
+export interface BloomBarStoreContext {
+  storeCode: string;
+  store?: Record<string, unknown>;
+}
+
 interface CartContextValue {
   items: BloomBarCartItem[];
   itemCount: number;
@@ -24,6 +29,9 @@ interface CartContextValue {
   clearCart: () => void;
   kioskContext: BloomBarKioskContext | null;
   setKioskContext: (ctx: BloomBarKioskContext) => void;
+  /** Set when the basket originates from a store QR (whole-store catalog). */
+  storeContext: BloomBarStoreContext | null;
+  setStoreContext: (ctx: BloomBarStoreContext) => void;
   sessionId: string;
 }
 
@@ -31,6 +39,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 const STORAGE_KEY = 'bloombar_cart';
 const KIOSK_KEY = 'bloombar_kiosk_context';
+const STORE_KEY = 'bloombar_store_context';
 const SESSION_KEY = 'bloombar_session_id';
 
 /** One stable session id per device, persisted so scan → order → payment all share it
@@ -66,6 +75,14 @@ export function BloomBarCartProvider({ children }: { children: React.ReactNode }
       return null;
     }
   });
+  const [storeContext, setStoreContextState] = useState<BloomBarStoreContext | null>(() => {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
@@ -74,6 +91,10 @@ export function BloomBarCartProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (kioskContext) localStorage.setItem(KIOSK_KEY, JSON.stringify(kioskContext));
   }, [kioskContext]);
+
+  useEffect(() => {
+    if (storeContext) localStorage.setItem(STORE_KEY, JSON.stringify(storeContext));
+  }, [storeContext]);
 
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
   const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
@@ -111,8 +132,18 @@ export function BloomBarCartProvider({ children }: { children: React.ReactNode }
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
+  // A basket has a single origin: setting one context clears the other so the
+  // basket/checkout always know whether this is a kiosk-QR or store-QR order.
   const setKioskContext = useCallback((ctx: BloomBarKioskContext) => {
     setKioskContextState(ctx);
+    setStoreContextState(null);
+    localStorage.removeItem(STORE_KEY);
+  }, []);
+
+  const setStoreContext = useCallback((ctx: BloomBarStoreContext) => {
+    setStoreContextState(ctx);
+    setKioskContextState(null);
+    localStorage.removeItem(KIOSK_KEY);
   }, []);
 
   return (
@@ -127,6 +158,8 @@ export function BloomBarCartProvider({ children }: { children: React.ReactNode }
         clearCart,
         kioskContext,
         setKioskContext,
+        storeContext,
+        setStoreContext,
         sessionId: SESSION_ID,
       }}
     >
