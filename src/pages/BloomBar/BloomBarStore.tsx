@@ -133,8 +133,7 @@ export default function BloomBarStore() {
         {/* In-Room Dining pill */}
         <div className="mx-auto flex items-center justify-center gap-2 bg-white rounded-full px-5 py-3 premium-shadow">
           <DoorOpen size={18} className="text-amber-700" />
-          <span className="font-semibold text-gray-800">In-Room Dining</span>
-          <span className="text-gray-400">· Delivered to your door</span>
+          <span className="font-semibold text-gray-800">India's first In-Room Flower Delivery</span>
         </div>
 
         {/* How it works */}
@@ -146,28 +145,14 @@ export default function BloomBarStore() {
             </span>
           </div>
           <div className="flex items-start justify-between gap-1">
-            <HowStep icon={<Camera size={22} className="text-gray-600" />} title="Scan Room QR" desc="Scan the QR on your room desk" />
+            <HowStep icon={<Camera size={22} className="text-gray-600" />} title="Scan Room QR" />
             <ChevronRight size={16} className="text-gray-300 mt-6 shrink-0" />
-            <HowStep icon={<span className="text-xl">🌸</span>} title="Pick Your Flowers" desc="Choose flower sticks or bouquets" />
+            <HowStep icon={<span className="text-xl">🌸</span>} title="Pick Your Flowers" />
             <ChevronRight size={16} className="text-gray-300 mt-6 shrink-0" />
-            <HowStep icon={<DoorOpen size={22} className="text-amber-700" />} title="Delivered to Your Room" desc="Sticks in 30 min · Bouquets in 4 hrs" />
+            <HowStep icon={<DoorOpen size={22} className="text-amber-700" />} title="Delivered to Your Room" />
           </div>
         </div>
 
-        {/* Bouquet timing notice */}
-        <div className="flex gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
-          <div className="shrink-0 w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">
-            <AlertCircle size={18} className="text-amber-600" />
-          </div>
-          <div>
-            <p className="font-semibold text-amber-800 leading-snug">
-              Bouquets ordered now will be delivered tomorrow
-            </p>
-            <p className="text-sm text-gray-600 mt-0.5">
-              Bouquets are hand-crafted at our production centre · Same-day delivery before 2 PM IST
-            </p>
-          </div>
-        </div>
 
         {/* Category tabs */}
         <div className="grid grid-cols-2 gap-3">
@@ -176,7 +161,6 @@ export default function BloomBarStore() {
             accent="green"
             icon={<Leaf size={18} />}
             label="Sticks"
-            eta="30 min"
             onClick={() => setTab('stick')}
           />
           <CategoryTab
@@ -184,7 +168,6 @@ export default function BloomBarStore() {
             accent="gold"
             icon={<Flower2 size={18} />}
             label="Bouquets"
-            eta="4 hrs"
             onClick={goToBouquets}
           />
         </div>
@@ -303,14 +286,14 @@ export default function BloomBarStore() {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function HowStep({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+function HowStep({ icon, title, desc }: { icon: React.ReactNode; title: string; desc?: string }) {
   return (
     <div className="flex-1 flex flex-col items-center text-center px-0.5">
       <div className="w-12 h-12 rounded-full bg-genda-cream flex items-center justify-center mb-2">
         {icon}
       </div>
       <p className="text-sm font-semibold text-gray-800 leading-tight">{title}</p>
-      <p className="text-[11px] text-gray-500 mt-1 leading-snug">{desc}</p>
+      {desc && <p className="text-[11px] text-gray-500 mt-1 leading-snug">{desc}</p>}
     </div>
   );
 }
@@ -327,7 +310,7 @@ function CategoryTab({
   accent: 'green' | 'gold';
   icon: React.ReactNode;
   label: string;
-  eta: string;
+  eta?: string;
   onClick: () => void;
 }) {
   const activeCls =
@@ -341,9 +324,11 @@ function CategoryTab({
     >
       {icon}
       <span>{label}</span>
-      <span className={`text-xs font-normal ${active ? 'text-white/80' : 'text-gray-400'}`}>
-        {eta}
-      </span>
+      {eta && (
+        <span className={`text-xs font-normal ${active ? 'text-white/80' : 'text-gray-400'}`}>
+          {eta}
+        </span>
+      )}
     </button>
   );
 }

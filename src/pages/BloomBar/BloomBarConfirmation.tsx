@@ -137,7 +137,7 @@ export default function BloomBarConfirmation({ orderId, customerName }: Props) {
 
         {/* Discover */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65 }}>
-          <h3 className="font-semibold text-sm mb-3 px-1">Discover BloomBar</h3>
+          <h3 className="font-semibold text-sm mb-3 px-1">Discover Us</h3>
           <div className="grid grid-cols-2 gap-3">
             {DISCOVER.map((item, i) => (
               <motion.div
@@ -171,7 +171,7 @@ export default function BloomBarConfirmation({ orderId, customerName }: Props) {
               />
             </div>
             <div>
-              <p className="font-playfair font-semibold text-base">Discover Genda Phool</p>
+              <p className="font-playfair font-semibold text-base">About Us</p>
               <p className="text-white/70 text-xs">India's Flower Commerce Platform</p>
             </div>
           </div>
