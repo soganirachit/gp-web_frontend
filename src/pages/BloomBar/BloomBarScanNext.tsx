@@ -100,7 +100,7 @@ export default function BloomBarScanNext() {
   const scanAgain = () => { setScanKey(k => k + 1); setView('scanning'); };
 
   return (
-    <div className="min-h-[100dvh] bg-genda-cream">
+    <div className="min-h-[100dvh] bg-white">
       {/* QR Scanner overlay */}
       <AnimatePresence>
         {view === 'scanning' && (
@@ -120,7 +120,7 @@ export default function BloomBarScanNext() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 24 }}
                   transition={{ type: 'spring', damping: 22, stiffness: 300 }}
-                  className="fixed left-0 right-0 px-5 z-[120] pointer-events-none bottom-[calc(6.5rem+env(safe-area-inset-bottom))]"
+                  className="fixed left-0 right-0 px-5 z-[120] pointer-events-none bottom-[calc(50%+9rem)]"
                 >
                   <div className="mx-auto max-w-sm bg-white/95 backdrop-blur rounded-2xl px-4 py-3 text-center float-shadow">
                     <p className="font-semibold text-gray-800 text-sm">
@@ -181,7 +181,7 @@ export default function BloomBarScanNext() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex flex-col items-center justify-center min-h-[100dvh] px-5 py-12"
+            className="flex flex-col items-center justify-center min-h-[100dvh] px-5 py-12 bg-genda-cream"
           >
             <motion.div
               initial={{ opacity: 0, y: 12 }}
