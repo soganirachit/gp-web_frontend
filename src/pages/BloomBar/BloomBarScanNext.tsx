@@ -120,7 +120,7 @@ export default function BloomBarScanNext() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -24 }}
                   transition={{ type: 'spring', damping: 22, stiffness: 300 }}
-                  className="fixed top-24 left-0 right-0 px-5 z-[120] pointer-events-none"
+                  className="fixed left-0 right-0 px-5 z-[120] pointer-events-none top-[calc(env(safe-area-inset-top)+5.5rem)]"
                 >
                   <div className="mx-auto max-w-sm bg-white/95 backdrop-blur rounded-2xl px-4 py-3 text-center float-shadow">
                     <p className="font-semibold text-gray-800 text-sm">

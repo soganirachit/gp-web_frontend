@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, Minus, Plus } from 'lucide-react';
 import { useCart } from '../BloomBarCartContext';
@@ -8,7 +8,7 @@ export interface BloomBarProduct {
   id: string;
   name: string;
   price: number;
-  description?: string;
+  short_description?: string;
   image_url?: string;
   category?: string;
   badge?: string;
@@ -38,19 +38,6 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
   const { addItem, itemCount } = useCart();
   const hasItems = itemCount > 0;
   const inStock = product.stock_available !== false;
-
-  // Description "Read More" (scroll mode only — fitViewport clips to fill the screen).
-  const [descExpanded, setDescExpanded] = useState(false);
-  const [descOverflows, setDescOverflows] = useState(false);
-  const descRef = useRef<HTMLParagraphElement>(null);
-
-  // Measure whether the clamped description actually overflows 5 lines.
-  useLayoutEffect(() => {
-    if (fitViewport) return;
-    const el = descRef.current;
-    if (!el || descExpanded) return;
-    setDescOverflows(el.scrollHeight > el.clientHeight + 1);
-  }, [product.description, descExpanded, fitViewport]);
 
   // In scroll mode the quantity section + CTA live in one fixed bottom bar.
   // Measure it so the scrolling content reserves exactly the right space and
@@ -178,7 +165,7 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
         }
       >
         {/* Product Image — fixed aspect, unchanged in both modes */}
-        <div className="relative mx-4 rounded-3xl overflow-hidden bg-genda-cream aspect-square shrink-0">
+        <div className="relative mx-4 rounded-3xl overflow-hidden bg-white aspect-square shrink-0">
           {product.image_url ? (
             <img
               src={product.image_url}
@@ -221,29 +208,14 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
             </div>
           </div>
 
-          {product.description && (
-            fitViewport ? (
-              <p className="mt-2 text-sm text-gray-500 leading-relaxed flex-1 min-h-0 overflow-hidden">
-                {product.description}
-              </p>
-            ) : (
-              <div className="mt-2">
-                <p
-                  ref={descRef}
-                  className={`text-sm text-gray-500 leading-relaxed ${descExpanded ? '' : 'line-clamp-5'}`}
-                >
-                  {product.description}
-                </p>
-                {(descOverflows || descExpanded) && (
-                  <button
-                    onClick={() => setDescExpanded(v => !v)}
-                    className="mt-1 text-sm font-medium text-genda-green hover:underline"
-                  >
-                    {descExpanded ? 'Read Less' : 'Read More'}
-                  </button>
-                )}
-              </div>
-            )
+          {product.short_description && (
+            <p
+              className={`mt-2 text-sm text-gray-500 leading-relaxed ${
+                fitViewport ? 'flex-1 min-h-0 overflow-hidden' : ''
+              }`}
+            >
+              {product.short_description}
+            </p>
           )}
 
           {/* Tags */}

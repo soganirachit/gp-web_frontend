@@ -21,6 +21,9 @@ export default function BloomBarScanner({ onClose, onScan, lastAddedName }: Prop
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [torch, setTorch] = useState(false);
+  // Torch (flashlight) is device/browser dependent — notably unsupported on iOS
+  // Safari. Detected once the camera is live so we don't show a dead button.
+  const [torchSupported, setTorchSupported] = useState(false);
   const navigate = useNavigate();
   const didScan = useRef(false);
 
@@ -57,6 +60,14 @@ export default function BloomBarScanner({ onClose, onScan, lastAddedName }: Prop
         },
         () => {}
       )
+      .then(() => {
+        // Capabilities are only available once the track is live.
+        try {
+          setTorchSupported(scanner.getRunningTrackCameraCapabilities().torchFeature().isSupported());
+        } catch {
+          setTorchSupported(false);
+        }
+      })
       .catch(() => {
         setError('Camera access denied. Please allow camera permissions.');
         setScanning(false);
@@ -68,6 +79,18 @@ export default function BloomBarScanner({ onClose, onScan, lastAddedName }: Prop
       }
     };
   }, []);
+
+  // Push the torch state to the camera whenever it changes. The track closes on
+  // stop/unmount, so no explicit cleanup is needed.
+  useEffect(() => {
+    const scanner = scannerRef.current;
+    if (!scanner || !torchSupported) return;
+    try {
+      scanner.getRunningTrackCameraCapabilities().torchFeature().apply(torch).catch(() => {});
+    } catch {
+      /* track not live yet — ignore */
+    }
+  }, [torch, torchSupported]);
 
   const handleClose = () => {
     if (onClose) {
@@ -100,14 +123,18 @@ export default function BloomBarScanner({ onClose, onScan, lastAddedName }: Prop
           )}
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setTorch(t => !t)}
-            className={`w-10 h-10 rounded-full flex items-center justify-center ${
-              torch ? 'bg-yellow-400 text-black' : 'bg-white/20 text-white'
-            }`}
-          >
-            <Zap size={18} />
-          </button>
+          {torchSupported && (
+            <button
+              onClick={() => setTorch(t => !t)}
+              aria-label={torch ? 'Turn off flash' : 'Turn on flash'}
+              aria-pressed={torch}
+              className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                torch ? 'bg-yellow-400 text-black' : 'bg-white/20 text-white'
+              }`}
+            >
+              <Zap size={18} />
+            </button>
+          )}
           <button
             onClick={handleClose}
             className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white"

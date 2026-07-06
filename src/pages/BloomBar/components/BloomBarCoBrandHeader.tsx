@@ -32,7 +32,7 @@ export default function BloomBarCoBrandHeader({ kiosk }: Props) {
             className="h-10 w-auto object-contain mx-auto"
           />
         ) : (
-          <p className="font-playfair text-lg font-semibold text-gray-900 truncate max-w-[130px]">
+          <p className="font-playfair text-lg font-semibold text-gray-900 max-w-[140px] leading-tight break-words">
             {hotelName}
           </p>
         )}

@@ -66,7 +66,7 @@ export default function BloomBarProductPage() {
       <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 text-center bg-genda-cream">
         <span className="text-6xl mb-4">🌸</span>
         <h2 className="font-playfair text-2xl font-semibold mb-2">Oops!</h2>
-        <p className="text-gray-500 mb-6">{error}</p>
+        <p className="text-gray-500 mb-6">This product is currently unavailable. Please try again later.</p>
         <Link to="/bloombar" className="py-3 px-8 genda-gradient text-white rounded-2xl font-medium">
           Go Home
         </Link>
