@@ -116,11 +116,11 @@ export default function BloomBarScanNext() {
             <AnimatePresence>
               {showNotice && lastAdded && (
                 <motion.div
-                  initial={{ opacity: 0, y: -24 }}
+                  initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -24 }}
+                  exit={{ opacity: 0, y: 24 }}
                   transition={{ type: 'spring', damping: 22, stiffness: 300 }}
-                  className="fixed left-0 right-0 px-5 z-[120] pointer-events-none top-[calc(env(safe-area-inset-top)+5.5rem)]"
+                  className="fixed left-0 right-0 px-5 z-[120] pointer-events-none bottom-[calc(6.5rem+env(safe-area-inset-bottom))]"
                 >
                   <div className="mx-auto max-w-sm bg-white/95 backdrop-blur rounded-2xl px-4 py-3 text-center float-shadow">
                     <p className="font-semibold text-gray-800 text-sm">
@@ -164,7 +164,7 @@ export default function BloomBarScanNext() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
           >
-            <div className="pb-10">
+            <div className="pb-10 min-h-[100dvh] bg-white">
               <BloomBarCoBrandHeader kiosk={kiosk as { name?: string } | null} />
               <BloomBarProductCard
                 product={product}
