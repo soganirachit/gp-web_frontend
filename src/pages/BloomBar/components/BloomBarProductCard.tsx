@@ -73,7 +73,7 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
   const quantitySection = (
     <div className="bg-genda-cream rounded-2xl p-4">
       <p className="text-center text-sm font-large text-gray-800 mb-3">
-        How many sticks would you like? 🌸
+        How many stems would you like? 🌸
       </p>
       <div className="flex items-center justify-center gap-6">
         <button

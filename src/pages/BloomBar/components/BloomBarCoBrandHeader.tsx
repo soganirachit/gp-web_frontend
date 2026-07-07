@@ -47,8 +47,11 @@ export default function BloomBarCoBrandHeader({ kiosk }: Props) {
 
       {/* Genda Phool side */}
       <div className="text-center">
-        <p className="font-playfair text-lg font-semibold text-genda-green">Genda Phool</p>
-        <p className="text-xs text-gray-400 font-light">Fresh Flowers</p>
+        <img
+          src="/Bloombar-Logo-Final.png"
+          alt="Bloombar by Genda Phool"
+          className="h-16 w-auto object-contain mx-auto"
+        />
       </div>
     </motion.div>
   );

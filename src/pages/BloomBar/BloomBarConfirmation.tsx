@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, ExternalLink } from 'lucide-react';
+import BloomBarFooter from './components/BloomBarFooter';
 
 const DISCOVER = [
   { emoji: '🌹', title: 'Daily Subscriptions', desc: 'Fresh flowers every morning' },
@@ -113,23 +114,23 @@ export default function BloomBarConfirmation({ orderId, customerName }: Props) {
           transition={{ delay: 0.5, type: 'spring', damping: 18 }}
           className="bg-white rounded-2xl p-4 premium-shadow"
         >
-          <h3 className="font-semibold text-sm mb-3">What happens next?</h3>
+          <h3 className="font-semibold text-sm mb-3 text-gray-800">Care Instructions</h3>
           <div className="space-y-3">
             {[
-              { icon: '📱', text: 'WhatsApp confirmation sent to your number' },
-              { icon: '📧', text: 'Email receipt on its way' },
-              { icon: '🌸', text: 'Kiosk staff will prepare your order' },
-              { icon: '✨', text: 'Pick up at the kiosk in a few minutes' },
+              { icon: '🌼', text: 'Change the water every 2 days and trim the stems at a 45° angle for longer-lasting blooms.' },
+              { icon: '💧', text: 'Remove wilted petals and leaves, and add flower food whenever possible to keep them nourished.' },
+              { icon: '❄️', text: 'Keep your flowers in a cool, air-conditioned room away from direct sunlight and heat.' },
+              { icon: '💛', text: 'With proper care, your flowers can stay fresh and beautiful for 5–7+ days.' },
             ].map((step, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, x: -16 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.55 + i * 0.1 }}
-                className="flex items-center gap-3"
+                className="flex items-start gap-3"
               >
-                <span className="text-xl">{step.icon}</span>
-                <span className="text-sm text-gray-500">{step.text}</span>
+                <span className="text-sm leading-none mt-0.5">{step.icon}</span>
+                <span className="text-xs text-gray-700 leading-snug">{step.text}</span>
               </motion.div>
             ))}
           </div>
@@ -137,7 +138,7 @@ export default function BloomBarConfirmation({ orderId, customerName }: Props) {
 
         {/* Discover */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65 }}>
-          <h3 className="font-semibold text-sm mb-3 px-1">Discover Us</h3>
+          <h3 className="font-semibold text-sm mb-3 px-1">Discover Genda Phool</h3>
           <div className="grid grid-cols-2 gap-3">
             {DISCOVER.map((item, i) => (
               <motion.div
@@ -160,14 +161,14 @@ export default function BloomBarConfirmation({ orderId, customerName }: Props) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
-          className="bg-genda-green rounded-2xl p-5 text-white"
+          className="bg-genda-green rounded-2xl p-4 text-white"
         >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center flex-shrink-0 p-1.5">
+          <div className="flex items-center gap-3 mb-2.5">
+            <div className="w-11 h-11 rounded-full overflow-hidden flex-shrink-0">
               <img
-                src="https://media.base44.com/images/public/6a19710a955d0c68cf58358a/4b879ad11_logo-GP-Black.png"
+                src="/Logo-CIrcle.png"
                 alt="Genda Phool"
-                className="w-full h-full object-contain"
+                className="w-full h-full object-cover"
               />
             </div>
             <div>
@@ -175,14 +176,14 @@ export default function BloomBarConfirmation({ orderId, customerName }: Props) {
               <p className="text-white/70 text-xs">India's Flower Commerce Platform</p>
             </div>
           </div>
-          <p className="text-white/80 text-sm leading-relaxed mb-4">
+          <p className="text-white/80 text-sm leading-snug mb-3">
             Get daily puja flowers, bouquets, wedding decor & festival specials — delivered fresh to your door. Over 50,000 happy customers across India! 🌸
           </p>
           <a
             href="https://mygendaphool.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full py-3 bg-white text-genda-green font-semibold rounded-xl text-sm mb-3"
+            className="flex items-center justify-center gap-2 w-full py-2.5 bg-white text-genda-green font-semibold rounded-xl text-sm mb-2.5"
           >
             <ExternalLink size={15} /> Visit mygendaphool.com
           </a>
@@ -191,7 +192,7 @@ export default function BloomBarConfirmation({ orderId, customerName }: Props) {
               href="https://play.google.com/store/apps/details?id=com.gendaphool"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 bg-white/15 rounded-xl py-2.5 text-center text-xs font-medium"
+              className="flex-1 bg-white/15 rounded-xl py-2 text-center text-xs font-medium"
             >
               Google Play
             </a>
@@ -199,7 +200,7 @@ export default function BloomBarConfirmation({ orderId, customerName }: Props) {
               href="https://apps.apple.com/app/genda-phool"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 bg-white/15 rounded-xl py-2.5 text-center text-xs font-medium"
+              className="flex-1 bg-white/15 rounded-xl py-2 text-center text-xs font-medium"
             >
               App Store
             </a>
@@ -211,16 +212,18 @@ export default function BloomBarConfirmation({ orderId, customerName }: Props) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.95 }}
-          className="pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+          className="-mt-2"
         >
           <a
             href="/bloombar/scan-next"
-            className="flex items-center justify-center gap-2 w-full py-4 genda-gradient text-white font-semibold rounded-2xl premium-shadow"
+            className="flex items-center justify-center gap-2 w-full py-3 genda-gradient text-white font-semibold rounded-2xl premium-shadow"
           >
             🌸 Scan More Flowers
           </a>
         </motion.div>
       </div>
+
+      <BloomBarFooter />
     </div>
   );
 }

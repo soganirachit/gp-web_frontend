@@ -4,14 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShoppingBag,
   Plus,
-  Check,
+  Minus,
   Leaf,
   Flower2,
   Sparkles,
   Camera,
   DoorOpen,
   AlertCircle,
-  Clock,
   ChevronRight,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -29,22 +28,21 @@ interface CatalogProduct {
   short_description?: string;
   description?: string;
   bloombar_type?: BloomBarType;
-  delivery_eta?: string;
   badge?: string;
   [key: string]: unknown;
 }
 
 /**
  * Store-QR "Room Order" page (`/bloombar/<store-code>_products`). Mirrors the
- * gpkiosk prototype: co-brand header, in-room dining intro, a Sticks/Bouquets
+ * gpkiosk prototype: co-brand header, in-room dining intro, a Buy Stems/Bouquets
  * split, and a product grid that feeds the shared basket (which then asks for
- * the guest's room). Sticks are 30-min; bouquets are hand-crafted (4-hr).
+ * the guest's room). Bouquets are hand-crafted at the production centre.
  */
 export default function BloomBarStore() {
   const { storeSlug = '' } = useParams();
   const code = useMemo(() => storeSlug.replace(/_products$/, ''), [storeSlug]);
 
-  const { addItem, itemCount, total, setStoreContext, sessionId } = useCart();
+  const { itemCount, total, setStoreContext, sessionId } = useCart();
   const navigate = useNavigate();
 
   const [store, setStore] = useState<Record<string, unknown> | null>(null);
@@ -54,12 +52,14 @@ export default function BloomBarStore() {
   const [tab, setTab] = useState<BloomBarType>('stick');
   const [redirecting, setRedirecting] = useState(false);
 
-  // Bouquets are fulfilled through the GP Store catalog + checkout. Hand off there,
-  // letting the fade overlay play first so the transition feels intentional, not abrupt.
+  // Bouquets are fulfilled on the main Genda Phool site. Hand off there, letting the
+  // fade overlay play first so the transition feels intentional, not abrupt.
   const goToBouquets = () => {
     if (redirecting) return;
     setRedirecting(true);
-    setTimeout(() => navigate('/gp-store/products'), 550);
+    setTimeout(() => {
+      window.location.href = 'https://www.mygendaphool.com/category/bouquets';
+    }, 600);
   };
 
   useEffect(() => {
@@ -131,25 +131,25 @@ export default function BloomBarStore() {
 
       <div className="px-4 pt-2 space-y-4">
         {/* In-Room Dining pill */}
-        <div className="mx-auto flex items-center justify-center gap-2 bg-white rounded-full px-5 py-3 premium-shadow">
-          <DoorOpen size={18} className="text-amber-700" />
-          <span className="font-semibold text-gray-800">India's first In-Room Flower Delivery</span>
+        <div className="mx-auto flex items-center justify-center gap-1.5 bg-white rounded-full px-4 py-1.5 premium-shadow">
+          <DoorOpen size={15} className="text-amber-700" />
+          <span className="text-sm font-semibold text-gray-800">India's first In-Room Flower Delivery</span>
         </div>
 
         {/* How it works */}
-        <div className="bg-white rounded-3xl p-5 premium-shadow">
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles size={16} className="text-genda-gold" />
-            <span className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
+        <div className="bg-white rounded-2xl px-3 py-2 premium-shadow">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Sparkles size={12} className="text-genda-gold" />
+            <span className="text-[10px] font-semibold tracking-wide text-gray-500 uppercase">
               How it works
             </span>
           </div>
           <div className="flex items-start justify-between gap-1">
-            <HowStep icon={<Camera size={22} className="text-gray-600" />} title="Scan Room QR" />
-            <ChevronRight size={16} className="text-gray-300 mt-6 shrink-0" />
-            <HowStep icon={<span className="text-xl">🌸</span>} title="Pick Your Flowers" />
-            <ChevronRight size={16} className="text-gray-300 mt-6 shrink-0" />
-            <HowStep icon={<DoorOpen size={22} className="text-amber-700" />} title="Delivered to Your Room" />
+            <HowStep icon={<Camera size={16} className="text-gray-600" />} title="Scan Room QR" />
+            <ChevronRight size={12} className="text-gray-300 mt-2.5 shrink-0" />
+            <HowStep icon={<span className="text-base">🌸</span>} title="Pick Your Flowers" />
+            <ChevronRight size={12} className="text-gray-300 mt-2.5 shrink-0" />
+            <HowStep icon={<DoorOpen size={16} className="text-amber-700" />} title="Delivered to Your Room" />
           </div>
         </div>
 
@@ -160,7 +160,7 @@ export default function BloomBarStore() {
             active={tab === 'stick'}
             accent="green"
             icon={<Leaf size={18} />}
-            label="Sticks"
+            label="Buy Stems"
             onClick={() => setTab('stick')}
           />
           <CategoryTab
@@ -175,11 +175,8 @@ export default function BloomBarStore() {
         {/* Section header */}
         {tab === 'stick' ? (
           <div>
-            <h2 className="font-playfair text-2xl font-semibold flex items-center gap-2">
-              <Leaf size={20} className="text-genda-green" /> Flower Sticks
-            </h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Fresh single stems · Delivered to your room in 30 minutes
+            <p className="text-sm text-gray-500 text-center">
+              Fresh single stems · Delivered to your room
             </p>
           </div>
         ) : (
@@ -188,7 +185,7 @@ export default function BloomBarStore() {
               <Flower2 size={20} className="text-genda-gold" /> Bouquets &amp; Arrangements
             </h2>
             <p className="text-sm text-gray-500 mt-0.5">
-              Hand-crafted at our production centre · 4-hour delivery to your room
+              Hand-crafted at our production centre · delivery to your room
             </p>
           </div>
         )}
@@ -197,7 +194,7 @@ export default function BloomBarStore() {
         {list.length === 0 ? (
           <div className="py-14 text-center text-gray-500">
             <span className="text-5xl block mb-3">💐</span>
-            No {tab === 'stick' ? 'flower sticks' : 'bouquets'} available here right now.
+            No {tab === 'stick' ? 'stems' : 'bouquets'} available here right now.
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 auto-rows-fr">
@@ -206,15 +203,6 @@ export default function BloomBarStore() {
                 key={product.id}
                 product={product}
                 accent={tab === 'stick' ? 'green' : 'gold'}
-                onAdd={() =>
-                  addItem({
-                    product_id: product.id,
-                    product_name: product.name,
-                    price: product.price,
-                    quantity: 1,
-                    image_url: product.image_url,
-                  })
-                }
               />
             ))}
           </div>
@@ -225,7 +213,7 @@ export default function BloomBarStore() {
           <PromoBox
             tone="pink"
             icon={<span className="text-base">💐</span>}
-            title="Add a flower stick to your bouquet for just ₹49"
+            title="Add a flower stem to your bouquet for just ₹49"
             desc="A single stem makes the arrangement pop"
           />
         )}
@@ -289,11 +277,11 @@ export default function BloomBarStore() {
 function HowStep({ icon, title, desc }: { icon: React.ReactNode; title: string; desc?: string }) {
   return (
     <div className="flex-1 flex flex-col items-center text-center px-0.5">
-      <div className="w-12 h-12 rounded-full bg-genda-cream flex items-center justify-center mb-2">
+      <div className="w-8 h-8 rounded-full bg-genda-cream flex items-center justify-center mb-1">
         {icon}
       </div>
-      <p className="text-sm font-semibold text-gray-800 leading-tight">{title}</p>
-      {desc && <p className="text-[11px] text-gray-500 mt-1 leading-snug">{desc}</p>}
+      <p className="text-[11px] font-semibold text-gray-800 leading-tight">{title}</p>
+      {desc && <p className="text-[10px] text-gray-500 mt-1 leading-snug">{desc}</p>}
     </div>
   );
 }
@@ -303,14 +291,12 @@ function CategoryTab({
   accent,
   icon,
   label,
-  eta,
   onClick,
 }: {
   active: boolean;
   accent: 'green' | 'gold';
   icon: React.ReactNode;
   label: string;
-  eta?: string;
   onClick: () => void;
 }) {
   const activeCls =
@@ -324,11 +310,6 @@ function CategoryTab({
     >
       {icon}
       <span>{label}</span>
-      {eta && (
-        <span className={`text-xs font-normal ${active ? 'text-white/80' : 'text-gray-400'}`}>
-          {eta}
-        </span>
-      )}
     </button>
   );
 }
@@ -336,21 +317,24 @@ function CategoryTab({
 function StoreProductCard({
   product,
   accent,
-  onAdd,
 }: {
   product: CatalogProduct;
   accent: 'green' | 'gold';
-  onAdd: () => void;
 }) {
-  const [added, setAdded] = useState(false);
+  const { items, addItem, updateQuantity } = useCart();
+  const qty = items.find((i) => i.product_id === product.id)?.quantity ?? 0;
   const badgeCls = accent === 'green' ? 'bg-genda-green text-white' : 'bg-genda-gold text-white';
   const addCls = accent === 'green' ? 'genda-gradient' : 'bg-genda-gold';
 
-  const handleAdd = () => {
-    onAdd();
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1200);
-  };
+  const increment = () =>
+    addItem({
+      product_id: product.id,
+      product_name: product.name,
+      price: product.price,
+      quantity: 1,
+      image_url: product.image_url,
+    });
+  const decrement = () => updateQuantity(product.id, qty - 1);
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden premium-shadow flex flex-col h-full">
@@ -379,20 +363,41 @@ function StoreProductCard({
             <p className="text-genda-green font-bold text-base leading-none">
               ₹{product.price.toLocaleString('en-IN')}
             </p>
-            {product.delivery_eta && (
-              <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1">
-                <Clock size={11} /> {product.delivery_eta}
-              </p>
-            )}
           </div>
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={handleAdd}
-            aria-label={`Add ${product.name}`}
-            className={`shrink-0 w-11 h-11 rounded-2xl ${addCls} text-white flex items-center justify-center shadow-md`}
-          >
-            {added ? <Check size={18} /> : <Plus size={18} />}
-          </motion.button>
+          {qty === 0 ? (
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={increment}
+              aria-label={`Add ${product.name}`}
+              className={`shrink-0 w-11 h-11 rounded-full ${addCls} text-white flex items-center justify-center shadow-md`}
+            >
+              <Plus size={18} />
+            </motion.button>
+          ) : (
+            <div
+              className={`shrink-0 flex items-center gap-0.5 rounded-full ${addCls} text-white shadow-md`}
+            >
+              <motion.button
+                whileTap={{ scale: 0.85 }}
+                onClick={decrement}
+                aria-label={`Remove one ${product.name}`}
+                className="w-9 h-9 flex items-center justify-center"
+              >
+                <Minus size={16} />
+              </motion.button>
+              <span className="min-w-[1.25rem] text-center text-sm font-bold tabular-nums">
+                {qty}
+              </span>
+              <motion.button
+                whileTap={{ scale: 0.85 }}
+                onClick={increment}
+                aria-label={`Add one more ${product.name}`}
+                className="w-9 h-9 flex items-center justify-center"
+              >
+                <Plus size={16} />
+              </motion.button>
+            </div>
+          )}
         </div>
       </div>
     </div>

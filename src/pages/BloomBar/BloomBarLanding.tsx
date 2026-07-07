@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion';
 import { QrCode, ShoppingBag, BarChart2, ArrowRight, ExternalLink, Smartphone, Star } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import BloomBarFooter from './components/BloomBarFooter';
 
-const LOGO_URL =
-  'https://media.base44.com/images/public/6a19710a955d0c68cf58358a/4b879ad11_logo-GP-Black.png';
+const LOGO_URL = '/Logo-CIrcle.png';
 
 const SERVICES = [
   { emoji: '🌼', title: 'Daily Puja Flowers', desc: 'Fresh marigolds, roses, belpatra & more – delivered every morning for your pooja rituals.' },
@@ -37,8 +37,8 @@ export default function BloomBarLanding() {
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center flex-shrink-0 p-1">
-              <img src={LOGO_URL} alt="Genda Phool" className="w-full h-full object-contain" />
+            <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
+              <img src={LOGO_URL} alt="Genda Phool" className="w-full h-full object-cover" />
             </div>
             <div>
               <p className="font-playfair text-xl font-semibold">BloomBar</p>
@@ -99,8 +99,8 @@ export default function BloomBarLanding() {
           </h2>
           <div className="bg-white rounded-2xl p-5 premium-shadow">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-14 h-14 rounded-xl bg-genda-cream flex items-center justify-center flex-shrink-0 p-2">
-                <img src={LOGO_URL} alt="Genda Phool" className="w-full h-full object-contain" />
+              <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0">
+                <img src={LOGO_URL} alt="Genda Phool" className="w-full h-full object-cover" />
               </div>
               <div>
                 <p className="font-playfair font-semibold text-base">Genda Phool</p>
@@ -265,6 +265,8 @@ export default function BloomBarLanding() {
           </div>
         </motion.div>
       </div>
+
+      <BloomBarFooter />
     </div>
   );
 }

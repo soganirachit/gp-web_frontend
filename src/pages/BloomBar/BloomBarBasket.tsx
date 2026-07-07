@@ -28,7 +28,7 @@ export default function BloomBarBasket() {
   // Totals come from the backend (admin-configured tax) — same source-of-truth
   // pattern as the store/daily cart. No local fallback: if the backend doesn't
   // return totals, they stay null and we never fabricate a tax/total.
-  type Totals = { subtotal: number; tax: number; total: number };
+  type Totals = { subtotal: number; tax: number; total: number; discount: number };
   const [totals, setTotals] = useState<Totals | null>(null);
 
   const itemsKey = items.map(i => `${i.product_id}:${i.quantity}`).join(',');
@@ -48,7 +48,19 @@ export default function BloomBarBasket() {
           campaign: isStore ? 'store' : kioskContext?.campaign || 'direct',
           items: items.map(i => ({ product_id: i.product_id, quantity: i.quantity })),
         });
-        if (!cancelled) setTotals({ subtotal: t.subtotal, tax: t.tax_amount, total: t.total_amount });
+        if (!cancelled) {
+          // Prefer the backend's explicit discount; otherwise derive it from the
+          // gap between (subtotal + tax) and the charged total so any promo the
+          // server applies still surfaces on the summary.
+          const derived = t.subtotal + t.tax_amount - t.total_amount;
+          const discount =
+            t.discount_amount != null && t.discount_amount > 0
+              ? t.discount_amount
+              : derived > 0.009
+                ? derived
+                : 0;
+          setTotals({ subtotal: t.subtotal, tax: t.tax_amount, total: t.total_amount, discount });
+        }
       } catch {
         // Backend totals unavailable — leave null, do not invent any amount.
         if (!cancelled) setTotals(null);
@@ -62,6 +74,7 @@ export default function BloomBarBasket() {
 
   const tax = totals?.tax ?? null;
   const grandTotal = totals?.total ?? null;
+  const discount = totals?.discount ?? 0;
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -231,7 +244,7 @@ export default function BloomBarBasket() {
                   <p className="font-semibold text-sm">
                     {item.product_name} ×{item.quantity}
                   </p>
-                  <p className="text-genda-gold font-bold text-base mt-0.5">
+                  <p className="text-genda-green font-bold text-base mt-0.5">
                     ₹{item.price.toLocaleString('en-IN')} each
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
@@ -288,6 +301,14 @@ export default function BloomBarBasket() {
           <h3 className="font-semibold text-sm mb-3">Order Summary</h3>
           <div className="space-y-2">
             <BloomBarOrderSummaryRow label="Subtotal" value={`₹${total.toLocaleString('en-IN')}`} />
+
+            {discount > 0 && (
+              <BloomBarOrderSummaryRow
+                label="Discount"
+                value={`−₹${discount.toLocaleString('en-IN')}`}
+                valueClassName="text-genda-green font-semibold"
+              />
+            )}
 
             <BloomBarOrderSummaryRow
               label="Tax"
