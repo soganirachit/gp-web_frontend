@@ -25,10 +25,19 @@ export default function BloomBarBasket() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState('');
 
+  // Coupon: `couponInput` is what's being typed; `appliedCoupon` is the code sent
+  // to the backend (empty until the customer taps Apply). The backend re-validates
+  // it on every totals call and on payment, so the UI just reflects its verdict.
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState('');
+
   // Totals come from the backend (admin-configured tax) — same source-of-truth
   // pattern as the store/daily cart. No local fallback: if the backend doesn't
   // return totals, they stay null and we never fabricate a tax/total.
-  type Totals = { subtotal: number; tax: number; total: number; discount: number; discountPct: number };
+  type Totals = {
+    subtotal: number; tax: number; total: number;
+    couponDiscount: number; couponCode: string; couponMessage: string | null;
+  };
   const [totals, setTotals] = useState<Totals | null>(null);
 
   const itemsKey = items.map(i => `${i.product_id}:${i.quantity}`).join(',');
@@ -46,32 +55,19 @@ export default function BloomBarBasket() {
           kiosk_id: isStore ? undefined : kioskContext?.kioskId || '',
           store_id: isStore ? storeId : undefined,
           campaign: isStore ? 'store' : kioskContext?.campaign || 'direct',
+          coupon_code: appliedCoupon || undefined,
           items: items.map(i => ({ product_id: i.product_id, quantity: i.quantity })),
         });
         if (!cancelled) {
-          // Prefer the backend's explicit discount; otherwise derive it from the
-          // gap between (subtotal + tax) and the charged total so any promo the
-          // server applies still surfaces on the summary.
-          const derived = t.subtotal + t.tax_amount - t.total_amount;
-          const discount =
-            t.discount_amount != null && t.discount_amount > 0
-              ? t.discount_amount
-              : derived > 0.009
-                ? derived
-                : 0;
-          // Prefer the backend's effective %, else derive it from the discount vs subtotal.
-          const discountPct =
-            t.discount_percentage != null && t.discount_percentage > 0
-              ? t.discount_percentage
-              : t.subtotal > 0
-                ? Math.round((discount / t.subtotal) * 100)
-                : 0;
+          // Cart parity: subtotal already reflects any auto/store discount (it's baked
+          // into the item price), so only the coupon shows as a discount line.
           setTotals({
             subtotal: t.subtotal,
             tax: t.tax_amount,
             total: t.total_amount,
-            discount,
-            discountPct,
+            couponDiscount: t.coupon_discount ?? 0,
+            couponCode: t.coupon_code ?? '',
+            couponMessage: t.coupon_message ?? null,
           });
         }
       } catch {
@@ -83,14 +79,15 @@ export default function BloomBarBasket() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemsKey, isStore, storeId, kioskContext?.kioskId, kioskContext?.campaign]);
+  }, [itemsKey, isStore, storeId, kioskContext?.kioskId, kioskContext?.campaign, appliedCoupon]);
 
   const tax = totals?.tax ?? null;
   const grandTotal = totals?.total ?? null;
-  const discount = totals?.discount ?? 0;
-  const discountPct = totals?.discountPct ?? 0;
-  // Order Summary subtotal is the ORIGINAL (pre-discount) amount from the backend.
-  // Fall back to the local cart sum only until backend totals arrive.
+  const couponDiscount = totals?.couponDiscount ?? 0;
+  const couponCode = totals?.couponCode ?? '';
+  const couponMessage = totals?.couponMessage ?? null;
+  // Subtotal from the backend already reflects any auto/store discount (baked into
+  // the price, same as the storefront). Fall back to the local sum until it loads.
   const displaySubtotal = totals?.subtotal ?? total;
 
   const validate = () => {
@@ -130,6 +127,7 @@ export default function BloomBarBasket() {
       kiosk_id: isStore ? undefined : kioskContext?.kioskId || '',
       store_id: isStore ? storeId : undefined,
       campaign: isStore ? 'store' : kioskContext?.campaign || 'direct',
+      coupon_code: appliedCoupon || undefined,
       customer_name: form.name,
       customer_email: isStore ? '' : form.email,
       customer_whatsapp: form.whatsapp,
@@ -307,16 +305,58 @@ export default function BloomBarBasket() {
           Scan another flower
         </Link>
 
+        {/* Promo code */}
+        <div className="bg-white rounded-2xl p-4 premium-shadow">
+          <h3 className="font-semibold text-sm mb-3">Have a promo code?</h3>
+          {appliedCoupon && couponCode ? (
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-genda-green">
+                {couponCode} applied
+              </span>
+              <button
+                onClick={() => {
+                  setAppliedCoupon('');
+                  setCouponInput('');
+                }}
+                className="text-xs text-gray-500 underline"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Enter code"
+                value={couponInput}
+                onChange={e => setCouponInput(e.target.value.toUpperCase().trim())}
+                className="flex-1 border border-gray-200 rounded-xl px-4 py-3 bg-genda-cream text-sm outline-none uppercase"
+              />
+              <button
+                onClick={() => setAppliedCoupon(couponInput)}
+                disabled={!couponInput}
+                className="px-5 py-3 rounded-xl genda-gradient text-white text-sm font-semibold disabled:opacity-50"
+              >
+                Apply
+              </button>
+            </div>
+          )}
+          {/* Rejection reason from the backend (invalid / expired / min-order not met). */}
+          {appliedCoupon && couponMessage && (
+            <p className="text-red-500 text-xs mt-2">{couponMessage}</p>
+          )}
+        </div>
+
         {/* Order Summary */}
         <div className="bg-white rounded-2xl p-4 premium-shadow">
           <h3 className="font-semibold text-sm mb-3">Order Summary</h3>
           <div className="space-y-2">
             <BloomBarOrderSummaryRow label="Subtotal" value={`₹${displaySubtotal.toLocaleString('en-IN')}`} />
 
-            {discount > 0 && (
+            {couponDiscount > 0 && (
               <BloomBarOrderSummaryRow
-                label={discountPct > 0 ? `Discount (${discountPct}%)` : 'Discount'}
-                value={`−₹${discount.toLocaleString('en-IN')}`}
+                label={couponCode ? `Coupon (${couponCode})` : 'Coupon'}
+                value={`−₹${couponDiscount.toLocaleString('en-IN')}`}
                 valueClassName="text-genda-green font-semibold"
               />
             )}

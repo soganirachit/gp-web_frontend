@@ -124,6 +124,7 @@ interface CheckoutInput {
   store_id?: string;
   campaign?: string;
   session_id?: string;
+  coupon_code?: string;
   customer_name: string;
   customer_email?: string;
   customer_whatsapp: string;
@@ -142,6 +143,7 @@ function toBackendCheckout(data: CheckoutInput) {
     customer_email: data.customer_email || '',
     campaign: data.campaign || 'direct',
     session_id: data.session_id || '',
+    coupon_code: data.coupon_code || '',
     items: data.items.map((i) => ({
       product_id: Number(i.product_id),
       quantity: i.quantity,
@@ -230,6 +232,12 @@ export interface BloomBarTotals {
   discount_amount?: number;
   /** Effective discount % (discount_amount / subtotal). Optional, for display. */
   discount_percentage?: number;
+  /** Applied coupon code (echoed back when valid), else ''. */
+  coupon_code?: string;
+  /** Coupon discount amount, if a valid code was applied. */
+  coupon_discount?: number;
+  /** Friendly reason a non-empty coupon code was rejected, else null. */
+  coupon_message?: string | null;
   /** Tax % the backend used (from admin config). Optional, for display. */
   tax_rate?: number;
 }
@@ -238,6 +246,7 @@ interface TotalsInput {
   kiosk_id?: string;
   store_id?: string;
   campaign?: string;
+  coupon_code?: string;
   items: { product_id: string; quantity: number }[];
 }
 
@@ -257,6 +266,7 @@ async function fetchTotals(data: TotalsInput): Promise<BloomBarTotals> {
   };
   if (data.store_id) payload.store_id = Number(data.store_id);
   else if (data.kiosk_id) payload.kiosk_id = Number(data.kiosk_id);
+  if (data.coupon_code) payload.coupon_code = data.coupon_code;
   const res = await api.post(`${BASE}/orders/calculate/`, payload);
   const t = unwrap<{
     subtotal: number | string;
@@ -264,6 +274,9 @@ async function fetchTotals(data: TotalsInput): Promise<BloomBarTotals> {
     total_amount: number | string;
     discount_amount?: number | string;
     discount_percentage?: number | string;
+    coupon_code?: string;
+    coupon_discount?: number | string;
+    coupon_message?: string | null;
     tax_rate?: number | string;
   }>(res);
   return {
@@ -273,6 +286,9 @@ async function fetchTotals(data: TotalsInput): Promise<BloomBarTotals> {
     discount_amount: t.discount_amount !== undefined ? Number(t.discount_amount) || 0 : undefined,
     discount_percentage:
       t.discount_percentage !== undefined ? Number(t.discount_percentage) || 0 : undefined,
+    coupon_code: t.coupon_code ?? '',
+    coupon_discount: t.coupon_discount !== undefined ? Number(t.coupon_discount) || 0 : undefined,
+    coupon_message: t.coupon_message ?? null,
     tax_rate: t.tax_rate !== undefined ? Number(t.tax_rate) : undefined,
   };
 }
