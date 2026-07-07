@@ -28,7 +28,7 @@ export default function BloomBarBasket() {
   // Totals come from the backend (admin-configured tax) — same source-of-truth
   // pattern as the store/daily cart. No local fallback: if the backend doesn't
   // return totals, they stay null and we never fabricate a tax/total.
-  type Totals = { subtotal: number; tax: number; total: number; discount: number };
+  type Totals = { subtotal: number; tax: number; total: number; discount: number; discountPct: number };
   const [totals, setTotals] = useState<Totals | null>(null);
 
   const itemsKey = items.map(i => `${i.product_id}:${i.quantity}`).join(',');
@@ -59,7 +59,20 @@ export default function BloomBarBasket() {
               : derived > 0.009
                 ? derived
                 : 0;
-          setTotals({ subtotal: t.subtotal, tax: t.tax_amount, total: t.total_amount, discount });
+          // Prefer the backend's effective %, else derive it from the discount vs subtotal.
+          const discountPct =
+            t.discount_percentage != null && t.discount_percentage > 0
+              ? t.discount_percentage
+              : t.subtotal > 0
+                ? Math.round((discount / t.subtotal) * 100)
+                : 0;
+          setTotals({
+            subtotal: t.subtotal,
+            tax: t.tax_amount,
+            total: t.total_amount,
+            discount,
+            discountPct,
+          });
         }
       } catch {
         // Backend totals unavailable — leave null, do not invent any amount.
@@ -75,6 +88,10 @@ export default function BloomBarBasket() {
   const tax = totals?.tax ?? null;
   const grandTotal = totals?.total ?? null;
   const discount = totals?.discount ?? 0;
+  const discountPct = totals?.discountPct ?? 0;
+  // Order Summary subtotal is the ORIGINAL (pre-discount) amount from the backend.
+  // Fall back to the local cart sum only until backend totals arrive.
+  const displaySubtotal = totals?.subtotal ?? total;
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -247,12 +264,6 @@ export default function BloomBarBasket() {
                   <p className="text-genda-green font-bold text-base mt-0.5">
                     ₹{item.price.toLocaleString('en-IN')} each
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Subtotal:{' '}
-                    <span className="font-semibold text-gray-800">
-                      ₹{(item.price * item.quantity).toLocaleString('en-IN')}
-                    </span>
-                  </p>
                 </div>
                 <button
                   onClick={() => removeItem(item.product_id)}
@@ -300,20 +311,22 @@ export default function BloomBarBasket() {
         <div className="bg-white rounded-2xl p-4 premium-shadow">
           <h3 className="font-semibold text-sm mb-3">Order Summary</h3>
           <div className="space-y-2">
-            <BloomBarOrderSummaryRow label="Subtotal" value={`₹${total.toLocaleString('en-IN')}`} />
+            <BloomBarOrderSummaryRow label="Subtotal" value={`₹${displaySubtotal.toLocaleString('en-IN')}`} />
 
             {discount > 0 && (
               <BloomBarOrderSummaryRow
-                label="Discount"
+                label={discountPct > 0 ? `Discount (${discountPct}%)` : 'Discount'}
                 value={`−₹${discount.toLocaleString('en-IN')}`}
                 valueClassName="text-genda-green font-semibold"
               />
             )}
 
-            <BloomBarOrderSummaryRow
-              label="Tax"
-              value={tax != null ? `₹${tax.toLocaleString('en-IN')}` : '—'}
-            />
+            {tax != null && tax > 0 && (
+              <BloomBarOrderSummaryRow
+                label="Tax"
+                value={`+₹${tax.toLocaleString('en-IN')}`}
+              />
+            )}
             <BloomBarOrderSummaryRow
               label="Total"
               value={grandTotal != null ? `₹${grandTotal.toLocaleString('en-IN')}` : '—'}

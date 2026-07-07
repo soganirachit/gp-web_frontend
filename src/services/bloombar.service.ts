@@ -228,6 +228,8 @@ export interface BloomBarTotals {
   total_amount: number;
   /** Discount the backend applied, if any. Optional, for display. */
   discount_amount?: number;
+  /** Effective discount % (discount_amount / subtotal). Optional, for display. */
+  discount_percentage?: number;
   /** Tax % the backend used (from admin config). Optional, for display. */
   tax_rate?: number;
 }
@@ -261,6 +263,7 @@ async function fetchTotals(data: TotalsInput): Promise<BloomBarTotals> {
     tax_amount: number | string;
     total_amount: number | string;
     discount_amount?: number | string;
+    discount_percentage?: number | string;
     tax_rate?: number | string;
   }>(res);
   return {
@@ -268,6 +271,8 @@ async function fetchTotals(data: TotalsInput): Promise<BloomBarTotals> {
     tax_amount: Number(t.tax_amount) || 0,
     total_amount: Number(t.total_amount) || 0,
     discount_amount: t.discount_amount !== undefined ? Number(t.discount_amount) || 0 : undefined,
+    discount_percentage:
+      t.discount_percentage !== undefined ? Number(t.discount_percentage) || 0 : undefined,
     tax_rate: t.tax_rate !== undefined ? Number(t.tax_rate) : undefined,
   };
 }
