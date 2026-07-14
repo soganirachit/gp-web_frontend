@@ -99,6 +99,39 @@ async function resolveScan(params: {
   }
 }
 
+// ── Vase add-on (pre-payment upsell) ─────────────────────────────────────────
+
+export interface BloomBarVase {
+  id: string;
+  name: string;
+  price: number;
+  image_url?: string;
+}
+
+/**
+ * The vase offered before payment, or `null` when there is nothing to offer.
+ * The backend collapses every "don't show it" case (kiosk toggle off, no vase
+ * configured, vase out of stock or deleted) into a null payload, so the caller
+ * just checks for null — never for stock.
+ */
+async function fetchVaseAddon(params: {
+  kioskId?: string;
+  storeCode?: string;
+}): Promise<BloomBarVase | null> {
+  const qs = new URLSearchParams();
+  if (params.kioskId) qs.set('kiosk', String(params.kioskId));
+  else if (params.storeCode) qs.set('store', params.storeCode);
+  else return null;
+  try {
+    const res = await api.get(`${BASE}/vase-addon/?${qs.toString()}`);
+    const raw = unwrap<Record<string, unknown> | null>(res);
+    return raw ? (normalizeProduct(raw) as unknown as BloomBarVase) : null;
+  } catch {
+    // An upsell must never block checkout.
+    return null;
+  }
+}
+
 // ── Scan event ───────────────────────────────────────────────────────────────
 
 async function createScanEvent(data: Record<string, unknown>) {
@@ -357,6 +390,13 @@ export const base44 = {
     },
 
     QRMapping,
+
+    VaseAddon: {
+      /** Pre-payment vase upsell for this basket's kiosk or store. Null = no prompt. */
+      async get(params: { kioskId?: string; storeCode?: string }) {
+        return fetchVaseAddon(params);
+      },
+    },
 
     Cart: {
       async getTotals(data: TotalsInput) {

@@ -7,12 +7,13 @@ import { Link } from 'react-router-dom';
 import { loadRazorpayScript } from '@/lib/razorpayLoader';
 import BloomBarOrderSummaryRow from './components/BloomBarOrderSummaryRow';
 import BloomBarConfirmation from './BloomBarConfirmation';
+import type { BloomBarVase } from '@/services/bloombar.service';
 
 
 
 
 export default function BloomBarBasket() {
-  const { items, itemCount, total, updateQuantity, removeItem, clearCart, kioskContext, storeContext, sessionId } =
+  const { items, itemCount, total, addItem, updateQuantity, removeItem, clearCart, kioskContext, storeContext, sessionId } =
     useCart();
   // Source of the basket decides the checkout fields + payload:
   //   store QR  → asks Room + Name + Phone, sends store_id + customer_room
@@ -40,7 +41,25 @@ export default function BloomBarBasket() {
   };
   const [totals, setTotals] = useState<Totals | null>(null);
 
+  // Inline vase upsell. `vase` stays null whenever there's nothing to offer
+  // (kiosk toggle off, no vase configured, out of stock) — the backend decides.
+  const [vase, setVase] = useState<BloomBarVase | null>(null);
+
   const itemsKey = items.map(i => `${i.product_id}:${i.quantity}`).join(',');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const v = await base44.entities.VaseAddon.get({
+        kioskId: isStore ? undefined : kioskContext?.kioskId,
+        storeCode: isStore ? storeContext?.storeCode : undefined,
+      });
+      if (!cancelled) setVase(v);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isStore, kioskContext?.kioskId, storeContext?.storeCode]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -104,8 +123,28 @@ export default function BloomBarBasket() {
     return Object.keys(e).length === 0;
   };
 
-  const handlePayment = async () => {
+  // Once added, the vase is an ordinary cart line (own quantity/remove controls),
+  // so the offer card hides — the line item above it is the confirmation.
+  const vaseInBasket = !!vase && items.some(i => i.product_id === String(vase.id));
+
+  const onPayClick = () => {
     if (!validate()) return;
+    startPayment();
+  };
+
+  /** The vase is just a product: added like any flower, priced by the same backend totals. */
+  const addVase = () => {
+    if (!vase) return;
+    addItem({
+      product_id: String(vase.id),
+      product_name: vase.name,
+      price: vase.price,
+      quantity: 1,
+      image_url: vase.image_url,
+    });
+  };
+
+  const startPayment = async () => {
     if (grandTotal == null) {
       alert('Could not load the order total. Please try again in a moment.');
       return;
@@ -296,6 +335,80 @@ export default function BloomBarBasket() {
           ))}
         </AnimatePresence>
 
+        {/* Vase add-on */}
+{vase && !vaseInBasket && (
+  <motion.div
+    layout
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="
+      relative overflow-hidden
+      bg-gradient-to-br
+      from-[#b3ec7e]
+      via-[#bfd9bf]
+      to-[#80ed9d]
+      border border-[#DDEBDD]
+      rounded-2xl
+      p-2
+      premium-shadow
+      flex items-center gap-3
+      transition-all duration-300
+    "
+  >
+    {/* Optional subtle shine */}
+    <div className="absolute inset-0 bg-gradient-to-r from-white/30 via-transparent to-transparent pointer-events-none" />
+
+    {vase.image_url ? (
+      <img
+        src={vase.image_url}
+        alt={vase.name}
+        className="w-20 h-16 rounded-xl object-cover flex-shrink-0"
+      />
+    ) : (
+      <div className="w-20 h-16 rounded-xl bg-genda-cream flex items-center justify-center text-2xl flex-shrink-0">
+        🏺
+      </div>
+    )}
+
+    <div className="flex-1 min-w-0 relative z-10">
+      <p className="font-semibold text-sm text-gray-900">
+        Add a vase for your blooms
+      </p>
+      <p className="text-xs text-gray-600 truncate">
+        {vase.name}
+      </p>
+      <p className="text-genda-green font-bold text-sm mt-0.5">
+        ₹{vase.price.toLocaleString("en-IN")}
+      </p>
+    </div>
+
+    <motion.button
+      whileTap={{ scale: 0.95 }}
+      whileHover={{ scale: 1.03 }}
+      onClick={addVase}
+      className="
+        relative z-10
+        flex-shrink-0
+        flex items-center gap-1.5
+        px-4 py-2
+        rounded-xl
+        bg-gradient-to-r
+        from-genda-green
+        to-emerald-600
+        text-white
+        text-sm
+        font-semibold
+        shadow-md
+        hover:shadow-lg
+        transition-all
+      "
+    >
+      <Plus size={14} />
+      Add
+    </motion.button>
+  </motion.div>
+)}
+
         {/* Scan more */}
         <Link
           to="/bloombar/scan-next"
@@ -481,7 +594,7 @@ export default function BloomBarBasket() {
         <div className="max-w-lg mx-auto">
         <motion.button
           whileTap={{ scale: 0.97 }}
-          onClick={handlePayment}
+          onClick={onPayClick}
           disabled={loading || grandTotal == null}
           className="w-full py-4 genda-gradient text-white font-semibold text-base rounded-2xl premium-shadow flex items-center justify-center gap-2 disabled:opacity-60"
         >
