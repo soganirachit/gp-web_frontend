@@ -14,13 +14,30 @@ function unwrap<T>(res: { data: { data: T } }): T {
 
 // ── Product ──────────────────────────────────────────────────────────────────
 
-/** Map the backend product shape (effective_price/image) to the card's shape (price/image_url). */
+/**
+ * Map the backend product shape to the card's shape.
+ *
+ * `price` is the LIST price — what we show while the customer browses. Any
+ * automatic discount is deliberately NOT folded into it: it is revealed as its
+ * own line in the basket summary. Showing the already-discounted price here is
+ * what made an 80%-off flower read as a plain cheap flower.
+ *
+ * `netPrice` is what actually gets charged. The basket never adds prices up
+ * itself — the backend returns authoritative totals — so this is for display
+ * and for the pre-load subtotal fallback only.
+ *
+ * The `?? effective_price` fallbacks keep this working against a backend that
+ * has not yet shipped `list_price`.
+ */
 function normalizeProduct(raw: Record<string, unknown>): Record<string, unknown> {
+  const net = Number(raw.effective_price ?? raw.price ?? 0);
   return {
     ...raw,
     id: String(raw.id),
     name: String(raw.name ?? ''),
-    price: Number(raw.effective_price ?? raw.price ?? 0),
+    price: Number(raw.list_price ?? net),
+    netPrice: net,
+    discountPercentage: Number(raw.discount_percentage ?? 0),
     image_url: (raw.image ?? raw.image_url ?? undefined) as string | undefined,
   };
 }
@@ -258,13 +275,20 @@ async function verifyOrder(data: VerifyInput): Promise<VerifiedOrder> {
 // ── Cart totals (backend is the source of truth — mirrors store/daily) ───────
 
 export interface BloomBarTotals {
+  /** NET subtotal — what we charge, auto-discount already applied. */
   subtotal: number;
+  /**
+   * Pre-discount subtotal (sum of list prices). This is what the summary shows
+   * on the "Subtotal" row; `product_discount` below is then subtracted from it.
+   * Guaranteed by the backend: mrp_subtotal − product_discount === subtotal.
+   */
+  mrp_subtotal?: number;
+  /** The automatic store/category/product discount, revealed as its own line. */
+  product_discount?: number;
+  /** That discount as a %, for the "Discount (80%)" label. */
+  product_discount_percentage?: number;
   tax_amount: number;
   total_amount: number;
-  /** Discount the backend applied, if any. Optional, for display. */
-  discount_amount?: number;
-  /** Effective discount % (discount_amount / subtotal). Optional, for display. */
-  discount_percentage?: number;
   /** Applied coupon code (echoed back when valid), else ''. */
   coupon_code?: string;
   /** Coupon discount amount, if a valid code was applied. */
@@ -303,10 +327,11 @@ async function fetchTotals(data: TotalsInput): Promise<BloomBarTotals> {
   const res = await api.post(`${BASE}/orders/calculate/`, payload);
   const t = unwrap<{
     subtotal: number | string;
+    mrp_subtotal?: number | string;
+    product_discount?: number | string;
+    product_discount_percentage?: number | string;
     tax_amount: number | string;
     total_amount: number | string;
-    discount_amount?: number | string;
-    discount_percentage?: number | string;
     coupon_code?: string;
     coupon_discount?: number | string;
     coupon_message?: string | null;
@@ -314,11 +339,15 @@ async function fetchTotals(data: TotalsInput): Promise<BloomBarTotals> {
   }>(res);
   return {
     subtotal: Number(t.subtotal) || 0,
+    mrp_subtotal: t.mrp_subtotal !== undefined ? Number(t.mrp_subtotal) || 0 : undefined,
+    product_discount:
+      t.product_discount !== undefined ? Number(t.product_discount) || 0 : undefined,
+    product_discount_percentage:
+      t.product_discount_percentage !== undefined
+        ? Number(t.product_discount_percentage) || 0
+        : undefined,
     tax_amount: Number(t.tax_amount) || 0,
     total_amount: Number(t.total_amount) || 0,
-    discount_amount: t.discount_amount !== undefined ? Number(t.discount_amount) || 0 : undefined,
-    discount_percentage:
-      t.discount_percentage !== undefined ? Number(t.discount_percentage) || 0 : undefined,
     coupon_code: t.coupon_code ?? '',
     coupon_discount: t.coupon_discount !== undefined ? Number(t.coupon_discount) || 0 : undefined,
     coupon_message: t.coupon_message ?? null,

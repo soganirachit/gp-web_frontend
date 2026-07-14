@@ -8,8 +8,7 @@ import { loadRazorpayScript } from '@/lib/razorpayLoader';
 import BloomBarOrderSummaryRow from './components/BloomBarOrderSummaryRow';
 import BloomBarConfirmation from './BloomBarConfirmation';
 import type { BloomBarVase } from '@/services/bloombar.service';
-
-
+import { fmt, fmtPct } from './money';
 
 
 export default function BloomBarBasket() {
@@ -36,7 +35,10 @@ export default function BloomBarBasket() {
   // pattern as the store/daily cart. No local fallback: if the backend doesn't
   // return totals, they stay null and we never fabricate a tax/total.
   type Totals = {
-    subtotal: number; tax: number; total: number;
+    subtotal: number; tax: number; taxRate: number; total: number;
+    // Pre-discount subtotal and the automatic discount, shown as separate rows so
+    // the saving is visible. Backend guarantees mrpSubtotal − productDiscount === subtotal.
+    mrpSubtotal: number; productDiscount: number; productDiscountPct: number;
     couponDiscount: number; couponCode: string; couponMessage: string | null;
   };
   const [totals, setTotals] = useState<Totals | null>(null);
@@ -78,11 +80,17 @@ export default function BloomBarBasket() {
           items: items.map(i => ({ product_id: i.product_id, quantity: i.quantity })),
         });
         if (!cancelled) {
-          // Cart parity: subtotal already reflects any auto/store discount (it's baked
-          // into the item price), so only the coupon shows as a discount line.
+          // The auto/store discount is no longer hidden inside the item price: the
+          // backend hands back the pre-discount subtotal and the saving separately,
+          // so both get their own row below. Falling back to `subtotal` with a zero
+          // discount keeps this correct against a backend without the new fields.
           setTotals({
             subtotal: t.subtotal,
+            mrpSubtotal: t.mrp_subtotal ?? t.subtotal,
+            productDiscount: t.product_discount ?? 0,
+            productDiscountPct: t.product_discount_percentage ?? 0,
             tax: t.tax_amount,
+            taxRate: t.tax_rate ?? 0,
             total: t.total_amount,
             couponDiscount: t.coupon_discount ?? 0,
             couponCode: t.coupon_code ?? '',
@@ -101,13 +109,19 @@ export default function BloomBarBasket() {
   }, [itemsKey, isStore, storeId, kioskContext?.kioskId, kioskContext?.campaign, appliedCoupon]);
 
   const tax = totals?.tax ?? null;
+  const taxRate = totals?.taxRate ?? 0;
   const grandTotal = totals?.total ?? null;
   const couponDiscount = totals?.couponDiscount ?? 0;
   const couponCode = totals?.couponCode ?? '';
   const couponMessage = totals?.couponMessage ?? null;
-  // Subtotal from the backend already reflects any auto/store discount (baked into
-  // the price, same as the storefront). Fall back to the local sum until it loads.
-  const displaySubtotal = totals?.subtotal ?? total;
+  // The "Subtotal" row shows the PRE-discount amount, and the discount is then
+  // subtracted on its own row — otherwise an 80%-off flower just looks cheap and
+  // the customer never sees what they saved. `total` (the local sum of list prices)
+  // is the fallback until the backend totals land, so the row never flickers.
+  const displaySubtotal = totals?.mrpSubtotal ?? total;
+  const productDiscount = totals?.productDiscount ?? 0;
+  const productDiscountPct = totals?.productDiscountPct ?? 0;
+  const totalSaved = productDiscount + couponDiscount;
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -298,8 +312,10 @@ export default function BloomBarBasket() {
                   <p className="font-semibold text-sm">
                     {item.product_name} ×{item.quantity}
                   </p>
+                  {/* List price — the discount is applied once, on the summary below,
+                      so it must not also be baked into the line price shown here. */}
                   <p className="text-genda-green font-bold text-base mt-0.5">
-                    ₹{item.price.toLocaleString('en-IN')} each
+                    ₹{fmt(item.price)} each
                   </p>
                 </div>
                 <button
@@ -378,7 +394,7 @@ export default function BloomBarBasket() {
         {vase.name}
       </p>
       <p className="text-genda-green font-bold text-sm mt-0.5">
-        ₹{vase.price.toLocaleString("en-IN")}
+        ₹{fmt(vase.price)}
       </p>
     </div>
 
@@ -460,32 +476,49 @@ export default function BloomBarBasket() {
           )}
         </div>
 
-        {/* Order Summary */}
+        {/* Order Summary — the discount is itemised here, not hidden in the price. */}
         <div className="bg-white rounded-2xl p-4 premium-shadow">
           <h3 className="font-semibold text-sm mb-3">Order Summary</h3>
           <div className="space-y-2">
-            <BloomBarOrderSummaryRow label="Subtotal" value={`₹${displaySubtotal.toLocaleString('en-IN')}`} />
+            {/* Pre-discount total, so the discount row below has something to bite into. */}
+            <BloomBarOrderSummaryRow label="Subtotal" value={`₹${fmt(displaySubtotal)}`} />
+
+            {productDiscount > 0 && (
+              <BloomBarOrderSummaryRow
+                label={productDiscountPct > 0 ? `Discount (${fmtPct(productDiscountPct)}% OFF)` : 'Discount'}
+                value={`−₹${fmt(productDiscount)}`}
+                valueClassName="text-genda-green font-semibold"
+              />
+            )}
 
             {couponDiscount > 0 && (
               <BloomBarOrderSummaryRow
                 label={couponCode ? `Coupon (${couponCode})` : 'Coupon'}
-                value={`−₹${couponDiscount.toLocaleString('en-IN')}`}
+                value={`−₹${fmt(couponDiscount)}`}
                 valueClassName="text-genda-green font-semibold"
               />
             )}
 
             {tax != null && tax > 0 && (
               <BloomBarOrderSummaryRow
-                label="Tax"
-                value={`+₹${tax.toLocaleString('en-IN')}`}
+                label={taxRate > 0 ? `Tax (${fmtPct(taxRate)}%)` : 'Tax'}
+                value={`+₹${fmt(tax)}`}
               />
             )}
             <BloomBarOrderSummaryRow
               label="Total"
-              value={grandTotal != null ? `₹${grandTotal.toLocaleString('en-IN')}` : '—'}
+              value={grandTotal != null ? `₹${fmt(grandTotal)}` : '—'}
               isTotal
             />
           </div>
+
+          {totalSaved > 0 && (
+            <div className="mt-3 rounded-xl bg-genda-green/10 px-3 py-2 text-center">
+              <p className="text-genda-green text-xs font-semibold">
+                You saved ₹{fmt(totalSaved)} on this order 🎉
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Contact Details */}
@@ -611,7 +644,7 @@ export default function BloomBarBasket() {
           ) : (
             <>
               <Lock size={16} />
-              <span>Pay ₹{grandTotal.toLocaleString('en-IN')} Securely</span>
+              <span>Pay ₹{fmt(grandTotal)} Securely</span>
             </>
           )}
         </motion.button>

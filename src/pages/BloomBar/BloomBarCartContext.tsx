@@ -3,6 +3,13 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 export interface BloomBarCartItem {
   product_id: string;
   product_name: string;
+  /**
+   * LIST price (pre-auto-discount) — display only. The backend recomputes the
+   * real, discounted totals from product_id + quantity, so nothing here is ever
+   * trusted as money. Do not "fix" this to the discounted price: the discount is
+   * shown as its own row in the basket summary, and folding it back in here
+   * would both hide the saving and double-count it against that row.
+   */
   price: number;
   quantity: number;
   image_url?: string;
@@ -97,6 +104,9 @@ export function BloomBarCartProvider({ children }: { children: React.ReactNode }
   }, [storeContext]);
 
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
+  // Sum of LIST prices — this is the pre-discount subtotal, used as the basket's
+  // fallback "Subtotal" row until the backend's authoritative totals arrive. It is
+  // deliberately NOT the payable amount; the Pay button waits on the backend total.
   const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   const addItem = useCallback((item: BloomBarCartItem) => {

@@ -8,6 +8,7 @@ import BloomBarScanner from './BloomBarScanner';
 import BloomBarProductCard, { BloomBarProduct } from './components/BloomBarProductCard';
 import BloomBarLoadingSkeleton from './components/BloomBarLoadingSkeleton';
 import BloomBarCoBrandHeader from './components/BloomBarCoBrandHeader';
+import { fmt } from './money';
 
 type View = 'prompt' | 'scanning' | 'loading' | 'product';
 
@@ -141,7 +142,7 @@ export default function BloomBarScanNext() {
                   className="w-full py-4 rounded-2xl bg-white text-genda-green font-semibold text-base flex items-center justify-center gap-2 float-shadow"
                 >
                   <ShoppingBag size={18} />
-                  Continue to Basket ({itemCount}) · ₹{total.toLocaleString('en-IN')}
+                  Continue to Basket ({itemCount}) · ₹{fmt(total)}
                   <ArrowRight size={16} />
                 </Link>
               </div>
@@ -209,7 +210,7 @@ export default function BloomBarScanNext() {
                   className="w-full py-4 rounded-2xl border-2 border-genda-green text-genda-green font-semibold text-base flex items-center justify-center gap-2"
                 >
                   <ShoppingBag size={18} />
-                  View Basket ({itemCount}) · ₹{total.toLocaleString('en-IN')}
+                  View Basket ({itemCount}) · ₹{fmt(total)}
                   <ArrowRight size={16} />
                 </Link>
               )}

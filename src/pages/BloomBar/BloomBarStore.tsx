@@ -17,6 +17,7 @@ import { base44 } from '@/api/base44Client';
 import { useCart } from './BloomBarCartContext';
 import BloomBarCoBrandHeader from './components/BloomBarCoBrandHeader';
 import BloomBarLoadingSkeleton from './components/BloomBarLoadingSkeleton';
+import { fmt } from './money';
 
 type BloomBarType = 'stick' | 'bouquet';
 
@@ -238,7 +239,7 @@ export default function BloomBarStore() {
                 <span className="flex-1 text-center">
                   Continue to Basket · {itemCount} {itemCount === 1 ? 'item' : 'items'}
                 </span>
-                <span className="font-bold shrink-0">₹{total.toLocaleString('en-IN')}</span>
+                <span className="font-bold shrink-0">₹{fmt(total)}</span>
               </motion.button>
             </div>
           </motion.div>
@@ -361,7 +362,7 @@ function StoreProductCard({
         <div className="mt-auto pt-3 flex items-end justify-between">
           <div>
             <p className="text-genda-green font-bold text-base leading-none">
-              ₹{product.price.toLocaleString('en-IN')}
+              ₹{fmt(product.price)}
             </p>
           </div>
           {qty === 0 ? (

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, Minus, Plus } from 'lucide-react';
 import { useCart } from '../BloomBarCartContext';
 import { Link } from 'react-router-dom';
+import { fmt } from '../money';
 
 export interface BloomBarProduct {
   id: string;
@@ -94,7 +95,7 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
         <p className="text-xs text-gray-500">
           Total:{' '}
           <span className="font-semibold text-genda-green">
-            ₹{(product.price * quantity).toLocaleString('en-IN')}
+            ₹{fmt(product.price * quantity)}
           </span>
         </p>
       </div>
@@ -200,9 +201,12 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
                 </span>
               )}
             </div>
+            {/* List price. Any automatic discount is revealed on the basket's
+                summary rather than silently folded in here — a discounted price
+                shown alone just reads as a cheap product. */}
             <div className="text-right ml-3 shrink-0">
               <p className="font-playfair text-2xl font-bold text-genda-green">
-                ₹{product.price?.toLocaleString('en-IN')}
+                ₹{fmt(product.price ?? 0)}
               </p>
               <p className="text-xs text-gray-500">per piece</p>
             </div>
