@@ -352,9 +352,15 @@ export default function BloomBarBasket() {
         </AnimatePresence>
 
         {/* Vase add-on */}
+{/* No `layout` prop here. It opts this card into framer's layout-projection
+    engine, and the card mounts LATE (its own vase-addon request) — so it is
+    mid-projection exactly when the customer taps "Scan another flower" directly
+    below it. Unmounting a projecting node while the route transition is running
+    can strand the navigation: the basket unmounts, the next page never mounts,
+    and you are left on a blank screen until a reload. The card only fades in;
+    initial/animate already does that, so `layout` bought nothing. */}
 {vase && !vaseInBasket && (
   <motion.div
-    layout
     initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
     className="
