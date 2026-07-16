@@ -926,10 +926,11 @@ const ManageMySubscription: React.FC = () => {
             </p>
             <button
               type="button"
-              onClick={() => navigate("/gp-daily/products?category=pujaflowers")}
-              className="rounded-lg bg-[#FAA222] px-6 py-3 font-medium text-[#111827] transition-opacity hover:opacity-90"
+              onClick={() => navigate("/gp-daily/Products")}
+              className="rounded-lg px-6 py-3 font-medium text-[#111827] transition-opacity hover:opacity-90"
+              style={{ backgroundColor: theme.colors.primary }}
             >
-              Browse Subscribe Packs
+              Browse subscription packs
             </button>
           </div>
         </div>

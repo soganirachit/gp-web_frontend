@@ -740,7 +740,7 @@ const Wallet = () => {
           feature === "gpDaily" &&
           isLoggedIn &&
           thirtyDayRechargePlan.total > 0 && (
-            <div className="w-full shrink-0 rounded-[24px] border border-[#FAA222]/35 bg-[#FFF7ED] px-4 py-3.5">
+            <div className="w-full shrink-0 rounded-[24px] border border-[#FFB343]/35 bg-[#FFF7ED] px-4 py-3.5">
               <div className="flex items-start gap-2.5">
                 <IoWalletOutline
                   className="mt-0.5 h-5 w-5 shrink-0 text-[#B45309]"
@@ -769,7 +769,7 @@ const Wallet = () => {
                       setCustomAmount(String(amount));
                       handleQuickAmount(amount);
                     }}
-                    className="mt-2 rounded-full bg-[#FAA222] px-3.5 py-2 font-sans text-xs font-semibold text-[#222222] transition-opacity hover:opacity-90"
+                    className="mt-2 rounded-full bg-[#FFB343] px-3.5 py-2 font-sans text-xs font-semibold text-[#222222] transition-opacity hover:opacity-90"
                   >
                     Recharge ₹
                     {thirtyDayRechargePlan.topUpAmount.toLocaleString("en-IN")}
@@ -794,7 +794,7 @@ const Wallet = () => {
                 onClick={() => handleQuickAmount(amount)}
                 className={`min-w-0 rounded-[10px] border px-3.5 py-2 text-xs font-sans font-semibold transition-colors ${
                   isQuickAmountActive(amount)
-                    ? "border-[#FFB043] bg-[#FFB043] text-[#222222]"
+                    ? "border-[#FFB343] bg-[#FFB343] text-[#222222]"
                     : "border-[#e5e7eb] bg-white text-[#808080]"
                 }`}
               >
@@ -922,7 +922,7 @@ const Wallet = () => {
                 error.message || "Payment failed. Please try again."
               );
             }}
-            className="mt-2.5 block w-full rounded-[12px] bg-[#FFB043] py-3 text-center text-sm font-sans font-semibold text-[#222222] transition-opacity disabled:cursor-not-allowed disabled:opacity-70"
+            className="mt-2.5 block w-full rounded-[12px] bg-[#FFB343] py-3 text-center text-sm font-sans font-semibold text-[#222222] transition-opacity disabled:cursor-not-allowed disabled:opacity-70"
             buttonText={
               isProcessingPayment ? "Processing..." : `Proceed to Pay ₹${customAmount}`
             }
@@ -1009,7 +1009,7 @@ const Wallet = () => {
             </div>
             <button
               type="button"
-              className="shrink-0 rounded-2xl bg-[#FAA222] px-3 py-2 text-center text-xs font-semibold text-black shadow-sm hover:bg-[#E5931F]"
+              className="shrink-0 rounded-2xl bg-[#FFB343] px-3 py-2 text-center text-xs font-semibold text-black shadow-sm hover:bg-[#E5931F]"
             >
               Disable
             </button>
@@ -1128,7 +1128,7 @@ const Wallet = () => {
                       }
                       className={`mb-2 flex min-h-[64px] w-full items-center gap-2 rounded-[12px] border border-[#f3f4f6] bg-white px-3 py-2.5 last:mb-0 ${
                         isClickable
-                          ? "cursor-pointer transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FAA222]/50"
+                          ? "cursor-pointer transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB343]/50"
                           : ""
                       }`}
                     >

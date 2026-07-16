@@ -76,7 +76,7 @@ export function checkAccountDeletionAllowed(
   return {
     blocked: true,
     message: num
-      ? `You have an active order (${num}, ${statusLabel}). Please wait until it is delivered or cancelled, or contact support to request cancellation before deleting your account.`
-      : `You have an active order (${statusLabel}). Please wait until it is delivered or cancelled, or contact support to request cancellation before deleting your account.`,
+      ? `You have an active order. Please wait until it is delivered or cancelled, or contact support to request cancellation before deleting your account.`
+      : `You have an active order. Please wait until it is delivered or cancelled, or contact support to request cancellation before deleting your account.`,
   };
 }

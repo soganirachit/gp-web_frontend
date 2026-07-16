@@ -1,6 +1,11 @@
 /** Fired when GP Daily subscription cart changes (add/remove/checkout). */
 export const DAILY_CART_UPDATED_EVENT = "dailyCartUpdated";
 
+export type DailyCartUpdatedDetail = {
+  count?: number;
+  cart?: unknown;
+};
+
 export function countDailyCartItems(cart: unknown): number {
   if (!cart || typeof cart !== "object") return 0;
   const c = cart as Record<string, unknown>;
@@ -16,6 +21,8 @@ export function countDailyCartItems(cart: unknown): number {
 export function notifyDailyCartUpdated(cart?: unknown): void {
   const count = cart != null ? countDailyCartItems(cart) : undefined;
   window.dispatchEvent(
-    new CustomEvent(DAILY_CART_UPDATED_EVENT, { detail: { count } }),
+    new CustomEvent<DailyCartUpdatedDetail>(DAILY_CART_UPDATED_EVENT, {
+      detail: { count, cart },
+    }),
   );
 }

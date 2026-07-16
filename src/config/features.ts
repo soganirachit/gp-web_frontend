@@ -82,17 +82,17 @@ export const featureThemes: Record<Feature, FeatureTheme> = {
   gpDaily: {
     feature: "gpDaily",
     colors: {
-      primary: "#FAA222",
+      primary: "#FFB343",
     },
     classes: {
       authPageBackground: "bg-[#f8f6f1]",
-      primaryButton: "bg-[#FAA222] text-black",
+      primaryButton: "bg-[#FFB343] text-black",
       primaryButtonHover: "hover:bg-[#DD7600]",
-      authIndicatorActive: "bg-[#FAA222]",
+      authIndicatorActive: "bg-[#FFB343]",
       authIndicatorInactive: "bg-gray-300",
-      bottomNavActiveText: "text-[#FAA222]",
+      bottomNavActiveText: "text-[#FFB343]",
       bottomNavInactiveText: "text-gray-500",
-      otpInputBorder: "border-[#FAA222] focus:ring-[#FAA222]",
+      otpInputBorder: "border-[#FFB343] focus:ring-[#FFB343]",
     },
     assets: {
       loginHero: loginLogoDaily,

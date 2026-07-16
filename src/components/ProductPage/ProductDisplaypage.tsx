@@ -48,6 +48,7 @@ import {
 import {
   subscriptionCartService,
   isSubscriptionCartZoneStaleError,
+  type DailyCartItem,
 } from "../../services/subscriptionCart.service";
 import { notifyDailyCartUpdated } from "../../utils/dailyCartEvents";
 import { GP_DAILY_ZONE_STALE_TOAST } from "../../utils/gpDailyCustomerMessages";
@@ -62,6 +63,18 @@ import {
   InsufficientWalletModal,
   type InsufficientWalletDetails,
 } from "../daily/InsufficientWalletModal";
+import {
+  getDailyCartPackCategory,
+  getDailyPackMixBlockedMessage,
+  isDailyPackMixBlockedMessage,
+  DAILY_PACK_MIX_BLOCKED_MESSAGE,
+  resolveDailyPackCategoryFromProduct,
+} from "../../utils/dailyPackCartRules";
+import { DailyPackCategoryAlertModal } from "../daily/DailyPackCategoryAlertModal";
+import {
+  DAILY_CART_UPDATED_EVENT,
+  type DailyCartUpdatedDetail,
+} from "../../utils/dailyCartEvents";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
 import { resolveProductShareUrl, shareProductLink } from "../../utils/productShare";
 import { useOrderingStoreOffline } from "../../hooks/useOrderingStoreOffline";
@@ -287,6 +300,9 @@ const ProductPage: React.FC = () => {
     );
   }, [dailyCart, product, selectedVariant, feature]);
   const basketQuantity = Number((activeCartLine as any)?.quantity ?? 0);
+  const [packCategoryAlertMessage, setPackCategoryAlertMessage] = useState<string | null>(
+    null,
+  );
   const [addingToBasket, setAddingToBasket] = useState(false);
   const [isUpdatingBasket, setIsUpdatingBasket] = useState(false);
   const [stockLimitMessage, setStockLimitMessage] = useState<string | null>(null);
@@ -536,6 +552,18 @@ const ProductPage: React.FC = () => {
       mounted = false;
     };
   }, [feature, product, basePath, navigate, isLoggedIn]);
+
+  useEffect(() => {
+    if (feature === "gpStore" || !isLoggedIn) return;
+    const onCartUpdated = (event: Event) => {
+      const cart = (event as CustomEvent<DailyCartUpdatedDetail>).detail?.cart;
+      if (cart !== undefined) {
+        setDailyCart(cart as any);
+      }
+    };
+    window.addEventListener(DAILY_CART_UPDATED_EVENT, onCartUpdated);
+    return () => window.removeEventListener(DAILY_CART_UPDATED_EVENT, onCartUpdated);
+  }, [feature, isLoggedIn]);
 
   const handleBestSellerCardClick = (item: any) => {
     const pathSlug = item.slug ?? item.id;
@@ -937,6 +965,10 @@ const ProductPage: React.FC = () => {
     }
   };
 
+  const showPackCategoryBlockedAlert = (message: string) => {
+    setPackCategoryAlertMessage(message);
+  };
+
   const handleAddToBasket = async () => {
     if (!product) {
       toast.error("Product information not available", {
@@ -959,6 +991,36 @@ const ProductPage: React.FC = () => {
       });
       return;
     }
+
+    const newPackCategory = resolveDailyPackCategoryFromProduct(
+      product as unknown as Record<string, unknown>,
+    );
+
+    if (newPackCategory && !activeCartLine) {
+      let cartItems: DailyCartItem[] | undefined = (
+        dailyCart as { items?: DailyCartItem[] } | null
+      )?.items;
+      try {
+        const freshCart = await subscriptionCartService.getDailyCart();
+        setDailyCart(freshCart as any);
+        cartItems = freshCart?.items;
+      } catch {
+        // Fall back to the cart already in state.
+      }
+
+      const cartCategory = getDailyCartPackCategory(cartItems);
+      if (cartCategory) {
+        const blockedMessage = getDailyPackMixBlockedMessage(
+          cartCategory,
+          newPackCategory,
+        );
+        if (blockedMessage) {
+          showPackCategoryBlockedAlert(blockedMessage);
+          return;
+        }
+      }
+    }
+
     setAddingToBasket(true);
     try {
       const variantId =
@@ -975,8 +1037,16 @@ const ProductPage: React.FC = () => {
       toast.success("Added to basket", { id: "Added to basket" });
     } catch (error: unknown) {
       console.error("Error adding to cart:", error);
-      toast.error("Failed to add product to basket. Please try again.", {
-        id: "Failed to add product to basket. Please try again.",
+      const apiMessage = errorMessageFromCatch(
+        error,
+        "Failed to add product to basket. Please try again.",
+      );
+      if (isDailyPackMixBlockedMessage(apiMessage)) {
+        showPackCategoryBlockedAlert(DAILY_PACK_MIX_BLOCKED_MESSAGE);
+        return;
+      }
+      toast.error(apiMessage, {
+        id: apiMessage,
       });
     } finally {
       setAddingToBasket(false);
@@ -992,7 +1062,16 @@ const ProductPage: React.FC = () => {
     if (feature === "gpStore" || !isLoggedIn || !product || autoAddAttemptedRef.current) {
       return;
     }
-    const pending = consumePendingProductAddAfterLogin(String(slug ?? ""));
+    const slugCandidates = [
+      String(slug ?? "").trim(),
+      String((product as { slug?: string })?.slug ?? "").trim(),
+      String((product as { id?: string | number })?.id ?? "").trim(),
+    ].filter(Boolean);
+    let pending: string | null = null;
+    for (const candidate of slugCandidates) {
+      pending = consumePendingProductAddAfterLogin(candidate);
+      if (pending) break;
+    }
     if (!pending) return;
     autoAddAttemptedRef.current = true;
     void handleAddToBasket();
@@ -1647,13 +1726,19 @@ const ProductPage: React.FC = () => {
           ) : !isLoggedIn ? (
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                const productSlug = String(
+                  (product as { slug?: string })?.slug ?? slug ?? "",
+                ).trim();
+                if (productSlug) {
+                  setPendingProductAddAfterLogin(productSlug);
+                }
                 navigate(`${basePath}/login`, {
                   state: {
                     returnUrl: `${basePath}/product/${encodeURIComponent(slug ?? "")}`,
                   },
-                })
-              }
+                });
+              }}
               className="mb-6 mt-6 flex w-full items-center justify-center rounded-[25px] bg-[#FAA222] py-3.5 text-base font-semibold text-gray-900 transition-colors hover:bg-[#e8941a] disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!product}
             >
@@ -1850,6 +1935,14 @@ const ProductPage: React.FC = () => {
                 returnUrl: `${basePath}/address-selection`,
               });
             }}
+          />
+        ) : null}
+
+        {isGpDaily ? (
+          <DailyPackCategoryAlertModal
+            open={packCategoryAlertMessage != null}
+            message={packCategoryAlertMessage}
+            onClose={() => setPackCategoryAlertMessage(null)}
           />
         ) : null}
       </div>

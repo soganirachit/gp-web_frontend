@@ -76,6 +76,12 @@ import {
 } from '../../../utils/cartStockInlineMessage';
 import { validateGpDailyDeliveryArea } from '../../../services/subscriptionZone.service';
 import { GpDailyOutOfZoneBanner } from '../../../components/daily/GpDailyOutOfZoneBanner';
+import {
+  getDailyCartPackCategory,
+  getMinWeeklySubscriptionDays,
+  getMinWeeklySubscriptionDaysMessage,
+  getMinWeeklySubscriptionDaysWarning,
+} from '../../../utils/dailyPackCartRules';
 import { UniformPageHeader } from '../../../components/layout/UniformPageHeader';
 import { DELIVERY_DATE_MAX_DAYS_FROM_TODAY } from '../../../constants/deliveryBooking';
 import {
@@ -822,6 +828,15 @@ const Cart: React.FC = () => {
       };
     });
   }, [dailyCart]);
+
+  const cartPackCategory = useMemo(
+    () => getDailyCartPackCategory(dailyCart?.items),
+    [dailyCart],
+  );
+  const minWeeklySubscriptionDays = useMemo(
+    () => getMinWeeklySubscriptionDays(cartPackCategory),
+    [cartPackCategory],
+  );
 
   /** Stable basket signature — avoids effects re-firing on every cart refresh (new `items` array). */
   const itemsSignature = useMemo(
@@ -1979,9 +1994,13 @@ const Cart: React.FC = () => {
       return;
     }
     if (activeDeliveryDayInts.length === 0) { toast.error('Please select delivery days'); return; }
-    if (deliveryFrequency === 'Customize' && activeDeliveryDayInts.length < 3) {
-      setCheckoutInlineError(REQUIRED_TOAST.SELECT_THREE_DAYS);
-      toast.error(REQUIRED_TOAST.SELECT_THREE_DAYS);
+    if (
+      deliveryFrequency === 'Customize' &&
+      activeDeliveryDayInts.length < minWeeklySubscriptionDays
+    ) {
+      const minDaysMessage = getMinWeeklySubscriptionDaysMessage(minWeeklySubscriptionDays);
+      setCheckoutInlineError(minDaysMessage);
+      toast.error(minDaysMessage);
       return;
     }
     if (!isLoggedIn) {
@@ -2383,7 +2402,7 @@ const Cart: React.FC = () => {
         noIndex={true}
       />
       <div className="mx-auto flex min-h-screen w-full max-w-[min(800px,100vw)] flex-1 flex-col pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]">
-        <div className="sticky top-0 z-10 bg-[#f8f6f1]">
+        <div className="sticky top-0 z-40 bg-[#f8f6f1] shadow-sm">
           <UniformPageHeader
             title="My Basket"
             onBack={() => navigate(-1)}
@@ -2424,7 +2443,7 @@ const Cart: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => void handleDeleteItem(item.id)}
-                    className="absolute right-4 top-4 z-30 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-red-500 transition-colors hover:bg-gray-200"
+                    className="absolute right-4 top-4 z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-red-500 transition-colors hover:bg-gray-200"
                     aria-label="Remove item"
                   >
                     <IoTrashOutline className="h-[15px] w-[15px]" aria-hidden />
@@ -2578,11 +2597,12 @@ const Cart: React.FC = () => {
                   })}
                 </div>
 
-                {deliveryFrequency === 'Customize' && activeDeliveryDays.length < 3 ? (
+                {deliveryFrequency === 'Customize' &&
+                activeDeliveryDays.length < minWeeklySubscriptionDays ? (
                   <div className="mb-2.5 flex items-center gap-2 rounded-xl bg-[#FCE7F3] px-3 py-2.5">
                     <IoWarning className="h-4 w-4 shrink-0 text-[#B91C1C]" aria-hidden />
                     <p className="flex-1 text-left text-xs font-semibold leading-snug text-[#7F1D1D]">
-                      Please select at least 3 days for a 1-week subscription.
+                      {getMinWeeklySubscriptionDaysWarning(minWeeklySubscriptionDays)}
                     </p>
                   </div>
                 ) : null}

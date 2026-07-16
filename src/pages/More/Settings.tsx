@@ -402,7 +402,6 @@ const Settings: React.FC = () => {
       const check = checkAccountDeletionAllowed(orders as Array<Record<string, unknown>>);
       if (check.blocked) {
         setDeleteBlockMessage(check.message);
-        toast.error(check.message, { duration: 8000 });
         return;
       }
       setShowDeleteAccountDialog(true);
@@ -901,9 +900,6 @@ const Settings: React.FC = () => {
               >
                 {isCheckingDeleteEligibility ? 'Checking orders…' : 'Delete Account'}
               </button>
-              {deleteBlockMessage ? (
-                <p className="text-xs text-red-600 px-4 leading-relaxed">{deleteBlockMessage}</p>
-              ) : null}
             </div>
           )}
 
@@ -951,6 +947,28 @@ const Settings: React.FC = () => {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Blocked Dialog */}
+      {deleteBlockMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl p-6 mx-4 max-w-sm w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3 text-center">
+              Cannot Delete Account
+            </h3>
+            <p className="text-sm text-gray-600 mb-6 text-center leading-relaxed">
+              {deleteBlockMessage}
+            </p>
+            <button
+              type="button"
+              onClick={() => setDeleteBlockMessage(null)}
+              className="w-full py-3 text-gray-900 font-medium text-base rounded-lg transition-colors"
+              style={{ backgroundColor: theme.colors.primary }}
+            >
+              OK
+            </button>
           </div>
         </div>
       )}

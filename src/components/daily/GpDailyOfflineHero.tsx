@@ -52,7 +52,9 @@ export const GpDailyOfflineHero: React.FC<Props> = ({
   return (
     <div className="relative mt-4 sm:mt-5">
       <div className="mb-2.5 flex items-center justify-between gap-2 pl-3 pr-1">
-        <h2 className={gpDailyHome.greeting}>{gpDailyOfflineGreeting(userFirstName)}</h2>
+        <h2 className={isLoggedIn ? gpDailyHome.greeting : gpDailyHome.storeHeroGreeting}>
+          {gpDailyOfflineGreeting(userFirstName)}
+        </h2>
         {isLoggedIn && onManage ? (
           <button type="button" onClick={onManage} className={gpDailyHome.managePill}>
             Manage

@@ -9,6 +9,7 @@ import BloomBarOrderSummaryRow from './components/BloomBarOrderSummaryRow';
 import BloomBarConfirmation from './BloomBarConfirmation';
 import type { BloomBarVase } from '@/services/bloombar.service';
 import { fmt, fmtPct } from './money';
+import { toast } from 'react-hot-toast';
 
 
 export default function BloomBarBasket() {
@@ -160,7 +161,7 @@ export default function BloomBarBasket() {
 
   const startPayment = async () => {
     if (grandTotal == null) {
-      alert('Could not load the order total. Please try again in a moment.');
+      toast.error('Could not load the order total. Please try again in a moment.');
       return;
     }
     setLoading(true);
@@ -169,7 +170,7 @@ export default function BloomBarBasket() {
       await loadRazorpayScript();
     } catch {
       setLoading(false);
-      alert('Failed to load payment gateway. Please check your connection and try again.');
+      toast.error('Failed to load payment gateway. Please check your connection and try again.');
       return;
     }
 
@@ -200,7 +201,7 @@ export default function BloomBarBasket() {
         resp?.message ||
         (resp?.errors ? Object.values(resp.errors).flat().join(' ') : '') ||
         'Please check your connection and try again.';
-      alert(`Could not start payment. ${detail}`);
+      toast.error(`Could not start payment. ${detail}`);
       return;
     }
 
@@ -228,7 +229,7 @@ export default function BloomBarBasket() {
           setCustomerName(form.name);
           setOrderId(order.order_number || order.id);
         } catch {
-          alert('Payment received but confirmation failed. Please contact support with your payment ID: ' + response.razorpay_payment_id);
+          toast.error('Payment received but confirmation failed. Please contact support with your payment ID: ' + response.razorpay_payment_id);
         } finally {
           setLoading(false);
         }
@@ -247,7 +248,7 @@ export default function BloomBarBasket() {
       rzp.open();
     } catch {
       setLoading(false);
-      alert('Could not open payment gateway. Please try again.');
+      toast.error('Could not open payment gateway. Please try again.');
     }
   };
 

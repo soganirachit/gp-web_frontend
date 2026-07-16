@@ -16,8 +16,8 @@ export function consumePendingProductAddAfterLogin(
   try {
     const pending = localStorage.getItem(KEY)?.trim();
     if (!pending) return null;
-    localStorage.removeItem(KEY);
     if (expectedSlug && pending !== expectedSlug.trim()) return null;
+    localStorage.removeItem(KEY);
     return pending;
   } catch {
     return null;

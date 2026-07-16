@@ -133,6 +133,9 @@ const NAMASTE_AUTOPLAY_SNOOZE_MS = 3500;
 const NAMASTE_AUTOPLAY_SCROLL_TIMEOUT_MS = 900;
 const dailyScooterHeroSvg = "/daily_scooter.svg";
 const dailyScooterHeroImgClass = GP_DAILY_SCOOTER_HERO_IMG_CLASS;
+/** Logged-in home (Namaste + Manage) — scooter below Manage row; guests keep shared class. */
+const GP_DAILY_HOME_MARKETING_SCOOTER_LOGGED_IN_CLASS =
+  "pointer-events-none absolute -right-10 -top-3 z-0 translate-x-6 sm:top-11";
 const NAMASTE_MAX_VISIBLE_DOTS = 3;
 
 function getNamasteVisibleDotIndices(total: number, current: number): number[] {
@@ -1338,7 +1341,7 @@ const Home2: React.FC = () => {
       <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
         <div className="mx-auto w-full max-w-[min(800px,100vw)]">
           <div
-            className={`relative px-4 pt-4 rounded-b-2xl overflow-visible ${showNamasteMarketing ? "pb-0" : "pb-1"}`}
+            className={`relative px-4 pt-4 rounded-b-2xl overflow-hidden ${showNamasteMarketing ? "pb-0" : "pb-1"}`}
             style={{
               background:
                 "linear-gradient(90deg, rgba(250, 193, 20, 0.4) 0%, rgba(250, 193, 20, 0.2) 100%)",
@@ -1450,7 +1453,7 @@ const Home2: React.FC = () => {
               ) : (
               <div className={`relative ${showNamasteMarketing ? "mt-2 sm:mt-3" : "mt-5 sm:mt-6"}`}>
                 <div className={`mb-1.5 flex items-center justify-between gap-2 ${gpDailyHome.namasteHeroInset}`}>
-                  <h2 className={gpDailyHome.greeting}>
+                  <h2 className={isLoggedIn ? gpDailyHome.greeting : gpDailyHome.storeHeroGreeting}>
                     {formatNamasteGreeting(isLoggedIn, userFirstName)}
                   </h2>
                   {isLoggedIn ? (
@@ -1563,9 +1566,9 @@ const Home2: React.FC = () => {
                     </div>
                   </div>
                 ) : showNamasteMarketing ? (
-                  <div className="relative pb-0 sm:pb-0">
+                  <div className={`relative pb-0 sm:pb-0 ${isLoggedIn ? "mt-3 sm:mt-4" : ""}`}>
                     <div
-                      className={`relative z-10 min-w-0 ${GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS} ${gpDailyHome.namasteHeroInset}`}
+                      className={`relative z-10 min-w-0 ${GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS} ${gpDailyHome.namasteHeroInset} ${isLoggedIn ? "pt-1" : ""}`}
                     >
                       <BrandIntroPyramidCopy className="mb-1.5" />
                       {/* <p className={gpDailyHome.marketingLine}>
@@ -1575,7 +1578,13 @@ const Home2: React.FC = () => {
                         it by tomorrow <span className="font-bold">12PM!</span>
                       </p> */}
                     </div>
-                    <div className={GP_DAILY_SCOOTER_HERO_MARKETING_GUEST_WRAPPER_CLASS}>
+                    <div
+                      className={
+                        isLoggedIn
+                          ? GP_DAILY_HOME_MARKETING_SCOOTER_LOGGED_IN_CLASS
+                          : GP_DAILY_SCOOTER_HERO_MARKETING_GUEST_WRAPPER_CLASS
+                      }
+                    >
                       <img
                         src={dailyScooterHeroSvg}
                         alt=""

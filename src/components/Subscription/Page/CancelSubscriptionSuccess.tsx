@@ -89,15 +89,15 @@ const CancelSubscriptionSuccess: React.FC = () => {
 
                 {/* Next Steps Section */}
                 <div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-4 font-serif">
+                    <h3 className="text-base font-bold text-gray-900 mb-3 font-serif">
                         What would you like to do next?
                     </h3>
 
                     <button
                         onClick={() => navigate('/gp-daily/Products')}
-                        className="w-full h-[50px] bg-[#FAA222] text-gray-900 py-4 rounded-[20px] font-semibold shadow-sm hover:bg-[#E8911F] flex items-center justify-center gap-3 transition-transform active:scale-95"
+                        className="w-full h-[44px] bg-[#FAA222] text-gray-900 text-sm rounded-[20px] font-semibold shadow-sm hover:bg-[#E8911F] flex items-center justify-center gap-2 transition-transform active:scale-95"
                     >
-                        <img src={blackFlowerIcon} alt="" className="w-8 h-8 opacity-80" />
+                        <img src={blackFlowerIcon} alt="" className="w-5 h-5 opacity-80" />
                         Explore Other Packs
                     </button>
                 </div>
