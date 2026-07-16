@@ -128,9 +128,8 @@ export default function BloomBarBasket() {
     if (!form.name.trim()) e.name = 'Name is required';
     if (!form.whatsapp.trim() || !/^\d{10}$/.test(form.whatsapp.replace(/\s/g, '')))
       e.whatsapp = 'Valid 10-digit number required';
-    if (isStore) {
-      if (!form.room.trim()) e.room = 'Room number is required';
-    } else if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    if (isStore && !form.room.trim()) e.room = 'Room number is required';
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       e.email = 'Invalid email';
     }
     setErrors(e);
@@ -182,7 +181,7 @@ export default function BloomBarBasket() {
       campaign: isStore ? 'store' : kioskContext?.campaign || 'direct',
       coupon_code: appliedCoupon || undefined,
       customer_name: form.name,
-      customer_email: isStore ? '' : form.email,
+      customer_email: form.email,
       customer_whatsapp: form.whatsapp,
       customer_room: isStore ? form.room : undefined,
       items,
@@ -233,7 +232,7 @@ export default function BloomBarBasket() {
           setLoading(false);
         }
       },
-      prefill: { name: form.name, email: isStore ? '' : form.email, contact: `+91${form.whatsapp}` },
+      prefill: { name: form.name, email: form.email, contact: `+91${form.whatsapp}` },
       theme: { color: '#1d4d2a' },
       // Abandon/decline: no order was ever created, so just stop the spinner.
       modal: {
@@ -575,7 +574,7 @@ export default function BloomBarBasket() {
               )}
             </div>
 
-            {isStore ? (
+            {isStore && (
               <div>
                 <div
                   className={`flex items-center gap-3 border rounded-xl px-4 py-3 bg-genda-cream ${
@@ -593,25 +592,28 @@ export default function BloomBarBasket() {
                 </div>
                 {errors.room && <p className="text-red-500 text-xs mt-1 px-1">{errors.room}</p>}
               </div>
-            ) : (
-              <div>
-                <div
-                  className={`flex items-center gap-3 border rounded-xl px-4 py-3 bg-genda-cream ${
-                    errors.email ? 'border-red-400' : 'border-gray-200'
-                  }`}
-                >
-                  <Mail size={16} className="text-gray-400 flex-shrink-0" />
-                  <input
-                    type="email"
-                    placeholder="Email (optional)"
-                    value={form.email}
-                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                    className="flex-1 bg-transparent outline-none text-sm"
-                  />
-                </div>
-                {errors.email && <p className="text-red-500 text-xs mt-1 px-1">{errors.email}</p>}
-              </div>
             )}
+
+            <div>
+              <div
+                className={`flex items-center gap-3 border rounded-xl px-4 py-3 bg-genda-cream ${
+                  errors.email ? 'border-red-400' : 'border-gray-200'
+                }`}
+              >
+                <Mail size={16} className="text-gray-400 flex-shrink-0" />
+                <input
+                  type="email"
+                  placeholder="Email (optional)"
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  className="flex-1 bg-transparent outline-none text-sm"
+                />
+              </div>
+              {errors.email && <p className="text-red-500 text-xs mt-1 px-1">{errors.email}</p>}
+              <p className="text-gray-400 text-xs mt-1 px-1">
+                We send invoices by email only — add your email if you'd like to receive an invoice for your order.
+              </p>
+            </div>
           </div>
         </div>
 
