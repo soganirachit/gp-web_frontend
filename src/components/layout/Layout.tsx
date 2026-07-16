@@ -45,9 +45,11 @@ const Layout: React.FC = () => {
   ];
   const isAuthRoute = authRoutes.includes(location.pathname);
 
-  // Routes that should not show BottomNav (landing, location pages)
+  // Routes that should not show BottomNav (landing, location pages, BloomBar kiosk flow)
   const routesWithoutBottomNav = ["/home", "/location", "/sajawat", "/sajawat/gallery"];
-  const shouldHideBottomNav = routesWithoutBottomNav.includes(location.pathname);
+  const shouldHideBottomNav =
+    routesWithoutBottomNav.includes(location.pathname) ||
+    location.pathname.startsWith('/bloombar');
 
   // Routes that should not have top padding.
   // Important: pathname is like `/gp-store/orders`, so we must use prefix matching.

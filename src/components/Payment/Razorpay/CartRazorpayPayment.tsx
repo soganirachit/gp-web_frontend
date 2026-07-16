@@ -2,39 +2,6 @@ import React, { useEffect, useRef, useState, forwardRef } from "react";
 import Spinner from "../../common/Spinner";
 import { loadRazorpayScript } from "../../../lib/razorpayLoader";
 
-// Type declaration for Razorpay
-interface RazorpayOptions {
-  key: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description: string;
-  order_id: string;
-  prefill: {
-    name?: string;
-    email?: string;
-    contact?: string;
-  };
-  notes?: Record<string, string>;
-  theme?: {
-    color?: string;
-  };
-  handler: (response: RazorpayResponse) => void;
-  modal?: {
-    ondismiss: () => void;
-  };
-}
-
-interface RazorpayResponse {
-  razorpay_payment_id: string;
-  razorpay_order_id: string;
-  razorpay_signature: string;
-}
-
-interface RazorpayInstance {
-  open: () => void;
-  on: (event: string, callback: Function) => void;
-}
 
 interface CartRazorpayPaymentProps {
   razorpayOrderId: string;
@@ -123,13 +90,11 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
         },
       };
 
-      const RazorpayConstructor = (window as unknown as { Razorpay: new (opts: RazorpayOptions) => RazorpayInstance }).Razorpay;
-
-      if (typeof RazorpayConstructor !== 'function') {
+      if (typeof window.Razorpay !== 'function') {
         throw new Error('Payment gateway is not ready. Please try again.');
       }
 
-      const razorpayInstance = new RazorpayConstructor(options);
+      const razorpayInstance = new window.Razorpay(options);
       razorpayInstance.on('payment.failed', () => {
         paymentOpeningRef.current = false;
       });

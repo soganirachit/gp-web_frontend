@@ -1,45 +1,8 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Spinner from "../../common/Spinner";
 import { loadRazorpayScript } from "../../../lib/razorpayLoader";
 import { walletService } from "../../../services/wallet.service";
 
-declare global {
-  interface Window {
-    Razorpay: new (options: RazorpayOptions) => RazorpayInstance;
-  }
-}
-
-// Type declaration for Razorpay
-interface RazorpayOptions {
-  key: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description: string;
-  order_id: string;
-  prefill: {
-    name?: string;
-    email?: string;
-    contact?: string;
-  };
-  notes?: Record<string, string>;
-  theme?: {
-    color?: string;
-  };
-  handler: (response: RazorpayResponse) => void;
-}
-
-interface RazorpayResponse {
-  razorpay_payment_id: string;
-  razorpay_order_id: string;
-  razorpay_signature: string;
-}
-
-interface RazorpayInstance {
-  open: () => void;
-  on: (event: string, callback: Function) => void;
-  // Add other methods if needed
-}
 
 interface RazorpayPaymentProps {
   amount: number;

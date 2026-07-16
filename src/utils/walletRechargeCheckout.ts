@@ -51,14 +51,11 @@ export async function rechargeWalletInApp(amountRupees: number): Promise<boolean
       },
     };
 
-    const RazorpayCtor = (window as unknown as {
-      Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
-    }).Razorpay;
-    if (!RazorpayCtor) {
+    if (typeof window.Razorpay !== 'function') {
       reject(new Error("Razorpay SDK unavailable"));
       return;
     }
-    const razorpayInstance = new RazorpayCtor(options);
+    const razorpayInstance = new window.Razorpay(options);
     razorpayInstance.open();
   });
 

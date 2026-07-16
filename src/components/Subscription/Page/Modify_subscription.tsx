@@ -32,7 +32,7 @@ function intsToShortLabels(ints: number[]): string[] {
 const ModifySubscription: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { theme } = useFeatureTheme();
+  const { theme, basePath } = useFeatureTheme();
   const primary = theme.colors.primary;
 
   const subscriptionFromNav =

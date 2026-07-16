@@ -35,6 +35,7 @@ module.exports = {
       fontFamily: {
         sans: ['IBM Plex Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         serif: ['IBM Plex Serif', 'Georgia', 'serif'],
+        playfair: ['Playfair Display', 'Georgia', 'serif'],
       },
       /** GP Daily section titles — 22px mobile, 24px tablet+ (28px line) */
       fontSize: {
@@ -50,6 +51,9 @@ module.exports = {
       },
       colors: {
         background: '#f8f6f1',
+        'genda-green': '#1d4d2a',
+        'genda-gold': '#d4a853',
+        'genda-cream': '#f9f5f0',
       },
       // Safe area insets for punch-hole / notch / dynamic-island phones
       spacing: {
