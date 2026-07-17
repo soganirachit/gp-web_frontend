@@ -259,27 +259,30 @@ export default function BloomBarStore() {
       </AnimatePresence>
 
       {/* Product detail sheet — the same card the kiosk QR page renders, in its
-          fitViewport mode: bottom bar becomes an inline footer, so nothing inside
-          relies on `fixed` (which this sheet's transform would break anyway).
+          fitViewport mode: the bottom bar becomes an inline footer, so nothing
+          inside relies on `fixed` (which this popup's transform would break).
           Reusing it keeps the stock rules — out-of-stock CTA, the + cap, the
-          "Only N left" note — identical on both surfaces for free. */}
+          "Only N left" note — identical on both surfaces for free.
+
+          Height follows the content, capped at 85dvh, so a short product is a
+          small popup rather than a mostly-empty full-height panel. */}
       <AnimatePresence>
         {selected && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.18 }}
             onClick={() => setSelected(null)}
-            className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
+            className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
           >
             <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              initial={{ scale: 0.94, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.94, opacity: 0 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 320 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-lg h-[92dvh] bg-white rounded-t-3xl overflow-hidden flex flex-col"
+              className="relative w-full max-w-sm max-h-[85dvh] bg-white rounded-3xl overflow-hidden flex flex-col premium-shadow"
             >
               <button
                 onClick={() => setSelected(null)}
@@ -288,7 +291,7 @@ export default function BloomBarStore() {
               >
                 <X size={18} className="text-gray-700" />
               </button>
-              <div className="flex-1 min-h-0 pt-3">
+              <div className="flex-1 min-h-0 pt-4">
                 <BloomBarProductCard
                   product={selected as unknown as BloomBarProduct}
                   fitViewport
