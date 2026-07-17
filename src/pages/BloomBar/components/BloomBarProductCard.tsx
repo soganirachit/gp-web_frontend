@@ -4,6 +4,7 @@ import { ShoppingBag, Minus, Plus } from 'lucide-react';
 import { useCart } from '../BloomBarCartContext';
 import { Link } from 'react-router-dom';
 import { fmt } from '../money';
+import { stockOf, toastStockCap } from '../stock';
 
 export interface BloomBarProduct {
   id: string;
@@ -13,7 +14,10 @@ export interface BloomBarProduct {
   image_url?: string;
   category?: string;
   badge?: string;
-  stock_available?: boolean;
+  /** Units still sellable. null/undefined = uncapped, 0 = out of stock. */
+  stock?: number | null;
+  /** At or below the inventory item's Minimum Alert Level. */
+  low_stock?: boolean;
   tags?: string[];
   [key: string]: unknown;
 }
@@ -36,9 +40,26 @@ interface Props {
 export default function BloomBarProductCard({ product, onAdded, fitViewport = false }: Props) {
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
-  const { addItem, itemCount } = useCart();
+  const { addItem, itemCount, items } = useCart();
   const hasItems = itemCount > 0;
-  const inStock = product.stock_available !== false;
+
+  const stock = stockOf(product);
+  const inStock = stock !== 0;
+  // What's already in the basket counts against the shelf, so the stepper caps at
+  // what's actually still addable — not at the full stock figure.
+  const inBasket = items.find(i => i.product_id === product.id)?.quantity ?? 0;
+  const addable = stock === null ? null : Math.max(0, stock - inBasket);
+  const atCap = addable !== null && quantity >= addable;
+  const noneLeftToAdd = addable === 0;
+  // "Only N left" — the remaining count, surfaced only once inventory says it's
+  // worth mentioning (at/below the Minimum Alert Level).
+  const showLowStock = product.low_stock === true && stock !== null && stock > 0;
+
+  // Stock can drop between render and tap (or the basket already holds the lot):
+  // never leave the stepper sitting above what can still be added.
+  useEffect(() => {
+    if (addable !== null && addable > 0 && quantity > addable) setQuantity(addable);
+  }, [addable, quantity]);
 
   // In scroll mode the quantity section + CTA live in one fixed bottom bar.
   // Measure it so the scrolling content reserves exactly the right space and
@@ -64,6 +85,7 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
       price: product.price,
       quantity,
       image_url: product.image_url,
+      stock: stock ?? undefined,
     });
     await new Promise(r => setTimeout(r, 350));
     setAdding(false);
@@ -84,20 +106,30 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
           <Minus size={18} />
         </button>
         <span className="text-2xl font-bold tabular-nums w-10 text-center">{quantity}</span>
+        {/* aria-disabled, not disabled: a disabled button swallows the click, and
+            the tap is what explains WHY the + stopped. Reads as disabled, still
+            answers the customer. */}
         <button
-          onClick={() => setQuantity(q => q + 1)}
-          className="w-11 h-11 rounded-full genda-gradient text-white flex items-center justify-center shadow-md"
+          onClick={() => (atCap ? toastStockCap(addable!) : setQuantity(q => q + 1))}
+          aria-disabled={atCap}
+          aria-label={`Add one more ${product.name}`}
+          className={`w-11 h-11 rounded-full genda-gradient text-white flex items-center justify-center shadow-md transition-opacity ${
+            atCap ? 'opacity-40' : ''
+          }`}
         >
           <Plus size={18} />
         </button>
       </div>
-      <div className="flex justify-center mt-2">
+      <div className="flex flex-col items-center gap-1 mt-2">
         <p className="text-xs text-gray-500">
           Total:{' '}
           <span className="font-semibold text-genda-green">
             ₹{fmt(product.price * quantity)}
           </span>
         </p>
+        {showLowStock && (
+          <p className="text-xs font-medium text-amber-700">Only {stock} left</p>
+        )}
       </div>
     </div>
   );
@@ -107,12 +139,22 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
     <div className="flex items-center gap-3">
       <motion.button
         whileTap={{ scale: 0.97 }}
-        disabled={!inStock || adding}
+        disabled={!inStock || noneLeftToAdd || adding}
         onClick={handleAdd}
-        className={`${hasItems ? 'flex-1' : 'w-full'} py-4 rounded-2xl genda-gradient text-white font-semibold text-base disabled:opacity-50 premium-shadow relative overflow-hidden transition-all duration-300`}
+        className={`${hasItems ? 'flex-1' : 'w-full'} py-4 rounded-2xl ${
+          inStock ? 'genda-gradient' : 'bg-gray-400'
+        } text-white font-semibold text-base disabled:opacity-50 premium-shadow relative overflow-hidden transition-all duration-300`}
       >
         <AnimatePresence mode="wait">
-          {adding ? (
+          {!inStock ? (
+            <motion.span key="oos" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              Out of Stock
+            </motion.span>
+          ) : noneLeftToAdd ? (
+            <motion.span key="nomore" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              No items left to add more
+            </motion.span>
+          ) : adding ? (
             <motion.div
               key="adding"
               initial={{ opacity: 0 }}
@@ -234,8 +276,9 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
           )}
         </div>
 
-        {/* Quantity Section — inline in the flow only when fitting the viewport */}
-        {fitViewport && <div className="mx-5 mt-3 shrink-0">{quantitySection}</div>}
+        {/* Quantity Section — inline in the flow only when fitting the viewport.
+            Out of stock: no picker, the CTA says Out of Stock on its own. */}
+        {fitViewport && inStock && <div className="mx-5 mt-3 shrink-0">{quantitySection}</div>}
       </motion.div>
 
       {/* Scroll mode: reserve exactly the fixed bar's height so content can
@@ -252,7 +295,7 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
             : 'fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]'
         }
       >
-        {!fitViewport && <div className="px-5 pt-4">{quantitySection}</div>}
+        {!fitViewport && inStock && <div className="px-5 pt-4">{quantitySection}</div>}
         <div className={fitViewport ? '' : 'px-5 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'}>{ctaButtons}</div>
       </div>
     </div>

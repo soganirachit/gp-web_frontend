@@ -123,6 +123,9 @@ export interface BloomBarVase {
   name: string;
   price: number;
   image_url?: string;
+  /** Units still sellable. null/undefined = uncapped. The endpoint already returns
+   *  null for a vase with no stock, so 0 should never reach the card. */
+  stock?: number | null;
 }
 
 /**

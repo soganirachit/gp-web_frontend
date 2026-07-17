@@ -18,6 +18,7 @@ import { useCart } from './BloomBarCartContext';
 import BloomBarCoBrandHeader from './components/BloomBarCoBrandHeader';
 import BloomBarLoadingSkeleton from './components/BloomBarLoadingSkeleton';
 import { fmt } from './money';
+import { stockOf, toastStockCap } from './stock';
 
 type BloomBarType = 'stick' | 'bouquet';
 
@@ -30,6 +31,10 @@ interface CatalogProduct {
   description?: string;
   bloombar_type?: BloomBarType;
   badge?: string;
+  /** Units still sellable. null/undefined = uncapped, 0 = out of stock. */
+  stock?: number | null;
+  /** At or below the inventory item's Minimum Alert Level. */
+  low_stock?: boolean;
   [key: string]: unknown;
 }
 
@@ -327,18 +332,33 @@ function StoreProductCard({
   const badgeCls = accent === 'green' ? 'bg-genda-green text-white' : 'bg-genda-gold text-white';
   const addCls = accent === 'green' ? 'genda-gradient' : 'bg-genda-gold';
 
-  const increment = () =>
+  const stock = stockOf(product);
+  const outOfStock = stock === 0;
+  const atCap = stock !== null && qty >= stock;
+  const showLowStock = product.low_stock === true && stock !== null && stock > 0;
+
+  const increment = () => {
+    if (atCap) {
+      toastStockCap(stock!);
+      return;
+    }
     addItem({
       product_id: product.id,
       product_name: product.name,
       price: product.price,
       quantity: 1,
       image_url: product.image_url,
+      stock: stock ?? undefined,
     });
+  };
   const decrement = () => updateQuantity(product.id, qty - 1);
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden premium-shadow flex flex-col h-full">
+    <div
+      className={`bg-white rounded-2xl overflow-hidden premium-shadow flex flex-col h-full ${
+        outOfStock ? 'opacity-60 grayscale' : ''
+      }`}
+    >
       <div className="relative w-full aspect-square bg-genda-cream shrink-0 overflow-hidden">
         {product.image_url ? (
           <img
@@ -349,15 +369,23 @@ function StoreProductCard({
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-4xl">💐</div>
         )}
-        {product.badge && (
+        {product.badge && !outOfStock && (
           <span className={`absolute top-2 left-2 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${badgeCls}`}>
             {product.badge}
           </span>
+        )}
+        {outOfStock && (
+          <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
+            <span className="text-white font-semibold text-sm">Out of Stock</span>
+          </div>
         )}
       </div>
 
       <div className="p-3 flex flex-col flex-1">
         <h3 className="font-semibold text-sm leading-snug line-clamp-2 min-h-[2.5rem]">{product.name}</h3>
+        {showLowStock && (
+          <p className="mt-1 text-[11px] font-medium text-amber-700">Only {stock} left</p>
+        )}
 
         <div className="mt-auto pt-3 flex items-end justify-between">
           <div>
@@ -365,7 +393,7 @@ function StoreProductCard({
               ₹{fmt(product.price)}
             </p>
           </div>
-          {qty === 0 ? (
+          {outOfStock ? null : qty === 0 ? (
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={increment}
@@ -389,11 +417,14 @@ function StoreProductCard({
               <span className="min-w-[1.25rem] text-center text-sm font-bold tabular-nums">
                 {qty}
               </span>
+              {/* aria-disabled, not disabled: the tap is what tells the customer
+                  why the + stopped. */}
               <motion.button
                 whileTap={{ scale: 0.85 }}
                 onClick={increment}
+                aria-disabled={atCap}
                 aria-label={`Add one more ${product.name}`}
-                className="w-9 h-9 flex items-center justify-center"
+                className={`w-9 h-9 flex items-center justify-center ${atCap ? 'opacity-40' : ''}`}
               >
                 <Plus size={16} />
               </motion.button>

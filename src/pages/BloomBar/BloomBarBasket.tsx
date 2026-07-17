@@ -9,6 +9,7 @@ import BloomBarOrderSummaryRow from './components/BloomBarOrderSummaryRow';
 import BloomBarConfirmation from './BloomBarConfirmation';
 import type { BloomBarVase } from '@/services/bloombar.service';
 import { fmt, fmtPct } from './money';
+import { stockOf, toastStockCap } from './stock';
 
 
 export default function BloomBarBasket() {
@@ -154,6 +155,7 @@ export default function BloomBarBasket() {
       price: vase.price,
       quantity: 1,
       image_url: vase.image_url,
+      stock: stockOf(vase) ?? undefined,
     });
   };
 
@@ -338,9 +340,20 @@ export default function BloomBarBasket() {
                     )}
                   </button>
                   <span className="font-semibold min-w-[1.5rem] text-center tabular-nums">{item.quantity}</span>
+                  {/* aria-disabled, not disabled: the tap explains why the + stopped.
+                      Without this cap the basket silently overshoots stock, the
+                      backend rejects the totals call, and the Pay button just
+                      vanishes with no explanation. */}
                   <button
-                    onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
-                    className="w-8 h-8 rounded-full genda-gradient text-white flex items-center justify-center"
+                    onClick={() =>
+                      item.stock != null && item.quantity >= item.stock
+                        ? toastStockCap(item.stock)
+                        : updateQuantity(item.product_id, item.quantity + 1)
+                    }
+                    aria-disabled={item.stock != null && item.quantity >= item.stock}
+                    className={`w-8 h-8 rounded-full genda-gradient text-white flex items-center justify-center ${
+                      item.stock != null && item.quantity >= item.stock ? 'opacity-40' : ''
+                    }`}
                   >
                     <Plus size={12} />
                   </button>

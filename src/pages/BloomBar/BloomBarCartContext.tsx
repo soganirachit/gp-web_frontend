@@ -13,6 +13,14 @@ export interface BloomBarCartItem {
   price: number;
   quantity: number;
   image_url?: string;
+  /**
+   * Units still sellable, captured when the item was added. `undefined` = no cap
+   * (empty BOM, or the vase, which is added from the basket with no catalogue
+   * data). Only a UI convenience so the +/− controls know where to stop — it can
+   * go stale while the basket sits open, and the backend re-checks stock on every
+   * calculate/checkout regardless. Never treat it as authoritative.
+   */
+  stock?: number;
 }
 
 export interface BloomBarKioskContext {
@@ -109,17 +117,21 @@ export function BloomBarCartProvider({ children }: { children: React.ReactNode }
   // deliberately NOT the payable amount; the Pay button waits on the backend total.
   const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
+  // Both writers clamp to `stock` here rather than in each caller: the product
+  // card, the store card and the basket all funnel through them, so one guard
+  // keeps every surface from overshooting stock.
   const addItem = useCallback((item: BloomBarCartItem) => {
     setItems(prev => {
       const existing = prev.find(i => i.product_id === item.product_id);
-      if (existing) {
-        return prev.map(i =>
-          i.product_id === item.product_id
-            ? { ...i, quantity: i.quantity + item.quantity }
-            : i
-        );
-      }
-      return [...prev, item];
+      if (!existing) return [...prev, item];
+      // Freshest stock wins: the caller just read it off the catalogue.
+      const cap = item.stock ?? existing.stock;
+      const merged = existing.quantity + item.quantity;
+      return prev.map(i =>
+        i.product_id === item.product_id
+          ? { ...i, stock: cap, quantity: cap == null ? merged : Math.min(merged, cap) }
+          : i
+      );
     });
   }, []);
 
@@ -128,7 +140,11 @@ export function BloomBarCartProvider({ children }: { children: React.ReactNode }
       setItems(prev => prev.filter(i => i.product_id !== productId));
     } else {
       setItems(prev =>
-        prev.map(i => (i.product_id === productId ? { ...i, quantity: qty } : i))
+        prev.map(i =>
+          i.product_id === productId
+            ? { ...i, quantity: i.stock == null ? qty : Math.min(qty, i.stock) }
+            : i
+        )
       );
     }
   }, []);
