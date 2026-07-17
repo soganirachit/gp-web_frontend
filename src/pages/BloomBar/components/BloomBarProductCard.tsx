@@ -11,6 +11,8 @@ export interface BloomBarProduct {
   name: string;
   price: number;
   short_description?: string;
+  /** Long description. Rendered under the short one when it adds something. */
+  description?: string;
   image_url?: string;
   category?: string;
   badge?: string;
@@ -54,6 +56,12 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
   // "Only N left" — the remaining count, surfaced only once inventory says it's
   // worth mentioning (at/below the Minimum Alert Level).
   const showLowStock = product.low_stock === true && stock !== null && stock > 0;
+  // Plenty of products repeat the short description in the long one; printing it
+  // twice just looks broken.
+  const longDescription =
+    product.description && product.description.trim() !== (product.short_description ?? '').trim()
+      ? product.description
+      : null;
 
   // Stock can drop between render and tap (or the basket already holds the lot):
   // never leave the stepper sitting above what can still be added.
@@ -254,26 +262,31 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
             </div>
           </div>
 
-          {product.short_description && (
-            <p
-              className={`mt-2 text-sm text-gray-500 leading-relaxed ${
-                fitViewport ? 'flex-1 min-h-0 overflow-hidden' : ''
-              }`}
-            >
-              {product.short_description}
-            </p>
-          )}
+          {/* Copy block. When fitting the viewport (the store-QR detail sheet) this
+              is the one part allowed to scroll, so a long description stays
+              readable instead of being clipped by the fixed-height card. */}
+          <div className={fitViewport ? 'flex-1 min-h-0 overflow-y-auto mt-2' : 'mt-2'}>
+            {product.short_description && (
+              <p className="text-sm text-gray-500 leading-relaxed">{product.short_description}</p>
+            )}
 
-          {/* Tags */}
-          {product.tags && product.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-3 shrink-0">
-              {product.tags.map(tag => (
-                <span key={tag} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
-                  #{tag}
-                </span>
-              ))}
-            </div>
-          )}
+            {longDescription && (
+              <p className="mt-3 text-sm text-gray-600 leading-relaxed whitespace-pre-line">
+                {longDescription}
+              </p>
+            )}
+
+            {/* Tags */}
+            {product.tags && product.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                {product.tags.map(tag => (
+                  <span key={tag} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Quantity Section — inline in the flow only when fitting the viewport.

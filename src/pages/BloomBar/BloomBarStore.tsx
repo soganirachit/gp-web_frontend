@@ -12,11 +12,15 @@ import {
   DoorOpen,
   AlertCircle,
   ChevronRight,
+  X,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useCart } from './BloomBarCartContext';
 import BloomBarCoBrandHeader from './components/BloomBarCoBrandHeader';
 import BloomBarLoadingSkeleton from './components/BloomBarLoadingSkeleton';
+import BloomBarProductCard, {
+  type BloomBarProduct,
+} from './components/BloomBarProductCard';
 import { fmt } from './money';
 import { stockOf, toastStockCap } from './stock';
 
@@ -57,6 +61,8 @@ export default function BloomBarStore() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<BloomBarType>('stick');
   const [redirecting, setRedirecting] = useState(false);
+  // Tapped card → full detail sheet. Null = closed.
+  const [selected, setSelected] = useState<CatalogProduct | null>(null);
 
   // Bouquets are fulfilled on the main Genda Phool site. Hand off there, letting the
   // fade overlay play first so the transition feels intentional, not abrupt.
@@ -209,6 +215,7 @@ export default function BloomBarStore() {
                 key={product.id}
                 product={product}
                 accent={tab === 'stick' ? 'green' : 'gold'}
+                onOpen={setSelected}
               />
             ))}
           </div>
@@ -247,6 +254,48 @@ export default function BloomBarStore() {
                 <span className="font-bold shrink-0">₹{fmt(total)}</span>
               </motion.button>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Product detail sheet — the same card the kiosk QR page renders, in its
+          fitViewport mode: bottom bar becomes an inline footer, so nothing inside
+          relies on `fixed` (which this sheet's transform would break anyway).
+          Reusing it keeps the stock rules — out-of-stock CTA, the + cap, the
+          "Only N left" note — identical on both surfaces for free. */}
+      <AnimatePresence>
+        {selected && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setSelected(null)}
+            className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-lg h-[92dvh] bg-white rounded-t-3xl overflow-hidden flex flex-col"
+            >
+              <button
+                onClick={() => setSelected(null)}
+                aria-label="Close"
+                className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-md"
+              >
+                <X size={18} className="text-gray-700" />
+              </button>
+              <div className="flex-1 min-h-0 pt-3">
+                <BloomBarProductCard
+                  product={selected as unknown as BloomBarProduct}
+                  fitViewport
+                  onAdded={() => setSelected(null)}
+                />
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -323,9 +372,11 @@ function CategoryTab({
 function StoreProductCard({
   product,
   accent,
+  onOpen,
 }: {
   product: CatalogProduct;
   accent: 'green' | 'gold';
+  onOpen: (product: CatalogProduct) => void;
 }) {
   const { items, addItem, updateQuantity } = useCart();
   const qty = items.find((i) => i.product_id === product.id)?.quantity ?? 0;
@@ -354,8 +405,21 @@ function StoreProductCard({
   const decrement = () => updateQuantity(product.id, qty - 1);
 
   return (
+    // Whole card opens the detail sheet; the quantity controls stop the click so
+    // adding a stem never yanks the sheet open. Out-of-stock still opens — reading
+    // about it is the one thing left to do with it.
     <div
-      className={`bg-white rounded-2xl overflow-hidden premium-shadow flex flex-col h-full ${
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(product)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen(product);
+        }
+      }}
+      aria-label={`View ${product.name}`}
+      className={`bg-white rounded-2xl overflow-hidden premium-shadow flex flex-col h-full cursor-pointer text-left ${
         outOfStock ? 'opacity-60 grayscale' : ''
       }`}
     >
@@ -393,6 +457,9 @@ function StoreProductCard({
               ₹{fmt(product.price)}
             </p>
           </div>
+          {/* Quantity controls sit inside a clickable card: swallow the click so
+              tapping + adds a stem instead of opening the sheet. */}
+          <div onClick={(e) => e.stopPropagation()}>
           {outOfStock ? null : qty === 0 ? (
             <motion.button
               whileTap={{ scale: 0.9 }}
@@ -430,6 +497,7 @@ function StoreProductCard({
               </motion.button>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
