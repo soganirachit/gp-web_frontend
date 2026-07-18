@@ -211,12 +211,21 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
         transition={{ type: 'spring', damping: 24, stiffness: 250 }}
         className={
           fitViewport
-            ? 'flex-1 min-h-0 flex flex-col w-full max-w-full overflow-x-hidden'
+            ? // The whole body scrolls as one region — image included. Sizing each
+              // part to fit instead needs a flex-1/min-h-0 chain through every
+              // wrapper, and one broken link silently clips the copy and the CTA.
+              // overscroll-contain stops a flick at the end from scrolling the store behind.
+              'flex-1 min-h-0 overflow-y-auto overscroll-contain w-full max-w-full overflow-x-hidden'
             : 'block w-full max-w-full overflow-x-hidden'
         }
       >
-        {/* Product Image — fixed aspect, unchanged in both modes */}
-        <div className="relative mx-4 rounded-3xl overflow-hidden bg-white aspect-square shrink-0">
+        {/* Product Image — square, but capped in the sheet so opening it doesn't
+            land on a wall of photo with the copy pushed below the fold. */}
+        <div
+          className={`relative mx-4 rounded-3xl overflow-hidden bg-white aspect-square shrink-0 ${
+            fitViewport ? 'max-h-[38dvh]' : ''
+          }`}
+        >
           {product.image_url ? (
             <img
               src={product.image_url}
@@ -241,7 +250,7 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
         </div>
 
         {/* Product Info */}
-        <div className={`px-5 pt-4 pb-1 ${fitViewport ? 'flex-1 min-h-0 flex flex-col' : 'shrink-0'}`}>
+        <div className="px-5 pt-4 pb-1 shrink-0">
           <div className="flex items-start justify-between shrink-0">
             <div className="flex-1 min-w-0">
               <h1 className="font-playfair text-2xl font-semibold leading-snug">{product.name}</h1>
@@ -262,10 +271,8 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
             </div>
           </div>
 
-          {/* Copy block. When fitting the viewport (the store-QR detail sheet) this
-              is the one part allowed to scroll, so a long description stays
-              readable instead of being clipped by the fixed-height card. */}
-          <div className={fitViewport ? 'flex-1 min-h-0 overflow-y-auto mt-2' : 'mt-2'}>
+          {/* Copy block — scrolls with the rest of the body, never truncated. */}
+          <div className="mt-2">
             {product.short_description && (
               <p className="text-sm text-gray-500 leading-relaxed">{product.short_description}</p>
             )}
@@ -289,26 +296,24 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
           </div>
         </div>
 
-        {/* Quantity Section — inline in the flow only when fitting the viewport.
-            Out of stock: no picker, the CTA says Out of Stock on its own. */}
-        {fitViewport && inStock && <div className="mx-5 mt-3 shrink-0">{quantitySection}</div>}
       </motion.div>
 
       {/* Scroll mode: reserve exactly the fixed bar's height so content can
           scroll fully behind it and the controls stay on-screen. */}
       {!fitViewport && <div aria-hidden style={{ height: bottomBarHeight }} />}
 
-      {/* Bottom bar — inline footer when fitting the viewport; a single fixed
-          bar holding the sticky quantity selector + CTA in scroll mode. */}
+      {/* Bottom bar — quantity + CTA, held out of the scroll region in both modes:
+          a pinned footer in the sheet, a fixed bar in scroll mode. Out of stock:
+          no picker, the CTA says Out of Stock on its own. */}
       <div
         ref={bottomBarRef}
         className={
           fitViewport
-            ? 'shrink-0 px-5 pt-3 pb-[calc(2rem+env(safe-area-inset-bottom))]'
+            ? 'shrink-0 bg-white border-t border-gray-100 px-5 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]'
             : 'fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]'
         }
       >
-        {!fitViewport && inStock && <div className="px-5 pt-4">{quantitySection}</div>}
+        {inStock && <div className={fitViewport ? 'pb-3' : 'px-5 pt-4'}>{quantitySection}</div>}
         <div className={fitViewport ? '' : 'px-5 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'}>{ctaButtons}</div>
       </div>
     </div>
