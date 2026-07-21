@@ -293,13 +293,28 @@ export default function BloomBarScanner({ onClose, onScan, lastAddedName }: Prop
         </div>
       </div>
 
-      {/* Scanner viewport */}
-      <div className="flex-1 relative flex items-center justify-center">
+      {/* Scanner viewport.
+          overflow-hidden is required: the scan window's dimming is painted by a
+          huge-spread box-shadow, which would otherwise bleed over the header and
+          footer. */}
+      <div className="flex-1 relative overflow-hidden flex items-center justify-center">
         <div id={containerId.current} className="w-full h-full" />
 
-        {/* Corner frame overlay */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="relative w-60 h-60">
+        {/* Scan window + dimming.
+            The mask used to be a radial-gradient, which can only ever draw a
+            circle — that circle also ran under the fixed "Continue to Basket"
+            button on iOS, where Safari's bottom bar shortens the viewport.
+            One square element with `box-shadow: 0 0 0 9999px` paints everything
+            OUTSIDE itself instead: exactly square, no gradient maths, identical
+            on every browser.
+            The bottom padding reserves room for that fixed CTA (and the iOS home
+            indicator via safe-area-inset), so the window is centred in the space
+            that's actually free rather than the full height. */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-6 pb-[calc(9rem+env(safe-area-inset-bottom))]">
+          <div
+            className="relative w-full max-w-[280px] aspect-square rounded-2xl"
+            style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)' }}
+          >
             {(
               [
                 ['top-0 left-0', 'border-t-4 border-l-4 rounded-tl-2xl'],
@@ -319,14 +334,6 @@ export default function BloomBarScanner({ onClose, onScan, lastAddedName }: Prop
             )}
           </div>
         </div>
-
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              'radial-gradient(ellipse 260px 260px at center, transparent 0%, transparent 50%, rgba(0,0,0,0.7) 51%)',
-          }}
-        />
       </div>
 
       {/* Footer */}
