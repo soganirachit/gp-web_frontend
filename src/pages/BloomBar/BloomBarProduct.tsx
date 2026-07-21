@@ -75,8 +75,12 @@ export default function BloomBarProductPage() {
   }
 
   const handleAdded = (prod: Product, qty: number) => {
-    // Hand the just-added flower + qty to scan-next so its notification pops from the first scan.
-    navigate('/bloombar/scan-next', { state: { addedName: prod.name, addedQty: qty } });
+    // Straight to the basket — it's the shopping screen now, and "Scan another
+    // flower" there is how the customer keeps going. No `replace`, so Back lands
+    // here again; the card then reads the cart and offers "Go to Basket" instead
+    // of a second Add (see editWhenInBasket below). The state is still passed so
+    // a revert to scan-next needs nothing else.
+    navigate('/bloombar/basket', { state: { addedName: prod.name, addedQty: qty } });
   };
 
   return (
@@ -96,6 +100,7 @@ export default function BloomBarProductPage() {
               product={product}
               kiosk={kiosk as { name?: string } | null}
               onAdded={handleAdded}
+              editWhenInBasket
             />
           </motion.div>
         </AnimatePresence>

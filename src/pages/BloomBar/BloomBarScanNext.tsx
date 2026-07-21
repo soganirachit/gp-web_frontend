@@ -137,7 +137,12 @@ export default function BloomBarScanNext() {
 
             {itemCount > 0 && (
               <div className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-0 right-0 px-5 z-[100]">
+                {/* `replace` on every exit from this page: the scanner must never
+                    stay behind the basket in history, or Back from the basket
+                    reopens a live camera. Replacing means Back skips it and lands
+                    on the product page instead. */}
                 <Link
+                  replace
                   to="/bloombar/basket"
                   className="w-full py-4 rounded-2xl bg-white text-genda-green font-semibold text-base flex items-center justify-center gap-2 float-shadow"
                 >
@@ -171,6 +176,7 @@ export default function BloomBarScanNext() {
                 product={product}
                 kiosk={kiosk as { name?: string } | null}
                 onAdded={handleAdded}
+                basketLinkReplace
               />
             </div>
           </motion.div>
@@ -204,8 +210,10 @@ export default function BloomBarScanNext() {
               >
                 <QrCode size={20} /> Open Scanner
               </motion.button>
+              {/* Same reason as the scanner's Continue-to-Basket link above. */}
               {itemCount > 0 && (
                 <Link
+                  replace
                   to="/bloombar/basket"
                   className="w-full py-4 rounded-2xl border-2 border-genda-green text-genda-green font-semibold text-base flex items-center justify-center gap-2"
                 >

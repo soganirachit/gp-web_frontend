@@ -37,12 +37,27 @@ interface Props {
    *  the image keeps its size, the description absorbs/clips any extra height,
    *  and the CTA sits inline as a footer (always just above the basket button). */
   fitViewport?: boolean;
+  /** Product page only. When the product is ALREADY in the basket, the stepper
+   *  edits that cart line instead of a to-add amount and the CTA becomes
+   *  "Go to Basket". Scan-next deliberately leaves this off so its rapid-scan
+   *  loop keeps the plain Add button and just merges quantities. */
+  editWhenInBasket?: boolean;
+  /** Set by scan-next: leaving the live scanner must REPLACE it in history, never
+   *  push past it, or Back from the basket reopens the camera. The product page
+   *  leaves this off — there, pushing is what makes Back return to the product. */
+  basketLinkReplace?: boolean;
 }
 
-export default function BloomBarProductCard({ product, onAdded, fitViewport = false }: Props) {
+export default function BloomBarProductCard({
+  product,
+  onAdded,
+  fitViewport = false,
+  editWhenInBasket = false,
+  basketLinkReplace = false,
+}: Props) {
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
-  const { addItem, itemCount, items } = useCart();
+  const { addItem, updateQuantity, itemCount, items } = useCart();
   const hasItems = itemCount > 0;
 
   const stock = stockOf(product);
@@ -51,8 +66,32 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
   // what's actually still addable — not at the full stock figure.
   const inBasket = items.find(i => i.product_id === product.id)?.quantity ?? 0;
   const addable = stock === null ? null : Math.max(0, stock - inBasket);
-  const atCap = addable !== null && quantity >= addable;
   const noneLeftToAdd = addable === 0;
+
+  // Edit mode: the customer came back to a product they've already added, so the
+  // stepper drives the cart line directly.
+  const editMode = editWhenInBasket && inBasket > 0;
+  const displayQty = editMode ? inBasket : quantity;
+  // The cap differs by mode and getting it wrong is silent: `quantity` is a DELTA
+  // when adding (cap = what's still addable) but an ABSOLUTE line quantity when
+  // editing (cap = the whole shelf). Using `addable` in edit mode would freeze the
+  // + at roughly half the stock.
+  const cap = editMode ? stock : addable;
+  const atCap = cap !== null && displayQty >= cap;
+
+  const incQuantity = () => {
+    if (atCap) return toastStockCap(cap!);
+    if (editMode) updateQuantity(product.id, inBasket + 1);
+    else setQuantity(q => q + 1);
+  };
+
+  // Floors at 1 in both modes: removing a line stays a basket action (it has a
+  // trash control there), so the − never silently empties the card out from under
+  // the customer and flips the CTA back to "Add".
+  const decQuantity = () => {
+    if (editMode) updateQuantity(product.id, Math.max(1, inBasket - 1));
+    else setQuantity(q => Math.max(1, q - 1));
+  };
   // "Only N left" — the remaining count, surfaced only once inventory says it's
   // worth mentioning (at/below the Minimum Alert Level).
   const showLowStock = product.low_stock === true && stock !== null && stock > 0;
@@ -104,21 +143,21 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
   const quantitySection = (
     <div className="bg-genda-cream rounded-2xl p-4">
       <p className=" text-center text-sm font-large text-gray-800 mb-3">
-        How many stems would you like? 🌸
+        {editMode ? 'In your basket 🌸' : 'How many stems would you like? 🌸'}
       </p>
       <div className="flex items-center justify-center gap-6">
         <button
-          onClick={() => setQuantity(q => Math.max(1, q - 1))}
+          onClick={decQuantity}
           className="w-11 h-11 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center text-gray-600 hover:border-genda-green transition-colors"
         >
           <Minus size={18} />
         </button>
-        <span className="text-2xl font-bold tabular-nums w-10 text-center">{quantity}</span>
+        <span className="text-2xl font-bold tabular-nums w-10 text-center">{displayQty}</span>
         {/* aria-disabled, not disabled: a disabled button swallows the click, and
             the tap is what explains WHY the + stopped. Reads as disabled, still
             answers the customer. */}
         <button
-          onClick={() => (atCap ? toastStockCap(addable!) : setQuantity(q => q + 1))}
+          onClick={incQuantity}
           aria-disabled={atCap}
           aria-label={`Add one more ${product.name}`}
           className={`w-11 h-11 rounded-full genda-gradient text-white flex items-center justify-center shadow-md transition-opacity ${
@@ -132,7 +171,7 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
         <p className="text-xs text-gray-500">
           Total:{' '}
           <span className="font-semibold text-genda-green">
-            ₹{fmt(product.price * quantity)}
+            ₹{fmt(product.price * displayQty)}
           </span>
         </p>
         {showLowStock && (
@@ -143,7 +182,18 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
   );
 
   // ── Add-to-basket buttons (shared by both layouts) ──────────────────────────
-  const ctaButtons = (
+  // Already in the basket (product page only): nothing left to add, so the CTA
+  // just takes them back. The small basket shortcut below would be a second copy
+  // of this same link, so it sits out this branch.
+  const ctaButtons = editMode ? (
+    <Link
+      to="/bloombar/basket"
+      className="w-full py-4 rounded-2xl genda-gradient text-white font-semibold text-base premium-shadow flex items-center justify-center gap-2"
+    >
+      <ShoppingBag size={18} />
+      Go to Basket ({itemCount})
+    </Link>
+  ) : (
     <div className="flex items-center gap-3">
       <motion.button
         whileTap={{ scale: 0.97 }}
@@ -189,6 +239,7 @@ export default function BloomBarProductCard({ product, onAdded, fitViewport = fa
             transition={{ type: 'spring', damping: 18, stiffness: 300 }}
           >
             <Link
+              replace={basketLinkReplace}
               to="/bloombar/basket"
               className="w-16 h-14 rounded-2xl bg-white border-2 border-genda-green flex flex-col items-center justify-center relative flex-shrink-0 shadow-md"
             >
