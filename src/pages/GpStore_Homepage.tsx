@@ -17,6 +17,7 @@ import {
   PRODUCT_AVAILABILITY_STORE,
   resolveProductImageUrl,
 } from "../services/product.service";
+import { pickPrimaryImageUrl } from "../utils/pickPrimaryImageUrl";
 import {
   GUEST_STORE_UPDATED_EVENT,
   GPS_CATALOG_LOCATION_UPDATED_EVENT,
@@ -652,7 +653,7 @@ const GpStore_Homepage: React.FC = () => {
                                     >
                                         <div className="aspect-square bg-[#f8f6f1] overflow-hidden">
                                             <SessionCachedImage
-                                                src={resolveProductImageUrl(product as unknown as Record<string, unknown>)}
+                                                src={pickPrimaryImageUrl(product, "card") || resolveProductImageUrl(product as unknown as Record<string, unknown>)}
                                                 alt={product.name}
                                                 className="w-full h-full object-cover"
                                                 priority={productIdx < 4}
@@ -712,7 +713,7 @@ const GpStore_Homepage: React.FC = () => {
                                         <div className="relative aspect-square bg-[#f8f6f1] overflow-hidden">
                                             <ProductImageTag labels={bestSeller.labels} />
                                             <SessionCachedImage
-                                                src={resolveProductImageUrl(bestSeller as unknown as Record<string, unknown>)}
+                                                src={pickPrimaryImageUrl(bestSeller, "card") || resolveProductImageUrl(bestSeller as unknown as Record<string, unknown>)}
                                                 alt={bestSeller.name}
                                                 className="w-full h-full object-cover"
                                                 priority={bestSellerIdx < 4}
@@ -774,7 +775,7 @@ const GpStore_Homepage: React.FC = () => {
                                     <div className="relative aspect-square bg-[#f8f6f1] overflow-hidden">
                                         <ProductImageTag labels={product.labels} />
                                         <SessionCachedImage
-                                            src={resolveProductImageUrl(product as unknown as Record<string, unknown>)}
+                                            src={pickPrimaryImageUrl(product, "card") || resolveProductImageUrl(product as unknown as Record<string, unknown>)}
                                             alt={product.name}
                                             className="w-full h-full object-cover"
                                             priority={premiumIdx < 4}
