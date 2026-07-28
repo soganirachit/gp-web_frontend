@@ -49,7 +49,8 @@ export function SessionCachedImage({
       alt={alt}
       className={[
         className,
-        priority && !paintReady ? "opacity-0" : "opacity-100",
+        "transition-opacity duration-200",
+        paintReady ? "opacity-100" : "opacity-0",
       ]
         .filter(Boolean)
         .join(" ")}
