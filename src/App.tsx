@@ -4,6 +4,7 @@ import './App.css';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { NotificationInboxProvider } from './context/NotificationInboxContext';
+import { PaymentRecoveryProvider } from './context/PaymentRecoveryProvider';
 import ErrorBoundary from './components/ErrorBoundary';
 import { initMetaPixel } from './lib/metaPixel';
 
@@ -16,11 +17,13 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <NotificationInboxProvider>
-        <CartProvider>
-          <Router />
-        </CartProvider>
-        </NotificationInboxProvider>
+        <PaymentRecoveryProvider>
+          <NotificationInboxProvider>
+            <CartProvider>
+              <Router />
+            </CartProvider>
+          </NotificationInboxProvider>
+        </PaymentRecoveryProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

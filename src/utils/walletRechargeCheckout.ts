@@ -1,5 +1,6 @@
 import { loadRazorpayScript } from "../lib/razorpayLoader";
 import { walletService } from "../services/wallet.service";
+import { PAYMENT_MODAL_DISMISSED } from "./razorpayModalDismiss";
 
 /** Opens Razorpay for wallet top-up; returns true when payment is verified. */
 export async function rechargeWalletInApp(amountRupees: number): Promise<boolean> {
@@ -15,49 +16,63 @@ export async function rechargeWalletInApp(amountRupees: number): Promise<boolean
 
   await loadRazorpayScript();
 
-  const paymentResult = await new Promise<{
+  let paymentResult: {
     razorpay_payment_id: string;
     razorpay_order_id: string;
     razorpay_signature: string;
-  }>((resolve, reject) => {
-    const { order, key_id, customer } = data;
-    const options = {
-      key: key_id,
-      amount: order.amount,
-      currency: order.currency,
-      name: "Genda Phool",
-      description: "Wallet Recharge",
-      order_id: order.id,
-      prefill: {
-        name: customer?.name,
-        email: customer?.email,
-        contact: customer?.contact,
-      },
-      notes: order.notes,
-      theme: {
-        color: "#FAA222",
-      },
-      handler: (response: {
-        razorpay_payment_id: string;
-        razorpay_order_id: string;
-        razorpay_signature: string;
-      }) => {
-        resolve(response);
-      },
-      modal: {
-        ondismiss: () => {
-          reject(new Error("Payment cancelled by user"));
-        },
-      },
-    };
+  };
 
-    if (typeof window.Razorpay !== 'function') {
-      reject(new Error("Razorpay SDK unavailable"));
-      return;
+  try {
+    paymentResult = await new Promise((resolve, reject) => {
+      const { order, key_id, customer } = data;
+      const options = {
+        key: key_id,
+        amount: order.amount,
+        currency: order.currency,
+        name: "Genda Phool",
+        description: "Wallet Recharge",
+        order_id: order.id,
+        prefill: {
+          name: customer?.name,
+          email: customer?.email,
+          contact: customer?.contact,
+        },
+        notes: order.notes,
+        theme: {
+          color: "#FAA222",
+        },
+        handler: (response: {
+          razorpay_payment_id: string;
+          razorpay_order_id: string;
+          razorpay_signature: string;
+        }) => {
+          resolve(response);
+        },
+        modal: {
+          ondismiss: () => {
+            reject(new Error(PAYMENT_MODAL_DISMISSED));
+          },
+        },
+      };
+
+      if (typeof window.Razorpay !== 'function') {
+        reject(new Error("Razorpay SDK unavailable"));
+        return;
+      }
+      const razorpayInstance = new window.Razorpay(options);
+      razorpayInstance.open();
+    });
+  } catch (modalErr) {
+    if (
+      modalErr instanceof Error &&
+      modalErr.message === PAYMENT_MODAL_DISMISSED &&
+      data.order?.id
+    ) {
+      const synced = await walletService.pollPaymentStatus(data.order.id, 20);
+      return synced;
     }
-    const razorpayInstance = new window.Razorpay(options);
-    razorpayInstance.open();
-  });
+    throw modalErr;
+  }
 
   await walletService.verifyPayment({
     razorpay_payment_id: paymentResult.razorpay_payment_id,
@@ -65,6 +80,5 @@ export async function rechargeWalletInApp(amountRupees: number): Promise<boolean
     razorpay_signature: paymentResult.razorpay_signature,
     amount: effectiveAmount,
   });
-
   return true;
 }

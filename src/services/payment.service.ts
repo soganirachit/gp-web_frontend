@@ -195,6 +195,7 @@ export interface PaymentStatusResponse {
   order_id?: number;
   order_number?: string;
   razorpay_payment_id?: string;
+  checkout_type?: 'cart' | 'wallet';
 }
 
 class PaymentService {
@@ -334,7 +335,8 @@ class PaymentService {
 
   /**
    * Step 4: Check payment status (optional)
-   * Use this to check if payment was completed if app crashed
+   * Use this to check if payment was completed if app crashed.
+   * Server syncs from Razorpay when checkout is still pending.
    */
   async getPaymentStatus(
     razorpayOrderId: string
@@ -358,6 +360,8 @@ class PaymentService {
           body.razorpay_payment_id != null
             ? String(body.razorpay_payment_id)
             : undefined,
+        checkout_type:
+          body.checkout_type === 'wallet' ? 'wallet' : 'cart',
       };
     } catch (error: unknown) {
       console.error("Error getting payment status:", error);
@@ -369,6 +373,34 @@ class PaymentService {
       }
       throw new Error(getUserFacingPaymentError(error));
     }
+  }
+
+  /**
+   * Poll status until order/wallet credit is fulfilled.
+   * Each poll triggers server-side Razorpay sync (UPI completed on phone while modal closed).
+   */
+  async pollUntilFulfilled(
+    razorpayOrderId: string,
+    maxPolls = 5,
+    intervalMs = 2000,
+  ): Promise<PaymentStatusResponse | null> {
+    for (let i = 0; i < maxPolls; i++) {
+      try {
+        const status = await this.getPaymentStatus(razorpayOrderId);
+        const st = status.status?.toLowerCase() ?? '';
+        const done =
+          (st === 'completed' || st === 'complete' || st === 'paid' || st === 'success') &&
+          (Boolean(status.order_number) || status.checkout_type === 'wallet');
+        if (done) return status;
+        if (st === 'failed') return null;
+      } catch {
+        /* retry */
+      }
+      if (i < maxPolls - 1) {
+        await new Promise((r) => setTimeout(r, intervalMs));
+      }
+    }
+    return null;
   }
 }
 

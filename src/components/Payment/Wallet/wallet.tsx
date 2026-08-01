@@ -13,6 +13,7 @@ import { useCart, CartItem, CartDeliveryInfo } from "../../../context/CartContex
 import RazorpayPayment from "../Razorpay/RazorpayPayment";
 import { IoAlertCircle, IoWarningOutline } from "react-icons/io5";
 import { useNetworkRecovery } from "../../../hooks/useNetworkRecovery";
+import { WALLET_PAYMENT_RECOVERED_EVENT } from "../../../utils/pendingPayments";
 import { IoMdArrowDown, IoMdArrowUp } from "react-icons/io";
 import walletImage from "../../../assets/icon/Wallet.png";
 import profileImage from "../../../assets/icon/Profile.png";
@@ -175,9 +176,7 @@ const Wallet = () => {
     isRecovering,
     setIsRecovering,
     storePendingPayment,
-    getPendingPayments,
     removePendingPayment,
-    retryWithBackoff,
   } = useNetworkRecovery();
 
   // Add useCallback to memoize fetchWalletBalance
@@ -518,70 +517,34 @@ const Wallet = () => {
     return sorted[0]?.amount ?? null;
   }, [transactions]);
 
-  // Recovery mechanism for pending payments
-  const recoverPendingPayments = async () => {
-    const pendingPayments = getPendingPayments();
-    if (pendingPayments.length === 0) return;
+  // Wallet-specific UI when global PaymentRecoveryProvider completes wallet recovery.
+  useEffect(() => {
+    const onWalletPaymentsRecovered = (event: Event) => {
+      const detail = (event as CustomEvent<{ recoveredCount: number }>).detail;
+      if (!detail?.recoveredCount) return;
 
-    setIsRecovering(true);
-    let recoveredCount = 0;
-
-    for (const payment of pendingPayments) {
-      try {
-        const success = await retryWithBackoff(async () => {
-          return await walletService.recoverPendingPayment({
-            razorpay_payment_id: payment.razorpay_payment_id,
-            razorpay_order_id: payment.razorpay_order_id,
-            razorpay_signature: payment.razorpay_signature,
-            amount: payment.amount,
-          });
-        });
-
-        if (success) {
-          removePendingPayment(payment.id);
-          recoveredCount++;
+      void (async () => {
+        setIsRecovering(true);
+        try {
+          toast.success(
+            `${detail.recoveredCount} pending payment(s) recovered successfully!`,
+          );
+          await fetchWalletBalance();
+          await tryCompleteGpDailyPendingSubscriptionAfterRecharge(
+            (path, opts) => navigate(path, opts),
+            feature,
+          );
+        } finally {
+          setIsRecovering(false);
         }
-      } catch (error) {
-        console.error(
-          "Failed to recover payment:",
-          payment.razorpay_payment_id,
-          error
-        );
-      }
-    }
+      })();
+    };
 
-    setIsRecovering(false);
-
-    if (recoveredCount > 0) {
-      toast.success(
-        `${recoveredCount} pending payment(s) recovered successfully!`
-      );
-      await fetchWalletBalance();
-      await tryCompleteGpDailyPendingSubscriptionAfterRecharge(
-        (path, opts) => navigate(path, opts),
-        feature,
-      );
-    }
-  };
-
-  // Handle network reconnection
-  useEffect(() => {
-    if (isOnline && !isRecovering) {
-      const pendingPayments = getPendingPayments();
-      if (pendingPayments.length > 0) {
-        void recoverPendingPayments();
-      }
-    }
-  }, [isOnline]);
-
-  // Auto-recover on component mount
-  useEffect(() => {
-    if (isOnline) {
-      setTimeout(() => {
-        recoverPendingPayments();
-      }, 1000); // Delay to let wallet balance load first
-    }
-  }, []);
+    window.addEventListener(WALLET_PAYMENT_RECOVERED_EVENT, onWalletPaymentsRecovered);
+    return () => {
+      window.removeEventListener(WALLET_PAYMENT_RECOVERED_EVENT, onWalletPaymentsRecovered);
+    };
+  }, [feature, fetchWalletBalance, navigate, setIsRecovering]);
 
   if (isLoadingBalance) {
     return <WalletPageSkeleton />;

@@ -34,6 +34,7 @@ import { GP_SHEET_DESKTOP_ALIGN_CLASSES } from '../../../components/common/Searc
 import api from '../../../services/api';
 import { getApiUrl } from '../../../config/api.config';
 import { useNetworkRecovery } from '../../../hooks/useNetworkRecovery';
+import { CART_PAYMENT_RECOVERED_EVENT, consumePendingCartRecoveredSession } from '../../../utils/pendingPayments';
 import { SEO } from '../../../components/SEO';
 import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
@@ -487,7 +488,7 @@ const Cart: React.FC = () => {
   const { isLoggedIn, phoneNumber: authPhoneNumber } = useAuth();
   const { feature, theme } = useFeatureTheme();
   const browseProductsPath = feature === 'gpStore' ? '/gp-store/products' : '/gp-daily/Products';
-  const { storePendingPayment, getPendingPayments, removePendingPayment, retryWithBackoff } = useNetworkRecovery();
+  const { storePendingPayment, removePendingPayment, retryWithBackoff } = useNetworkRecovery();
   const {
     items,
     deliveryInfo,
@@ -1862,22 +1863,31 @@ const Cart: React.FC = () => {
   };
 
   // Poll status endpoint until the order appears or we give up
-  const pollPaymentStatus = async (razorpayOrderId: string, amountPaise: number): Promise<boolean> => {
-    const MAX_POLLS = 5;
-    for (let i = 0; i < MAX_POLLS; i++) {
-      try {
-        const status = await paymentService.getPaymentStatus(razorpayOrderId);
-        const st = status.status?.toLowerCase() ?? '';
-        const done =
-          (st === 'completed' || st === 'complete' || st === 'paid' || st === 'success') &&
-          Boolean(status.order_number);
-        if (done && status.order_number) {
-          finalizeOrder(status.order_number, parseFloat(status.amount) || amountPaise / 100);
-          return true;
-        }
-      } catch (_) {}
-      // Wait 2s between polls (skip wait after last attempt)
-      if (i < MAX_POLLS - 1) await new Promise(r => setTimeout(r, 2000));
+  const pollPaymentStatus = async (
+    razorpayOrderId: string,
+    amountPaise: number,
+    maxPolls = 5,
+  ): Promise<boolean> => {
+    const result = await paymentService.pollUntilFulfilled(razorpayOrderId, maxPolls, 2000);
+    if (result?.order_number) {
+      finalizeOrder(result.order_number, parseFloat(result.amount) || amountPaise / 100);
+      return true;
+    }
+    return false;
+  };
+
+  /** UPI on phone can succeed while user closes the Razorpay modal on desktop. */
+  const recoverAfterModalDismiss = async (): Promise<boolean> => {
+    if (!razorpayOrderId) return false;
+    setIsConfirmingOrder(true);
+    setShouldTriggerPayment(false);
+    const checkingToastId = toast.loading('Checking if your payment completed…');
+    const recovered = await pollPaymentStatus(razorpayOrderId, razorpayAmount, 30);
+    toast.dismiss(checkingToastId);
+    setIsConfirmingOrder(false);
+    if (recovered) {
+      checkoutInFlightRef.current = false;
+      return true;
     }
     return false;
   };
@@ -1933,46 +1943,33 @@ const Cart: React.FC = () => {
     setIsConfirmingOrder(false);
   };
 
-  // On mount: recover any pending payments from a previous session that crashed after Razorpay SDK
-  // success but before /verify/ completed (e.g. app went background, network dropped)
+  // Global recovery may complete while this basket is open — finalize order UX here.
   useEffect(() => {
-    const pending = getPendingPayments();
-    if (!pending.length) return;
+    const missed = consumePendingCartRecoveredSession();
+    if (missed?.orderNumber) {
+      finalizeOrder(missed.orderNumber, missed.amount);
+    }
 
-    const recover = async () => {
-      for (const payment of pending) {
-        const verifyPayload = {
-          razorpay_order_id: payment.razorpay_order_id,
-          razorpay_payment_id: payment.razorpay_payment_id,
-          razorpay_signature: payment.razorpay_signature,
-        };
-
-        // Try verify first (idempotent)
-        let done = false;
-        try {
-          const res = await paymentService.verifyPayment(verifyPayload);
-          if (res.order && res.payment) {
-            finalizeOrder(res.order.order_number, payment.amount / 100);
-            removePendingPayment(payment.id);
-            done = true;
-          }
-        } catch (_) {}
-
-        // If verify failed, try status poll
-        if (!done) {
-          const recovered = await pollPaymentStatus(payment.razorpay_order_id, payment.amount);
-          if (recovered) removePendingPayment(payment.id);
-        }
-      }
+    const onCartPaymentRecovered = (event: Event) => {
+      const detail = (event as CustomEvent<{ orderNumber: string; amount: number }>).detail;
+      if (!detail?.orderNumber) return;
+      finalizeOrder(detail.orderNumber, detail.amount);
     };
 
-    recover();
-    // Only run on mount
+    window.addEventListener(CART_PAYMENT_RECOVERED_EVENT, onCartPaymentRecovered);
+    return () => {
+      window.removeEventListener(CART_PAYMENT_RECOVERED_EVENT, onCartPaymentRecovered);
+    };
+    // finalizeOrder identity is stable for the mounted basket session
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handlePaymentError = (error: Error) => {
+  const handlePaymentError = async (error: Error) => {
     const cancelledByUser = /cancel/i.test(error.message || '');
+    if (cancelledByUser && razorpayOrderId) {
+      const recovered = await recoverAfterModalDismiss();
+      if (recovered) return;
+    }
     if (!cancelledByUser) {
       const msg = error.message?.trim() || REQUIRED_TOAST.PAYMENT_NOT_COMPLETED;
       toast.error(
