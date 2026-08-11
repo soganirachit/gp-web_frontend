@@ -1,4 +1,5 @@
 import axios from "axios";
+import api from "./api";
 import { REQUIRED_TOAST } from "../constants/requiredToastMessages";
 import { errorMessageFromParsedBody, errorMessageFromCatch } from "../utils/apiErrorMessage";
 
@@ -96,6 +97,7 @@ const OTP_DELIVERY_POLL_MAX_ATTEMPTS = 5;
 export function clearAuthSession(): void {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
+  localStorage.removeItem("prevToken");
   localStorage.removeItem("phoneNumber");
   localStorage.removeItem("userName");
   localStorage.removeItem("userId");
@@ -236,21 +238,14 @@ export const authService = {
     email: string
   ) {
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
-      const token = localStorage.getItem("access_token");
-      const response = await axios.put(
-        `${baseUrl}/users/me/update/`,
+      // Use the intercepted api instance so 401s are retried with a refreshed token
+      const response = await api.put(
+        `/users/me/update/`,
         {
           first_name: firstName,
           last_name: lastName,
           gender: gender.toLowerCase(),
           email,
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
         }
       );
 

@@ -125,8 +125,17 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       // Don't clear temp cart here - it's handled in the login detection useEffect
       // Only clear if it's empty (already merged)
       const tempCart = localStorage.getItem(TEMP_CART_KEY);
-      if (!tempCart || JSON.parse(tempCart).length === 0) {
+      if (!tempCart) {
         localStorage.removeItem(TEMP_CART_KEY);
+      } else {
+        try {
+          if (JSON.parse(tempCart).length === 0) {
+            localStorage.removeItem(TEMP_CART_KEY);
+          }
+        } catch {
+          // Corrupted temp cart — clear it
+          localStorage.removeItem(TEMP_CART_KEY);
+        }
       }
     } else {
       // User not logged in - use temp cart and clear regular cart

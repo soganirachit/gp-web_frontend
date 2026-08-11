@@ -1,8 +1,7 @@
-// Suppress all console output in production
+// Suppress noisy console output in production (keep console.error for monitoring)
 if (import.meta.env.PROD) {
   console.log = () => {};
   console.warn = () => {};
-  console.error = () => {};
   console.debug = () => {};
   console.info = () => {};
 }
