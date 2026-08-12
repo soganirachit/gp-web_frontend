@@ -19,18 +19,14 @@ import {
 } from '../utils/landingHomeTypography';
 import ProfileIcon from '../assets/icon/Profile.png';
 import { SearchBar } from '../components/common/SearchBar';
+import { OPTIMIZED_ILLUSTRATIONS } from '../config/optimizedIllustrations';
 // Large assets served from public/ — no bundle impact, long-cache headers apply
 const storyImage = '/story.png';
-const dailyScooterSvg = '/daily_scooter.svg';
-const bannerSvg = '/banner.svg';
-const bottomBannerSvg = '/bottom_banner.svg';
 // SVG Imports
 import namasteSvg from '../assets/svg/namaste.svg';
 import dailyTabGlyph from '../assets/icon/navbar/daily.svg';
 import storeLogoSvg from '../assets/svg/store_logo.svg';
-import truckSvg from '../assets/svg/truck.svg';
 import sajawatLogoSvg from '../assets/svg/sajawat_logo.svg';
-import garlandSvg from '../assets/svg/garland.svg';
 import logoSvg from '../assets/svg/logo.svg';
 import profilehomeIcon from '../assets/svg/gp_daily svg/profilehome.svg';
 import profilelogoIcon from '../assets/svg/gp_daily svg/profilelogo.svg';
@@ -349,7 +345,7 @@ const HomePage: React.FC = () => {
               </span>
               <div className={`relative w-full shrink-0 overflow-hidden rounded-[10px] bg-[#FFF5E6]/40 sm:rounded-xl ${HOME_SERVICE_CARD_MEDIA_HEIGHT_CLASS}`}>
                 <img
-                  src={dailyScooterSvg}
+                  src={OPTIMIZED_ILLUSTRATIONS.dailyScooter}
                   alt=""
                   className={`${HOME_SERVICE_CARD_HERO_IMG_CLASS} -left-[6%] right-auto top-4.5 bottom-0 mt-[-22px] h-[72%] w-[124%] object-left sm:mt-[-24px] sm:h-[80%] sm:w-[112%] sm:-left-[4%] lg:mt-[-20px] lg:h-[60%] lg:w-[104%] lg:-left-[2%] xl:w-[100%] xl:left-0 2xl:h-[60%] 2xl:w-[98%]`}
                 />
@@ -394,7 +390,7 @@ const HomePage: React.FC = () => {
               </span>
               <div className={`relative w-full shrink-0 overflow-hidden rounded-[10px] bg-[#E8F5E9]/40 sm:rounded-xl ${HOME_SERVICE_CARD_MEDIA_HEIGHT_CLASS}`}>
                 <img
-                  src={truckSvg}
+                  src={OPTIMIZED_ILLUSTRATIONS.truck}
                   alt=""
                   className={`${HOME_SERVICE_CARD_HERO_IMG_CLASS} -left-[6%] right-auto top-4.5 inset-x-0 bottom-0 mx-auto mt-[-22px] h-[72%] w-[118%] object-bottom sm:mt-[-24px] sm:h-[114%] sm:w-[128%] lg:mt-[-20px] lg:h-[92%] lg:w-[102%] xl:w-[100%] 2xl:h-[110%] 2xl:w-[118%]`}
                 />
@@ -455,7 +451,7 @@ const HomePage: React.FC = () => {
               </div>
               <div className="pointer-events-none flex w-[42%] max-w-[9.5rem] shrink-0 items-end justify-end self-stretch sm:max-w-[11rem]">
                 <img
-                  src={garlandSvg}
+                  src={OPTIMIZED_ILLUSTRATIONS.garland}
                   alt=""
                   className="h-auto w-full max-h-[7.5rem] object-contain object-bottom sm:max-h-[8.5rem]"
                 />
@@ -628,7 +624,7 @@ const HomePage: React.FC = () => {
             ) : (
               <div className={GP_LANDING_FLOWER_WISDOM_MEDIA_CLASS}>
                 <img
-                  src={flowerWisdomImageUrl ?? bottomBannerSvg}
+                  src={flowerWisdomImageUrl ?? OPTIMIZED_ILLUSTRATIONS.bottomBanner}
                   alt="Flower Wisdom"
                   className={GP_LANDING_FLOWER_WISDOM_IMAGE_CLASS}
                 />

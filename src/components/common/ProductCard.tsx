@@ -33,7 +33,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
   price,
   originalPrice,
   showDailyButton = false,
-  showBestsellerTag = false,
   compact = false,
   labels,
   imagePriority = false,
@@ -85,8 +84,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
         {(labels && labels.length > 0) ? (
           <ProductImageTag labels={labels} variant={tagVariant} />
-        ) : showBestsellerTag ? (
-          <ProductImageTag labels={[{ name: 'Bestseller' }]} variant={tagVariant} />
         ) : null}
       </div>
 

@@ -93,7 +93,7 @@ import { pickPrimaryImageUrl } from '../../../utils/pickPrimaryImageUrl';
 import { computeFirstSubscriptionDeliveryDateFromWeekdayInts } from '../../../utils/subscriptionFirstDeliveryDate';
 import { SUBSCRIPTION_FIRST_DELIVERY_CUTOFF_MESSAGE } from '../../../utils/subscriptionCartDeliveryMessage';
 import emptyCartSvg from '../../../assets/svg/gp_store_svg/cart-empty.svg';
-import deliveryTruckIcon from "../../../assets/svg/gp_daily svg/delivery_truck.svg";
+import { OPTIMIZED_ILLUSTRATIONS } from "../../../config/optimizedIllustrations";
 import { rechargeWalletInApp } from '../../../utils/walletRechargeCheckout';
 import { setGpDailyPendingSubscriptionCheckout } from '../../../utils/gpDailyPendingSubscriptionCheckout';
 import {
@@ -2608,7 +2608,7 @@ const Cart: React.FC = () => {
               <div className="my-2">
                 <div className="flex flex-row items-center gap-3 rounded-[16px] border border-amber-200/80 bg-[#FFF4E5] px-4 py-4 shadow-sm">
                   <img
-                    src={deliveryTruckIcon}
+                    src={OPTIMIZED_ILLUSTRATIONS.deliveryTruck}
                     alt=""
                     className="h-14 w-14 shrink-0 object-contain"
                   />

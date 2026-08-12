@@ -13,7 +13,9 @@ import {
   GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS,
 } from "../../utils/gpDailyHomeDesignSystem";
 
-const dailyScooterHeroSvg = "/daily_scooter.svg";
+import { OPTIMIZED_ILLUSTRATIONS } from "../../config/optimizedIllustrations";
+
+const dailyScooterHeroImg = OPTIMIZED_ILLUSTRATIONS.dailyScooter;
 
 type Props = {
   userFirstName: string;
@@ -80,7 +82,7 @@ export const GpDailyOfflineHero: React.FC<Props> = ({
         </div>
         <div className={GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS}>
           <img
-            src={dailyScooterHeroSvg}
+            src={dailyScooterHeroImg}
             alt=""
             aria-hidden
             className={GP_DAILY_SCOOTER_HERO_IMG_CLASS}

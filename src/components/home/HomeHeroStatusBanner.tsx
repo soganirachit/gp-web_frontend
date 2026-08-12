@@ -1,6 +1,6 @@
 import React from "react";
 import { IoChevronForward, IoLocationOutline } from "react-icons/io5";
-import truckStoreIcon from "../../assets/svg/gp_store_svg/truckhome.svg";
+import { OPTIMIZED_ILLUSTRATIONS } from "../../config/optimizedIllustrations";
 import {
   AREA_COMING_SOON_HERO_SUBTITLE,
   AREA_COMING_SOON_HERO_TITLE,
@@ -40,7 +40,7 @@ export const HomeHeroStatusBanner: React.FC<Props> = ({
       >
         {isOffline ? (
           <img
-            src={truckStoreIcon}
+            src={OPTIMIZED_ILLUSTRATIONS.truckHome}
             alt=""
             className="h-6 w-10 object-contain object-center"
           />

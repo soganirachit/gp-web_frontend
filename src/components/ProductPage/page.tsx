@@ -464,9 +464,9 @@ const ProductBrowsePage: React.FC = () => {
                 <div className="absolute left-4 right-4 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
                   {[
                     { value: "Price", label: "Sort by Price" },
-                    { value: "Popularity", label: "Sort by Popularity" },
                     { value: "New", label: "Sort by New" },
-                    { value: "Special", label: "Sort by Special" },
+                    // { value: "Popularity", label: "Sort by Popularity" },
+                    // { value: "Special", label: "Sort by Special" },
                   ].map((option) => (
                     <button
                       key={option.value}

@@ -51,7 +51,7 @@ import {
   type HomeHeroStatus,
 } from "../utils/homeLocationHeroState";
 import { resolveGpStoreOfflineStoreCandidates } from "../utils/gpStoreOfflineStore";
-import truckStoreIcon from "../assets/svg/gp_store_svg/truckhome.svg";
+import { OPTIMIZED_ILLUSTRATIONS } from "../config/optimizedIllustrations";
 import storeGreenBanner from "../assets/svg/gp_store_svg/greenbanner.svg";
 import storeWhiteLogo from "../assets/svg/gp_store_svg/whitelogo.svg";
 import locationhomeIcon from "../assets/svg/gp_daily svg/locationhome.svg";
@@ -63,7 +63,6 @@ import {
   PROFILE_HEADER_FALLBACK_HOME_CLASS,
   PROFILE_HEADER_LOGO_CLASS,
 } from "../components/common/ProfileAvatarButton";
-import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
 import { formatProductTitleCase } from "../lib/formatProductTitleCase";
 import {
   fetchGuestDeviceLocationLabel,
@@ -556,7 +555,7 @@ const GpStore_Homepage: React.FC = () => {
                                         </div>
                                     </div>
                                     <img
-                                        src={truckStoreIcon}
+                                        src={OPTIMIZED_ILLUSTRATIONS.truckHome}
                                         alt=""
                                         aria-hidden
                                         className={`${GP_STORE_HERO_TRUCK_ABSOLUTE_CLASS} ${GP_STORE_HERO_TRUCK_IMG_CLASS}`}
@@ -814,7 +813,7 @@ const GpStore_Homepage: React.FC = () => {
 
                     {/* <GpDailyHomeSection title="Quote Of The Day">
                         <img
-                            src={bottomBannerSvg}
+                            src={OPTIMIZED_ILLUSTRATIONS.bottomBanner}
                             alt=""
                             className="h-auto w-full"
                             aria-hidden

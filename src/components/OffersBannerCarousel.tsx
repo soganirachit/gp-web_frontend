@@ -304,7 +304,8 @@ export function OffersBannerCarousel({
             src={banner.image_url!}
             alt={banner.title}
             priority
-            className="absolute inset-0 h-full w-full object-cover object-center bg-[#f8f6f1]"
+            fill
+            className="h-full w-full object-cover object-center bg-[#f8f6f1]"
             onError={() => setImgErrors(prev => ({ ...prev, [banner.id]: true }))}
           />
         ) : (

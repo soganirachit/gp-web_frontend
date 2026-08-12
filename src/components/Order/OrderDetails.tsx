@@ -21,7 +21,7 @@ import { useFeatureTheme } from '../../context/FeatureThemeContext';
 import supportIcon from '../../assets/svg/gp_store_svg/support.svg';
 import orderTickIcon from '../../assets/svg/gp_store_svg/ordertick.svg';
 import orderDeliveredIcon from '../../assets/svg/gp_store_svg/orderdelivered.svg';
-import truckStoreIcon from '../../assets/svg/gp_store_svg/truckhome.svg';
+import { OPTIMIZED_ILLUSTRATIONS } from '../../config/optimizedIllustrations';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
 import { invoiceService, type OrderInvoicePayload } from '../../services/invoice.service';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
@@ -538,7 +538,7 @@ const OrderDetails: React.FC = () => {
   if (outForDeliveryEvent) {
     timelinePoints.push({
       label: 'Out for Delivery',
-      icon: truckStoreIcon,
+      icon: OPTIMIZED_ILLUSTRATIONS.truckHome,
       date: formatDateTime(outForDeliveryEvent.created_at).date,
       time: formatDateTime(outForDeliveryEvent.created_at).time,
       status: 'out_for_delivery'

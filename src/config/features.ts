@@ -2,10 +2,9 @@ import loginLogoDaily from "../assets/All/login_logo.png";
 import otpLogoDaily from "../assets/All/otp_logo.png";
 import logoDaily from "../assets/All/logo.png";
 import vectorBg from "../assets/All/Vector (1).png";
-import smallGendaDaily from "../assets/svg/smallgenda.svg";
+import { OPTIMIZED_ILLUSTRATIONS } from "./optimizedIllustrations";
 import dailyLowBalance from "../assets/svg/gp_daily svg/lowbalance.svg";
 import dailyTopBanner from "../assets/svg/gp_daily svg/top _banner.svg";
-import dailyBottomBanner from "../assets/svg/gp_daily svg/bottom_banner.svg";
 import dailyLocationHome from "../assets/svg/gp_daily svg/locationhome.svg";
 import dailyProfileHome from "../assets/svg/gp_daily svg/profilehome.svg";
 import dailyProfileLogo from "../assets/svg/gp_daily svg/profilelogo.svg";
@@ -97,8 +96,8 @@ export const featureThemes: Record<Feature, FeatureTheme> = {
     assets: {
       loginHero: loginLogoDaily,
       otpHero: otpLogoDaily,
-      headerBadge: smallGendaDaily,
-      headerBottomBanner: dailyBottomBanner,
+      headerBadge: OPTIMIZED_ILLUSTRATIONS.smallGenda,
+      headerBottomBanner: OPTIMIZED_ILLUSTRATIONS.bottomBanner,
       headerLocationIcon: dailyLocationHome,
       headerProfileHomeIcon: dailyProfileHome,
       headerProfileLogoIcon: dailyProfileLogo,

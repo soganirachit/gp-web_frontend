@@ -12,7 +12,7 @@ import {
   GP_STORE_HERO_TRUCK_IMG_CLASS,
   GP_STORE_HERO_TRUCK_WRAPPER_CLASS,
 } from "../../utils/gpDailyHomeDesignSystem";
-import truckStoreIcon from "../../assets/svg/gp_store_svg/truckhome.svg";
+import { OPTIMIZED_ILLUSTRATIONS } from "../../config/optimizedIllustrations";
 
 type Props = {
   userFirstName: string;
@@ -55,7 +55,7 @@ export const GpStoreOfflineHero: React.FC<Props> = ({ userFirstName }) => {
         </div>
         <div className={GP_STORE_HERO_TRUCK_WRAPPER_CLASS}>
           <img
-            src={truckStoreIcon}
+            src={OPTIMIZED_ILLUSTRATIONS.truckHome}
             alt=""
             aria-hidden
             className={GP_STORE_HERO_TRUCK_IMG_CLASS}

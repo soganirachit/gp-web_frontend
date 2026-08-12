@@ -48,7 +48,7 @@ import {
   GP_DAILY_SCOOTER_HERO_MARKETING_GUEST_WRAPPER_CLASS,
 } from "../utils/gpDailyHomeDesignSystem";
 import { SearchBar } from "../components/common/SearchBar";
-import smallgendaIcon from "../assets/svg/smallgenda.svg";
+import { OPTIMIZED_ILLUSTRATIONS } from "../config/optimizedIllustrations";
 import scooterIcon from "../assets/svg/gp_daily svg/scooter.svg";
 import flowerIcon from "../assets/svg/gp_daily svg/flower.svg";
 import bannerPng from "../assets/svg/gp_daily svg/banner.png";
@@ -56,7 +56,6 @@ import dailyOfferImage from "../assets/svg/gp_daily svg/offer.png";
 import { OffersBannerCarousel } from "../components/OffersBannerCarousel";
 import { HorizontalScrollSection } from "../components/common/HorizontalScrollSection";
 import { BANNER_PLACEMENT_DAILY_HOME } from "../utils/bannerPlacement";
-import bottomBannerSvg from "../assets/svg/gp_daily svg/bottom_banner.svg";
 import locationhomeIcon from "../assets/svg/gp_daily svg/locationhome.svg";
 import profilehomeIcon from "../assets/svg/gp_daily svg/profilehome.svg";
 import profilelogoIcon from "../assets/svg/gp_daily svg/profilelogo.svg";
@@ -131,7 +130,7 @@ const NAMASTE_SCROLL_SETTLE_MS = 280;
 const NAMASTE_AUTOPLAY_SNOOZE_MS = 3500;
 /** Hard cap on `scrollend` wait so the in-flight flag never gets stuck. */
 const NAMASTE_AUTOPLAY_SCROLL_TIMEOUT_MS = 900;
-const dailyScooterHeroSvg = "/daily_scooter.svg";
+const dailyScooterHeroImg = OPTIMIZED_ILLUSTRATIONS.dailyScooter;
 const dailyScooterHeroImgClass = GP_DAILY_SCOOTER_HERO_IMG_CLASS;
 /** Logged-in home (Namaste + Manage) — scooter below Manage row; guests keep shared class. */
 const GP_DAILY_HOME_MARKETING_SCOOTER_LOGGED_IN_CLASS =
@@ -1478,7 +1477,7 @@ const Home2: React.FC = () => {
                     </div>
                     <div className={GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS}>
                       <img
-                        src={dailyScooterHeroSvg}
+                        src={dailyScooterHeroImg}
                         alt=""
                         aria-hidden
                         className={dailyScooterHeroImgClass}
@@ -1558,7 +1557,7 @@ const Home2: React.FC = () => {
                     </div>
                     <div className={GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS}>
                       <img
-                        src={dailyScooterHeroSvg}
+                        src={dailyScooterHeroImg}
                         alt=""
                         aria-hidden
                         className={dailyScooterHeroImgClass}
@@ -1586,7 +1585,7 @@ const Home2: React.FC = () => {
                       }
                     >
                       <img
-                        src={dailyScooterHeroSvg}
+                        src={dailyScooterHeroImg}
                         alt=""
                         aria-hidden
                         className={GP_DAILY_SCOOTER_HERO_IMG_CLASS}
@@ -1697,7 +1696,7 @@ const Home2: React.FC = () => {
                           description="Mixed flowers daily"
                           price={`₹${pack.sellingPrice}`}
                           showDailyButton
-                          showBestsellerTag={!pack.labels?.length}
+                          showBestsellerTag={Boolean(pack.isBestSeller)}
                           labels={pack.labels?.length ? pack.labels : undefined}
                           onClick={() => handleProductClick(pack)}
                         />
@@ -1741,7 +1740,7 @@ const Home2: React.FC = () => {
                         description="Mixed flowers daily"
                         price={`₹${pack.sellingPrice}`}
                         showDailyButton
-                        showBestsellerTag={!pack.labels?.length}
+                        showBestsellerTag={Boolean(pack.isBestSeller)}
                         labels={pack.labels?.length ? pack.labels : undefined}
                         onClick={() => handleProductClick(pack)}
                       />
@@ -1784,7 +1783,7 @@ const Home2: React.FC = () => {
                         description="Mixed flowers daily"
                         price={`₹${pack.sellingPrice}`}
                         showDailyButton
-                        showBestsellerTag={!pack.labels?.length}
+                        showBestsellerTag={Boolean(pack.isBestSeller)}
                         labels={pack.labels?.length ? pack.labels : undefined}
                         onClick={() => handleProductClick(pack)}
                       />
@@ -1809,7 +1808,7 @@ const Home2: React.FC = () => {
 
             {/* <GpDailyHomeSection title="Quote Of The Day">
               <img
-                src={bottomBannerSvg}
+                src={OPTIMIZED_ILLUSTRATIONS.bottomBanner}
                 alt=""
                 className="h-auto w-full"
                 aria-hidden

@@ -34,7 +34,7 @@ import { FaChevronRight } from "react-icons/fa";
 import { ProductImageTag } from "../common/ProductImageTag";
 import { HorizontalScrollSection } from "../common/HorizontalScrollSection";
 import cautionIcon from "../../assets/svg/gp_daily svg/caution.svg";
-import deliveryTruckIcon from "../../assets/svg/gp_daily svg/delivery_truck.svg";
+import { OPTIMIZED_ILLUSTRATIONS } from "../../config/optimizedIllustrations";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { storeService } from "../../services/store.service";
@@ -1762,7 +1762,7 @@ const ProductPage: React.FC = () => {
           {/* Delivery Information Banner — light peach card */}
           {/* <div className="mt-5 sm:mt-6">
             <div className="bg-[#FEF3E2] rounded-2xl p-4 sm:p-5 flex items-center gap-3 sm:gap-4 shadow-md border border-amber-100/60">
-              <img src={deliveryTruckIcon} alt="" className="w-16 h-16 sm:w-[72px] sm:h-[72px] flex-shrink-0 object-contain" />
+              <img src={OPTIMIZED_ILLUSTRATIONS.deliveryTruck} alt="" className="w-16 h-16 sm:w-[72px] sm:h-[72px] flex-shrink-0 object-contain" />
               <p className="text-sm sm:text-base font-semibold text-gray-900 leading-snug flex-1">
                 Orders placed before 8 PM will be delivered next day. Sunday deliveries available on request.
               </p>

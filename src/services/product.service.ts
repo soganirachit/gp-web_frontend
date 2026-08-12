@@ -191,6 +191,8 @@ export interface Product {
     color_code?: string;
     icon?: string;
   }>;
+  /** Mirrors API `is_best_seller` for UI badge decisions. */
+  isBestSeller?: boolean;
 }
 
 function legacyCategoryCodeFromCategoryName(name: string): string {
@@ -248,6 +250,7 @@ export function mapGpDailyCatalogRowToProduct(
     categoryName: categoryName || undefined,
     availability_type: avail || undefined,
     labels,
+    isBestSeller: row.is_best_seller === true,
     isActive: row.is_active !== false,
     share_url:
       row.share_url != null && String(row.share_url).trim()
