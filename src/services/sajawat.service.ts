@@ -1,4 +1,5 @@
 import api from "./api";
+import { resolveMediaUrl } from "../utils/resolveMediaUrl";
 
 export type SajawatMediaType = "photo" | "video";
 
@@ -35,9 +36,11 @@ function parseMedia(
   categoryId: number,
   categoryName: string,
 ): SajawatGalleryMedia | null {
-  const url = String(raw.url ?? "").trim();
-  if (!url) return null;
-  const thumb = String(raw.thumbnail_url ?? raw.url ?? "").trim() || url;
+  const rawUrl = String(raw.url ?? "").trim();
+  if (!rawUrl) return null;
+  const url = resolveMediaUrl(rawUrl);
+  const thumbRaw = String(raw.thumbnail_url ?? raw.url ?? "").trim() || rawUrl;
+  const thumb = resolveMediaUrl(thumbRaw);
   return {
     id: Number(raw.id) || 0,
     media_type: normalizeMediaType(raw.media_type),

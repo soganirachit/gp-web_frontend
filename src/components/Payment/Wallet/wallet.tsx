@@ -688,7 +688,7 @@ const Wallet = () => {
           )}
 
         {!isLoadingBalance && feature === "gpStore" && balance < 500 && (
-          <div className="w-full shrink-0 flex flex-row items-start gap-2 rounded-[40px] bg-[#ff4d4f] px-3 py-2.5 text-white">
+          <div className="w-full shrink-0 flex flex-row items-start gap-2 rounded-[25px] bg-[#ff4d4f] px-3 py-2.5 text-white">
             <IoAlertCircle className="h-[18px] w-[18px] shrink-0 text-white" style={{ marginTop: 1 }} aria-hidden />
             <div className="min-w-0 flex-1">
               <h3 className="font-serif text-[13px] font-bold leading-[18px] text-white">Low Balance</h3>

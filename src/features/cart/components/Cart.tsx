@@ -488,7 +488,8 @@ const Cart: React.FC = () => {
   const { isLoggedIn, phoneNumber: authPhoneNumber } = useAuth();
   const { feature, theme } = useFeatureTheme();
   const browseProductsPath = feature === 'gpStore' ? '/gp-store/products' : '/gp-daily/Products';
-  const { storePendingPayment, removePendingPayment, retryWithBackoff } = useNetworkRecovery();
+  const { storePendingPayment, removePendingPayment, retryWithBackoff, recoverPendingPayments } =
+    useNetworkRecovery();
   const {
     items,
     deliveryInfo,
@@ -1882,13 +1883,15 @@ const Cart: React.FC = () => {
     setIsConfirmingOrder(true);
     setShouldTriggerPayment(false);
     const checkingToastId = toast.loading('Checking if your payment completed…');
-    const recovered = await pollPaymentStatus(razorpayOrderId, razorpayAmount, 30);
+    const recovered = await pollPaymentStatus(razorpayOrderId, razorpayAmount, 8);
     toast.dismiss(checkingToastId);
     setIsConfirmingOrder(false);
     if (recovered) {
       checkoutInFlightRef.current = false;
       return true;
     }
+    // Keep trying in the background without blocking checkout UI.
+    void recoverPendingPayments();
     return false;
   };
 
@@ -1937,6 +1940,10 @@ const Cart: React.FC = () => {
         // Payment was taken by Razorpay but we couldn't confirm the order.
         // Keep the pending payment in localStorage so it can be retried on next app load.
         toast.error(REQUIRED_TOAST.PAYMENT_NOT_CONFIRMED);
+        setCheckoutInlineError(REQUIRED_TOAST.PAYMENT_NOT_CONFIRMED);
+        checkoutInFlightRef.current = false;
+        // Trigger immediate global retry; do not wait for focus/page reload.
+        void recoverPendingPayments();
       }
     }
 
@@ -1969,6 +1976,7 @@ const Cart: React.FC = () => {
     if (cancelledByUser && razorpayOrderId) {
       const recovered = await recoverAfterModalDismiss();
       if (recovered) return;
+      setCheckoutInlineError(REQUIRED_TOAST.PAYMENT_NOT_COMPLETED);
     }
     if (!cancelledByUser) {
       const msg = error.message?.trim() || REQUIRED_TOAST.PAYMENT_NOT_COMPLETED;

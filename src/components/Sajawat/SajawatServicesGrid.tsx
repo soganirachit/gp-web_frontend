@@ -37,6 +37,10 @@ export const SajawatServicesGrid: React.FC = () => {
         description:
           category.description ||
           `Browse ${category.media.length} photo/video item${category.media.length === 1 ? "" : "s"} in this category.`,
+        imageSrc:
+          category.media.find((m) => (m.thumbnail_url || m.url).trim())?.thumbnail_url ||
+          category.media.find((m) => (m.thumbnail_url || m.url).trim())?.url ||
+          "",
         categoryId: category.id,
       }));
     }
@@ -44,6 +48,7 @@ export const SajawatServicesGrid: React.FC = () => {
       id: service.id,
       title: service.title,
       description: service.description,
+      imageSrc: "",
       categoryId: null as number | null,
     }));
   }, [galleryCategories]);
@@ -67,7 +72,16 @@ export const SajawatServicesGrid: React.FC = () => {
             }
             className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
           >
-            <ImagePlaceholder label={`${card.title} floral decor`} />
+            {card.imageSrc ? (
+              <img
+                src={card.imageSrc}
+                alt={`${card.title} floral decor`}
+                className="aspect-square w-full rounded-t-2xl object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <ImagePlaceholder label={`${card.title} floral decor`} />
+            )}
             <div className="p-3 sm:p-4">
               <h3 className="font-serif text-sm font-bold text-[#1F2937] sm:text-base">
                 {card.title}

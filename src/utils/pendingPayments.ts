@@ -4,6 +4,7 @@
  */
 import { paymentService } from '../services/payment.service';
 import { walletService } from '../services/wallet.service';
+import { getPaymentsRazorpayUrl, getWalletUrl } from '../config/api.config';
 
 export interface PendingPayment {
   id: string;
@@ -110,6 +111,8 @@ export function storePendingPayment(
   };
   const existing = getPendingPayments();
   writePendingPayments([...existing, pendingPayment]);
+  // Try to kick verification immediately so users don't need to wait on the same screen.
+  void fireAndForgetKeepaliveRecovery([pendingPayment]);
   return pendingPayment.id;
 }
 
@@ -206,6 +209,57 @@ function dispatchWalletRecovered(count: number): void {
       detail: { recoveredCount: count },
     }),
   );
+}
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('access_token');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+async function keepaliveJsonPost(url: string, body: Record<string, unknown>): Promise<void> {
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(body),
+      keepalive: true,
+      credentials: 'include',
+    });
+  } catch {
+    // Best effort only.
+  }
+}
+
+async function fireAndForgetKeepaliveRecovery(payments: PendingPayment[]): Promise<void> {
+  if (!navigator.onLine || payments.length === 0) return;
+  const razorpayBase = getPaymentsRazorpayUrl();
+  const walletBase = getWalletUrl();
+  await Promise.all(
+    payments.flatMap((payment) => {
+      const verifyPayload = {
+        razorpay_order_id: payment.razorpay_order_id,
+        razorpay_payment_id: payment.razorpay_payment_id,
+        razorpay_signature: payment.razorpay_signature,
+      };
+      return [
+        // Cart/order verification path
+        keepaliveJsonPost(`${razorpayBase}/verify/`, verifyPayload),
+        // Wallet recharge verification path
+        keepaliveJsonPost(`${walletBase}/add-money/`, verifyPayload),
+      ];
+    }),
+  );
+}
+
+/** Flush pending payments immediately before app/tab is backgrounded or closed. */
+export function flushPendingPaymentsKeepalive(): void {
+  const pending = getPendingPayments();
+  if (pending.length === 0) return;
+  void fireAndForgetKeepaliveRecovery(pending);
 }
 
 /**

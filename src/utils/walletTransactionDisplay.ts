@@ -59,6 +59,17 @@ function fallbackTxnTypeLabel(transactionType?: string | null): string {
   return "Transaction";
 }
 
+function isWalletRechargeDescription(description: string): boolean {
+  const d = description.toLowerCase();
+  return (
+    (d.includes("wallet") && d.includes("recharge")) ||
+    d.includes("wallet top-up") ||
+    d.includes("wallet topup") ||
+    (d.includes("added") && d.includes("wallet")) ||
+    (d.includes("razorpay") && d.includes("wallet"))
+  );
+}
+
 /**
  * Title for a wallet history row — never shows admin names or raw order IDs when
  * a product label is available.
@@ -92,6 +103,9 @@ export function resolveWalletTransactionTitle(opts: {
   }
 
   const desc = stripAdminTagFromWalletDescription(opts.description);
+  if (desc && isWalletRechargeDescription(desc)) {
+    return "Wallet Recharge";
+  }
   if (desc) return desc;
   return fallbackTxnTypeLabel(opts.transactionType);
 }

@@ -653,7 +653,8 @@ const Cart: React.FC = () => {
   // CartDaily should always follow gp-daily theming + routing.
   const basePath = '/gp-daily';
   const browseProductsPath = '/gp-daily/Products';
-  const { storePendingPayment, removePendingPayment, retryWithBackoff } = useNetworkRecovery();
+  const { storePendingPayment, removePendingPayment, retryWithBackoff, recoverPendingPayments } =
+    useNetworkRecovery();
   const {
     // Keep context around for shared helpers (e.g. clear after checkout),
     // but Daily cart data is fetched from subscription cart APIs.
@@ -2178,6 +2179,7 @@ const Cart: React.FC = () => {
 
   // Shared logic: given verified order/payment data, clear cart and navigate to success
   const finalizeOrder = (orderNumber: string, amount: number) => {
+    checkoutInFlightRef.current = false;
     // Pixel: Purchase — fired once per successful order
     trackPurchase(
       orderNumber,
@@ -2210,10 +2212,12 @@ const Cart: React.FC = () => {
     setIsConfirmingOrder(true);
     setShouldTriggerPayment(false);
     const checkingToastId = toast.loading('Checking if your payment completed…');
-    const recovered = await pollPaymentStatus(razorpayOrderId, razorpayAmount, 30);
+    const recovered = await pollPaymentStatus(razorpayOrderId, razorpayAmount, 8);
     toast.dismiss(checkingToastId);
     setIsConfirmingOrder(false);
     if (recovered) return true;
+    // Keep trying in the background without blocking checkout UI.
+    void recoverPendingPayments();
     return false;
   };
 
@@ -2262,6 +2266,10 @@ const Cart: React.FC = () => {
         // Payment was taken by Razorpay but we couldn't confirm the order.
         // Keep the pending payment in localStorage so it can be retried on next app load.
         toast.error(REQUIRED_TOAST.PAYMENT_NOT_CONFIRMED);
+        setCheckoutInlineError(REQUIRED_TOAST.PAYMENT_NOT_CONFIRMED);
+        checkoutInFlightRef.current = false;
+        // Trigger immediate global retry; do not wait for focus/page reload.
+        void recoverPendingPayments();
       }
     }
 
@@ -2293,6 +2301,7 @@ const Cart: React.FC = () => {
     if (cancelledByUser && razorpayOrderId) {
       const recovered = await recoverAfterModalDismiss();
       if (recovered) return;
+      setCheckoutInlineError(REQUIRED_TOAST.PAYMENT_NOT_COMPLETED);
     }
     if (!cancelledByUser) {
       const msg = error.message?.trim() || REQUIRED_TOAST.PAYMENT_NOT_COMPLETED;
@@ -2301,6 +2310,7 @@ const Cart: React.FC = () => {
     setIsProcessingPayment(false);
     setIsConfirmingOrder(false);
     setShouldTriggerPayment(false);
+    checkoutInFlightRef.current = false;
   };
 
   /** First delivery on or after tomorrow that matches selected `delivery_days`. */
