@@ -110,6 +110,7 @@ const SajawatSignatureGallery: React.FC = () => {
             <SajawatGalleryGrid
               categories={categories}
               selectedCategoryId={selectedCategoryId}
+              onSelectCategory={handleSelectCategory}
               onOpenMedia={setViewerItem}
             />
           </div>

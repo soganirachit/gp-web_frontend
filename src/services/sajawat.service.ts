@@ -18,6 +18,7 @@ export type SajawatGalleryCategory = {
   id: number;
   name: string;
   description: string;
+  image_url?: string | null;
   sort_order: number;
   media: SajawatGalleryMedia[];
 };
@@ -76,6 +77,7 @@ function parseGalleryPayload(payload: unknown): SajawatGalleryData {
         id,
         name,
         description: String(c.description ?? "").trim(),
+        image_url: resolveMediaUrl(String(c.image_url ?? "").trim()) || null,
         sort_order: Number(c.sort_order) || 0,
         media,
       };
@@ -84,6 +86,19 @@ function parseGalleryPayload(payload: unknown): SajawatGalleryData {
     .sort((a, b) => a.sort_order - b.sort_order);
 
   return { categories };
+}
+
+export function getCategoryDisplayImage(
+  category: SajawatGalleryCategory,
+): string {
+  const categoryImage = (category.image_url || "").trim();
+  if (categoryImage) return categoryImage;
+  const firstMedia = category.media.find((m) =>
+    (m.thumbnail_url || m.url).trim(),
+  );
+  return (
+    (firstMedia?.thumbnail_url || firstMedia?.url || "").trim()
+  );
 }
 
 let galleryInFlight: Promise<SajawatGalleryData> | null = null;
