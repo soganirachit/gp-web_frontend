@@ -30,6 +30,7 @@ import {
   GUEST_ORDERING_FOR_SOMEONE_SUBTITLE,
   GUEST_ORDERING_FOR_SOMEONE_TITLE,
 } from "../../config/guestBrowseAddressCopy";
+import { GUEST_SELECTED_LOCATION_TITLE } from "../../utils/guestHeaderLocation";
 import { AddressSelectionSkeleton } from "../common/PageSkeletons";
 import { formatPhoneForDisplay } from "../../utils/phoneDisplay";
 import {
@@ -400,9 +401,9 @@ const AddressSelection: React.FC = () => {
         const catalog = feature === "gpStore" ? "store" : "daily";
         const result = await storeService.applyGuestBrowseAddress(
           {
-            formattedLine: line || "Delivery address",
+            formattedLine: line || GUEST_SELECTED_LOCATION_TITLE,
             coordinates,
-            label: "Delivery address",
+            label: GUEST_SELECTED_LOCATION_TITLE,
           },
           catalog,
         );
@@ -735,7 +736,7 @@ const AddressSelection: React.FC = () => {
                 const msg =
                   typeof normalized.message === "string" && normalized.message.trim()
                     ? normalized.message.trim()
-                    : `Your delivery address maps to ${(normalized as { new_store?: { name?: string } }).new_store?.name ?? "a different store"}. Continuing will clear items in your daily basket that may not be available there.`;
+                    : `Your delivery address maps to ${(normalized as { new_store?: { name?: string } }).new_store?.name ?? "a different store"}. Continuing will remove items in your daily basket that are not available there and keep the rest.`;
                 setDailyCartFromAddressModal({ address, message: msg });
                 return;
               }

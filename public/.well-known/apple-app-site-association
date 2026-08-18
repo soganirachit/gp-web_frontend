@@ -1,0 +1,22 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": [
+          "REPLACE_TEAM_ID.com.customer.gendaphoolmobile"
+        ],
+        "components": [
+          {
+            "/": "/products/*",
+            "comment": "Product detail deep link"
+          },
+          {
+            "/": "/product/*",
+            "comment": "Legacy product deep link"
+          }
+        ]
+      }
+    ]
+  }
+}

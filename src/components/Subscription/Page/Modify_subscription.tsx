@@ -451,7 +451,7 @@ const ModifySubscription: React.FC = () => {
           >
             <IoArrowBack className="text-xl md:text-2xl" />
           </button>
-          <h1 className="font-ibm-plex-serif min-w-0 truncate text-xl font-bold text-gray-900 md:text-2xl">
+          <h1 className="font-serif min-w-0 truncate text-xl font-bold text-gray-900 md:text-2xl">
             Modify Subscription
           </h1>
         </header>
@@ -550,7 +550,7 @@ const ModifySubscription: React.FC = () => {
 
         {/* Delivery schedule — heading first, then subscribed-days card, then options */}
         <section>
-          <h3 className="font-ibm-plex-serif text-lg font-bold text-gray-900">
+          <h3 className="font-serif text-lg font-bold text-gray-900">
             Delivery Schedule
           </h3>
           <p className="mt-2.5 text-xs font-normal leading-relaxed text-gray-500">

@@ -29,7 +29,7 @@ import {
 } from "../utils/gpDailyWalletPauseSchedule";
 import { subscriptionsDueForAutoResume } from "../utils/subscriptionAutoResume";
 import { storeService, GUEST_STORE_UPDATED_EVENT, GPS_CATALOG_LOCATION_UPDATED_EVENT } from "../services/store.service";
-import { resolveGpDailyCatalogStoreId } from "../utils/gpDailyCatalogStore";
+import { resolveGpDailyCatalogStoreId, resolveGpDailyOfflineStoreCandidates } from "../utils/gpDailyCatalogStore";
 import { formatNamasteGreeting, hasRealUserFirstName } from "../utils/namasteGreeting";
 import type { Product as ProductType } from "../services/product.service";
 import { addressService } from "../services/address.service";
@@ -89,6 +89,7 @@ import {
   fetchGuestDeviceLocationLabel,
   GUEST_HEADER_LOCATION_TITLE,
   GUEST_LOCATION_UNAVAILABLE_HINT,
+  resolveGuestHeaderPrimaryLabel,
 } from "../utils/guestHeaderLocation";
 import {
   formatSavedAddressLine,
@@ -265,15 +266,20 @@ const Home2: React.FC = () => {
   }, [isLoggedIn, deliveryLocation, refreshDailyBannerStoreId]);
 
   const refreshHomeHeroStatus = useCallback(async () => {
+    storeService.clearOfflineStoreListCache();
     const storeId =
       storeService.getStoreIdForProducts() ??
       (await resolveGpDailyCatalogStoreId()) ??
       null;
+    const { primaryStoreId, storeIds } =
+      await resolveGpDailyOfflineStoreCandidates(storeId);
+    const sid = storeId ?? primaryStoreId;
     const guestTempId = storeService.getTemporaryStoreId();
     const inServiceArea =
       deliveryZoneStatus?.isValid === true ||
       guestTempId != null ||
-      storeId != null;
+      sid != null ||
+      storeIds.length > 0;
     let deviceLat: number | null = null;
     let deviceLng: number | null = null;
     try {
@@ -288,8 +294,26 @@ const Home2: React.FC = () => {
     } catch {
       /* ignore */
     }
+
+    const catalogStoreIds = [
+      ...new Set(
+        [sid, ...storeIds].filter(
+          (id): id is number =>
+            id != null && Number.isFinite(Number(id)) && Number(id) > 0,
+        ),
+      ),
+    ].map(Number);
+
+    for (const catalogId of catalogStoreIds) {
+      if (await storeService.isCatalogStoreOffline(catalogId, { bypassCache: true })) {
+        setHomeHeroStatus("store_offline");
+        return;
+      }
+    }
+
     const status = await resolveHomeHeroStatus({
-      storeId,
+      storeId: sid ?? null,
+      storeIds,
       inServiceArea,
       deviceLat,
       deviceLng,
@@ -603,7 +627,7 @@ const Home2: React.FC = () => {
       if (!localStorage.getItem("phoneNumber")) {
         const guestAddr = storeService.getGuestBrowseAddress();
         if (guestAddr) {
-          setAddressType(guestAddr.label || GUEST_HEADER_LOCATION_TITLE);
+          setAddressType(resolveGuestHeaderPrimaryLabel(guestAddr.label));
           setDeliveryLocation(guestAddr.formattedLine);
           return;
         }

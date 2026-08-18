@@ -20,3 +20,31 @@ export async function resolveGpDailyCatalogStoreId(): Promise<number | undefined
   const temp = storeService.getTemporaryStoreId();
   return temp ?? undefined;
 }
+
+/**
+ * Store ids that can affect the GP Daily offline hero — catalog / zone / temp store
+ * without switching the user to a different store.
+ */
+export async function resolveGpDailyOfflineStoreCandidates(
+  zoneStoreId?: number | null,
+  extraStoreIds: number[] = [],
+): Promise<{ primaryStoreId: number | null; storeIds: number[] }> {
+  const fromProducts = storeService.getStoreIdForProducts();
+  const fromCatalog = await resolveGpDailyCatalogStoreId().catch(() => undefined);
+  const tempStoreId = storeService.getTemporaryStoreId();
+  const storeIds = [
+    fromProducts,
+    fromCatalog,
+    zoneStoreId,
+    tempStoreId,
+    ...extraStoreIds,
+  ].filter(
+    (id): id is number =>
+      id != null && Number.isFinite(Number(id)) && Number(id) > 0,
+  );
+  const uniqueIds = [...new Set(storeIds.map(Number))];
+  return {
+    primaryStoreId: fromProducts ?? fromCatalog ?? zoneStoreId ?? null,
+    storeIds: uniqueIds,
+  };
+}

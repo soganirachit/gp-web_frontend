@@ -6,6 +6,7 @@ import {
 } from "../services/store.service";
 import { reverseGeocodeCityOnlyForGuest } from "./guestHeaderLocation";
 import type { HomeHeroStatusVariant } from "../config/homeHeroStatusCopy";
+import { shouldShowStoreOfflineHero } from "./storeOperatingHours";
 
 export type HomeHeroStatus = HomeHeroStatusVariant | "default";
 
@@ -181,8 +182,16 @@ async function isAnyCandidateStoreOffline(
   }
 
   for (const sid of storeIds) {
-    const store = await fetchStoreForHeroCheck(sid, deviceLat, deviceLng);
-    if (store && isStoreOffline(store)) return true;
+    let store: Store | null = null;
+    try {
+      store = await storeService.getStoreRowIncludingOffline(sid);
+    } catch {
+      /* fall through */
+    }
+    if (!store) {
+      store = await fetchStoreForHeroCheck(sid, deviceLat, deviceLng);
+    }
+    if (store && shouldShowStoreOfflineHero(store)) return true;
   }
   return false;
 }
@@ -203,6 +212,24 @@ async function isNearestStoreOffline(
     deviceLng!,
   );
   return !!(nearest && isStoreOffline(nearest));
+}
+
+async function isNearestStoreOfflineForHero(
+  deviceLat: number | null,
+  deviceLng: number | null,
+): Promise<boolean> {
+  const hasCoords =
+    deviceLat != null &&
+    deviceLng != null &&
+    !Number.isNaN(deviceLat) &&
+    !Number.isNaN(deviceLng);
+  if (!hasCoords) return false;
+
+  const nearest = await storeService.fetchNearestStoreUnfiltered(
+    deviceLat!,
+    deviceLng!,
+  );
+  return !!(nearest && shouldShowStoreOfflineHero(nearest));
 }
 
 /** True when catalog / nearest store is offline — block subscribe & checkout. */
@@ -268,11 +295,7 @@ export async function resolveHomeHeroStatus(opts: {
   }
 
   if (hasCoords) {
-    const nearest = await storeService.fetchNearestStoreUnfiltered(
-      deviceLat!,
-      deviceLng!,
-    );
-    if (nearest && isStoreOffline(nearest)) {
+    if (await isNearestStoreOfflineForHero(deviceLat, deviceLng)) {
       return "store_offline";
     }
   }

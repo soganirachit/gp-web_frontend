@@ -21,6 +21,7 @@ import {
 } from '../../utils/supportNavigation';
 import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
 import { useSupportChatWebSocket } from '../../hooks/useSupportChatWebSocket';
+import { UNIFORM_PAGE_HEADER_TITLE_CLASS } from '../../components/layout/UniformPageHeader';
 
 const MESSAGE_IMAGE_ROW = 200;
 const MESSAGE_IMAGE_GAP = 2;
@@ -548,7 +549,7 @@ const SupportTicketChat: React.FC = () => {
                 <IoArrowBack size={24} />
               </button>
               <div className="flex-1 min-w-0">
-                <h1 className="font-ibm-plex-serif mb-1 text-[22px] font-semibold leading-7 tracking-normal text-[#111827]">
+                <h1 className={`mb-1 ${UNIFORM_PAGE_HEADER_TITLE_CLASS}`}>
                   Support
                 </h1>
                 {ticket?.subject?.trim() ? (

@@ -732,7 +732,7 @@ const Cart: React.FC = () => {
           const msg =
             typeof normalized.message === 'string' && normalized.message.trim()
               ? normalized.message.trim()
-              : `Your delivery address maps to ${(normalized as { new_store?: { name?: string } }).new_store?.name ?? 'a different store'}. Continuing will clear items in your daily basket that are not available there.`;
+              : `Your delivery address maps to ${(normalized as { new_store?: { name?: string } }).new_store?.name ?? 'a different store'}. Continuing will remove items in your daily basket that are not available there and keep the rest.`;
           return await new Promise<boolean>((resolve) => {
             pendingSubscriptionAddressResolveRef.current = resolve;
             setSubscriptionStoreChangePrompt({ addressId, message: msg });
@@ -2552,7 +2552,7 @@ const Cart: React.FC = () => {
 
               {/* Select Delivery Days — matches app `CartScreen` (dailyDeliveryCard + chips + warning) */}
               <div className="relative mb-3.5 rounded-md bg-white p-3 shadow-sm" style={{ marginLeft: 2, marginRight: 2 }}>
-                <h2 className="mb-2.5 font-ibm-plex-serif text-xl font-semibold text-[#222222]">Select Delivery Days</h2>
+                <h2 className="mb-2.5 font-serif text-xl font-semibold text-[#222222]">Select Delivery Days</h2>
 
                 <div className="mb-2.5 flex flex-row flex-wrap gap-2">
                   {(['Daily', 'Mon-Sat', 'Customize'] as const).map((opt) => {
@@ -2780,7 +2780,7 @@ const Cart: React.FC = () => {
 
               {/* Order Summary */}
               <div className="bg-white rounded-[25px] p-4 shadow-sm">
-                <h3 className="font-ibm-plex-serif text-base font-semibold text-gray-900 mb-4">Order Summary</h3>
+                <h3 className="font-serif text-base font-semibold text-gray-900 mb-4">Order Summary</h3>
                 <div className="space-y-2 mb-4">
                   <div className="flex justify-between text-sm text-gray-700">
                     <span>Subtotal</span>
@@ -2825,8 +2825,8 @@ const Cart: React.FC = () => {
                   )}
                 </div>
                 <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-                  <span className="font-ibm-plex-serif text-lg font-bold text-gray-900">Total</span>
-                  <span className="font-ibm-plex-serif text-lg font-semibold text-gray-900">
+                  <span className="font-serif text-lg font-bold text-gray-900">Total</span>
+                  <span className="font-serif text-lg font-semibold text-gray-900">
                     ₹{total.toLocaleString('en-IN')}/Delivery
                   </span>
                 </div>

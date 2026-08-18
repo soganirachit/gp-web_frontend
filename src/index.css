@@ -62,18 +62,6 @@
   .overflow-y-auto, .overflow-y-scroll {
     -webkit-overflow-scrolling: touch;
   }
-
-  /* IBM Plex Serif font family */
-  .font-ibm-plex-serif {
-    font-family: 'IBM Plex Serif', serif;
-  }
-
-  /* GP Daily: section headings use serif (IBM Plex Serif via Tailwind `font-serif`) */
-  .gp-daily-headings h1,
-  .gp-daily-headings h2,
-  .gp-daily-headings h3 {
-    @apply font-serif;
-  }
 }
 
 @layer utilities {

@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { productService } from "../services/product.service";
 import { GpDailyHomeSkeleton } from "../components/common/PageSkeletons";
+import { tryOpenAndroidAppForProductPath } from "../utils/tryOpenAndroidAppLink";
 
 /**
  * Universal product URL: https://customerapp.mygendaphool.com/products/:slug
@@ -11,6 +12,13 @@ const ProductDeepLinkPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [targetPath, setTargetPath] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const triedAndroidAppOpen = useRef(false);
+
+  useEffect(() => {
+    if (!slug?.trim() || triedAndroidAppOpen.current) return;
+    triedAndroidAppOpen.current = true;
+    tryOpenAndroidAppForProductPath(slug);
+  }, [slug]);
 
   useEffect(() => {
     if (!slug?.trim()) {

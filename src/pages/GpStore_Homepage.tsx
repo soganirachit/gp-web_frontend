@@ -68,6 +68,7 @@ import {
   fetchGuestDeviceLocationLabel,
   GUEST_HEADER_LOCATION_TITLE,
   GUEST_LOCATION_UNAVAILABLE_HINT,
+  resolveGuestHeaderPrimaryLabel,
 } from "../utils/guestHeaderLocation";
 import {
   formatHomeHeaderAddressDisplay,
@@ -115,6 +116,7 @@ const GpStore_Homepage: React.FC = () => {
     const [deliveryCoordsTick, setDeliveryCoordsTick] = useState(0);
 
     const refreshHomeHeroStatus = useCallback(async () => {
+        storeService.clearOfflineStoreListCache();
         const { primaryStoreId, storeIds } =
             await resolveGpStoreOfflineStoreCandidates();
         const sid = primaryStoreId ?? storeId;
@@ -140,6 +142,23 @@ const GpStore_Homepage: React.FC = () => {
                 /* ignore */
             }
         }
+
+        const catalogStoreIds = [
+            ...new Set(
+                [sid, ...storeIds].filter(
+                    (id): id is number =>
+                        id != null && Number.isFinite(Number(id)) && Number(id) > 0,
+                ),
+            ),
+        ].map(Number);
+
+        for (const catalogId of catalogStoreIds) {
+            if (await storeService.isCatalogStoreOffline(catalogId, { bypassCache: true })) {
+                setHomeHeroStatus("store_offline");
+                return;
+            }
+        }
+
         const status = await resolveHomeHeroStatus({
             storeId: sid ?? null,
             storeIds,
@@ -286,7 +305,7 @@ const GpStore_Homepage: React.FC = () => {
             if (!isLoggedIn) {
                 const guestAddr = storeService.getGuestBrowseAddress();
                 if (guestAddr) {
-                    setAddressType(guestAddr.label || GUEST_HEADER_LOCATION_TITLE);
+                    setAddressType(resolveGuestHeaderPrimaryLabel(guestAddr.label));
                     setDeliveryLocation(guestAddr.formattedLine);
                     setIsLoadingAddress(false);
                     return;

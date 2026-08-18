@@ -49,6 +49,7 @@ import {
   formatFreeDeliveryThresholdForDisplay,
 } from "../../services/store.service";
 import { useOrderingStoreOffline } from "../../hooks/useOrderingStoreOffline";
+import { useCartStoreReplaceGate } from "../../hooks/useCartStoreReplaceGate";
 import {
   STORE_OFFLINE_CART_BODY,
   STORE_OFFLINE_ORDER_BUTTON_LABEL,
@@ -130,8 +131,12 @@ const StorePage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { items, addToCart, updateQuantity, removeFromCart, updateCustomizedMessage } =
+  const { items, addToCart, updateQuantity, removeFromCart, updateCustomizedMessage, loadCartFromAPI } =
     useCart();
+  const { runWithStoreCheck, modal: cartReplaceModal } = useCartStoreReplaceGate(
+    "gpStore",
+    { onAfterReplace: loadCartFromAPI },
+  );
   const { isLoggedIn } = useAuth();
   const { theme, basePath } = useFeatureTheme();
   const [guestStoreEpoch, setGuestStoreEpoch] = useState(0);
@@ -415,28 +420,30 @@ const StorePage: React.FC = () => {
     const productImage = getProductImage();
 
     try {
-      await addToCart({
-        productId: product.id,
-        productSlug: product.slug,
-        name: product.name,
-        image: productImage,
-        price: price,
-        quantity: 1,
-        variant: selectedVariant
-          ? {
-              id: selectedVariant.id,
-              name: selectedVariant.name,
-              final_price: selectedVariant.final_price,
-            }
-          : null,
-        categorySlug: product.category_slug,
-        customizedMessage: product.category_slug?.toLowerCase().includes("bouquet")
-          ? customMessage || undefined
-          : undefined,
-      });
+      await runWithStoreCheck(async () => {
+        await addToCart({
+          productId: product.id,
+          productSlug: product.slug,
+          name: product.name,
+          image: productImage,
+          price: price,
+          quantity: 1,
+          variant: selectedVariant
+            ? {
+                id: selectedVariant.id,
+                name: selectedVariant.name,
+                final_price: selectedVariant.final_price,
+              }
+            : null,
+          categorySlug: product.category_slug,
+          customizedMessage: product.category_slug?.toLowerCase().includes("bouquet")
+            ? customMessage || undefined
+            : undefined,
+        });
 
-      toast.success("Added to basket", { id: "Added to basket", duration: 3000 });
-      trackAddToCart({ id: product.id, name: product.name, price, quantity: 1 });
+        toast.success("Added to basket", { id: "Added to basket", duration: 3000 });
+        trackAddToCart({ id: product.id, name: product.name, price, quantity: 1 });
+      });
     } catch (error: unknown) {
       console.error("Error adding to cart:", error);
       const apiMessage = extractCartStockApiMessage(error);
@@ -915,7 +922,7 @@ const StorePage: React.FC = () => {
 
           {/* Product Name and Badge */}
           <div className="mt-4 flex items-start justify-between gap-3">
-            <h1 className="font-ibm-plex-serif text-2xl font-bold text-gray-900 flex-1 min-w-0 [overflow-wrap:anywhere]">
+            <h1 className="font-serif text-2xl font-bold text-gray-900 flex-1 min-w-0 [overflow-wrap:anywhere]">
               {formatProductTitleCase(product.name)}
             </h1>
             <div className="flex shrink-0 items-center gap-2">
@@ -1352,6 +1359,7 @@ const StorePage: React.FC = () => {
             </motion.div>
           )}
         </AnimatePresence>
+        {cartReplaceModal}
       </div>
     </div>
   );

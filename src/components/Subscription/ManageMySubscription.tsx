@@ -950,7 +950,7 @@ const ManageMySubscription: React.FC = () => {
             >
               <IoArrowBack className="text-xl md:text-2xl" />
             </button>
-            <h1 className="font-ibm-plex-serif min-w-0 truncate whitespace-nowrap text-xl font-bold text-gray-900 md:text-2xl">
+            <h1 className="font-serif min-w-0 truncate whitespace-nowrap text-xl font-bold text-gray-900 md:text-2xl">
               Your Subscriptions
             </h1>
           </div>

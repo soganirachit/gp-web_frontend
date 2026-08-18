@@ -1,9 +1,34 @@
 /** Shown as the bold title in the header address row when the customer is not logged in. */
 export const GUEST_HEADER_LOCATION_TITLE = "Current location";
 
+/** When a guest picks a pin / city different from device GPS. */
+export const GUEST_SELECTED_LOCATION_TITLE = "Location";
+
 /** Secondary line when guest GPS/network did not return a city label. */
 export const GUEST_LOCATION_UNAVAILABLE_HINT =
   "We could not detect your city. Check connection or location permissions, then tap to set your area.";
+
+/** Map stored guest browse labels to user-facing header titles. */
+export function resolveGuestHeaderPrimaryLabel(
+  savedLabel?: string | null,
+): string {
+  const trimmed = savedLabel?.trim();
+  if (!trimmed) return GUEST_HEADER_LOCATION_TITLE;
+  const normalized = trimmed.toLowerCase();
+  if (
+    normalized === "delivery address" ||
+    normalized === "delivery location"
+  ) {
+    return GUEST_SELECTED_LOCATION_TITLE;
+  }
+  if (normalized === "current location") {
+    return GUEST_HEADER_LOCATION_TITLE;
+  }
+  if (normalized === "location") {
+    return GUEST_SELECTED_LOCATION_TITLE;
+  }
+  return trimmed;
+}
 
 export async function reverseGeocodeCityOnlyForGuest(
   lat: number,

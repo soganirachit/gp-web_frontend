@@ -79,7 +79,7 @@ export const gpDailyHome = {
 
   greeting:
 
-    "font-ibm-plex-serif text-[1rem] font-bold leading-[1.3] text-[#222222] min-w-0 flex-1 [overflow-wrap:anywhere] md:text-[1.3125rem]",
+    "font-serif text-[1rem] font-bold leading-[1.3] text-[#222222] min-w-0 flex-1 [overflow-wrap:anywhere] md:text-[1.3125rem]",
 
   namasteHeroInset: "px-3",
 
@@ -95,7 +95,7 @@ export const gpDailyHome = {
 
   namasteDetail:
 
-    "font-ibm-plex-serif min-w-0 flex-1 text-xs font-normal leading-4 text-[#222222] md:text-[0.8125rem] md:leading-[1.125rem] [overflow-wrap:anywhere]",
+    "font-serif min-w-0 flex-1 text-xs font-normal leading-4 text-[#222222] md:text-[0.8125rem] md:leading-[1.125rem] [overflow-wrap:anywhere]",
 
   namasteIcon: "h-3.5 w-3.5 shrink-0",
 
@@ -124,7 +124,7 @@ export const gpDailyHome = {
 
   /** Pack label beside status badge — no flex-1 so badge sits flush after name. */
   namastePackName:
-    "font-ibm-plex-serif min-w-0 shrink truncate text-xs font-normal leading-4 text-[#222222] md:text-[0.8125rem] md:leading-[1.125rem]",
+    "font-serif min-w-0 shrink truncate text-xs font-normal leading-4 text-[#222222] md:text-[0.8125rem] md:leading-[1.125rem]",
 
   /** Prev/next beside dots — laptop+ only; GP Daily primary orange. */
   namastePaginationArrow:
@@ -162,7 +162,7 @@ export const gpDailyHome = {
 
   /** Store hero greeting when parent already has `namasteHeroInset`. */
   storeHeroGreeting:
-    "font-ibm-plex-serif text-[1.25rem] font-bold leading-[1.3] text-[#222222] mb-2 md:text-[1.3125rem]",
+    "font-serif text-[1.25rem] font-bold leading-[1.3] text-[#222222] mb-2 md:text-[1.3125rem]",
 
 } as const;
 

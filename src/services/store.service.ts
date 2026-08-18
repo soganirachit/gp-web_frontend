@@ -12,6 +12,7 @@ import {
   GEO_MSG_UNSUPPORTED,
   messageFromGeolocationPositionError,
 } from "../utils/geolocationMessages";
+import { shouldShowStoreOfflineHero } from "../utils/storeOperatingHours";
 
 /** Dispatched on `window` after a guest picks a store from the city picker (home / products refresh). */
 export const GUEST_STORE_UPDATED_EVENT = "gp-guest-temporary-store-updated";
@@ -150,6 +151,70 @@ export function formatFreeDeliveryThresholdForDisplay(
 }
 
 class StoreService {
+  private offlineStoreListCache: { rows: Store[]; ts: number } | null = null;
+  private offlineStoreListInFlight: Promise<Store[]> | null = null;
+  private static readonly OFFLINE_STORE_LIST_CACHE_TTL_MS = 30_000;
+
+  clearOfflineStoreListCache(): void {
+    this.offlineStoreListCache = null;
+  }
+
+  /**
+   * GET /stores/ without lat/lng — includes offline rows (omitted when lat/lng sent).
+   */
+  async getAllStoresIncludingOffline(options?: {
+    bypassCache?: boolean;
+  }): Promise<Store[]> {
+    if (options?.bypassCache) {
+      this.clearOfflineStoreListCache();
+    }
+    const cached = this.offlineStoreListCache;
+    if (
+      !options?.bypassCache &&
+      cached &&
+      Date.now() - cached.ts < StoreService.OFFLINE_STORE_LIST_CACHE_TTL_MS
+    ) {
+      return cached.rows;
+    }
+    if (this.offlineStoreListInFlight) {
+      return this.offlineStoreListInFlight;
+    }
+    const promise = this.getAllStores()
+      .then((rows) => {
+        this.offlineStoreListCache = { rows, ts: Date.now() };
+        return rows;
+      })
+      .finally(() => {
+        this.offlineStoreListInFlight = null;
+      });
+    this.offlineStoreListInFlight = promise;
+    return promise;
+  }
+
+  /** Lookup a store row by id from the unscoped list (offline rows included). */
+  async getStoreRowIncludingOffline(
+    storeId: number,
+    options?: { bypassCache?: boolean },
+  ): Promise<Store | null> {
+    const id = Number(storeId);
+    if (!Number.isFinite(id) || id <= 0) return null;
+    try {
+      const all = await this.getAllStoresIncludingOffline(options);
+      return all.find((s) => Number(s.id) === id) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** True when the store should show the offline hero (hours or API offline flag). */
+  async isCatalogStoreOffline(
+    storeId: number,
+    options?: { bypassCache?: boolean },
+  ): Promise<boolean> {
+    const row = await this.getStoreRowIncludingOffline(storeId, options);
+    return !!row && shouldShowStoreOfflineHero(row);
+  }
+
   /**
    * List active stores. If lat/lng are omitted or invalid, the API returns all stores in default order
    * (backend does not require location). With lat/lng, results are sorted by distance.

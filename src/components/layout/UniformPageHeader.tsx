@@ -6,14 +6,14 @@ import { IoArrowBack } from "react-icons/io5";
  * IBM Plex Serif 600, ~22px / 28px line-height, title #111827, back icon #374151, bar #f8f6f1, vertical 16px.
  */
 export const UNIFORM_PAGE_HEADER_TITLE_CLASS =
-  "font-ibm-plex-serif font-semibold text-[22px] leading-7 tracking-normal text-[#111827]";
+  "font-serif font-semibold text-[22px] leading-7 tracking-normal text-[#111827]";
 
 /** Back control only — use with a matching `IoArrowBack` size={24} for app parity. */
 export const UNIFORM_PAGE_HEADER_BACK_BUTTON_CLASS =
   "-ml-2 mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#374151] transition-colors hover:bg-black/5";
 
 const TITLE_ON_BRAND_CLASS =
-  "font-ibm-plex-serif font-semibold text-[22px] leading-7 tracking-normal text-white";
+  "font-serif font-semibold text-[22px] leading-7 tracking-normal text-white";
 
 const BACK_ON_BRAND_CLASS =
   "text-white hover:bg-white/15 bg-white/[0.14]";

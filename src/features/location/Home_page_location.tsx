@@ -601,7 +601,7 @@ const HomePageLocation: React.FC = () => {
               <MdArrowBack className="text-xl" />
             </button>
             <div className="min-w-0 flex-1">
-              <h1 className="font-ibm-plex-serif text-2xl font-semibold leading-tight text-gray-900">
+              <h1 className="font-serif text-2xl font-semibold leading-tight text-gray-900">
                 Delivery Address
               </h1>
               <p className="mt-1.5 text-base leading-snug text-gray-600">

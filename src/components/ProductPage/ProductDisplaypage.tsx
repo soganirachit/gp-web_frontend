@@ -78,6 +78,7 @@ import {
 import { UniformPageHeader } from "../layout/UniformPageHeader";
 import { resolveProductShareUrl, shareProductLink } from "../../utils/productShare";
 import { useOrderingStoreOffline } from "../../hooks/useOrderingStoreOffline";
+import { useCartStoreReplaceGate } from "../../hooks/useCartStoreReplaceGate";
 import {
   STORE_OFFLINE_CART_BODY,
   STORE_OFFLINE_ORDER_BUTTON_LABEL,
@@ -259,6 +260,25 @@ const ProductPage: React.FC = () => {
   const [combineProducts, setCombineProducts] = useState<Product[]>([]);
 
   const [dailyCart, setDailyCart] = useState<any>(null);
+
+  const refreshDailyCartState = useCallback(async () => {
+    if (feature === "gpStore" || !isLoggedIn) {
+      setDailyCart(null);
+      return;
+    }
+    try {
+      const cart = await subscriptionCartService.getDailyCart();
+      setDailyCart(cart as any);
+      notifyDailyCartUpdated(cart);
+    } catch {
+      setDailyCart(null);
+    }
+  }, [feature, isLoggedIn]);
+
+  const { runWithStoreCheck, modal: cartReplaceModal } = useCartStoreReplaceGate(
+    "gpDaily",
+    { onAfterReplace: refreshDailyCartState },
+  );
   /** GP Daily — size variants from catalog (same source as gp-store PDP). */
   const [selectedVariant, setSelectedVariant] = useState<Record<string, unknown> | null>(null);
   const activeCartLine = useMemo(() => {
@@ -969,6 +989,39 @@ const ProductPage: React.FC = () => {
     setPackCategoryAlertMessage(message);
   };
 
+  const performAddToBasket = async () => {
+    setAddingToBasket(true);
+    try {
+      const variantId =
+        selectedVariant && (selectedVariant as any).id != null
+          ? Number((selectedVariant as any).id)
+          : undefined;
+      const cart = await subscriptionCartService.addItem(
+        Number((product as any).id),
+        1,
+        variantId,
+      );
+      setDailyCart(cart as any);
+      notifyDailyCartUpdated(cart);
+      toast.success("Added to basket", { id: "Added to basket" });
+    } catch (error: unknown) {
+      console.error("Error adding to cart:", error);
+      const apiMessage = errorMessageFromCatch(
+        error,
+        "Failed to add product to basket. Please try again.",
+      );
+      if (isDailyPackMixBlockedMessage(apiMessage)) {
+        showPackCategoryBlockedAlert(DAILY_PACK_MIX_BLOCKED_MESSAGE);
+        return;
+      }
+      toast.error(apiMessage, {
+        id: apiMessage,
+      });
+    } finally {
+      setAddingToBasket(false);
+    }
+  };
+
   const handleAddToBasket = async () => {
     if (!product) {
       toast.error("Product information not available", {
@@ -1021,36 +1074,7 @@ const ProductPage: React.FC = () => {
       }
     }
 
-    setAddingToBasket(true);
-    try {
-      const variantId =
-        selectedVariant && (selectedVariant as any).id != null
-          ? Number((selectedVariant as any).id)
-          : undefined;
-      const cart = await subscriptionCartService.addItem(
-        Number((product as any).id),
-        1,
-        variantId,
-      );
-      setDailyCart(cart as any);
-      notifyDailyCartUpdated(cart);
-      toast.success("Added to basket", { id: "Added to basket" });
-    } catch (error: unknown) {
-      console.error("Error adding to cart:", error);
-      const apiMessage = errorMessageFromCatch(
-        error,
-        "Failed to add product to basket. Please try again.",
-      );
-      if (isDailyPackMixBlockedMessage(apiMessage)) {
-        showPackCategoryBlockedAlert(DAILY_PACK_MIX_BLOCKED_MESSAGE);
-        return;
-      }
-      toast.error(apiMessage, {
-        id: apiMessage,
-      });
-    } finally {
-      setAddingToBasket(false);
-    }
+    await runWithStoreCheck(performAddToBasket);
   };
 
   const autoAddAttemptedRef = useRef(false);
@@ -1507,7 +1531,7 @@ const ProductPage: React.FC = () => {
                 </div>
               )}
               <div className="mt-5">
-                <h2 className="mb-2.5 font-ibm-plex-serif text-2xl font-semibold text-[#222222]">Includes</h2>
+                <h2 className="mb-2.5 font-serif text-2xl font-semibold text-[#222222]">Includes</h2>
                 <div className="flex flex-wrap gap-2">
                   {bomDisplayRows.length > 0
                     ? bomDisplayRows.map((row) => (
@@ -1535,7 +1559,7 @@ const ProductPage: React.FC = () => {
           ) : (
             <>
               <div className="mt-4 flex items-start justify-between gap-3">
-                <h1 className="m-0 min-w-0 flex-1 font-ibm-plex-serif text-2xl font-bold leading-snug text-gray-900 [overflow-wrap:anywhere]">
+                <h1 className="m-0 min-w-0 flex-1 font-serif text-2xl font-bold leading-snug text-gray-900 [overflow-wrap:anywhere]">
                   {formatProductTitleCase(getProductName())}
                 </h1>
                 <div className="flex shrink-0 items-center gap-2">
@@ -1945,6 +1969,7 @@ const ProductPage: React.FC = () => {
             onClose={() => setPackCategoryAlertMessage(null)}
           />
         ) : null}
+        {isGpDaily ? cartReplaceModal : null}
       </div>
     </div>
   );

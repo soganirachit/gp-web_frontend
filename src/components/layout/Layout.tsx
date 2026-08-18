@@ -58,13 +58,12 @@ const Layout: React.FC = () => {
     location.pathname.startsWith(p)
   );
 
-  const isGpDailyRoute = location.pathname.startsWith("/gp-daily");
   const isGpStoreHome =
     location.pathname === "/gp-store" || location.pathname === "/gp-store/";
   const isGpDailyHome =
     location.pathname === "/gp-daily" || location.pathname === "/gp-daily/";
   useDoubleBackToExit(isGpStoreHome || isGpDailyHome);
-  const dailyHeadingsClass = isGpDailyRoute ? " gp-daily-headings" : "";
+
   const showBottomNav = !isAuthRoute && !shouldHideBottomNav;
 
   const isSupportRoute = location.pathname.includes("/customer-support");
@@ -78,14 +77,14 @@ const Layout: React.FC = () => {
     shouldHideBottomNav && !isAuthRoute && !isSupportDockedComposer;
 
   const contentClassName = isAuthRoute
-    ? dailyHeadingsClass.trim()
+    ? ""
     : showBottomNav
       ? isSupportDockedComposer
-        ? `h-0 min-h-0 overflow-hidden${dailyHeadingsClass}`
+        ? "h-0 min-h-0 overflow-hidden"
         : isSupportRoute
-          ? `min-h-[calc(100dvh-var(--gp-bottom-nav-offset))] pb-nav-bottom${dailyHeadingsClass}`
-          : `min-h-[calc(100dvh-144px)] min-h-[calc(100vh-144px)] pb-nav-bottom${dailyHeadingsClass}`
-      : `pb-0${dailyHeadingsClass}`;
+          ? "min-h-[calc(100dvh-var(--gp-bottom-nav-offset))] pb-nav-bottom"
+          : `min-h-[calc(100dvh-144px)] min-h-[calc(100vh-144px)] pb-nav-bottom`
+      : "pb-0";
 
   return (
     <FeatureThemeProvider>

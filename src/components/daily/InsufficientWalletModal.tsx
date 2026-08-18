@@ -92,7 +92,7 @@ export function InsufficientWalletRechargeCard({
       <div className={variant === "inline" ? "mb-3" : "mb-3 text-center"}>
         <h3
           id={titleId}
-          className="mb-1 font-ibm-plex-serif text-base font-bold text-gray-900 md:text-lg"
+          className="mb-1 font-serif text-base font-bold text-gray-900 md:text-lg"
         >
           Insufficient wallet balance
         </h3>

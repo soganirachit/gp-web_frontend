@@ -26,9 +26,9 @@ import { OrderListThumb } from './OrderListThumb';
 
 const ORDER_LIST_PAGE_SIZE = 6;
 
-/** My Orders header — IBM Plex Serif (matches app `UniformPageHeader`). */
+/** My Orders header — IBM Plex Serif via `font-serif` (matches app `UniformPageHeader`). */
 const MY_ORDER_HEADER_TITLE_CLASS =
-  "font-ibm-plex-serif font-semibold text-[24px] leading-[26px] tracking-normal text-[#111827]";
+  "font-serif font-semibold text-[24px] leading-[26px] tracking-normal text-[#111827]";
 
 const ORDER_LIST_STATUS_CLASS =
   "mb-1 text-[11px] font-semibold leading-snug";

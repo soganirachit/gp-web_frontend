@@ -312,7 +312,7 @@ const StoreOrderConfirmation: React.FC = () => {
         <div className="pt-8 pb-4 text-center">
           <SuccessCheckmark />
           <motion.h1
-            className="font-ibm-plex-serif text-[28px] font-semibold leading-8 text-gray-900 mb-2"
+            className="font-serif text-[28px] font-semibold leading-8 text-gray-900 mb-2"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}

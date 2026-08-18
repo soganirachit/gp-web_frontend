@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "node scripts/generate-app-links.mjs && tsc && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:generate": "node testing/scripts/generate-artifacts.mjs",
