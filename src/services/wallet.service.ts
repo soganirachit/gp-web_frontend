@@ -220,15 +220,19 @@ class WalletService {
     throw new Error(response.data?.message || "Failed to add amount");
   }
 
-  async checkPaymentStatus(razorpayOrderId: string): Promise<{
+  async checkPaymentStatus(
+    razorpayOrderId: string,
+    options?: { sync?: boolean },
+  ): Promise<{
     status: "pending" | "completed" | "failed";
     amount?: number;
   }> {
     try {
       const razorpayBase = getPaymentsRazorpayUrl();
+      const params = options?.sync ? { sync: "1" } : undefined;
       const response = await api.get(
         `${razorpayBase}/status/${razorpayOrderId}/`,
-        { timeout: this.TIMEOUT_MS }
+        { timeout: this.TIMEOUT_MS, params },
       );
 
       if (response.status === 200) {
@@ -253,11 +257,15 @@ class WalletService {
 
   async pollPaymentStatus(
     razorpayOrderId: string,
-    maxAttempts: number = 10
+    maxAttempts: number = 5,
+    intervalMs: number = 1000,
+    options?: { sync?: boolean },
   ): Promise<boolean> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        const status = await this.checkPaymentStatus(razorpayOrderId);
+        const status = await this.checkPaymentStatus(razorpayOrderId, {
+          sync: options?.sync === true && attempt === 0,
+        });
 
         if (status.status === "completed") {
           return true;
@@ -267,7 +275,7 @@ class WalletService {
           return false;
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
       } catch (error) {
         console.error(
           `Payment status check attempt ${attempt + 1} failed:`,
@@ -323,7 +331,9 @@ class WalletService {
       try {
         const isCompleted = await this.pollPaymentStatus(
           paymentData.razorpay_order_id,
-          3
+          5,
+          1000,
+          { sync: true },
         );
         if (isCompleted) {
           console.log(

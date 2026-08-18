@@ -1,6 +1,11 @@
 import axios from "axios";
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
+import { PAYMENT_MODAL_DISMISSED } from "../utils/razorpayModalDismiss";
+import {
+  markRazorpayCheckoutClosed,
+  markRazorpayCheckoutOpen,
+} from "../utils/razorpayCheckoutSession";
 
 // Ensure API URL includes /api/v1 if not already in base URL
 const getPaymentApiUrl = () => {
@@ -272,6 +277,7 @@ class PaymentService {
         key: options.razorpayKeyId,
         amount: options.amount,
         currency: options.currency || 'INR',
+        name: 'Genda Phool',
         order_id: options.razorpayOrderId,
         description: options.description || 'Order Payment',
         prefill: {
@@ -287,17 +293,27 @@ class PaymentService {
           razorpay_order_id: string;
           razorpay_signature: string;
         }) {
-          // Payment successful — resolve with details to pass into Step 3
+          markRazorpayCheckoutClosed();
           console.log('Razorpay payment successful:', response);
           resolve(response);
         },
         modal: {
           ondismiss: function () {
             console.log('Razorpay checkout dismissed by user');
-            reject(new Error('Payment cancelled by user'));
+            markRazorpayCheckoutClosed();
+            reject(new Error(PAYMENT_MODAL_DISMISSED));
           },
         },
       };
+
+      if (typeof window.Razorpay !== 'function') {
+        reject(new Error('Payment gateway is not ready. Please try again.'));
+        return;
+      }
+
+      markRazorpayCheckoutOpen();
+      const razorpay = new window.Razorpay(rzpOptions);
+      razorpay.open();
     });
   }
 
@@ -334,16 +350,30 @@ class PaymentService {
   }
 
   /**
-   * Step 4: Check payment status (optional)
+   * Mark an abandoned Razorpay checkout so status polls return quickly.
+   */
+  async abandonCheckout(razorpayOrderId: string): Promise<void> {
+    try {
+      await api.post(`${API_URL}/abandon/`, { razorpay_order_id: razorpayOrderId });
+    } catch {
+      /* best effort */
+    }
+  }
+
+  /**
+   * Check payment status (optional).
    * Use this to check if payment was completed if app crashed.
-   * Server syncs from Razorpay when checkout is still pending.
+   * Pass `{ sync: true }` only during recovery polling (`?sync=1` on server).
    */
   async getPaymentStatus(
-    razorpayOrderId: string
+    razorpayOrderId: string,
+    options?: { sync?: boolean },
   ): Promise<PaymentStatusResponse> {
     try {
+      const params = options?.sync ? { sync: '1' } : undefined;
       const response = await api.get(
-        `${API_URL}/status/${razorpayOrderId}/`
+        `${API_URL}/status/${razorpayOrderId}/`,
+        { params },
       );
 
       const body = unwrapResponseBody(response.data);
@@ -377,16 +407,19 @@ class PaymentService {
 
   /**
    * Poll status until order/wallet credit is fulfilled.
-   * Each poll triggers server-side Razorpay sync (UPI completed on phone while modal closed).
+   * Pass `{ sync: true }` only when recovery is needed (post-verify / known payment id).
    */
   async pollUntilFulfilled(
     razorpayOrderId: string,
     maxPolls = 5,
-    intervalMs = 2000,
+    intervalMs = 1000,
+    options?: { sync?: boolean },
   ): Promise<PaymentStatusResponse | null> {
     for (let i = 0; i < maxPolls; i++) {
       try {
-        const status = await this.getPaymentStatus(razorpayOrderId);
+        const status = await this.getPaymentStatus(razorpayOrderId, {
+          sync: options?.sync === true && i === 0,
+        });
         const st = status.status?.toLowerCase() ?? '';
         const done =
           (st === 'completed' || st === 'complete' || st === 'paid' || st === 'success') &&

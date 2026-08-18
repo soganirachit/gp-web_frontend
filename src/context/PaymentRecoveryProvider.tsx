@@ -6,6 +6,8 @@ import {
   PENDING_PAYMENTS_KEY,
   recoverPendingPayments,
 } from '../utils/pendingPayments';
+import { isPaymentRecoverySuppressed } from '../utils/razorpayCheckoutFailure';
+import { isRazorpayCheckoutOpen } from '../utils/razorpayCheckoutSession';
 
 interface PaymentRecoveryProviderProps {
   children: ReactNode;
@@ -23,6 +25,8 @@ export function PaymentRecoveryProvider({ children }: PaymentRecoveryProviderPro
 
   const maybeRecover = useCallback(async () => {
     if (!isLoggedIn || !navigator.onLine) return;
+    if (isRazorpayCheckoutOpen()) return;
+    if (isPaymentRecoverySuppressed()) return;
     if (getPendingPayments().length === 0) return;
 
     const now = Date.now();

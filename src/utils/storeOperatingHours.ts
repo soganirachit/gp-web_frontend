@@ -48,8 +48,5 @@ export function shouldShowStoreOfflineHero(
   now = new Date(),
 ): boolean {
   if (isOutsideStoreOperatingHours(store, now)) return true;
-  const v = store.is_online;
-  if (v === false || v === 0) return true;
-  if (typeof v === "string" && v.trim().toLowerCase() === "false") return true;
-  return false;
+  return store.is_online === false;
 }

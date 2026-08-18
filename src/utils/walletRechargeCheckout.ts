@@ -1,6 +1,7 @@
 import { loadRazorpayScript } from "../lib/razorpayLoader";
 import { walletService } from "../services/wallet.service";
 import { PAYMENT_MODAL_DISMISSED } from "./razorpayModalDismiss";
+import { suppressPaymentRecoveryAfterDismiss } from "./razorpayCheckoutFailure";
 
 /** Opens Razorpay for wallet top-up; returns true when payment is verified. */
 export async function rechargeWalletInApp(amountRupees: number): Promise<boolean> {
@@ -65,11 +66,10 @@ export async function rechargeWalletInApp(amountRupees: number): Promise<boolean
   } catch (modalErr) {
     if (
       modalErr instanceof Error &&
-      modalErr.message === PAYMENT_MODAL_DISMISSED &&
-      data.order?.id
+      modalErr.message === PAYMENT_MODAL_DISMISSED
     ) {
-      const synced = await walletService.pollPaymentStatus(data.order.id, 20);
-      return synced;
+      suppressPaymentRecoveryAfterDismiss();
+      return false;
     }
     throw modalErr;
   }

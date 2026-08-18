@@ -22,6 +22,10 @@ import { formatNextDeliveryDateLine } from "../../utils/subscriptionNextDelivery
 import { computeFirstSubscriptionDeliveryDateFromWeekdayInts } from "../../utils/subscriptionFirstDeliveryDate";
 import { navigateToGpDailyWalletForRecharge } from "../../utils/gpDailyWalletRechargeRedirect";
 import {
+  getPlainDismissUserMessage,
+  isPaymentModalDismissed,
+} from "../../utils/razorpayCheckoutFailure";
+import {
   InsufficientWalletModal,
   type InsufficientWalletDetails,
 } from "../daily/InsufficientWalletModal";
@@ -1133,6 +1137,10 @@ const ConfirmSubscription: React.FC = () => {
                   purpose="store_product_payment"
                   onSuccess={handleStoreProductPayment}
                   onError={(error) => {
+                    if (isPaymentModalDismissed(error)) {
+                      toast.error(getPlainDismissUserMessage());
+                      return;
+                    }
                     toast.error(error.message || "Payment failed. Please try again.");
                   }}
                   className="w-full bg-[#F15A22] text-white py-3.5 rounded-full text-[15px] font-medium mb-3 hover:bg-[#E04D15] transition-colors disabled:opacity-50"

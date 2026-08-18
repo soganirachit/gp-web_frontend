@@ -46,6 +46,8 @@ import whatsappIcon from '../../assets/icon/social/whatsapp.svg';
 import { SOCIAL_URLS } from '../../config/socialUrls';
 import { APP_DISPLAY_VERSION } from '../../config/appVersion';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
+import { supportService } from '../../services/support.service';
+import { SupportUnreadIndicator } from '../../components/common/SupportUnreadIndicator';
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
@@ -66,6 +68,7 @@ const Settings: React.FC = () => {
   const [deleteBlockMessage, setDeleteBlockMessage] = useState<string | null>(null);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
+  const [hasUnreadSupport, setHasUnreadSupport] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedStore, setSelectedStore] = useState<string>('');
@@ -103,6 +106,29 @@ const Settings: React.FC = () => {
       window.removeEventListener('tokenRemoved', handleTokenRemoved);
     };
   }, [navigate, basePath, location.pathname]);
+
+  useEffect(() => {
+    if (!isLoggedIn || location.pathname !== `${basePath}/account`) {
+      setHasUnreadSupport(false);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const tickets = await supportService.getTickets();
+        if (!cancelled) {
+          setHasUnreadSupport(tickets.some((ticket) => ticket.has_unread_by_customer));
+        }
+      } catch {
+        if (!cancelled) setHasUnreadSupport(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, basePath, location.pathname]);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -828,7 +854,16 @@ const Settings: React.FC = () => {
                       }`}
                     />
                   )}
-                  <span className="text-[15px] text-gray-700 font-normal">{item.title}</span>
+                  <span className="text-[15px] text-gray-700 font-normal flex items-center gap-2">
+                    {item.title}
+                    {item.title === 'Request & Support' && hasUnreadSupport ? (
+                      <span aria-label="Unread support messages">
+                        <SupportUnreadIndicator
+                          variant={feature === 'gpStore' ? 'store' : 'daily'}
+                        />
+                      </span>
+                    ) : null}
+                  </span>
                 </div>
                 <FaChevronRight className="text-gray-400 text-sm" />
               </div>

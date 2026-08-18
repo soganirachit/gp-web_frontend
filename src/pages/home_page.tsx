@@ -432,7 +432,7 @@ const HomePage: React.FC = () => {
                   alt="Sajawat by Genda Phool"
                   className="mb-2 h-8 w-auto max-w-[10.5rem] sm:h-10"
                 />
-                <p className="mb-3 max-w-[13.5rem] text-[13px] font-medium leading-snug text-[#9B2226] sm:text-sm sm:leading-normal">
+                <p className="mb-3 max-w-[13.5rem] text-[13px] font-medium leading-tight text-[#9B2226] sm:text-sm sm:leading-snug">
                   A floral first event design and management service, 200+ events executed!
                 </p>
                 <button
@@ -479,7 +479,7 @@ const HomePage: React.FC = () => {
             <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-4 items-stretch w-full min-w-0">
               <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center min-w-0 [overflow-wrap:anywhere]">
                 <FaLeaf className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-gray-800" />
-                <div className="text-lg sm:text-2xl font-bold text-gray-800 mb-1">100,000+</div>
+                <div className="text-lg sm:text-xl font-bold text-gray-800 mb-1">100,000+</div>
                 <div className="text-xs sm:text-sm text-gray-600">Orders Delivered</div>
               </div>
               <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center min-w-0 [overflow-wrap:anywhere]">
@@ -489,12 +489,12 @@ const HomePage: React.FC = () => {
               </div>
               <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center min-w-0 [overflow-wrap:anywhere]">
                 <FaBox className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-gray-800" />
-                <div className="text-base sm:text-xl font-bold text-gray-800 mb-1">Eco-Friendly</div>
+                <div className="text-base sm:text-lg font-bold text-gray-800 mb-1">Eco-Friendly</div>
                 <div className="text-xs sm:text-sm text-gray-600">Packaging</div>
               </div>
               <div className="bg-[#f8f6f1] rounded-xl p-3 sm:p-4 text-center min-w-0 [overflow-wrap:anywhere]">
                 <MdAccessTime className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-gray-800" />
-                <div className="text-base sm:text-xl font-bold text-gray-800 mb-1">Freshly Plucked</div>
+                <div className="text-base sm:text-lg font-bold text-gray-800 mb-1">Freshly Plucked</div>
                 <div className="text-xs sm:text-sm text-gray-600">by 5:00 AM</div>
               </div>
             </div>
@@ -563,7 +563,7 @@ const HomePage: React.FC = () => {
             <h2 className={GP_LANDING_SECTION_HEADING_CLASS}>WE ARE LOVED</h2>
             {reviewsLoading ? (
               <HorizontalScrollSection
-                trackClassName="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:gap-4 -mx-1 px-1 min-w-0"
+                trackClassName="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 no-scrollbar sm:gap-4 -mx-1 px-1 min-w-0"
                 prevLabel="Previous review"
                 nextLabel="Next review"
               >
@@ -582,7 +582,7 @@ const HomePage: React.FC = () => {
               <p className="text-sm text-gray-500">Customer reviews will appear here soon.</p>
             ) : (
               <HorizontalScrollSection
-                trackClassName="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain touch-pan-x pb-2 sm:gap-4 -mx-1 px-1 min-w-0"
+                trackClassName="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain touch-pan-x pb-2 no-scrollbar sm:gap-4 -mx-1 px-1 min-w-0"
                 prevLabel="Previous review"
                 nextLabel="Next review"
               >

@@ -18,7 +18,6 @@ import {
   validateGpDailyDeliveryAreaForAddressId,
   validateGpDailyDeliveryAreaFromCoordinates,
 } from "../../services/subscriptionZone.service";
-import { messageFromGeolocationPositionError } from "../../utils/geolocationMessages";
 import { customerService } from "../../services/getcustomer.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useAuth } from "../../context/AuthContext";
@@ -231,8 +230,8 @@ const AddressSelection: React.FC = () => {
         }
         setLiveDeviceLocation({ lat, lng, formattedAddress: formatted });
       },
-      (err) => {
-        toast.error(messageFromGeolocationPositionError(err), { id: "live-device-geo" });
+      () => {
+        /* Permission denied or unavailable — saved addresses still work; no toast on page open. */
       },
       { enableHighAccuracy: false, timeout: 20_000, maximumAge: 120_000 },
     );

@@ -32,6 +32,7 @@ import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { gpDailyHome } from "../../utils/gpDailyHomeDesignSystem";
+import { resolveLabelSectionTitle } from "../../utils/productLabelDisplay";
 import { ProductImageTag } from "../common/ProductImageTag";
 import { HorizontalScrollSection } from "../common/HorizontalScrollSection";
 import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
@@ -1248,7 +1249,9 @@ const StorePage: React.FC = () => {
           {relatedProducts.length > 0 && (
             <div className="mt-10 mb-8">
               <div className="flex justify-between items-center mb-4">
-                <h2 className={gpDailyHome.sectionHeading}>Best Sellers</h2>
+                <h2 className={gpDailyHome.sectionHeading}>
+                  {resolveLabelSectionTitle("best-seller", relatedProducts)}
+                </h2>
                 <button
                   type="button"
                   onClick={() => navigate("/gp-store/products")}
@@ -1266,7 +1269,7 @@ const StorePage: React.FC = () => {
                     onClick={() => handleProductClick(item)}
                   >
                     <div className="relative aspect-square bg-[#f8f6f1] overflow-hidden">
-                      <ProductImageTag labels={item.labels} />
+                      <ProductImageTag labels={item.labels} preferredLabelSlug="best-seller" />
                       <SessionCachedImage
                         src={
                           pickPrimaryImageUrl(item, "card") ||

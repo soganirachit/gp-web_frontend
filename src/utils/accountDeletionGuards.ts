@@ -1,3 +1,9 @@
+import {
+  extractFirstItemNameFromOrderRaw,
+  formatOrderListProductLabel,
+  resolveOrderItemsCount,
+} from "./orderListDisplay";
+
 /** Order statuses that block account deletion until resolved. */
 const ACTIVE_ORDER_STATUSES = new Set([
   "pending",
@@ -34,8 +40,11 @@ function orderStatus(order: Record<string, unknown>): string {
   return String(order.status ?? "").trim().toLowerCase();
 }
 
-function orderNumber(order: Record<string, unknown>): string {
-  return String(order.order_number ?? order.orderNumber ?? "").trim();
+function orderPackLabel(order: Record<string, unknown>): string {
+  const first = extractFirstItemNameFromOrderRaw(order);
+  const count = resolveOrderItemsCount(order);
+  const label = formatOrderListProductLabel(first, count);
+  return label || "your order";
 }
 
 function isActiveOrder(order: Record<string, unknown>): boolean {
@@ -61,22 +70,17 @@ export function checkAccountDeletionAllowed(
   });
 
   if (todayDaily) {
-    const num = orderNumber(todayDaily);
+    const packLabel = orderPackLabel(todayDaily);
     return {
       blocked: true,
-      message: num
-        ? `Your GP Daily delivery for today (${num}) is still active. Please wait until it is delivered, or contact support to cancel the order before deleting your account.`
-        : "Your GP Daily delivery for today is still active. Please wait until it is delivered, or contact support to cancel the order before deleting your account.",
+      message: `Your GP Daily delivery for today (${packLabel}) is still active. Please wait until it is delivered, or contact support to cancel the order before deleting your account.`,
     };
   }
 
   const first = active[0];
-  const num = orderNumber(first);
-  const statusLabel = orderStatus(first).replace(/_/g, " ");
   return {
     blocked: true,
-    message: num
-      ? `You have an active order. Please wait until it is delivered or cancelled, or contact support to request cancellation before deleting your account.`
-      : `You have an active order. Please wait until it is delivered or cancelled, or contact support to request cancellation before deleting your account.`,
+    message:
+      "You have an active order. Please wait until it is delivered or cancelled, or contact support to request cancellation before deleting your account.",
   };
 }

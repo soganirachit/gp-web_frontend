@@ -19,6 +19,8 @@ interface ProductCardProps {
   compact?: boolean;
   /** Optional API labels (shown on image top-left; overrides showBestsellerTag when set) */
   labels?: { name?: string; slug?: string }[];
+  /** When set, badge shows this label slug (e.g. premium section → `premium`). */
+  preferredLabelSlug?: string;
   /** Eager-load above-the-fold product thumbnails without progressive paint. */
   imagePriority?: boolean;
   onClick?: () => void;
@@ -35,6 +37,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   showDailyButton = false,
   compact = false,
   labels,
+  preferredLabelSlug,
   imagePriority = false,
   onClick,
   className = ''
@@ -48,8 +51,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
     : "sm:aspect-auto sm:h-40 md:h-48 lg:h-52";
   const bodyPadClass = isCompact ? "p-3" : "p-2.5 sm:p-3";
   const titleClass = isCompact
-    ? "text-gp-card-title sm:text-gp-card-title-md font-semibold text-[#111827] line-clamp-2 leading-snug mb-0.5"
-    : "text-[15px] leading-5 font-semibold text-[#111827] line-clamp-2 mb-0.5";
+    ? "text-gp-card-title sm:text-gp-card-title-md font-semibold text-[#111827] truncate mb-0.5"
+    : "text-[15px] font-semibold text-[#111827] truncate mb-0.5";
   const categoryClass = isCompact
     ? "text-gp-card-meta sm:text-gp-card-meta-md font-medium text-[#19411f]/80 truncate mb-0.5"
     : "text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[#19411f]/80 truncate mb-0.5";
@@ -83,7 +86,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
         />
 
         {(labels && labels.length > 0) ? (
-          <ProductImageTag labels={labels} variant={tagVariant} />
+          <ProductImageTag
+            labels={labels}
+            variant={tagVariant}
+            preferredLabelSlug={preferredLabelSlug}
+          />
         ) : null}
       </div>
 
@@ -100,7 +107,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <p className={descClass}>{description}</p>
           </div>
 
-          {/* Daily Button */}
           {showDailyButton && (
             <button
               type="button"

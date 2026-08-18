@@ -2,6 +2,15 @@ import React, { useEffect, useState } from "react";
 import Spinner from "../../common/Spinner";
 import { loadRazorpayScript } from "../../../lib/razorpayLoader";
 import { walletService } from "../../../services/wallet.service";
+import { PAYMENT_MODAL_DISMISSED } from "../../../utils/razorpayModalDismiss";
+import {
+  getPlainDismissUserMessage,
+  isPaymentModalDismissed,
+} from "../../../utils/razorpayCheckoutFailure";
+import {
+  markRazorpayCheckoutClosed,
+  markRazorpayCheckoutOpen,
+} from "../../../utils/razorpayCheckoutSession";
 
 
 interface RazorpayPaymentProps {
@@ -60,6 +69,7 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
           color: "#FFFBEB",
         },
         handler: function (response: RazorpayResponse) {
+          markRazorpayCheckoutClosed();
           // Payment completed successfully on Razorpay side
           onSuccess({
             razorpay_payment_id: response.razorpay_payment_id,
@@ -70,13 +80,17 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
         },
         modal: {
           ondismiss: function () {
-            // Payment modal was closed by user
-            onError(new Error("Payment cancelled by user"));
+            markRazorpayCheckoutClosed();
+            onError(new Error(PAYMENT_MODAL_DISMISSED));
           },
         },
       };
 
       const razorpayInstance = new window.Razorpay(options);
+      razorpayInstance.on('payment.failed', () => {
+        markRazorpayCheckoutClosed();
+      });
+      markRazorpayCheckoutOpen();
       razorpayInstance.open();
     } catch (error) {
       onError(

@@ -5,6 +5,7 @@
 import { paymentService } from '../services/payment.service';
 import { walletService } from '../services/wallet.service';
 import { getPaymentsRazorpayUrl, getWalletUrl } from '../config/api.config';
+import { isPaymentRecoverySuppressed } from './razorpayCheckoutFailure';
 
 export interface PendingPayment {
   id: string;
@@ -121,6 +122,14 @@ export function removePendingPayment(paymentId: string): void {
   writePendingPayments(updated);
 }
 
+/** Drop stale recovery entries when user cancels checkout for this Razorpay order. */
+export function removePendingPaymentsByOrderId(razorpayOrderId: string): void {
+  const updated = getPendingPayments().filter(
+    (p) => p.razorpay_order_id !== razorpayOrderId,
+  );
+  writePendingPayments(updated);
+}
+
 export function clearPendingPayments(): void {
   localStorage.removeItem(PENDING_PAYMENTS_KEY);
 }
@@ -173,7 +182,8 @@ async function tryRecoverCartPayment(
     const status = await paymentService.pollUntilFulfilled(
       payment.razorpay_order_id,
       5,
-      2000,
+      1000,
+      { sync: true },
     );
     if (status?.order_number) {
       return { recovered: true, orderNumber: status.order_number };
@@ -267,6 +277,14 @@ export function flushPendingPaymentsKeepalive(): void {
  * Uses a module-level mutex to prevent concurrent recovery runs.
  */
 export async function recoverPendingPayments(): Promise<PendingRecoveryResult> {
+  if (isPaymentRecoverySuppressed()) {
+    return {
+      recoveredCount: 0,
+      cartRecovered: [],
+      walletRecoveredCount: 0,
+    };
+  }
+
   if (recoveryInFlight) {
     return recoveryInFlight;
   }
@@ -293,7 +311,7 @@ export async function recoverPendingPayments(): Promise<PendingRecoveryResult> {
         const cartOk = await retryWithBackoff(async () => {
           cartAttempt = await tryRecoverCartPayment(payment);
           return cartAttempt.recovered;
-        }, 3);
+        }, 1);
         if (cartOk) {
           removePendingPayment(payment.id);
           result.recoveredCount += 1;

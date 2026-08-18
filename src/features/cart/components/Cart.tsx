@@ -35,6 +35,12 @@ import api from '../../../services/api';
 import { getApiUrl } from '../../../config/api.config';
 import { useNetworkRecovery } from '../../../hooks/useNetworkRecovery';
 import { CART_PAYMENT_RECOVERED_EVENT, consumePendingCartRecoveredSession } from '../../../utils/pendingPayments';
+import {
+  getPlainDismissUserMessage,
+  handlePlainRazorpayDismiss,
+  isPaymentModalDismissed,
+  pollStoreCheckoutRecovery,
+} from '../../../utils/razorpayCheckoutFailure';
 import { SEO } from '../../../components/SEO';
 import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
@@ -562,6 +568,7 @@ const Cart: React.FC = () => {
   const [customerInfo, setCustomerInfo] = useState<{ name?: string; email?: string; contact?: string }>({});
   const paymentButtonRef = useRef<HTMLButtonElement | null>(null);
   const checkoutInFlightRef = useRef(false);
+  const checkoutDismissedRef = useRef(false);
   const pendingConfirmationRef = useRef<OrderConfirmationSnapshot | null>(null);
 
   // Promo code state
@@ -1795,6 +1802,7 @@ const Cart: React.FC = () => {
     }
 
     checkoutInFlightRef.current = true;
+    checkoutDismissedRef.current = false;
     try {
       setIsProcessingPayment(true);
       let deliveryDateFormatted: string | undefined;
@@ -1869,29 +1877,11 @@ const Cart: React.FC = () => {
     amountPaise: number,
     maxPolls = 5,
   ): Promise<boolean> => {
-    const result = await paymentService.pollUntilFulfilled(razorpayOrderId, maxPolls, 2000);
+    const result = await pollStoreCheckoutRecovery(razorpayOrderId, maxPolls, 1000);
     if (result?.order_number) {
       finalizeOrder(result.order_number, parseFloat(result.amount) || amountPaise / 100);
       return true;
     }
-    return false;
-  };
-
-  /** UPI on phone can succeed while user closes the Razorpay modal on desktop. */
-  const recoverAfterModalDismiss = async (): Promise<boolean> => {
-    if (!razorpayOrderId) return false;
-    setIsConfirmingOrder(true);
-    setShouldTriggerPayment(false);
-    const checkingToastId = toast.loading('Checking if your payment completed…');
-    const recovered = await pollPaymentStatus(razorpayOrderId, razorpayAmount, 8);
-    toast.dismiss(checkingToastId);
-    setIsConfirmingOrder(false);
-    if (recovered) {
-      checkoutInFlightRef.current = false;
-      return true;
-    }
-    // Keep trying in the background without blocking checkout UI.
-    void recoverPendingPayments();
     return false;
   };
 
@@ -1901,6 +1891,12 @@ const Cart: React.FC = () => {
     razorpay_signature: string;
     payment_status: string;
   }) => {
+    if (checkoutDismissedRef.current) {
+      setIsConfirmingOrder(false);
+      setIsProcessingPayment(false);
+      checkoutInFlightRef.current = false;
+      return;
+    }
     setIsConfirmingOrder(true);
     setShouldTriggerPayment(false);
 
@@ -1931,11 +1927,18 @@ const Cart: React.FC = () => {
       } catch {
         return false;
       }
-    }, 3);
+    }, 2);
+
+    if (checkoutDismissedRef.current) {
+      setIsConfirmingOrder(false);
+      setIsProcessingPayment(false);
+      checkoutInFlightRef.current = false;
+      return;
+    }
 
     if (!verified) {
       // Verify retries exhausted — fall back to polling the status endpoint
-      const recovered = await pollPaymentStatus(paymentData.razorpay_order_id, razorpayAmount);
+      const recovered = await pollPaymentStatus(paymentData.razorpay_order_id, razorpayAmount, 3);
       if (!recovered) {
         // Payment was taken by Razorpay but we couldn't confirm the order.
         // Keep the pending payment in localStorage so it can be retried on next app load.
@@ -1972,13 +1975,11 @@ const Cart: React.FC = () => {
   }, []);
 
   const handlePaymentError = async (error: Error) => {
-    const cancelledByUser = /cancel/i.test(error.message || '');
-    if (cancelledByUser && razorpayOrderId) {
-      const recovered = await recoverAfterModalDismiss();
-      if (recovered) return;
-      setCheckoutInlineError(REQUIRED_TOAST.PAYMENT_NOT_COMPLETED);
-    }
-    if (!cancelledByUser) {
+    checkoutDismissedRef.current = true;
+    if (isPaymentModalDismissed(error) || /cancel/i.test(error.message || '')) {
+      handlePlainRazorpayDismiss(razorpayOrderId);
+      setCheckoutInlineError(getPlainDismissUserMessage());
+    } else {
       const msg = error.message?.trim() || REQUIRED_TOAST.PAYMENT_NOT_COMPLETED;
       toast.error(
         /not charged|no charge/i.test(msg) ? REQUIRED_TOAST.PAYMENT_NOT_CHARGED : msg,

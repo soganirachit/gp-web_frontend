@@ -12,6 +12,7 @@ import { formatItemsPreviewAsProductLabel } from "@/utils/orderListDisplay";
 import { format } from "date-fns";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { SettingsListSkeleton } from "../../components/common/PageSkeletons";
+import { SupportUnreadIndicator } from "../../components/common/SupportUnreadIndicator";
 import { UniformPageHeader } from "../../components/layout/UniformPageHeader";
 
 function normalizeOrderNumber(n: string | null | undefined): string {
@@ -380,21 +381,27 @@ const CustomerSupport: React.FC = () => {
                 </p>
               ) : null}
               <div className="space-y-3">
-                {tickets.map((ticket) => (
+                {tickets.map((ticket) => {
+                  const unread = Boolean(ticket.has_unread_by_customer);
+                  const unreadVariant = feature === "gpStore" ? "store" : "daily";
+                  const ticketCardClass = unread
+                    ? feature === "gpStore"
+                      ? "bg-[#F3FAF4] border border-[#C8E6C9] hover:bg-[#EAF5EB]"
+                      : "bg-[#FFFBF0] border border-[#FFE082] hover:bg-[#FFF8E1]"
+                    : "bg-gray-50 hover:bg-gray-100";
+
+                  return (
                   <div
                     key={ticket.id}
                     onClick={() => handleTicketClick(ticket.ticket_number)}
-                    className="bg-gray-50 rounded-xl p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                    className={`rounded-xl p-4 cursor-pointer transition-colors ${ticketCardClass}`}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          {ticket.has_unread_by_customer && (
-                            <span
-                              className="inline-flex h-2.5 w-2.5 rounded-full bg-red-500"
-                              aria-label="unread messages"
-                            />
-                          )}
+                          {unread ? (
+                            <SupportUnreadIndicator variant={unreadVariant} size="md" />
+                          ) : null}
                           <h3 className="font-semibold text-gray-900 text-base">
                             {ticket.subject}
                           </h3>
@@ -425,7 +432,8 @@ const CustomerSupport: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               {(ticketsPrevious || ticketsNext) && (
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-4">

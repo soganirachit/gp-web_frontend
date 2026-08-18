@@ -14,6 +14,10 @@ import RazorpayPayment from "../Razorpay/RazorpayPayment";
 import { IoAlertCircle, IoWarningOutline } from "react-icons/io5";
 import { useNetworkRecovery } from "../../../hooks/useNetworkRecovery";
 import { WALLET_PAYMENT_RECOVERED_EVENT } from "../../../utils/pendingPayments";
+import {
+  getPlainDismissUserMessage,
+  isPaymentModalDismissed,
+} from "../../../utils/razorpayCheckoutFailure";
 import { IoMdArrowDown, IoMdArrowUp } from "react-icons/io";
 import walletImage from "../../../assets/icon/Wallet.png";
 import profileImage from "../../../assets/icon/Profile.png";
@@ -881,6 +885,10 @@ const Wallet = () => {
               }
             }}
             onError={(error) => {
+              if (isPaymentModalDismissed(error)) {
+                toast.error(getPlainDismissUserMessage());
+                return;
+              }
               toast.error(
                 error.message || "Payment failed. Please try again."
               );

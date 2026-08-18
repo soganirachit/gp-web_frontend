@@ -485,9 +485,8 @@ const OrderDetails: React.FC = () => {
   const confirmedEvent = order.timeline.find(
     (e) => e.status === 'confirmed' || e.status === 'order_confirmed',
   );
-  const preparingEvent = order.timeline.find((e) =>
-    ['preparing', 'ready'].includes(e.status),
-  );
+  const preparingEvent = order.timeline.find((e) => e.status === 'preparing');
+  const readyEvent = order.timeline.find((e) => e.status === 'ready');
   const outForDeliveryEvent = order.timeline.find((e) => e.status === 'out_for_delivery');
   const deliveredEvent = order.timeline.find((e) => e.status === 'delivered');
   const failedEvent = order.timeline.find((e) => e.status === 'failed');
@@ -524,7 +523,16 @@ const OrderDetails: React.FC = () => {
     });
   }
 
-  if (preparingEvent || customerStatusKey === 'preparing') {
+  if (readyEvent || customerStatusKey === 'ready') {
+    const readyAt = readyEvent?.created_at || order.confirmed_at || order.created_at;
+    timelinePoints.push({
+      label: 'Ready for Delivery',
+      icon: orderTickIcon,
+      date: formatDateTime(readyAt).date,
+      time: formatDateTime(readyAt).time,
+      status: 'ready',
+    });
+  } else if (preparingEvent || customerStatusKey === 'preparing') {
     const prepAt = preparingEvent?.created_at || order.confirmed_at || order.created_at;
     timelinePoints.push({
       label: 'Preparing',

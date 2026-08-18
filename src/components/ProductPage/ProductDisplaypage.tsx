@@ -22,6 +22,7 @@ import {
 } from "../../services/product.service";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { gpDailyHome } from "../../utils/gpDailyHomeDesignSystem";
+import { resolveLabelSectionTitle } from "../../utils/productLabelDisplay";
 import { Product } from "../../services/product.service";
 // Import icons from assets
 import WalletImage from "../../assets/icon/Wallet.png";
@@ -1869,7 +1870,9 @@ const ProductPage: React.FC = () => {
           {bestSellers.length > 0 && (
             <div className="mt-10 mb-8">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className={gpDailyHome.sectionHeading}>Best Sellers</h2>
+                <h2 className={gpDailyHome.sectionHeading}>
+                  {resolveLabelSectionTitle("best-seller", bestSellers)}
+                </h2>
                 <button
                   type="button"
                   onClick={() => navigate(`${basePath}/Products`)}
@@ -1895,7 +1898,11 @@ const ProductPage: React.FC = () => {
                     className="gp-store-card-scroll hover:shadow-md transition-shadow"
                   >
                     <div className="relative aspect-square overflow-hidden bg-[#f8f6f1]">
-                      <ProductImageTag labels={item.labels} variant="daily" />
+                      <ProductImageTag
+                        labels={item.labels}
+                        variant="daily"
+                        preferredLabelSlug="best-seller"
+                      />
                       <img
                         src={resolveProductImageUrl(item as unknown as Record<string, unknown>)}
                         alt={item.name}

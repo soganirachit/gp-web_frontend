@@ -221,10 +221,13 @@ export interface TicketQuestion {
 }
 
 export interface PredefinedAnswers {
-  issue_type?: string; // From choices: wrong items / missing items / damaged / not delivered / quality / other
-  affected_items?: string; // Text answer
-  description?: string; // Text answer (API uses "description" not "problem_description")
-  noticed_when?: string; // Text answer
+  issue_type?: string;
+  description?: string;
+  additional_info?: string;
+  /** @deprecated Legacy ticket flows */
+  affected_items?: string;
+  /** @deprecated Legacy ticket flows */
+  noticed_when?: string;
 }
 
 class SupportService {

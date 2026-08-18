@@ -492,10 +492,13 @@ const StoreProductsPages: React.FC = () => {
                     >
                     {/* Product Image */}
                     <div className="aspect-square bg-white overflow-hidden relative">
-                      <ProductImageTag
-                        labels={item.labels}
-                        variant={availabilityChannel === "daily" ? "daily" : "store"}
-                      />
+                      {/* GP Daily products list — hide Daily label badge for now */}
+                      {availabilityChannel !== "daily" ? (
+                        <ProductImageTag
+                          labels={item.labels}
+                          variant="store"
+                        />
+                      ) : null}
                       <img
                         src={getProductImageUrl(item)}
                         alt={item.name}
@@ -528,8 +531,8 @@ const StoreProductsPages: React.FC = () => {
 
                     {/* Product Info — flex-1 + row stretch so price row aligns across the grid */}
                     <div className="flex min-h-0 flex-1 flex-col p-3">
-                      <div className="mb-1 flex min-h-[2.75rem] items-start justify-between gap-1">
-                        <h3 className="min-w-0 flex-1 pr-1 text-sm font-semibold leading-snug text-gray-900 line-clamp-2">
+                      <div className="mb-1 flex min-h-[1.375rem] items-start justify-between gap-1">
+                        <h3 className="min-w-0 flex-1 truncate pr-1 text-sm font-semibold text-gray-900">
                           {formatProductTitleCase(item.name)}
                         </h3>
                       </div>

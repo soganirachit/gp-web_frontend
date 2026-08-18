@@ -1,6 +1,11 @@
 import React, { useEffect, useRef, useState, forwardRef } from "react";
 import Spinner from "../../common/Spinner";
 import { loadRazorpayScript } from "../../../lib/razorpayLoader";
+import { PAYMENT_MODAL_DISMISSED } from "../../../utils/razorpayModalDismiss";
+import {
+  markRazorpayCheckoutClosed,
+  markRazorpayCheckoutOpen,
+} from "../../../utils/razorpayCheckoutSession";
 
 
 interface CartRazorpayPaymentProps {
@@ -70,6 +75,7 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
         },
         handler: function (response: RazorpayResponse) {
           paymentOpeningRef.current = false;
+          markRazorpayCheckoutClosed();
           // Payment completed successfully on Razorpay side
           onSuccess({
             razorpay_payment_id: response.razorpay_payment_id,
@@ -81,11 +87,12 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
         modal: {
           ondismiss: function () {
             paymentOpeningRef.current = false;
+            markRazorpayCheckoutClosed();
             // Payment modal was closed by user
             if (isMountedRef.current) {
               setIsLoading(false);
             }
-            onError(new Error("Payment cancelled by user"));
+            onError(new Error(PAYMENT_MODAL_DISMISSED));
           },
         },
       };
@@ -97,7 +104,13 @@ const CartRazorpayPayment = forwardRef<HTMLButtonElement, CartRazorpayPaymentPro
       const razorpayInstance = new window.Razorpay(options);
       razorpayInstance.on('payment.failed', () => {
         paymentOpeningRef.current = false;
+        markRazorpayCheckoutClosed();
+        if (isMountedRef.current) {
+          setIsLoading(false);
+        }
+        onError(new Error(PAYMENT_MODAL_DISMISSED));
       });
+      markRazorpayCheckoutOpen();
       razorpayInstance.open();
       setIsLoading(false);
     } catch (error) {

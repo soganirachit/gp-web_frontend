@@ -572,8 +572,8 @@ const ProductBrowsePage: React.FC = () => {
                           />
                         </div>
                         <div className="flex min-h-0 flex-1 flex-col p-3">
-                          <div className="mb-1 flex min-h-[2.75rem] items-start justify-between gap-1.5">
-                            <h3 className="min-w-0 flex-1 pr-1 text-sm font-semibold leading-snug text-gray-900 line-clamp-2">
+                          <div className="mb-1 flex min-h-[1.375rem] items-start justify-between gap-1.5">
+                            <h3 className="min-w-0 flex-1 truncate pr-1 text-sm font-semibold text-gray-900">
                               {formatProductTitleCase(String(row.name ?? ""))}
                             </h3>
                             <span className="shrink-0 rounded-md bg-[#FAA222] px-2 py-0.5 text-[10px] font-semibold leading-tight text-gray-900">

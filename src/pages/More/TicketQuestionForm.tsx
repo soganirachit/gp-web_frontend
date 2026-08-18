@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
 import { FaPaperPlane } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
-import { supportService, TicketQuestion, PredefinedAnswers } from '../../services/support.service';
+import { SUPPORT_TICKET_QUESTIONS } from '../../constants/supportTicketQuestions';
+import { supportService, type PredefinedAnswers } from '../../services/support.service';
 import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
 import { errorMessageFromCatch } from '../../utils/apiErrorMessage';
 import { useFeatureTheme } from '../../context/FeatureThemeContext';
@@ -57,9 +58,9 @@ const TicketQuestionForm: React.FC = () => {
     navigate(`${supportBasePath}/customer-support`, { replace: false });
   };
 
-  const [questions, setQuestions] = useState<TicketQuestion[]>([]);
+  const [questions, setQuestions] = useState(SUPPORT_TICKET_QUESTIONS);
   const [answers, setAnswers] = useState<PredefinedAnswers>({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -67,9 +68,16 @@ const TicketQuestionForm: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Scroll to top on mount
     window.scrollTo(0, 0);
-    fetchQuestions();
+    if (SUPPORT_TICKET_QUESTIONS.length > 0) {
+      setChatMessages([{
+        id: 'q-0',
+        type: 'question',
+        content: SUPPORT_TICKET_QUESTIONS[0].question,
+        questionId: SUPPORT_TICKET_QUESTIONS[0].id,
+        timestamp: new Date(),
+      }]);
+    }
   }, []);
 
   useEffect(() => {
@@ -78,29 +86,6 @@ const TicketQuestionForm: React.FC = () => {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const fetchQuestions = async () => {
-    try {
-      setLoading(true);
-      const fetchedQuestions = await supportService.getTicketQuestions();
-      setQuestions(fetchedQuestions);
-      
-      // Add first question as a chat message
-      if (fetchedQuestions.length > 0) {
-        setChatMessages([{
-          id: 'q-0',
-          type: 'question',
-          content: fetchedQuestions[0].question,
-          questionId: fetchedQuestions[0].id,
-          timestamp: new Date()
-        }]);
-      }
-    } catch (error) {
-      console.error('Error fetching questions:', error);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleAnswerSelect = (questionId: string, value: string, label: string) => {
@@ -195,7 +180,7 @@ const TicketQuestionForm: React.FC = () => {
     const finalAnswers = answersToSubmit || answers;
     
     // Check if all required questions are answered
-    const requiredAnswers = ['issue_type', 'affected_items', 'description', 'noticed_when'];
+    const requiredAnswers = ['issue_type', 'description'];
     const allAnswered = requiredAnswers.every(key => {
       const answer = finalAnswers[key as keyof PredefinedAnswers];
       return answer !== undefined && answer !== null && answer !== '';
@@ -365,7 +350,7 @@ const TicketQuestionForm: React.FC = () => {
         {showComposer ? (
           <div className="support-composer-dock z-30">
             {currentQuestion.type === 'choice' && currentQuestion.options ? (
-              <div className="space-y-2 px-4 pt-3 pb-0">
+              <div className="space-y-2 px-4 py-3">
                 {currentQuestion.options.map((option) => (
                   <button
                     key={option.value}
@@ -389,14 +374,8 @@ const TicketQuestionForm: React.FC = () => {
                   </button>
                 ))}
               </div>
-            ) : null}
-            <div
-              className={`flex items-end gap-2 px-4 pb-3 sm:pb-4 ${
-                currentQuestion.type === 'choice' && currentQuestion.options
-                  ? 'pt-2'
-                  : 'pt-3 sm:pt-4'
-              }`}
-            >
+            ) : (
+              <div className="flex items-end gap-2 px-4 py-3 sm:py-4">
                 <textarea
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
@@ -407,9 +386,7 @@ const TicketQuestionForm: React.FC = () => {
                     }
                   }}
                   placeholder={
-                    currentQuestion.type === 'choice'
-                      ? 'Or type your answer...'
-                      : currentQuestion.placeholder || 'Type your answer...'
+                    currentQuestion.placeholder || 'Type your answer...'
                   }
                   className={`min-h-[44px] max-h-[min(7.5rem,28dvh)] flex-1 resize-none rounded-xl border border-gray-300 bg-gray-50 p-3 text-sm focus:outline-none ${
                     isDailySupport
@@ -421,13 +398,14 @@ const TicketQuestionForm: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleTextAnswerSend}
-                  disabled={!textInput.trim()}
+                  disabled={!textInput.trim() && currentQuestion.id !== 'additional_info'}
                   className="flex shrink-0 rounded-xl p-2.5 text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                   style={{ backgroundColor: accentColor }}
                 >
                   <FaPaperPlane size={16} />
                 </button>
-            </div>
+              </div>
+            )}
           </div>
         ) : null}
       </div>

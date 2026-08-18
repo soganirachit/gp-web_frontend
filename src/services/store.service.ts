@@ -3,6 +3,7 @@ import api from "./api";
 import { REQUIRED_TOAST } from "../constants/requiredToastMessages";
 import { getApiUrl } from "../config/api.config";
 import { addressService, type Address } from "./address.service";
+import { formatSavedAddressLine } from "../utils/resolveHomeCatalogHeaderAddress";
 import { cartService } from "./cart.service";
 import {
   resolveGpDailyZoneAtLatLng,
@@ -637,6 +638,15 @@ class StoreService {
       );
     }
     this.setGpStoreCatalogAddressOverrideId(String(address.id));
+    try {
+      localStorage.setItem("selectedDeliveryAddress", JSON.stringify(address));
+      const headerLine = formatSavedAddressLine(address);
+      if (headerLine.trim()) {
+        localStorage.setItem("userLocation", headerLine);
+      }
+    } catch {
+      /* ignore storage errors */
+    }
 
     const isGpDaily =
       typeof window !== "undefined" &&

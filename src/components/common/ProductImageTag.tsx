@@ -1,25 +1,29 @@
-import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
+import {
+  labelDisplayText,
+  pickProductLabel,
+  type ProductLabelLike,
+} from "../../utils/productLabelDisplay";
 
-export type ProductLabelLike = { name?: string; slug?: string };
+export type { ProductLabelLike };
 
 type Props = {
   labels?: ProductLabelLike[] | null;
   /** `store` = green badge (gp-store). `daily` = orange badge (gp-daily). */
   variant?: "store" | "daily";
+  /** When set, show this label slug on the card (e.g. `premium`, `best-seller`). */
+  preferredLabelSlug?: string;
 };
-
-function labelDisplayText(label: ProductLabelLike): string | null {
-  if (label.name?.trim()) return formatProductTitleCase(label.name);
-  if (label.slug?.trim()) return formatProductTitleCase(label.slug.replace(/-/g, " "));
-  return null;
-}
 
 /**
  * Top-left overlay on product thumbnails (store cards). Inset slightly so it clears the image edge.
  */
-export function ProductImageTag({ labels, variant = "store" }: Props) {
+export function ProductImageTag({
+  labels,
+  variant = "store",
+  preferredLabelSlug,
+}: Props) {
   if (!labels?.length) return null;
-  const label = labels.find((l) => labelDisplayText(l)) ?? labels[0];
+  const label = pickProductLabel(labels, preferredLabelSlug);
   const text = label ? labelDisplayText(label) : null;
   if (!text) return null;
 

@@ -1,11 +1,11 @@
 /**
  * Customer-facing order status labels and colors.
- * Internal status `ready` is mapped to preparing for customers.
  */
 
 export type CustomerOrderStatusKey =
   | "confirmed"
   | "preparing"
+  | "ready"
   | "out_for_delivery"
   | "delivered"
   | "cancelled"
@@ -39,10 +39,12 @@ export function toCustomerOrderStatusKey(raw: string): CustomerOrderStatusKey {
   }
   if (
     k === "preparing" ||
-    k === "processing" ||
-    k === "ready"
+    k === "processing"
   ) {
     return "preparing";
+  }
+  if (k === "ready") {
+    return "ready";
   }
   if (
     k === "confirmed" ||
@@ -68,6 +70,8 @@ export function getCustomerOrderStatusLabel(raw: string): string {
       return "Failed";
     case "out_for_delivery":
       return "Out for Delivery";
+    case "ready":
+      return "Ready";
     case "preparing":
       return "Preparing";
     case "confirmed":
@@ -89,15 +93,13 @@ export function getCustomerOrderStatusBadgeClass(
   }
   if (key === "cancelled" || key === "failed") return "bg-[#EF4444] text-white";
   if (key === "out_for_delivery") return "bg-[#3B82F6] text-white";
+  if (key === "ready") return "bg-[#0D9488] text-white";
   if (key === "preparing") return "bg-amber-500 text-white";
   return "bg-gray-500 text-white";
 }
 
 /** Text color classes (order list rows). */
 export function getCustomerOrderStatusTextClass(raw: string): string {
-  if (normalizeOrderStatusKey(raw) === "ready") {
-    return "text-[#0D9488]";
-  }
   switch (toCustomerOrderStatusKey(raw)) {
     case "delivered":
       return "text-[#166534]";
@@ -106,6 +108,8 @@ export function getCustomerOrderStatusTextClass(raw: string): string {
       return "text-[#EF4444]";
     case "out_for_delivery":
       return "text-[#1D4ED8]";
+    case "ready":
+      return "text-[#0D9488]";
     case "preparing":
       return "text-[#B45309]";
     case "confirmed":
@@ -124,6 +128,8 @@ export function getCustomerOrderStatusHistoryPillClass(raw: string): string {
       return "bg-[#FEE2E2] text-[#991B1B]";
     case "out_for_delivery":
       return "bg-[#DBEAFE] text-[#1D4ED8]";
+    case "ready":
+      return "bg-[#CCFBF1] text-[#0F766E]";
     case "preparing":
       return "bg-[#FFEDD5] text-[#C2410C]";
     case "confirmed":

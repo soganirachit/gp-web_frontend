@@ -82,6 +82,7 @@ import {
   HOME_HEADER_PROFILE_OFFSET,
 } from "../constants/homeHeaderLayout";
 import { ProductImageTag } from "../components/common/ProductImageTag";
+import { resolveLabelSectionTitle } from "../utils/productLabelDisplay";
 import { SessionCachedImage } from "../components/common/SessionCachedImage";
 import { formatNamasteGreeting, hasRealUserFirstName } from "../utils/namasteGreeting";
 import { OffersBannerCarousel } from "../components/OffersBannerCarousel";
@@ -300,6 +301,13 @@ const GpStore_Homepage: React.FC = () => {
     };
 
     const fetchLatestAddress = useCallback(async () => {
+        const applyHeaderAddress = (address: Parameters<typeof formatSavedAddressLine>[0] & { type?: string }) => {
+            setDeliveryLocation(formatSavedAddressLine(address));
+            setAddressType(address.type || "Home");
+            deliveryCoordsRef.current = parseDeliveryAddressCoords(address);
+            setDeliveryCoordsTick((t) => t + 1);
+        };
+
         try {
             setIsLoadingAddress(true);
             if (!isLoggedIn) {
@@ -325,22 +333,31 @@ const GpStore_Homepage: React.FC = () => {
             const selectedAddress = pickHomeCatalogHeaderAddress(addresses);
 
             if (selectedAddress) {
-                const formattedAddress = formatSavedAddressLine(selectedAddress);
-                setDeliveryLocation(formattedAddress);
-                setAddressType(selectedAddress.type || "Home");
-                deliveryCoordsRef.current =
-                    parseDeliveryAddressCoords(selectedAddress);
+                applyHeaderAddress(selectedAddress);
             } else {
                 setDeliveryLocation("");
                 setAddressType("Home");
                 deliveryCoordsRef.current = null;
             }
-            setDeliveryCoordsTick((t) => t + 1);
         } catch (error) {
             console.error("Error fetching address:", error);
-            // Avoid showing stale address when logged out or on failures.
-            setDeliveryLocation("");
-            setAddressType("Home");
+            const stored = localStorage.getItem("selectedDeliveryAddress");
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored) as Parameters<
+                        typeof formatSavedAddressLine
+                    >[0] & { type?: string };
+                    applyHeaderAddress(parsed);
+                } catch {
+                    setDeliveryLocation(localStorage.getItem("userLocation") || "");
+                    setAddressType("Home");
+                    deliveryCoordsRef.current = null;
+                }
+            } else {
+                setDeliveryLocation(localStorage.getItem("userLocation") || "");
+                setAddressType("Home");
+                deliveryCoordsRef.current = null;
+            }
         } finally {
             setIsLoadingAddress(false);
         }
@@ -407,7 +424,6 @@ const GpStore_Homepage: React.FC = () => {
     }, [isLoggedIn]);
 
     useEffect(() => {
-        if (!isLoggedIn) return;
         const onCatalog = () => {
             void fetchLatestAddress();
             const sid = storeService.getStoreIdForProducts();
@@ -417,14 +433,22 @@ const GpStore_Homepage: React.FC = () => {
             void fetchBestSellers();
         };
         window.addEventListener(GPS_CATALOG_LOCATION_UPDATED_EVENT, onCatalog);
-        return () =>
+        window.addEventListener("addressUpdated", onCatalog);
+        return () => {
             window.removeEventListener(
                 GPS_CATALOG_LOCATION_UPDATED_EVENT,
                 onCatalog,
             );
+            window.removeEventListener("addressUpdated", onCatalog);
+        };
         // Event handler uses the latest fetch* and fetchLatestAddress from the render when the listener is attached.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isLoggedIn]);
+
+    useEffect(() => {
+        if (location.pathname !== basePath) return;
+        void fetchLatestAddress();
+    }, [location.pathname, basePath, fetchLatestAddress]);
 
     const handleLocationClick = () => {
         if (!isLoggedIn) {
@@ -467,6 +491,8 @@ const GpStore_Homepage: React.FC = () => {
     }
 
     const filteredBestSellers = bestSellers;
+    const bestSellerSectionTitle = resolveLabelSectionTitle("best-seller", filteredBestSellers);
+    const premiumSectionTitle = resolveLabelSectionTitle("premium", premiumProducts);
 
     return (
         <ErrorBoundary>
@@ -707,7 +733,7 @@ const GpStore_Homepage: React.FC = () => {
                     </GpDailyHomeSection>
 
                     <GpDailyHomeSection
-                        title="Best Sellers"
+                        title={bestSellerSectionTitle}
                         headerRight={
                             filteredBestSellers.length > 0 ? (
                                 <button
@@ -729,7 +755,10 @@ const GpStore_Homepage: React.FC = () => {
                                         onClick={() => handleBestSellerClick(bestSeller)}
                                     >
                                         <div className="relative aspect-square bg-[#f8f6f1] overflow-hidden">
-                                            <ProductImageTag labels={bestSeller.labels} />
+                                            <ProductImageTag
+                                                labels={bestSeller.labels}
+                                                preferredLabelSlug="best-seller"
+                                            />
                                             <SessionCachedImage
                                                 src={pickPrimaryImageUrl(bestSeller, "card") || resolveProductImageUrl(bestSeller as unknown as Record<string, unknown>)}
                                                 alt={bestSeller.name}
@@ -769,7 +798,7 @@ const GpStore_Homepage: React.FC = () => {
                     </GpDailyHomeSection>
 
                     <GpDailyHomeSection
-                        title="Premium Packs"
+                        title={premiumSectionTitle}
                         headerRight={
                             premiumProducts.length > 0 ? (
                                 <button
@@ -791,7 +820,10 @@ const GpStore_Homepage: React.FC = () => {
                                     onClick={() => handleProductClick(product)}
                                 >
                                     <div className="relative aspect-square bg-[#f8f6f1] overflow-hidden">
-                                        <ProductImageTag labels={product.labels} />
+                                        <ProductImageTag
+                                            labels={product.labels}
+                                            preferredLabelSlug="premium"
+                                        />
                                         <SessionCachedImage
                                             src={pickPrimaryImageUrl(product, "card") || resolveProductImageUrl(product as unknown as Record<string, unknown>)}
                                             alt={product.name}

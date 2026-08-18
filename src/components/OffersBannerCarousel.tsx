@@ -50,6 +50,16 @@ function normalizeBannersFromResponse(body: unknown): Banner[] {
   return [];
 }
 
+function resolveBannerCta(banner: Banner): { label: string; link: string } | null {
+  const link = String(banner.cta_link || banner.secondary_cta_link || "").trim();
+  const label = String(banner.cta_label || banner.secondary_cta_label || "").trim();
+  if (!link && !label) return null;
+  return {
+    link: link || "#",
+    label: label || "Shop Now",
+  };
+}
+
 
 // Theme-aligned fallback gradients (cream, soft green, soft orange) — no harsh dark brown
 const FALLBACK_GRADIENTS_GP_STORE = [
@@ -199,12 +209,21 @@ export function OffersBannerCarousel({
   }, [startAutoSlide]);
 
   const handleNavigate = (link?: string) => {
-    if (!link) return;
+    if (!link || link === '#') return;
     if (link.startsWith('http://') || link.startsWith('https://')) {
-      window.open(link, '_blank', 'noopener,noreferrer');
-    } else {
-      navigate(link);
+      try {
+        const url = new URL(link);
+        if (url.origin === window.location.origin) {
+          navigate(url.pathname + url.search + url.hash);
+          return;
+        }
+      } catch {
+        // fall through to same-tab navigation
+      }
+      window.location.href = link;
+      return;
     }
+    navigate(link);
   };
 
   const handleManualSlide = useCallback((index: number) => {
@@ -263,6 +282,9 @@ export function OffersBannerCarousel({
   const banner = banners[activeIndex];
   const hasImage = !!(banner.image_url && !imgErrors[banner.id]);
   const fallbackGradient = fallbackGradients[banner.id % fallbackGradients.length];
+  const bannerCta = resolveBannerCta(banner);
+  const ctaBg =
+    (banner.cta_bg_color && String(banner.cta_bg_color).trim()) || primaryColor;
 
   return (
     <div className={`${sectionMarginClass} relative z-0`}>
@@ -291,7 +313,7 @@ export function OffersBannerCarousel({
         key={banner.id}
         className={`relative w-full ${dailyBannerHeightClass} ${cardRadiusClass} overflow-hidden cursor-pointer select-none shadow-md border border-gray-200/60`}
         style={{ animation: 'bannerFadeIn 0.4s ease-out' }}
-        onClick={() => handleNavigate(banner.cta_link)}
+        onClick={() => handleNavigate(bannerCta?.link || banner.cta_link)}
         role="button"
         aria-label={banner.title}
         onTouchStart={handleTouchStart}
@@ -318,8 +340,8 @@ export function OffersBannerCarousel({
         {/* Softer gradient scrim for text legibility */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" />
 
-        {/* Content pinned to bottom — responsive padding */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 sm:gap-3">
+        {/* Content pinned to bottom — title left, CTA right */}
+        <div className="absolute bottom-0 left-0 right-0 z-10 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 sm:gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-white font-bold text-sm sm:text-base leading-snug drop-shadow-md line-clamp-2">
               {banner.title}
@@ -331,18 +353,19 @@ export function OffersBannerCarousel({
             )}
           </div>
 
-          {banner.cta_label && (
+          {bannerCta ? (
             <button
-              className="flex-shrink-0 self-start sm:self-auto px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm shadow-lg whitespace-nowrap transition-opacity active:opacity-90 min-h-[42px] flex items-center justify-center"
+              type="button"
+              className="flex-shrink-0 self-end sm:self-auto px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm shadow-lg whitespace-nowrap transition-opacity active:opacity-90 min-h-[42px] flex items-center justify-center border border-white/20"
               style={{
-                backgroundColor: banner.cta_bg_color || primaryColor,
+                backgroundColor: ctaBg,
                 color: theme.feature === 'gpDaily' ? '#1a1a1a' : 'white',
               }}
-              onClick={e => { e.stopPropagation(); handleNavigate(banner.cta_link); }}
+              onClick={e => { e.stopPropagation(); handleNavigate(bannerCta.link); }}
             >
-              {banner.cta_label}
+              {bannerCta.label}
             </button>
-          )}
+          ) : null}
         </div>
       </div>
       </div>
