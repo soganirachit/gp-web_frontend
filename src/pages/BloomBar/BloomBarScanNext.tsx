@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, QrCode, ArrowRight } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from './BloomBarCartContext';
 import { base44 } from '@/api/base44Client';
 import BloomBarScanner from './BloomBarScanner';
@@ -19,6 +19,7 @@ interface ScanParams {
 export default function BloomBarScanNext() {
   const { itemCount, total, setKioskContext, sessionId } = useCart();
   const location = useLocation();
+  const navigate = useNavigate();
   const navState = location.state as { addedName?: string; addedQty?: number } | null;
   const [view, setView] = useState<View>('scanning');
   const [scanKey, setScanKey] = useState(0);
@@ -41,52 +42,28 @@ export default function BloomBarScanNext() {
   }, [showNotice, lastAdded]);
 
   const handleScan = useCallback(
-    async (params: ScanParams) => {
-      setView('loading');
+    (params: ScanParams) => {
       setLoadError(null);
 
+      // A QR that isn't one of ours (wifi, a website, anything without a product)
+      // stays here rather than dumping the customer on the product page's dead-end
+      // error screen — they're mid-scan and just need to try another tag.
       const productId = params.product || params.p;
-      const kioskId = params.kiosk || params.k || '';
-      const campaign = params.campaign || params.c || 'direct';
-
-      try {
-        let resolvedProduct: BloomBarProduct | undefined;
-        if (productId) {
-          const results = await base44.entities.Product.filter({ id: productId });
-          if (results.length > 0) resolvedProduct = results[0] as unknown as BloomBarProduct;
-          else throw new Error('Product not found');
-        } else {
-          const results = await base44.entities.Product.list('-created_date', 1);
-          if (results.length > 0) resolvedProduct = results[0] as unknown as BloomBarProduct;
-          else throw new Error('No products available');
-        }
-
-        if (kioskId) {
-          const kiosks = await base44.entities.Kiosk.filter({ id: kioskId });
-          if (kiosks.length > 0) {
-            setKiosk(kiosks[0]);
-            setKioskContext({ kioskId, campaign, kiosk: kiosks[0] });
-          }
-        }
-
-        if (productId) {
-          base44.entities.QRScanEvent.create({
-            kiosk_id: kioskId,
-            product_id: productId,
-            campaign,
-            session_id: sessionId,
-            user_agent: navigator.userAgent,
-          }).catch(() => {});
-        }
-
-        setProduct(resolvedProduct!);
-        setView('product');
-      } catch (e) {
-        setLoadError((e as Error).message);
+      if (!productId) {
+        setLoadError('This QR code is not recognised. Please scan a flower tag.');
         setView('prompt');
+        return;
       }
+
+      // Both scan entry points now run the SAME code. Instead of resolving and
+      // rendering the card inline, hand the scanned params to /bloombar/product
+      // and let it do the Resolve gate, the scan event, the kiosk context and the
+      // in-cart detection — one implementation, one set of validations.
+      // `replace`: the live camera must never be a Back destination.
+      setView('loading');
+      navigate(`/bloombar/product?${new URLSearchParams(params).toString()}`, { replace: true });
     },
-    [kiosk, setKioskContext]
+    [navigate]
   );
 
   const handleAdded = useCallback((prod: BloomBarProduct, qty: number) => {
@@ -137,7 +114,12 @@ export default function BloomBarScanNext() {
 
             {itemCount > 0 && (
               <div className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-0 right-0 px-5 z-[100]">
+                {/* `replace` on every exit from this page: the scanner must never
+                    stay behind the basket in history, or Back from the basket
+                    reopens a live camera. Replacing means Back skips it and lands
+                    on the product page instead. */}
                 <Link
+                  replace
                   to="/bloombar/basket"
                   className="w-full py-4 rounded-2xl bg-white text-genda-green font-semibold text-base flex items-center justify-center gap-2 float-shadow"
                 >
@@ -171,6 +153,7 @@ export default function BloomBarScanNext() {
                 product={product}
                 kiosk={kiosk as { name?: string } | null}
                 onAdded={handleAdded}
+                basketLinkReplace
               />
             </div>
           </motion.div>
@@ -204,8 +187,10 @@ export default function BloomBarScanNext() {
               >
                 <QrCode size={20} /> Open Scanner
               </motion.button>
+              {/* Same reason as the scanner's Continue-to-Basket link above. */}
               {itemCount > 0 && (
                 <Link
+                  replace
                   to="/bloombar/basket"
                   className="w-full py-4 rounded-2xl border-2 border-genda-green text-genda-green font-semibold text-base flex items-center justify-center gap-2"
                 >

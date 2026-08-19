@@ -123,7 +123,11 @@ export function AppToaster() {
       }}
     >
       {(t: Toast) => (
-        <ToastBar toast={t} position={position}>
+        // t.position ?? position: a toast that overrides its placement (e.g. the
+        // BloomBar stock cap, which drops from the top) must animate from the edge
+        // it actually sits on, not slide up from a bottom it isn't on. Toasts
+        // without an override keep the global default.
+        <ToastBar toast={t} position={t.position ?? position}>
           {({ icon, message }) => (
             <div className="flex w-full min-w-0 items-center gap-1">
               {icon}

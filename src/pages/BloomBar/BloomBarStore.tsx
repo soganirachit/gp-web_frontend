@@ -12,12 +12,18 @@ import {
   DoorOpen,
   AlertCircle,
   ChevronRight,
+  X,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useCart } from './BloomBarCartContext';
 import BloomBarCoBrandHeader from './components/BloomBarCoBrandHeader';
+import BloomBarFlowerLoader from './components/BloomBarFlowerLoader';
 import BloomBarLoadingSkeleton from './components/BloomBarLoadingSkeleton';
+import BloomBarProductCard, {
+  type BloomBarProduct,
+} from './components/BloomBarProductCard';
 import { fmt } from './money';
+import { stockOf, toastStockCap } from './stock';
 
 type BloomBarType = 'stick' | 'bouquet';
 
@@ -30,7 +36,46 @@ interface CatalogProduct {
   description?: string;
   bloombar_type?: BloomBarType;
   badge?: string;
+  /** Units still sellable. null/undefined = uncapped, 0 = out of stock. */
+  stock?: number | null;
+  /** At or below the inventory item's Minimum Alert Level. */
+  low_stock?: boolean;
   [key: string]: unknown;
+}
+
+/** Longest the loader is allowed to hold the catalogue back. One unreachable
+ *  image must never strand a guest on a spinner, so past this we show the grid
+ *  and let whatever is still in flight land on its own. */
+const IMAGE_PRELOAD_TIMEOUT_MS = 6000;
+
+/**
+ * Download every catalogue image before the grid mounts. Kicking these off from
+ * the fetch handler — rather than waiting for React to render <img> tags — is
+ * what removes the dead gap between the products/ response and the first image
+ * request, and having them all cached is what lets the grid appear at once.
+ *
+ * Resolves when all are settled or the timeout fires, whichever comes first.
+ * A failed image resolves like a successful one: the card's own fallback covers it.
+ */
+function preloadImages(urls: string[]): Promise<void> {
+  if (urls.length === 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    let remaining = urls.length;
+    const timer = window.setTimeout(resolve, IMAGE_PRELOAD_TIMEOUT_MS);
+    const settle = () => {
+      remaining -= 1;
+      if (remaining === 0) {
+        window.clearTimeout(timer);
+        resolve();
+      }
+    };
+    urls.forEach((url) => {
+      const img = new Image();
+      img.onload = settle;
+      img.onerror = settle;
+      img.src = url;
+    });
+  });
 }
 
 /**
@@ -49,9 +94,25 @@ export default function BloomBarStore() {
   const [store, setStore] = useState<Record<string, unknown> | null>(null);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  // Catalogue images all downloaded (or given up on) — the grid waits for this
+  // so it renders complete instead of filling in photo by photo.
+  const [imagesReady, setImagesReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<BloomBarType>('stick');
   const [redirecting, setRedirecting] = useState(false);
+  // Tapped card → full detail sheet. Null = closed.
+  const [selected, setSelected] = useState<CatalogProduct | null>(null);
+
+  // Freeze the store behind the sheet: without this the grid scrolls under the
+  // overlay, and closing lands the customer somewhere they never scrolled to.
+  useEffect(() => {
+    if (!selected) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [selected]);
 
   // Bouquets are fulfilled on the main Genda Phool site. Hand off there, letting the
   // fade overlay play first so the transition feels intentional, not abrupt.
@@ -72,14 +133,31 @@ export default function BloomBarStore() {
         if (!code) throw new Error('No store specified');
         const { store: s, products: p } = await base44.entities.Store.catalog(code);
         if (cancelled) return;
+        const list = p as unknown as CatalogProduct[];
         setStore(s);
-        setProducts(p as unknown as CatalogProduct[]);
+        setProducts(list);
         setStoreContext({ storeCode: code, store: s });
         base44.entities.QRScanEvent.create({
           campaign: 'store',
           session_id: sessionId,
           user_agent: navigator.userAgent,
         }).catch(() => {});
+
+        // Catalogue is in — the page renders now. Only the product grid waits.
+        setLoading(false);
+
+        // Product photos only. Header artwork is left to load the way it always
+        // has; it is small and it is not what makes the grid crawl.
+        //
+        // Started here rather than on render: every millisecond between this
+        // response and the first image request is dead time the guest watches.
+        // If they finish before the grid paints, imagesReady is already true and
+        // the loader below never appears at all.
+        const urls = Array.from(
+          new Set(list.map((prod) => prod.image_url).filter((u): u is string => !!u)),
+        );
+        await preloadImages(urls);
+        if (!cancelled) setImagesReady(true);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
       } finally {
@@ -106,7 +184,8 @@ export default function BloomBarStore() {
     if (!loading && sticks.length === 0 && bouquets.length > 0) setTab('bouquet');
   }, [loading, sticks.length, bouquets.length]);
 
-  if (loading) return <BloomBarLoadingSkeleton />;
+  // Structural wait: no store, no products, nothing to lay out yet.
+  if (loading && !error) return <BloomBarLoadingSkeleton />;
 
   if (error) {
     return (
@@ -191,8 +270,12 @@ export default function BloomBarStore() {
           </div>
         )}
 
-        {/* Product grid */}
-        {list.length === 0 ? (
+        {/* Product grid. Photos still downloading — hold the grid so it lands
+            complete instead of painting in one band at a time. Nothing above
+            here waits on this: the storefront is already up. */}
+        {!imagesReady ? (
+          <BloomBarFlowerLoader />
+        ) : list.length === 0 ? (
           <div className="py-14 text-center text-gray-500">
             <span className="text-5xl block mb-3">💐</span>
             No {tab === 'stick' ? 'stems' : 'bouquets'} available here right now.
@@ -204,6 +287,7 @@ export default function BloomBarStore() {
                 key={product.id}
                 product={product}
                 accent={tab === 'stick' ? 'green' : 'gold'}
+                onOpen={setSelected}
               />
             ))}
           </div>
@@ -242,6 +326,51 @@ export default function BloomBarStore() {
                 <span className="font-bold shrink-0">₹{fmt(total)}</span>
               </motion.button>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Product detail sheet — the same card the kiosk QR page renders, in its
+          fitViewport mode: the bottom bar becomes an inline footer, so nothing
+          inside relies on `fixed` (which this popup's transform would break).
+          Reusing it keeps the stock rules — out-of-stock CTA, the + cap, the
+          "Only N left" note — identical on both surfaces for free.
+
+          Height follows the content, capped at 85dvh, so a short product is a
+          small popup rather than a mostly-empty full-height panel. */}
+      <AnimatePresence>
+        {selected && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={() => setSelected(null)}
+            className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.94, opacity: 0 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-sm max-h-[85dvh] bg-white rounded-3xl overflow-hidden flex flex-col premium-shadow"
+            >
+              <button
+                onClick={() => setSelected(null)}
+                aria-label="Close"
+                className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-md"
+              >
+                <X size={18} className="text-gray-700" />
+              </button>
+              <div className="flex-1 min-h-0 flex flex-col pt-4">
+                <BloomBarProductCard
+                  product={selected as unknown as BloomBarProduct}
+                  fitViewport
+                  onAdded={() => setSelected(null)}
+                />
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -318,27 +447,57 @@ function CategoryTab({
 function StoreProductCard({
   product,
   accent,
+  onOpen,
 }: {
   product: CatalogProduct;
   accent: 'green' | 'gold';
+  onOpen: (product: CatalogProduct) => void;
 }) {
   const { items, addItem, updateQuantity } = useCart();
   const qty = items.find((i) => i.product_id === product.id)?.quantity ?? 0;
   const badgeCls = accent === 'green' ? 'bg-genda-green text-white' : 'bg-genda-gold text-white';
   const addCls = accent === 'green' ? 'genda-gradient' : 'bg-genda-gold';
 
-  const increment = () =>
+  const stock = stockOf(product);
+  const outOfStock = stock === 0;
+  const atCap = stock !== null && qty >= stock;
+  const showLowStock = product.low_stock === true && stock !== null && stock > 0;
+
+  const increment = () => {
+    if (atCap) {
+      toastStockCap(stock!);
+      return;
+    }
     addItem({
       product_id: product.id,
       product_name: product.name,
       price: product.price,
       quantity: 1,
       image_url: product.image_url,
+      stock: stock ?? undefined,
     });
+  };
   const decrement = () => updateQuantity(product.id, qty - 1);
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden premium-shadow flex flex-col h-full">
+    // Whole card opens the detail sheet; the quantity controls stop the click so
+    // adding a stem never yanks the sheet open. Out-of-stock still opens — reading
+    // about it is the one thing left to do with it.
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(product)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen(product);
+        }
+      }}
+      aria-label={`View ${product.name}`}
+      className={`bg-white rounded-2xl overflow-hidden premium-shadow flex flex-col h-full cursor-pointer text-left ${
+        outOfStock ? 'opacity-60 grayscale' : ''
+      }`}
+    >
       <div className="relative w-full aspect-square bg-genda-cream shrink-0 overflow-hidden">
         {product.image_url ? (
           <img
@@ -349,15 +508,23 @@ function StoreProductCard({
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-4xl">💐</div>
         )}
-        {product.badge && (
+        {product.badge && !outOfStock && (
           <span className={`absolute top-2 left-2 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${badgeCls}`}>
             {product.badge}
           </span>
+        )}
+        {outOfStock && (
+          <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
+            <span className="text-white font-semibold text-sm">Out of Stock</span>
+          </div>
         )}
       </div>
 
       <div className="p-3 flex flex-col flex-1">
         <h3 className="font-semibold text-sm leading-snug line-clamp-2 min-h-[2.5rem]">{product.name}</h3>
+        {showLowStock && (
+          <p className="mt-1 text-[11px] font-medium text-amber-700">Only {stock} left</p>
+        )}
 
         <div className="mt-auto pt-3 flex items-end justify-between">
           <div>
@@ -365,7 +532,10 @@ function StoreProductCard({
               ₹{fmt(product.price)}
             </p>
           </div>
-          {qty === 0 ? (
+          {/* Quantity controls sit inside a clickable card: swallow the click so
+              tapping + adds a stem instead of opening the sheet. */}
+          <div onClick={(e) => e.stopPropagation()}>
+          {outOfStock ? null : qty === 0 ? (
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={increment}
@@ -389,16 +559,20 @@ function StoreProductCard({
               <span className="min-w-[1.25rem] text-center text-sm font-bold tabular-nums">
                 {qty}
               </span>
+              {/* aria-disabled, not disabled: the tap is what tells the customer
+                  why the + stopped. */}
               <motion.button
                 whileTap={{ scale: 0.85 }}
                 onClick={increment}
+                aria-disabled={atCap}
                 aria-label={`Add one more ${product.name}`}
-                className="w-9 h-9 flex items-center justify-center"
+                className={`w-9 h-9 flex items-center justify-center ${atCap ? 'opacity-40' : ''}`}
               >
                 <Plus size={16} />
               </motion.button>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>

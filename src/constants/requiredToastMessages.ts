@@ -78,6 +78,7 @@ export const REQUIRED_TOAST = {
     'Use "Switch store" below for this delivery address or choose another address.',
   CHOOSE_TIME_SLOT: "Please choose an available delivery time slot.",
   DELIVERY_DATE_WITHIN_N: "Please choose a delivery date within the next {N} days.",
+  BLOOMBAR_STOCK_CAP: "You've added all {N} we have left",
   NEAREST_STORE_OFFLINE:
     "Sorry for the inconvenience - the nearest store for this address is offline.",
   STORE_OFFLINE: "Sorry for the inconvenience - this store is currently offline.",

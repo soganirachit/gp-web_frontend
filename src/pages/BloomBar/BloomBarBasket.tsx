@@ -10,6 +10,7 @@ import BloomBarConfirmation from './BloomBarConfirmation';
 import type { BloomBarVase } from '@/services/bloombar.service';
 import { fmt, fmtPct } from './money';
 import { toast } from 'react-hot-toast';
+import { stockOf, toastStockCap } from './stock';
 
 
 export default function BloomBarBasket() {
@@ -129,9 +130,8 @@ export default function BloomBarBasket() {
     if (!form.name.trim()) e.name = 'Name is required';
     if (!form.whatsapp.trim() || !/^\d{10}$/.test(form.whatsapp.replace(/\s/g, '')))
       e.whatsapp = 'Valid 10-digit number required';
-    if (isStore) {
-      if (!form.room.trim()) e.room = 'Room number is required';
-    } else if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    if (isStore && !form.room.trim()) e.room = 'Room number is required';
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       e.email = 'Invalid email';
     }
     setErrors(e);
@@ -156,6 +156,7 @@ export default function BloomBarBasket() {
       price: vase.price,
       quantity: 1,
       image_url: vase.image_url,
+      stock: stockOf(vase) ?? undefined,
     });
   };
 
@@ -183,7 +184,7 @@ export default function BloomBarBasket() {
       campaign: isStore ? 'store' : kioskContext?.campaign || 'direct',
       coupon_code: appliedCoupon || undefined,
       customer_name: form.name,
-      customer_email: isStore ? '' : form.email,
+      customer_email: form.email,
       customer_whatsapp: form.whatsapp,
       customer_room: isStore ? form.room : undefined,
       items,
@@ -234,7 +235,7 @@ export default function BloomBarBasket() {
           setLoading(false);
         }
       },
-      prefill: { name: form.name, email: isStore ? '' : form.email, contact: `+91${form.whatsapp}` },
+      prefill: { name: form.name, email: form.email, contact: `+91${form.whatsapp}` },
       theme: { color: '#1d4d2a' },
       // Abandon/decline: no order was ever created, so just stop the spinner.
       modal: {
@@ -261,7 +262,10 @@ export default function BloomBarBasket() {
           <span className="text-7xl block mb-4">🌸</span>
           <h2 className="font-playfair text-2xl font-semibold mb-2">Your basket is empty</h2>
           <p className="text-gray-500 mb-8">Scan a flower QR to start building your bouquet</p>
+          {/* Same reason as the "Scan Another Flower" CTA — keep the camera out
+              of the history stack. */}
           <Link
+            replace
             to="/bloombar/scan-next"
             className="py-3 px-8 genda-gradient text-white rounded-2xl font-medium"
           >
@@ -340,9 +344,20 @@ export default function BloomBarBasket() {
                     )}
                   </button>
                   <span className="font-semibold min-w-[1.5rem] text-center tabular-nums">{item.quantity}</span>
+                  {/* aria-disabled, not disabled: the tap explains why the + stopped.
+                      Without this cap the basket silently overshoots stock, the
+                      backend rejects the totals call, and the Pay button just
+                      vanishes with no explanation. */}
                   <button
-                    onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
-                    className="w-8 h-8 rounded-full genda-gradient text-white flex items-center justify-center"
+                    onClick={() =>
+                      item.stock != null && item.quantity >= item.stock
+                        ? toastStockCap(item.stock)
+                        : updateQuantity(item.product_id, item.quantity + 1)
+                    }
+                    aria-disabled={item.stock != null && item.quantity >= item.stock}
+                    className={`w-8 h-8 rounded-full genda-gradient text-white flex items-center justify-center ${
+                      item.stock != null && item.quantity >= item.stock ? 'opacity-40' : ''
+                    }`}
                   >
                     <Plus size={12} />
                   </button>
@@ -432,13 +447,65 @@ export default function BloomBarBasket() {
   </motion.div>
 )}
 
-        {/* Scan more */}
+        {/* Scan more — the primary way to keep shopping now that "Add to Basket"
+            lands here instead of the scanner, so it gets a full card's weight
+            rather than the dashed placeholder it used to be. Marigold, not the
+            vase card's green: same gradient treatment, different hue, so the two
+            cards never read as the same offer. */}
+        {/* `replace` — the camera must never be a Back destination. Without it the
+            scanner is pushed, then replaced by the basket on the way out, leaving
+            TWO basket entries: the first Back looks like it did nothing. Both the
+            entry to the scanner and every exit from it must replace. */}
         <Link
+          replace
           to="/bloombar/scan-next"
-          className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border-2 border-dashed border-genda-green/40 text-genda-green text-sm font-medium"
+          className="
+            relative overflow-hidden
+bg-gradient-to-br
+from-[#FFF2F3]
+via-[#FFE3E6]
+to-[#FFD2D8]
+border border-[#E7A5AF]
+rounded-2xl
+px-5 py-5
+premium-shadow
+flex items-center gap-4 w-full
+          "
         >
-          <QrCode size={16} />
-          Scan another flower
+          
+          {/* Sheen — pure decoration, must never eat the tap. */}
+          <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/30 via-transparent to-transparent" />
+          <span className="relative z-10 w-18 h-18 rounded-xl bg-white flex items-center justify-center flex-shrink-0">
+            <QrCode size={40} className="text-genda-green" />
+          </span>
+          <span className="relative z-10 flex-1 text-left min-w-0">
+            <span className="block font-semibold text-base text-gray-900">Add Another Flower to Your Basket!</span>
+            <span className="block text-gray-700 text-xs mt-0.5">
+              Tap To Scan. 🌸
+            </span>
+          </span>
+          {/* Styled as a button but rendered as a span: the whole card is already
+              the <Link>, and nesting a real <button> inside an anchor is invalid
+              HTML. Looks and taps the same, one target instead of two. */}
+          <span
+            className="
+              relative z-10
+              flex-shrink-0
+              flex items-center gap-1.5
+              px-4 py-2
+              rounded-xl
+              bg-gradient-to-r
+              from-genda-green
+              to-emerald-600
+              text-white
+              text-sm
+              font-semibold
+              shadow-md
+            "
+          >
+            <Plus size={14} />
+            Add
+          </span>
         </Link>
 
         {/* Promo code */}
@@ -576,7 +643,7 @@ export default function BloomBarBasket() {
               )}
             </div>
 
-            {isStore ? (
+            {isStore && (
               <div>
                 <div
                   className={`flex items-center gap-3 border rounded-xl px-4 py-3 bg-genda-cream ${
@@ -594,25 +661,28 @@ export default function BloomBarBasket() {
                 </div>
                 {errors.room && <p className="text-red-500 text-xs mt-1 px-1">{errors.room}</p>}
               </div>
-            ) : (
-              <div>
-                <div
-                  className={`flex items-center gap-3 border rounded-xl px-4 py-3 bg-genda-cream ${
-                    errors.email ? 'border-red-400' : 'border-gray-200'
-                  }`}
-                >
-                  <Mail size={16} className="text-gray-400 flex-shrink-0" />
-                  <input
-                    type="email"
-                    placeholder="Email (optional)"
-                    value={form.email}
-                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                    className="flex-1 bg-transparent outline-none text-sm"
-                  />
-                </div>
-                {errors.email && <p className="text-red-500 text-xs mt-1 px-1">{errors.email}</p>}
-              </div>
             )}
+
+            <div>
+              <div
+                className={`flex items-center gap-3 border rounded-xl px-4 py-3 bg-genda-cream ${
+                  errors.email ? 'border-red-400' : 'border-gray-200'
+                }`}
+              >
+                <Mail size={16} className="text-gray-400 flex-shrink-0" />
+                <input
+                  type="email"
+                  placeholder="Email (optional)"
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  className="flex-1 bg-transparent outline-none text-sm"
+                />
+              </div>
+              {errors.email && <p className="text-red-500 text-xs mt-1 px-1">{errors.email}</p>}
+              <p className="text-gray-400 text-xs mt-1 px-1">
+                We send invoices by email only — add your email if you'd like to receive an invoice for your order.
+              </p>
+            </div>
           </div>
         </div>
 
