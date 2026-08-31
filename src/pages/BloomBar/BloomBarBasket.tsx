@@ -11,6 +11,17 @@ import type { BloomBarVase } from '@/services/bloombar.service';
 import { fmt, fmtPct } from './money';
 import { toast } from 'react-hot-toast';
 import { stockOf, toastStockCap } from './stock';
+import {
+  attachBloomBarPaymentIds,
+  clearBloomBarPending,
+  getBloomBarPending,
+  storeBloomBarPending,
+  tryRecoverBloomBarPayment,
+} from '@/utils/bloombarPendingPayment';
+import {
+  markRazorpayCheckoutClosed,
+  markRazorpayCheckoutOpen,
+} from '@/utils/razorpayCheckoutSession';
 
 
 export default function BloomBarBasket() {
@@ -50,6 +61,58 @@ export default function BloomBarBasket() {
   const [vase, setVase] = useState<BloomBarVase | null>(null);
 
   const itemsKey = items.map(i => `${i.product_id}:${i.quantity}`).join(',');
+
+  // Recovery for a checkout whose handler never ran — the tab was discarded during
+  // the UPI app-switch, or the phone died. The webhook has almost certainly created
+  // the order already; without this the customer is simply never told.
+  //
+  // Lives here rather than in BloomBarLayout because the confirmation screen is
+  // rendered by this component. Cost of that choice: if the customer reopens on a
+  // different BloomBar route, they are told once they reach the basket. The order
+  // itself never depended on the browser.
+  useEffect(() => {
+    if (orderId) return;
+    if (!getBloomBarPending()) return;
+
+    let cancelled = false;
+    // An abandoned checkout also leaves a stash. Bounded so it does not poll for the
+    // full 24h TTL; the triggers below still cover a genuine late UPI approval.
+    let attemptsLeft = 8;
+
+    const attempt = async () => {
+      if (cancelled || attemptsLeft <= 0) return;
+      if (!getBloomBarPending()) return;
+      attemptsLeft -= 1;
+      const result = await tryRecoverBloomBarPayment();
+      if (cancelled || !result.recovered || !result.orderNumber) return;
+      clearCart();
+      setCustomerName((prev) => prev || form.name);
+      setOrderId(result.orderNumber);
+    };
+
+    void attempt();
+    const timer = window.setInterval(() => { void attempt(); }, 5000);
+    const onWake = () => { void attempt(); };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') onWake();
+    };
+
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onWake);
+    window.addEventListener('pageshow', onWake);
+    window.addEventListener('online', onWake);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onWake);
+      window.removeEventListener('pageshow', onWake);
+      window.removeEventListener('online', onWake);
+    };
+    // form.name is read only as a fallback for the confirmation greeting.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -206,6 +269,47 @@ export default function BloomBarBasket() {
       return;
     }
 
+    // Stash BEFORE the modal opens. From here the order is recoverable without the
+    // handler ever running — which is the whole failure this guards: paying by UPI
+    // backgrounds the browser, and a discarded tab means verify is never called.
+    storeBloomBarPending(init.razorpay_order_id);
+
+    const finalizeOrder = (orderNumber: string) => {
+      clearBloomBarPending();
+      clearCart();
+      setCustomerName(form.name);
+      setOrderId(orderNumber);
+    };
+
+    // Verify is the fast path, not the authority. When it fails we ask the backend
+    // what actually happened — the webhook has usually created the order already.
+    const recoverOrWarn = async (paymentIdForSupport?: string) => {
+      const result = await tryRecoverBloomBarPayment();
+      if (result.recovered && result.orderNumber) {
+        finalizeOrder(result.orderNumber);
+        return;
+      }
+      if (paymentIdForSupport) {
+        // Stash intentionally kept: the layout's recovery loop and the Razorpay
+        // webhook both keep working after this message.
+        toast.error(
+          'Payment received — still confirming your order. Keep this page open. ' +
+            'If it does not confirm, contact support with payment ID: ' +
+            paymentIdForSupport,
+        );
+      }
+    };
+
+    // Starts true so a throw before open() cannot decrement a count we never took.
+    // Razorpay can fire ondismiss after handler; the guard keeps the pairing exact,
+    // which matters because a leaked count suppresses the store's recovery loop too.
+    let checkoutClosed = true;
+    const closeCheckoutOnce = () => {
+      if (checkoutClosed) return;
+      checkoutClosed = true;
+      markRazorpayCheckoutClosed();
+    };
+
     const options = {
       key: init.key,
       amount: init.amount,
@@ -219,6 +323,12 @@ export default function BloomBarBasket() {
       }`,
       image: 'https://images.unsplash.com/photo-1490750967868-88df5691cc2b?w=100&h=100&fit=crop',
       handler: async (response: RazorpayResponse) => {
+        // Record the ids first: if verify throws and the tab dies mid-recovery, the
+        // stash can still retry verify rather than only poll.
+        attachBloomBarPaymentIds({
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_signature: response.razorpay_signature,
+        });
         try {
           const order = await base44.entities.Order.verify({
             ...checkout,
@@ -226,28 +336,39 @@ export default function BloomBarBasket() {
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
           });
-          clearCart();
-          setCustomerName(form.name);
-          setOrderId(order.order_number || order.id);
+          finalizeOrder(order.order_number || order.id);
         } catch {
-          toast.error('Payment received but confirmation failed. Please contact support with your payment ID: ' + response.razorpay_payment_id);
+          await recoverOrWarn(response.razorpay_payment_id);
         } finally {
+          closeCheckoutOnce();
           setLoading(false);
         }
       },
       prefill: { name: form.name, email: form.email, contact: `+91${form.whatsapp}` },
       theme: { color: '#1d4d2a' },
-      // Abandon/decline: no order was ever created, so just stop the spinner.
       modal: {
-        ondismiss: () => { setLoading(false); },
+        // Dismissal is NOT proof the payment failed. A UPI collect request can be
+        // approved on the phone after the customer closes the modal, so ask the
+        // backend before assuming nothing happened.
+        ondismiss: () => {
+          closeCheckoutOnce();
+          void recoverOrWarn().finally(() => setLoading(false));
+        },
       },
     };
 
     try {
       const rzp = new window.Razorpay(options);
+      // A declined attempt leaves the hold pending on purpose: Razorpay reuses this
+      // order_id if the customer retries, and the backend now keeps that retry
+      // fulfillable. So drop the stash only when the customer walks away, not here.
       rzp.on('payment.failed', () => { setLoading(false); });
+      markRazorpayCheckoutOpen();
+      checkoutClosed = false;
       rzp.open();
     } catch {
+      closeCheckoutOnce();
+      clearBloomBarPending();
       setLoading(false);
       toast.error('Could not open payment gateway. Please try again.');
     }

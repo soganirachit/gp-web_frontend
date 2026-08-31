@@ -275,6 +275,46 @@ async function verifyOrder(data: VerifyInput): Promise<VerifiedOrder> {
   };
 }
 
+export interface BloomBarPaymentStatus {
+  razorpay_order_id: string;
+  /** Mirrors Payment.status: 'pending' | 'success' | 'failed' | … */
+  status: string;
+  order_id?: number;
+  order_number?: string;
+}
+
+/**
+ * Recovery poll, keyed on razorpay_order_id.
+ *
+ * The browser holds razorpay_order_id from the moment checkout opens; order_id only
+ * exists once verify succeeds. So this is the only question we can ask after the
+ * handler never ran — phone killed during the UPI app-switch, modal dismissed while
+ * the payment completed on the phone, verify erroring out. The webhook has usually
+ * created the order already; `sync` additionally asks Razorpay directly for the
+ * window before it lands (backend rate-limits that to one call per 4s).
+ */
+async function fetchPaymentStatus(
+  razorpayOrderId: string,
+  opts: { sync?: boolean } = {},
+): Promise<BloomBarPaymentStatus> {
+  const res = await api.get(
+    `${BASE}/payments/status/${encodeURIComponent(razorpayOrderId)}/`,
+    { params: opts.sync ? { sync: 1 } : undefined },
+  );
+  const s = unwrap<{
+    razorpay_order_id: string;
+    status: string;
+    order_id?: number;
+    order_number?: string;
+  }>(res);
+  return {
+    razorpay_order_id: s.razorpay_order_id,
+    status: s.status,
+    order_id: s.order_id,
+    order_number: s.order_number,
+  };
+}
+
 // ── Cart totals (backend is the source of truth — mirrors store/daily) ───────
 
 export interface BloomBarTotals {
@@ -442,6 +482,9 @@ export const base44 = {
       },
       async verify(data: Record<string, unknown>) {
         return verifyOrder(data as unknown as VerifyInput);
+      },
+      async paymentStatus(razorpayOrderId: string, opts?: { sync?: boolean }) {
+        return fetchPaymentStatus(razorpayOrderId, opts);
       },
     },
   },
