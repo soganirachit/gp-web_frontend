@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MdLocationOn, MdMyLocation } from 'react-icons/md';
-import { addressService, Address } from '../../services/address.service';
+import { addressService, Address, stripUnknownAddressToken } from '../../services/address.service';
 import { validateGpDailyDeliveryAreaFromCoordinates } from '../../services/subscriptionZone.service';
 import { toast } from 'react-hot-toast';
 import { GoogleMap, Autocomplete } from '@react-google-maps/api';
@@ -185,12 +185,23 @@ const AddEditAddress: React.FC = () => {
       const fullAddress = addressParts.join(', ');
 
       const addressType = existingAddress.type || 'Home';
+      const line2 = (existingAddress.streetName || '').trim();
+      let floorFromLine2 = '';
+      let streetForDisplay = line2;
+      const savedFloor = stripUnknownAddressToken(existingAddress.floor);
+      if (!savedFloor && line2.includes(',')) {
+        const [first, ...rest] = line2.split(',').map((s) => s.trim());
+        if (first) {
+          floorFromLine2 = first;
+          streetForDisplay = rest.join(', ') || '';
+        }
+      }
+      const displayParts = [existingAddress.houseNo, savedFloor ? line2 : (streetForDisplay || line2)].filter(Boolean);
+
       setFormData({
-        completeAddress: fullAddress || '',
-        floor: '',
-        landmark: existingAddress.area && existingAddress.area !== existingAddress.streetName 
-          ? existingAddress.area 
-          : '',
+        completeAddress: displayParts.join(', ') || fullAddress || '',
+        floor: savedFloor || floorFromLine2,
+        landmark: stripUnknownAddressToken(existingAddress.landmark || existingAddress.area),
         type: addressType,
       });
       // If type is "Others" or a custom type (not Home/Work), set it to Others and store custom name
@@ -366,8 +377,9 @@ const AddEditAddress: React.FC = () => {
 
       // Parse completeAddress to extract components
       const addressParts = formData.completeAddress.split(',').map(s => s.trim());
-      const houseNo = addressParts[0] || 'unknown';
-      const streetName = addressParts.slice(1).join(', ') || 'unknown';
+      const houseNo = stripUnknownAddressToken(addressParts[0]);
+      const streetFromAddress = stripUnknownAddressToken(addressParts.slice(1).join(', '));
+      const floorPart = stripUnknownAddressToken(formData.floor);
 
       // Determine the final type: use custom name if provided, otherwise use selected type
       // If Others is selected and custom name is provided, use the custom name
@@ -380,14 +392,16 @@ const AddEditAddress: React.FC = () => {
       const addressData = {
         name: name, // Include name in payload
         associatedPhoneNumber: indianMobileDigits10(phone),
-        city: mapAnchor?.city?.trim() || 'unknown',
+        city: stripUnknownAddressToken(mapAnchor?.city) || stripUnknownAddressToken(existingAddress?.city),
         coordinates: `${selectedPosition.lat},${selectedPosition.lng}`,
-        district: mapAnchor?.city?.trim() || 'unknown',
+        district: stripUnknownAddressToken(mapAnchor?.city) || stripUnknownAddressToken(existingAddress?.city),
         houseNo: houseNo,
-        area: formData.landmark.trim(),
-        state: mapAnchor?.state?.trim() || 'Unknown',
+        floor: floorPart,
+        landmark: stripUnknownAddressToken(formData.landmark),
+        area: stripUnknownAddressToken(formData.landmark),
+        state: stripUnknownAddressToken(mapAnchor?.state) || stripUnknownAddressToken(existingAddress?.state),
         pincode: pincode.trim() || mapAnchor?.pincode?.trim() || '',
-        streetName: streetName,
+        streetName: streetFromAddress,
         type: finalType as any, // Allow custom type names (e.g., "friends")
         setAsDefault: false // explicitly initialize as false
       };
@@ -928,6 +942,8 @@ const AddEditAddress: React.FC = () => {
             </label>
             <input
               type="tel"
+              inputMode="numeric"
+              maxLength={10}
               placeholder="00000 00000"
               value={phone}
               onChange={(e) =>
@@ -1029,7 +1045,12 @@ const AddEditAddress: React.FC = () => {
               type="text"
               placeholder="e.g., Near City Mall"
               value={formData.landmark}
-              onChange={(e) => setFormData({ ...formData, landmark: e.target.value })}
+              onChange={(e) => {
+                setFormData({
+                  ...formData,
+                  landmark: stripUnknownAddressToken(e.target.value),
+                });
+              }}
               className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:border-transparent bg-[#FFFBF7]"
               style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
               onFocus={(e) => {

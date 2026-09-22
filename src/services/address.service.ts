@@ -1,8 +1,17 @@
 import { AxiosError } from "axios";
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
-import { toIndianE164 } from "../utils/phoneDisplay";
 import { sanitizeAddressDisplayPart } from "../utils/formatCartDeliveryAddress";
+import { formatPhoneForDisplay, toIndianE164 } from "../utils/phoneDisplay";
+
+/** API/DB used "unknown" as a missing-value sentinel — never show or resave it. */
+export function stripUnknownAddressToken(value?: string | null): string {
+  let s = String(value ?? "").trim();
+  if (!s) return "";
+  if (/^unknown$/i.test(s)) return "";
+  s = s.replace(/^unknown\b[\s,]*/i, "").trim();
+  return !s || /^unknown$/i.test(s) ? "" : s;
+}
 
 // API Address structure (from Django backend)
 interface ApiAddress {
@@ -10,6 +19,7 @@ interface ApiAddress {
   user_id?: number;
   address_line1?: string;
   address_line2?: string;
+  floor?: string;
   city?: string;
   state?: string;
   postal_code?: string;
@@ -32,6 +42,7 @@ export interface Address {
   name?: string;
   houseNo: string;
   streetName: string;
+  floor?: string;
   landmark?: string;
   area: string;
   city: string;
@@ -51,6 +62,8 @@ export interface AddressInput {
   name?: string;
   houseNo: string;
   streetName: string;
+  floor?: string;
+  landmark?: string;
   area: string;
   city: string;
   state: string;
@@ -65,6 +78,7 @@ export interface AddressInput {
 
 const API_URL = `${getApiUrl()}/users/addresses`;
 const ADDRESS_UPDATE_FAILED_MESSAGE = "Failed to update address";
+const PATCH_KEEP_EMPTY = new Set(["landmark", "floor"]);
 
 // Helper: Convert API address to frontend format
 const mapApiToFrontend = (apiAddr: ApiAddress): Address => {
@@ -87,9 +101,10 @@ const mapApiToFrontend = (apiAddr: ApiAddress): Address => {
   // Handle pincode - can be in postal_code or pincode field
   const pincode = apiAddr.pincode || apiAddr.postal_code || "";
 
-  // Filter out "unknown" or "Unknown" values for city and state
-  const city = apiAddr.city && apiAddr.city.toLowerCase() !== 'unknown' ? apiAddr.city : "";
-  const state = apiAddr.state && apiAddr.state.toLowerCase() !== 'unknown' ? apiAddr.state : "";
+  const city = stripUnknownAddressToken(apiAddr.city);
+  const state = stripUnknownAddressToken(apiAddr.state);
+  const landmark = stripUnknownAddressToken(apiAddr.landmark);
+  const floor = stripUnknownAddressToken(apiAddr.floor);
 
   // Determine the type: if it's in the typeMap, use the mapped value
   // Otherwise, preserve the custom value from the API (capitalize first letter for display)
@@ -108,7 +123,7 @@ const mapApiToFrontend = (apiAddr: ApiAddress): Address => {
 
   const line1 = sanitizeAddressDisplayPart(apiAddr.address_line1);
   const line2 = sanitizeAddressDisplayPart(apiAddr.address_line2);
-  const landmark = sanitizeAddressDisplayPart(apiAddr.landmark);
+  const landmarkSanitized = sanitizeAddressDisplayPart(apiAddr.landmark) || landmark;
 
   return {
     id: (apiAddr.id !== undefined && apiAddr.id !== null) ? apiAddr.id.toString() : "",
@@ -116,8 +131,9 @@ const mapApiToFrontend = (apiAddr: ApiAddress): Address => {
     name: apiAddr.receiver_name || "",
     houseNo: line1,
     streetName: line2,
-    area: landmark || line2,
-    landmark,
+    floor,
+    landmark: landmarkSanitized,
+    area: landmarkSanitized || line2,
     city: city,
     state: state,
     pincode: pincode,
@@ -126,7 +142,7 @@ const mapApiToFrontend = (apiAddr: ApiAddress): Address => {
     coordinates: lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng) ? `${lat},${lng}` : undefined,
     createdAt: apiAddr.created_at || "",
     updatedAt: apiAddr.updated_at || "",
-    associatedPhoneNumber: apiAddr.receiver_phone || "",
+    associatedPhoneNumber: formatPhoneForDisplay(apiAddr.receiver_phone || ""),
   };
 };
 
@@ -156,11 +172,17 @@ const mapFrontendToApi = (input: AddressInput): Record<string, any> => {
     apiType = "home";
   }
 
+  const landmark = stripUnknownAddressToken(input.landmark ?? input.area);
+  const floor = stripUnknownAddressToken(input.floor);
+  const streetName = stripUnknownAddressToken(input.streetName);
+
   const apiData: Record<string, any> = {
-    address_line1: input.houseNo || "",
-    address_line2: input.streetName || input.area || "",
-    city: input.city || "",
-    state: input.state || "",
+    address_line1: stripUnknownAddressToken(input.houseNo),
+    address_line2: streetName,
+    floor,
+    landmark,
+    city: stripUnknownAddressToken(input.city),
+    state: stripUnknownAddressToken(input.state),
     pincode: input.pincode || "",
     address_type: apiType,
     is_default: input.setAsDefault || false,
@@ -172,11 +194,6 @@ const mapFrontendToApi = (input: AddressInput): Record<string, any> => {
   }
   if (input.associatedPhoneNumber) {
     apiData.receiver_phone = toIndianE164(String(input.associatedPhoneNumber));
-  }
-
-  // Add landmark if provided
-  if (input.area) {
-    apiData.landmark = input.area;
   }
 
   // Add coordinates if available
@@ -255,7 +272,7 @@ class AddressService {
       const fullApiData = mapFrontendToApi(addressInput as AddressInput);
       const apiData: Record<string, any> = {};
       Object.entries(fullApiData).forEach(([key, value]) => {
-        if (value !== "" && value !== null && value !== undefined) {
+        if (PATCH_KEEP_EMPTY.has(key) || (value !== "" && value !== null && value !== undefined)) {
           apiData[key] = value;
         }
       });

@@ -5,7 +5,7 @@ import { MdLocationOn, MdMyLocation } from "react-icons/md";
 import { IoArrowBack } from "react-icons/io5";
 import { toast } from "react-hot-toast";
 import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
-import { addressService, Address } from "../../services/address.service";
+import { addressService, Address, stripUnknownAddressToken } from "../../services/address.service";
 import { GoogleMap } from "@react-google-maps/api";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import { GOOGLE_MAP_TOUCH_PAN_OPTIONS } from "../../utils/googleMapTouchPanOptions";
@@ -477,9 +477,10 @@ const AddressSelection: React.FC = () => {
       const addressData = {
         houseNo: formData.houseNo,
         streetName: formData.streetName,
-        area: formData.area,
-        city: formData.city,
-        state: formData.state,
+        area: stripUnknownAddressToken(formData.landmark || formData.area),
+        landmark: stripUnknownAddressToken(formData.landmark || formData.area),
+        city: stripUnknownAddressToken(formData.city),
+        state: stripUnknownAddressToken(formData.state),
         pincode: formData.pincode,
         district: formData.district,
         associatedPhoneNumber: indianMobileDigits10(
@@ -534,13 +535,18 @@ const AddressSelection: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    const nextValue =
+    let next: string | boolean =
       name === "associatedPhoneNumber"
         ? value.replace(/\D/g, "").slice(0, 10)
-        : value;
+        : type === "checkbox"
+          ? checked
+          : value;
+    if ((name === "landmark" || name === "area") && typeof next === "string") {
+      next = stripUnknownAddressToken(next);
+    }
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : nextValue,
+      [name]: next,
     }));
   };
 
@@ -1511,8 +1517,10 @@ const AddressSelection: React.FC = () => {
                       <span className="bg-white border border-gray-200 rounded-lg px-3 py-3 text-gray-500 text-sm">+91</span>
                       <input
                         type="tel"
+                        inputMode="numeric"
                         name="associatedPhoneNumber"
                         placeholder="Enter your WhatsApp number"
+                        maxLength={10}
                         value={formData.associatedPhoneNumber}
                         onChange={handleInputChange}
                         className="flex-1 p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm ml-2"

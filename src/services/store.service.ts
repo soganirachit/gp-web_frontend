@@ -660,16 +660,10 @@ class StoreService {
 
     if (isGpDaily) {
       try {
-        const zone = await resolveGpDailyZoneAtLatLng(lat, lng);
-        if (!zone.eligible || zone.storeId == null) {
-          this.setGpStoreCatalogAddressOverrideId(null);
-          throw new Error(
-            zone.message?.trim() ||
-              "Genda Phool Daily is not available at this address.",
-          );
-        }
-        this.setTemporaryStoreId(zone.storeId);
-        notifyGpsCatalogLocationUpdated();
+        const { applyGpDailyBrowseDeliveryAddress } = await import(
+          "../utils/gpDailyAddressStoreChange"
+        );
+        await applyGpDailyBrowseDeliveryAddress(address);
         return;
       } catch (e) {
         this.setGpStoreCatalogAddressOverrideId(null);

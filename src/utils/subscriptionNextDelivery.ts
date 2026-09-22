@@ -64,25 +64,46 @@ function jsWeekdayToDeliveryInt(jsDay: number): number {
   return jsDay === 0 ? 6 : jsDay - 1;
 }
 
-/**
- * GP Daily: delivery on calendar day D requires the action before 12:00 AM on D.
- */
+function startOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+/** True once local calendar day D has started (after 12:00 AM on D). */
 export function isPastSameDaySubscriptionDeliveryCutoff(now: Date = new Date()): boolean {
-  const todayMidnight = startOfDay(new Date(now));
-  return now.getTime() >= todayMidnight.getTime();
+  const midnight = startOfDay(now);
+  return now.getTime() > midnight.getTime();
 }
 
-export function isFutureSubscriptionDeliveryCalendarDay(
-  candidate: Date,
-  now: Date = new Date(),
-): boolean {
-  const day = startOfDay(candidate);
-  const today = startOfDay(now);
-  return day.getTime() > today.getTime();
+/** Parse API date-only fields in local calendar (avoids UTC `YYYY-MM-DD` shifting). */
+export function parseSubscriptionDateField(
+  value: Date | string | undefined | null,
+): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : startOfDay(value);
+  }
+  const s = String(value).trim();
+  if (!s) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (m) {
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return startOfDay(d);
+  }
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : startOfDay(d);
+}
+
+export function getApiNextDeliveryDate(
+  subscription: Subscription,
+): Date | null {
+  return parseSubscriptionDateField(subscription.nextDeliveryDate);
 }
 
 /**
- * Next calendar delivery on a subscribed weekday (never same calendar day after midnight).
+ * Next subscribed weekday strictly after today (local calendar).
+ * GP Daily: actions on day D cannot deliver on D after midnight.
  */
 export function computeNextDeliveryFromSubscribedDays(
   subscription: Subscription,
@@ -99,25 +120,15 @@ export function computeNextDeliveryFromSubscribedDays(
   if (!ints.length) return null;
 
   const allowed = new Set(ints);
-  const now = new Date();
-  const todayMidnight = startOfDay(now);
-  const skipTodayBecauseSlotPassed = isPastSameDaySubscriptionDeliveryCutoff(now);
+  const todayMidnight = startOfDay(new Date());
 
-  for (let add = 0; add <= 28; add++) {
-    const d = new Date(todayMidnight);
-    d.setDate(todayMidnight.getDate() + add);
+  for (let add = 1; add <= 28; add++) {
+    const d = addDays(todayMidnight, add);
     const ui = jsWeekdayToDeliveryInt(d.getDay());
     if (!allowed.has(ui)) continue;
-    if (add === 0 && skipTodayBecauseSlotPassed) continue;
     return d;
   }
   return null;
-}
-
-function startOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
 }
 
 function parseSubscriptionCalendarDate(raw: unknown): Date | null {
@@ -130,10 +141,17 @@ function parseSubscriptionCalendarDate(raw: unknown): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
   if (m) {
     const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-    return Number.isNaN(dt.getTime()) ? null : dt;
+    return Number.isNaN(dt.getTime()) ? null : startOfDay(dt);
   }
   const dt = new Date(s);
   return Number.isNaN(dt.getTime()) ? null : startOfDay(dt);
+}
+
+function isFutureSubscriptionDeliveryCalendarDay(date: Date, now: Date): boolean {
+  const today = startOfDay(now);
+  const d0 = startOfDay(date);
+  if (d0.getTime() <= today.getTime()) return false;
+  return true;
 }
 
 /** Schedule-first next delivery (ignores stale API "today" after midnight). */
@@ -179,10 +197,10 @@ export function formatNextDeliveryDateLine(date: Date): string {
 }
 
 /**
- * Next calendar delivery date for an active subscription (schedule-first).
+ * Next delivery for an active subscription — prefer healed API date, then schedule.
  */
 export function calculateNextDeliveryDate(subscription: Subscription): Date | null {
-  return computeNextDeliveryFromSubscribedDays(subscription);
+  return resolveUpcomingSubscriptionDeliveryDate(subscription);
 }
 
 /** e.g. "Tomorrow - Sat, 18 Apr" or "Sun, 18 Apr" */
@@ -218,7 +236,10 @@ export function getPausedResumeDate(subscription: Subscription): Date | null {
 /** Paused copy — wallet pauses omit "paused till"; manual pauses show future resume date. */
 export function formatPausedDeliveryLine(subscription: Subscription): string {
   if (isSubscriptionPausedForInsufficientWallet(subscription)) {
-    return "Paused";
+    const display =
+      (subscription as { pauseReasonDisplay?: string }).pauseReasonDisplay ||
+      "Insufficient Wallet Balance";
+    return display;
   }
   const resume = getPausedResumeDate(subscription);
   if (resume) {
@@ -250,7 +271,7 @@ export function formatNamasteSubscriptionStatusLine(
   return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
 }
 
-/** GP Daily home Namaste row — schedule-first, then API fallback. */
+/** GP Daily home Namaste row — API next delivery, then schedule fallback. */
 export function formatNamasteDeliveryLine(subscription: Subscription): string {
   if (isNamastePausedStatus(subscription.status)) {
     return formatPausedDeliveryLine(subscription);
@@ -261,9 +282,7 @@ export function formatNamasteDeliveryLine(subscription: Subscription): string {
     return formatNextDeliveryDateLine(upcoming);
   }
 
-  const fallback = formatHomepageNextDeliveryLine(subscription);
-  if (fallback === "—") return "No upcoming delivery scheduled";
-  return fallback;
+  return "No upcoming delivery scheduled";
 }
 
 export function subscriptionProductLabel(subscription: Subscription): string {

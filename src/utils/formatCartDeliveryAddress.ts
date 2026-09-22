@@ -5,6 +5,7 @@
 export type CartDeliveryAddressLike = {
   houseNo?: string;
   streetName?: string;
+  floor?: string;
   area?: string;
   landmark?: string;
   city?: string;
@@ -31,6 +32,7 @@ export function formatCartDeliveryAddress(address: CartDeliveryAddressLike | nul
   if (!address) return '';
   const street = [
     address.houseNo,
+    address.floor,
     address.streetName,
     address.area,
     address.landmark,

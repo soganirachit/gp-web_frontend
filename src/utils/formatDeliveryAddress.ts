@@ -55,7 +55,8 @@ export function formatDeliveryAddress(
 
   append(line1);
   if (line2 && !shouldSkipLine2(line1, line2)) append(line2);
-  append(landmark);
+  append(cleanPart(addr.floor));
+  if (cleanPart(addr.landmark).toLowerCase() !== "unknown") append(landmark);
 
   const tail: string[] = [];
   if (city && !containsPart(combined, city)) tail.push(city);

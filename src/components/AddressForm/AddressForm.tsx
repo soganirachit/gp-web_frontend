@@ -8,6 +8,7 @@ import {
   type Address,
   type AddressInput,
 } from "../../services/address.service";
+import { formatPhoneForDisplay } from "../../utils/phoneDisplay";
 import Spinner from "../common/Spinner";
 
 interface AddressFormProps {
@@ -39,11 +40,13 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
       setFormData({
         houseNo: initialAddress.houseNo,
         streetName: initialAddress.streetName,
+        floor: initialAddress.floor || "",
+        landmark: initialAddress.landmark || "",
         area: initialAddress.area,
         city: initialAddress.city,
         state: initialAddress.state,
         pincode: initialAddress.pincode,
-        associatedPhoneNumber: initialAddress.associatedPhoneNumber,
+        associatedPhoneNumber: formatPhoneForDisplay(initialAddress.associatedPhoneNumber),
         coordinates: initialAddress.coordinates || "",
       });
     }

@@ -14,18 +14,20 @@ export function isValidIndianMobile10(phone: string | null | undefined): boolean
   return /^\d{10}$/.test(indianMobileDigits10(phone));
 }
 
-/** Strip +91 for UI when showing a 10-digit Indian mobile number. */
+/** Strip +91 / country code for UI. Always digits-only so save can validate 10 digits. */
 export function formatPhoneForDisplay(phone: string | null | undefined): string {
   if (phone == null || phone === "") return "";
-  const s = String(phone).trim();
-  if (s.startsWith("+91")) {
-    const digits = s.slice(3).replace(/\D/g, "");
-    return digits.length >= 10 ? digits.slice(-10) : s;
+  let digits = String(phone).replace(/\D/g, "");
+  if (digits.startsWith("91") && digits.length > 10) {
+    digits = digits.slice(2);
   }
-  const digits = s.replace(/\D/g, "");
-  if (digits.length === 11 && digits.startsWith("0")) return digits.slice(1);
-  if (digits.length >= 10) return digits.slice(-10);
-  return s;
+  if (digits.startsWith("0") && digits.length === 11) {
+    digits = digits.slice(1);
+  }
+  if (digits.length > 10) {
+    digits = digits.slice(-10);
+  }
+  return digits;
 }
 
 /** Normalize to Indian E.164 for API. Accepts 10 digits, +91…, or legacy 0-prefix. */

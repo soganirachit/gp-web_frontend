@@ -88,6 +88,7 @@ import { formatNamasteGreeting, hasRealUserFirstName } from "../utils/namasteGre
 import { OffersBannerCarousel } from "../components/OffersBannerCarousel";
 import { HorizontalScrollSection } from "../components/common/HorizontalScrollSection";
 import { BANNER_PLACEMENT_STORE_HOME } from "../utils/bannerPlacement";
+import { GpDailyAddressStoreChangeHost } from "../components/daily/GpDailyAddressStoreChangeHost";
 
 // Note: If truckstore.svg doesn't exist, rename truckhome.svg to truckstore.svg
 
@@ -886,6 +887,7 @@ const GpStore_Homepage: React.FC = () => {
                 </div>
 
             </div>
+            {feature !== "gpStore" ? <GpDailyAddressStoreChangeHost /> : null}
         </ErrorBoundary>
     );
 };
