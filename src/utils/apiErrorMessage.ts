@@ -1,3 +1,4 @@
+import axios from "axios";
 import { REQUIRED_TOAST } from "../constants/requiredToastMessages";
 
 /**
@@ -76,6 +77,16 @@ function formatNestedFieldErrors(errs: Record<string, unknown>, prefix = ""): st
 export function errorMessageFromParsedBody(body: unknown, fallback: string): string {
   const formatted = formatApiErrorBody(body);
   return formatted || fallback;
+}
+
+export function isHttpNotFoundError(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) {
+    const msg = String(
+      error instanceof Error ? error.message : error ?? "",
+    ).toLowerCase();
+    return msg.includes("404") || msg.includes("not found");
+  }
+  return error.response?.status === 404;
 }
 
 /** Axios errors, `throw response.data`, or `Error` from API helpers. */

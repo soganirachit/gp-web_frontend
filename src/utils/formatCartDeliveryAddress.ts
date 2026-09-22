@@ -16,6 +16,17 @@ function looseCompact(s: string): string {
   return s.toLowerCase().replace(/[\s,:-]+/g, '');
 }
 
+/** Hide API placeholders like "unknown" from customer-facing address lines. */
+export function sanitizeAddressDisplayPart(
+  value: string | null | undefined,
+): string {
+  const t = String(value ?? '').trim();
+  if (!t) return '';
+  const lower = t.toLowerCase();
+  if (lower === 'unknown' || lower === 'n/a' || lower === 'na') return '';
+  return t;
+}
+
 export function formatCartDeliveryAddress(address: CartDeliveryAddressLike | null): string {
   if (!address) return '';
   const street = [
@@ -24,11 +35,11 @@ export function formatCartDeliveryAddress(address: CartDeliveryAddressLike | nul
     address.area,
     address.landmark,
   ]
-    .map((x) => (x == null ? '' : String(x).trim()))
+    .map((x) => sanitizeAddressDisplayPart(x == null ? '' : String(x)))
     .filter(Boolean)
     .join(', ');
   const cityState = [address.city, address.state]
-    .map((x) => (x == null ? '' : String(x).trim()))
+    .map((x) => sanitizeAddressDisplayPart(x == null ? '' : String(x)))
     .filter(Boolean)
     .join(', ');
   const pin = String(address.pincode ?? '').trim();

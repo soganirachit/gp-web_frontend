@@ -96,23 +96,24 @@ const ExploreMore: React.FC = () => {
 
           } else if (categoryUpper === "ALL" || sectionUpper.includes("ALL")) {
             // → GET api/v1/products/  (no ordering param)
-            const fetched = await productService.getProductsByOrdering(
-              undefined,
-              storeId || undefined,
-              abortController.signal,
-              PRODUCT_AVAILABILITY_STORE,
-            );
+            const { products: fetched } =
+              await productService.getStoreProductListFirstPage({
+                storeId: storeId || undefined,
+                availabilityType: PRODUCT_AVAILABILITY_STORE,
+                pageSize: 24,
+                signal: abortController.signal,
+              });
             if (id !== fetchIdRef.current) return;
             setAllStoreProducts(fetched || []);
 
           } else {
-                // Fallback: All store products (no special ordering)
-                const fetched = await productService.getProductsByOrdering(
-                  undefined,
-                  storeId || undefined,
-                  abortController.signal,
-                  PRODUCT_AVAILABILITY_STORE,
-                );
+                const { products: fetched } =
+                  await productService.getStoreProductListFirstPage({
+                    storeId: storeId || undefined,
+                    availabilityType: PRODUCT_AVAILABILITY_STORE,
+                    pageSize: 24,
+                    signal: abortController.signal,
+                  });
                 if (id !== fetchIdRef.current) return;
                 setAllStoreProducts(fetched || []);
               }

@@ -2,6 +2,7 @@ import { AxiosError } from "axios";
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
 import { toIndianE164 } from "../utils/phoneDisplay";
+import { sanitizeAddressDisplayPart } from "../utils/formatCartDeliveryAddress";
 
 // API Address structure (from Django backend)
 interface ApiAddress {
@@ -105,13 +106,18 @@ const mapApiToFrontend = (apiAddr: ApiAddress): Address => {
     addressType = "Home";
   }
 
+  const line1 = sanitizeAddressDisplayPart(apiAddr.address_line1);
+  const line2 = sanitizeAddressDisplayPart(apiAddr.address_line2);
+  const landmark = sanitizeAddressDisplayPart(apiAddr.landmark);
+
   return {
     id: (apiAddr.id !== undefined && apiAddr.id !== null) ? apiAddr.id.toString() : "",
     userId: (apiAddr.user_id !== undefined && apiAddr.user_id !== null) ? apiAddr.user_id.toString() : "",
     name: apiAddr.receiver_name || "",
-    houseNo: apiAddr.address_line1 || "",
-    streetName: apiAddr.address_line2 || "",
-    area: apiAddr.landmark || apiAddr.address_line2 || "",
+    houseNo: line1,
+    streetName: line2,
+    area: landmark || line2,
+    landmark,
     city: city,
     state: state,
     pincode: pincode,

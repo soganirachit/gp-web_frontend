@@ -642,7 +642,7 @@ const Wallet = () => {
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                   <p className={gpDailyHome.walletHoldText}>
                     {gpDailyOrderHold.showOrderInHold
-                      ? "Order In Hold"
+                      ? "Order On Hold"
                       : "Wallet Running Low"}
                   </p>
                   <p className={gpDailyHome.holdCardBody}>

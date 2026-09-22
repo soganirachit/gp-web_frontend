@@ -31,7 +31,7 @@ import { format } from "date-fns";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import {
   WEEK_SHORT,
-  computeNextDeliveryFromSubscribedDays,
+  resolveUpcomingSubscriptionDeliveryDate,
   formatPausedDeliveryLine,
   getDeliveryDayInts,
 } from "../../utils/subscriptionNextDelivery";
@@ -64,6 +64,16 @@ import { resolveSubscriptionPerDeliveryDisplayTotal } from "../../utils/gpDailyS
 import { navigateToGpDailyWalletForRecharge } from "../../utils/gpDailyWalletRechargeRedirect";
 import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
 const GP_DAILY_BASE = "/gp-daily";
+
+function formatPauseReasonLabel(reason?: string): string {
+  const r = String(reason ?? "").trim();
+  if (!r) return "";
+  const lower = r.toLowerCase();
+  if (lower.includes("insufficient") || lower.includes("wallet")) {
+    return "Insufficient Wallet Balance";
+  }
+  return r.replace(/_/g, " ");
+}
 
 function historyOrderDelivered(o: Record<string, unknown>): boolean {
   const st = String(o.status ?? "").toLowerCase();
@@ -328,13 +338,9 @@ const ManageMySubscription: React.FC = () => {
     ) {
       return formatPausedDeliveryLine(subscription);
     }
-    const fromSchedule = computeNextDeliveryFromSubscribedDays(subscription);
-    if (fromSchedule) {
-      return `Next Delivery: ${format(fromSchedule, "EEE, d MMM")}`;
-    }
-    const apiNext = subscription.nextDeliveryDate;
-    if (apiNext && !Number.isNaN(apiNext.getTime())) {
-      return `Next Delivery: ${format(apiNext, "EEE, d MMM")}`;
+    const upcoming = resolveUpcomingSubscriptionDeliveryDate(subscription);
+    if (upcoming) {
+      return `Next Delivery: ${format(upcoming, "EEE, d MMM")}`;
     }
     return "Next delivery: —";
   };
@@ -892,6 +898,19 @@ const ManageMySubscription: React.FC = () => {
               />
             ) : null}
           </div>
+        ) : null}
+        {isPaused &&
+        (subscription.pauseReason ||
+          isSubscriptionPausedForInsufficientWallet(subscription)) ? (
+          <p className="mt-2 text-[13px] font-medium text-[#6B7280]">
+            Reason:{" "}
+            {formatPauseReasonLabel(
+              subscription.pauseReason ||
+                (isSubscriptionPausedForInsufficientWallet(subscription)
+                  ? "insufficient_wallet"
+                  : ""),
+            )}
+          </p>
         ) : null}
       </div>
     );

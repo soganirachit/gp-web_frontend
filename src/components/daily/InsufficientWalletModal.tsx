@@ -94,7 +94,7 @@ export function InsufficientWalletRechargeCard({
           id={titleId}
           className="mb-1 font-serif text-base font-bold text-gray-900 md:text-lg"
         >
-          Insufficient wallet balance
+          Insufficient Wallet Balance
         </h3>
         <p className="text-xs leading-snug text-gray-600">
           {details.contextLabel ??

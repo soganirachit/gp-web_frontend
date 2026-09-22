@@ -9,6 +9,12 @@ import React, {
 import { useAuth } from "./AuthContext";
 import { notificationClient } from "../notifications/notificationClient";
 import type { NotificationItem } from "../notifications/notificationClient";
+import { subscriptionService } from "../services/subscription.service";
+import {
+  buildSubscriptionsById,
+  enrichCustomerNotificationBody,
+  patchSubscriptionResumeNotificationCopy,
+} from "../utils/customerNotificationDeliveryBody";
 
 export const NOTIFICATION_INBOX_REFRESH_EVENT = "gp-notification-inbox-refresh";
 
@@ -42,12 +48,29 @@ export function NotificationInboxProvider({
     }
     try {
       setLoading(true);
-      const [count, list] = await Promise.all([
+      const [count, list, subs] = await Promise.all([
         notificationClient.unreadCount(),
         notificationClient.list(false),
+        subscriptionService.getCustomerSubscriptions().catch(() => []),
       ]);
+      const subsById = buildSubscriptionsById(subs);
+      const enriched = (Array.isArray(list) ? list : []).map((n) => {
+        const body = enrichCustomerNotificationBody(n.body || n.message || "", {
+          notification_type: n.notification_type,
+          data: n.data,
+          reference_id: n.reference_id,
+          reference_type: n.reference_type,
+        }, subsById);
+        const title = n.title
+          ? patchSubscriptionResumeNotificationCopy(n.title)
+          : n.title;
+        const changed =
+          body !== (n.body || n.message || "") ||
+          (title != null && title !== n.title);
+        return changed ? { ...n, body, title: title ?? n.title } : n;
+      });
       setUnreadCount(count);
-      setItems(Array.isArray(list) ? list : []);
+      setItems(enriched);
     } catch {
       /* ignore */
     } finally {

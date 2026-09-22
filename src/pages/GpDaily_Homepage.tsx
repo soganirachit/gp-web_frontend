@@ -513,24 +513,28 @@ const Home2: React.FC = () => {
       const catalogSid = await resolveGpDailyCatalogStoreId();
       const sid = catalogSid || undefined;
 
-      const [rawAll, rawPuja, rawExotic] = await Promise.all([
-        productService.getAllProductsPaged({
+      const [allPage, pujaPage, exoticPage] = await Promise.all([
+        productService.getStoreProductListFirstPage({
           availabilityType: PRODUCT_AVAILABILITY_GP_DAILY_LIST,
           storeId: sid,
+          pageSize: 24,
         }),
-        productService.getProductsByCategory(
-          "puja-packs",
-          sid,
-          PRODUCT_AVAILABILITY_GP_DAILY_LIST,
-          100,
-        ),
-        productService.getProductsByCategory(
-          "exotic-packs",
-          sid,
-          PRODUCT_AVAILABILITY_GP_DAILY_LIST,
-          100,
-        ),
+        productService.getStoreProductListFirstPage({
+          categorySlug: "puja-packs",
+          storeId: sid,
+          availabilityType: PRODUCT_AVAILABILITY_GP_DAILY_LIST,
+          pageSize: 12,
+        }),
+        productService.getStoreProductListFirstPage({
+          categorySlug: "exotic-packs",
+          storeId: sid,
+          availabilityType: PRODUCT_AVAILABILITY_GP_DAILY_LIST,
+          pageSize: 12,
+        }),
       ]);
+      const rawAll = allPage.products;
+      const rawPuja = pujaPage.products;
+      const rawExotic = exoticPage.products;
 
       const mapRow = (r: Record<string, unknown>) =>
         mapGpDailyCatalogRowToProduct(r);
@@ -1650,7 +1654,7 @@ const Home2: React.FC = () => {
                   <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                     <p className={gpDailyHome.walletHoldText}>
                       {orderOnHold.showOrderInHold
-                        ? "Order In Hold"
+                        ? "Order On Hold"
                         : "Wallet Running Low"}
                     </p>
                     <p className={gpDailyHome.holdCardBody}>

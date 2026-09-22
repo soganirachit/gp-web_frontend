@@ -1,5 +1,6 @@
 import { format, addDays } from "date-fns";
 import type { Subscription } from "../services/subscription.service";
+import { isSubscriptionPausedForInsufficientWallet } from "./gpDailySubscriptionWalletPause";
 
 /** Mon … Sun labels for UI (delivery int 0 = Monday). */
 export const WEEK_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
@@ -63,11 +64,25 @@ function jsWeekdayToDeliveryInt(jsDay: number): number {
   return jsDay === 0 ? 6 : jsDay - 1;
 }
 
-const SAME_DAY_NEXT_DELIVERY_CUTOFF_HOUR = 12;
+/**
+ * GP Daily: delivery on calendar day D requires the action before 12:00 AM on D.
+ */
+export function isPastSameDaySubscriptionDeliveryCutoff(now: Date = new Date()): boolean {
+  const todayMidnight = startOfDay(new Date(now));
+  return now.getTime() >= todayMidnight.getTime();
+}
+
+export function isFutureSubscriptionDeliveryCalendarDay(
+  candidate: Date,
+  now: Date = new Date(),
+): boolean {
+  const day = startOfDay(candidate);
+  const today = startOfDay(now);
+  return day.getTime() > today.getTime();
+}
 
 /**
- * Next calendar delivery on a subscribed weekday, respecting 12:00 cutoff for today.
- * Matches Manage Subscriptions / app schedule (not stale API-only dates).
+ * Next calendar delivery on a subscribed weekday (never same calendar day after midnight).
  */
 export function computeNextDeliveryFromSubscribedDays(
   subscription: Subscription,
@@ -85,14 +100,8 @@ export function computeNextDeliveryFromSubscribedDays(
 
   const allowed = new Set(ints);
   const now = new Date();
-  const todayMidnight = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  );
-  const cutoffToday = new Date(todayMidnight);
-  cutoffToday.setHours(SAME_DAY_NEXT_DELIVERY_CUTOFF_HOUR, 0, 0, 0);
-  const skipTodayBecauseSlotPassed = now.getTime() >= cutoffToday.getTime();
+  const todayMidnight = startOfDay(now);
+  const skipTodayBecauseSlotPassed = isPastSameDaySubscriptionDeliveryCutoff(now);
 
   for (let add = 0; add <= 28; add++) {
     const d = new Date(todayMidnight);
@@ -109,6 +118,48 @@ function startOfDay(d: Date): Date {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
+}
+
+function parseSubscriptionCalendarDate(raw: unknown): Date | null {
+  if (raw == null) return null;
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    return startOfDay(raw);
+  }
+  const s = String(raw).trim();
+  if (!s) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (m) {
+    const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  }
+  const dt = new Date(s);
+  return Number.isNaN(dt.getTime()) ? null : startOfDay(dt);
+}
+
+/** Schedule-first next delivery (ignores stale API "today" after midnight). */
+export function resolveUpcomingSubscriptionDeliveryDate(
+  subscription: Subscription,
+): Date | null {
+  const now = new Date();
+  const start = subscription.startDate
+    ? parseSubscriptionCalendarDate(subscription.startDate)
+    : null;
+  const apiNext = subscription.nextDeliveryDate
+    ? parseSubscriptionCalendarDate(subscription.nextDeliveryDate)
+    : null;
+
+  if (start && isFutureSubscriptionDeliveryCalendarDay(start, now)) {
+    return start;
+  }
+
+  const fromSchedule = computeNextDeliveryFromSubscribedDays(subscription);
+  if (fromSchedule) return startOfDay(fromSchedule);
+
+  if (apiNext && isFutureSubscriptionDeliveryCalendarDay(apiNext, now)) {
+    return apiNext;
+  }
+
+  return null;
 }
 
 /** e.g. "Tomorrow - Sat, 18 Apr" or "Tue, 19 May" */
@@ -136,34 +187,44 @@ export function calculateNextDeliveryDate(subscription: Subscription): Date | nu
 
 /** e.g. "Tomorrow - Sat, 18 Apr" or "Sun, 18 Apr" */
 export function formatHomepageNextDeliveryLine(subscription: Subscription): string {
-  const next = calculateNextDeliveryDate(subscription);
+  const next = resolveUpcomingSubscriptionDeliveryDate(subscription);
   if (!next) return "—";
   return formatNextDeliveryDateLine(next);
 }
 
-/** Resume date for paused subs — API uses `next_delivery_date` as resume when paused. */
+/** Resume date for manual pauses — not wallet-driven pauses or past resume dates. */
 export function getPausedResumeDate(subscription: Subscription): Date | null {
   if (subscription.status !== "PAUSED" && subscription.status !== "INACTIVE") {
     return null;
   }
+  if (isSubscriptionPausedForInsufficientWallet(subscription)) {
+    return null;
+  }
+  const candidates: Date[] = [];
   const next = subscription.nextDeliveryDate;
-  if (next && !Number.isNaN(next.getTime())) {
-    return next;
-  }
+  if (next && !Number.isNaN(next.getTime())) candidates.push(next);
   const until = subscription.pausedUntilDate;
-  if (until && !Number.isNaN(until.getTime())) {
-    return until;
-  }
-  return null;
+  if (until && !Number.isNaN(until.getTime())) candidates.push(until);
+  if (!candidates.length) return null;
+  const resume = candidates.sort((a, b) => a.getTime() - b.getTime())[0];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const resumeDay = new Date(resume);
+  resumeDay.setHours(0, 0, 0, 0);
+  if (resumeDay.getTime() < today.getTime()) return null;
+  return resume;
 }
 
-/** Paused copy with resume date from `next_delivery_date` (then `paused_until_date`). */
+/** Paused copy — wallet pauses omit "paused till"; manual pauses show future resume date. */
 export function formatPausedDeliveryLine(subscription: Subscription): string {
+  if (isSubscriptionPausedForInsufficientWallet(subscription)) {
+    return "Paused";
+  }
   const resume = getPausedResumeDate(subscription);
   if (resume) {
-      return `Paused till ${format(resume, "d MMM yyyy")}`;
-    }
-  return "Paused till —";
+    return `Paused till ${format(resume, "d MMM yyyy")}`;
+  }
+  return "Paused";
 }
 
 /** Namaste carousel — subscription status (replaces delivery time slot row). */
@@ -195,17 +256,9 @@ export function formatNamasteDeliveryLine(subscription: Subscription): string {
     return formatPausedDeliveryLine(subscription);
   }
 
-  const fromSchedule = computeNextDeliveryFromSubscribedDays(subscription);
-  if (fromSchedule) {
-    return formatNextDeliveryDateLine(fromSchedule);
-  }
-
-  const raw = subscription.nextDeliveryDate;
-  if (raw != null) {
-    const dt = new Date(raw);
-    if (!Number.isNaN(dt.getTime())) {
-      return formatNextDeliveryDateLine(dt);
-    }
+  const upcoming = resolveUpcomingSubscriptionDeliveryDate(subscription);
+  if (upcoming) {
+    return formatNextDeliveryDateLine(upcoming);
   }
 
   const fallback = formatHomepageNextDeliveryLine(subscription);

@@ -31,7 +31,11 @@ import {
 } from "../../config/guestBrowseAddressCopy";
 import { GUEST_SELECTED_LOCATION_TITLE } from "../../utils/guestHeaderLocation";
 import { AddressSelectionSkeleton } from "../common/PageSkeletons";
-import { formatPhoneForDisplay } from "../../utils/phoneDisplay";
+import {
+  formatPhoneForDisplay,
+  indianMobileDigits10,
+  isValidIndianMobile10,
+} from "../../utils/phoneDisplay";
 import {
   formatAddressReceiverNameLine,
   formatAddressReceiverPhoneLine,
@@ -389,6 +393,11 @@ const AddressSelection: React.FC = () => {
       return;
     }
 
+    if (!isGuestEntry && !isValidIndianMobile10(formData.associatedPhoneNumber)) {
+      toast.error(REQUIRED_TOAST.PHONE_TEN_DIGITS);
+      return;
+    }
+
     if (isGuestEntry) {
       const hadInvalidLocation = locationValidation?.isValid === false;
       try {
@@ -473,7 +482,9 @@ const AddressSelection: React.FC = () => {
         state: formData.state,
         pincode: formData.pincode,
         district: formData.district,
-        associatedPhoneNumber: formData.associatedPhoneNumber,
+        associatedPhoneNumber: indianMobileDigits10(
+          formData.associatedPhoneNumber,
+        ),
         coordinates: formData.coordinates,
         setAsDefault: formData.setAsDefault
       };
@@ -523,9 +534,13 @@ const AddressSelection: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
+    const nextValue =
+      name === "associatedPhoneNumber"
+        ? value.replace(/\D/g, "").slice(0, 10)
+        : value;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: type === "checkbox" ? checked : nextValue,
     }));
   };
 

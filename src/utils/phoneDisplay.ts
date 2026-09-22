@@ -2,6 +2,18 @@
  * Phone helpers — API returns E.164 (e.g. +919876543210). Use for display vs API payloads.
  */
 
+/** Last 10 digits of an Indian mobile (strips +91 / country code). */
+export function indianMobileDigits10(phone: string | null | undefined): string {
+  if (phone == null || phone === "") return "";
+  const digits = String(phone).replace(/\D/g, "");
+  if (digits.length >= 10) return digits.slice(-10);
+  return digits;
+}
+
+export function isValidIndianMobile10(phone: string | null | undefined): boolean {
+  return /^\d{10}$/.test(indianMobileDigits10(phone));
+}
+
 /** Strip +91 for UI when showing a 10-digit Indian mobile number. */
 export function formatPhoneForDisplay(phone: string | null | undefined): string {
   if (phone == null || phone === "") return "";

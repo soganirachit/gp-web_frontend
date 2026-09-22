@@ -39,7 +39,10 @@ import { OPTIMIZED_ILLUSTRATIONS } from "../../config/optimizedIllustrations";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { storeService } from "../../services/store.service";
-import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
+import {
+  errorMessageFromCatch,
+  isHttpNotFoundError,
+} from "../../utils/apiErrorMessage";
 import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
 import {
   extractCartStockApiMessage,
@@ -257,6 +260,9 @@ const ProductPage: React.FC = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const productUnavailableRedirectRef = useRef(false);
+  const PRODUCT_UNAVAILABLE_TOAST =
+    "This product is currently unavailable on the store.";
   const [activeTab, setActiveTab] = useState<"Description" | "Details" | "More">("Description");
   const [combineProducts, setCombineProducts] = useState<Product[]>([]);
 
@@ -456,6 +462,10 @@ const ProductPage: React.FC = () => {
         setProduct(productData);
         await loadBestSellers(slug, productData?.id ?? null, catalogSidForDaily ?? null);
       } catch (productError) {
+        if (isHttpNotFoundError(productError)) {
+          setError(PRODUCT_UNAVAILABLE_TOAST);
+          return;
+        }
         // Legacy base packs only: GET /basepacks/{id}/ — do not call with a product slug (404).
         const legacyNumericId = /^\d+$/.test(String(slug));
         if (!legacyNumericId) {
@@ -486,10 +496,12 @@ const ProductPage: React.FC = () => {
         feature !== "gpStore"
           ? catalogStoreId ?? storeService.getStoreIdForProducts()
           : storeService.getStoreIdForProducts();
-      const allProducts = await productService.getAllProducts({
-        availabilityType: productListAvailability,
-        storeId: sid || undefined,
-      });
+      const { products: allProducts } =
+        await productService.getStoreProductListFirstPage({
+          availabilityType: productListAvailability,
+          storeId: sid || undefined,
+          pageSize: 12,
+        });
       const otherProducts = allProducts
         .filter((p) => {
           const pSlug = (p as Product & { slug?: string }).slug;
@@ -521,10 +533,13 @@ const ProductPage: React.FC = () => {
           feature !== "gpStore"
             ? await resolveGpDailyCatalogStoreId().catch(() => undefined)
             : storeService.getStoreIdForProducts();
-        const allProducts = await productService.getAllProducts({
-          availabilityType: productListAvailability,
-          storeId: sid || undefined,
-        });
+        const { products: allProducts } =
+          await productService.getStoreProductListFirstPage({
+            availabilityType: productListAvailability,
+            storeId: sid || undefined,
+            categorySlug: "exotic-packs",
+            pageSize: 12,
+          });
         const exoticProducts = allProducts.filter(
           (product) => product.type === "EXOTIC"
         );
@@ -1249,10 +1264,12 @@ const ProductPage: React.FC = () => {
         feature !== "gpStore"
           ? await resolveGpDailyCatalogStoreId().catch(() => undefined)
           : storeService.getStoreIdForProducts();
-      const allProducts = await productService.getAllProducts({
-        availabilityType: productListAvailability,
-        storeId: sid || undefined,
-      });
+      const { products: allProducts } =
+        await productService.getStoreProductListFirstPage({
+          availabilityType: productListAvailability,
+          storeId: sid || undefined,
+          pageSize: 24,
+        });
       const garlandProducts = allProducts.filter(
         (product): product is GarlandProduct => product.type === "GARLAND"
       );
@@ -1267,7 +1284,23 @@ const ProductPage: React.FC = () => {
     void fetchGarlandProducts();
   }, [fetchGarlandProducts]);
 
+  useEffect(() => {
+    if (loading || productUnavailableRedirectRef.current) return;
+    if (error !== PRODUCT_UNAVAILABLE_TOAST) return;
+    productUnavailableRedirectRef.current = true;
+    toast.error(PRODUCT_UNAVAILABLE_TOAST);
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate(basePath);
+    }
+  }, [error, loading, navigate, basePath]);
+
   if (loading || isCheckingBalance) {
+    return <ProductDetailSkeleton />;
+  }
+
+  if (error === PRODUCT_UNAVAILABLE_TOAST) {
     return <ProductDetailSkeleton />;
   }
 

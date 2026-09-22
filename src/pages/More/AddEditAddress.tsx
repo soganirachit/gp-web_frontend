@@ -25,6 +25,11 @@ import {
   messageFromGeolocationPositionError,
 } from '../../utils/geolocationMessages';
 import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
+import {
+  formatPhoneForDisplay,
+  indianMobileDigits10,
+  isValidIndianMobile10,
+} from '../../utils/phoneDisplay';
 import type { MapPinAnchor } from '../../utils/validateTypedAddressMatchesMapPin';
 
 /** When Google Geocoding REST is unavailable or returns nothing, fill fields from OSM (usage policy: identify app). */
@@ -201,7 +206,7 @@ const AddEditAddress: React.FC = () => {
         setName(existingAddress.name);
       }
       if (existingAddress.associatedPhoneNumber) {
-        setPhone(existingAddress.associatedPhoneNumber);
+        setPhone(formatPhoneForDisplay(existingAddress.associatedPhoneNumber));
       }
       
       // Parse and set coordinates from existing address
@@ -238,7 +243,7 @@ const AddEditAddress: React.FC = () => {
           }
           // Set phone if available
           if (user.phoneNumber) {
-            setPhone(user.phoneNumber);
+            setPhone(formatPhoneForDisplay(user.phoneNumber));
           }
         }
       } catch (error) {
@@ -281,8 +286,7 @@ const AddEditAddress: React.FC = () => {
       showValidationToast(REQUIRED_TOAST.ENTER_FULL_NAME);
       return false;
     }
-    const phoneDigits = phone.replace(/\D/g, '');
-    if (phoneDigits.length !== 10) {
+    if (!isValidIndianMobile10(phone)) {
       showValidationToast(REQUIRED_TOAST.PHONE_TEN_DIGITS);
       return false;
     }
@@ -375,12 +379,12 @@ const AddEditAddress: React.FC = () => {
 
       const addressData = {
         name: name, // Include name in payload
-        associatedPhoneNumber: phone, // Use the state variable
+        associatedPhoneNumber: indianMobileDigits10(phone),
         city: mapAnchor?.city?.trim() || 'unknown',
         coordinates: `${selectedPosition.lat},${selectedPosition.lng}`,
         district: mapAnchor?.city?.trim() || 'unknown',
         houseNo: houseNo,
-        area: formData.landmark || 'unknown',
+        area: formData.landmark.trim(),
         state: mapAnchor?.state?.trim() || 'Unknown',
         pincode: pincode.trim() || mapAnchor?.pincode?.trim() || '',
         streetName: streetName,
@@ -694,13 +698,6 @@ const AddEditAddress: React.FC = () => {
     void reverseGeocodeMapCenter(lat, lng);
   }, [isEdit, isLoaded, routeState.initialFormattedAddress]);
 
-  useEffect(() => {
-    if (!isLoaded) return;
-    if (formData.completeAddress.trim()) {
-      syncPlacesSearchInput(formData.completeAddress);
-    }
-  }, [isLoaded, formData.completeAddress]);
-
   const handleMapDrag = () => {
     if (mapRef.current) {
       const center = mapRef.current.getCenter();
@@ -933,7 +930,9 @@ const AddEditAddress: React.FC = () => {
               type="tel"
               placeholder="00000 00000"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) =>
+                setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))
+              }
               className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:border-transparent bg-[#FFFBF7]"
               style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
               onFocus={(e) => {
@@ -967,7 +966,6 @@ const AddEditAddress: React.FC = () => {
                 isCompleteAddressFocusedRef.current = false;
                 e.currentTarget.style.borderColor = '#e5e7eb';
                 e.currentTarget.style.boxShadow = 'none';
-                void forwardGeocodeTypedAddress(e.target.value);
               }}
               rows={3}
               className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm resize-none focus:outline-none focus:ring-2 focus:border-transparent bg-[#FFFBF7]"

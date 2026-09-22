@@ -3,7 +3,10 @@ import {
   type Subscription,
   type SubscriptionLineItem,
 } from "../services/subscription.service";
-import { getDeliveryDayInts } from "./subscriptionNextDelivery";
+import {
+  getDeliveryDayInts,
+  isPastSameDaySubscriptionDeliveryCutoff,
+} from "./subscriptionNextDelivery";
 
 function sumDailyProductFromLineItems(items: SubscriptionLineItem[]): number {
   let productTotal = 0;
@@ -113,8 +116,6 @@ export type GpDailyWalletBannerState = {
   runwayLastCoveredDate: Date | null;
 };
 
-const SAME_DAY_DELIVERY_CUTOFF_HOUR = 12;
-
 function startOfDay(d: Date = new Date()): Date {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -155,13 +156,6 @@ function isWalletHoldPause(sub: Record<string, unknown>): boolean {
 
 function jsWeekdayToDeliveryInt(jsDay: number): number {
   return jsDay === 0 ? 6 : jsDay - 1;
-}
-
-function isPastSameDayDeliveryCutoff(now: Date): boolean {
-  const todayMidnight = startOfDay(now);
-  const cutoff = new Date(todayMidnight);
-  cutoff.setHours(SAME_DAY_DELIVERY_CUTOFF_HOUR, 0, 0, 0);
-  return now.getTime() >= cutoff.getTime();
 }
 
 type SubWalletCtx = {
@@ -309,7 +303,7 @@ export function sumActiveSubscriptionsThreeDayTotal(
     ctxs,
     startOfDay(),
     WALLET_WARNING_DAYS,
-    isPastSameDayDeliveryCutoff(new Date()),
+    isPastSameDaySubscriptionDeliveryCutoff(new Date()),
   );
 }
 
@@ -324,7 +318,7 @@ export function sumActiveSubscriptionsThirtyDayTotal(
     ctxs,
     startOfDay(),
     WALLET_RECOMMEND_RECHARGE_DAYS,
-    isPastSameDayDeliveryCutoff(new Date()),
+    isPastSameDaySubscriptionDeliveryCutoff(new Date()),
   );
 }
 
@@ -387,7 +381,7 @@ export function computeGpDailyWalletBanner(
 
   const today = startOfDay(input.today);
   const now = input.today ?? new Date();
-  const skipToday = isPastSameDayDeliveryCutoff(now);
+  const skipToday = isPastSameDaySubscriptionDeliveryCutoff(now);
   const subs = input.subscriptions ?? [];
   const activeSubs = subs.filter((s) =>
     isActiveSubscriptionStatus((s as Record<string, unknown>).status),

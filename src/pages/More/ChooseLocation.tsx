@@ -103,22 +103,30 @@ const ChooseLocation: React.FC = () => {
     return othersIcon;
   };
 
-  const handleSelectAddress = async (address: Address) => {
+  const handleSelectAddress = (address: Address) => {
     if (applyInProgress) return;
-    try {
-      setApplyInProgress(true);
-      await storeService.applyBrowseAddressForCatalog(address);
-      toast.success(REQUIRED_TOAST.DELIVERY_ADDRESS_UPDATED);
+    setApplyInProgress(true);
+    setBrowseOverrideId(String(address.id));
+    if (returnUrl) {
+      navigate(returnUrl);
+    } else {
       navigate(-1);
-    } catch (e: unknown) {
-      const m =
-        e instanceof Error
-          ? e.message
-          : REQUIRED_TOAST.FAILED_SWITCH_ADDRESS;
-      toast.error(m, { id: m });
-    } finally {
-      setApplyInProgress(false);
     }
+    void storeService
+      .applyBrowseAddressForCatalog(address)
+      .then(() => {
+        toast.success(REQUIRED_TOAST.DELIVERY_ADDRESS_UPDATED);
+      })
+      .catch((e: unknown) => {
+        const m =
+          e instanceof Error
+            ? e.message
+            : REQUIRED_TOAST.FAILED_SWITCH_ADDRESS;
+        toast.error(m, { id: m });
+      })
+      .finally(() => {
+        setApplyInProgress(false);
+      });
   };
 
   const handleUseCurrentGps = async () => {

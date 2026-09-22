@@ -204,13 +204,25 @@ const GpStore_Homepage: React.FC = () => {
             const normalizeList = (list: unknown[]) =>
                 (list || []).map((p) => productService.normalizeToBestSeller(p as Record<string, unknown>));
 
-            const [allPacksRaw, premiumRaw] = await Promise.all([
-                productService.getProductsByOrdering(undefined, sid, signal, PRODUCT_AVAILABILITY_STORE),
-                productService.getProductsByLabel("premium", sid, signal, "-order_count", PRODUCT_AVAILABILITY_STORE),
+            const [allPacksPage, premiumPage] = await Promise.all([
+                productService.getStoreProductListFirstPage({
+                    storeId: sid,
+                    availabilityType: PRODUCT_AVAILABILITY_STORE,
+                    pageSize: 24,
+                    signal,
+                }),
+                productService.getStoreProductListFirstPage({
+                    storeId: sid,
+                    availabilityType: PRODUCT_AVAILABILITY_STORE,
+                    pageSize: 12,
+                    ordering: "-order_count",
+                    label: "premium",
+                    signal,
+                }),
             ]);
 
-            setProducts(normalizeList(allPacksRaw as unknown[]));
-            setPremiumProducts(normalizeList(premiumRaw as unknown[]).slice(0, 12));
+            setProducts(normalizeList(allPacksPage.products as unknown[]));
+            setPremiumProducts(normalizeList(premiumPage.products as unknown[]));
         } catch (error: any) {
             if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
                 console.log("Products request was canceled");

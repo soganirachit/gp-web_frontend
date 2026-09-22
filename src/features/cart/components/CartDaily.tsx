@@ -268,10 +268,14 @@ function cartProductSignatureFromItems(
   items: Array<{
     productId?: number | string;
     variant?: { id?: number } | null;
+    quantity?: number;
   }>,
 ): string {
   return items
-    .map((it) => `${it.productId ?? 0}:${it.variant?.id ?? 0}`)
+    .map(
+      (it) =>
+        `${it.productId ?? 0}:${it.variant?.id ?? 0}:${it.quantity ?? 0}`,
+    )
     .sort()
     .join('|');
 }
@@ -849,7 +853,7 @@ const Cart: React.FC = () => {
   /** Stable basket signature — avoids effects re-firing on every cart refresh (new `items` array). */
   const itemsSignature = useMemo(
     () => cartProductSignatureFromItems(items),
-    [dailyCart],
+    [items],
   );
 
   /** Backend may clear lines when store changes — refresh if cart store id changes. */
@@ -929,7 +933,6 @@ const Cart: React.FC = () => {
   const [showPromoModal, setShowPromoModal] = useState(false);
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const appliedPromoCodeRef = useRef<string | null>(null);
-  const cartProductSignatureRef = useRef('');
   const promoTotalsRefreshSigRef = useRef<string | null>(null);
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState<number>(0);
@@ -1297,47 +1300,23 @@ const Cart: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const sig = itemsSignature;
-    const prev = cartProductSignatureRef.current;
-    if (prev) {
-      const prevSet = new Set(prev.split('|').filter(Boolean));
-      const addedNew = sig
-        .split('|')
-        .filter(Boolean)
-        .some((key) => !prevSet.has(key));
-      if (addedNew && appliedPromoCodeRef.current) {
-        void handleRemovePromoCode();
-      }
-    }
-    cartProductSignatureRef.current = sig;
-  }, [itemsSignature]);
-
-  // Re-apply promo when basket contents change (qty / add / remove) — not on every cart poll.
+  // Remove promo when basket contents change (user must re-apply on updated basket).
   useEffect(() => {
     const sig = itemsSignature;
     const prev = promoTotalsRefreshSigRef.current;
     promoTotalsRefreshSigRef.current = sig;
     if (!isLoggedIn || !prev || prev === sig) return;
+    if (!appliedPromoCodeRef.current) return;
 
     const id = window.setTimeout(() => {
       void (async () => {
-        const activeCode = appliedPromoCodeRef.current;
-        if (!activeCode) return;
-        try {
-          const response = await applyCouponAPI(activeCode);
-          const discountAmt = parseFloat(String(response.discount_amount ?? 0));
-          setPromoDiscount(Number.isFinite(discountAmt) ? discountAmt : 0);
-          await refreshDailyCart();
-        } catch {
-          await removeCouponAPI().catch(() => {});
-          setAppliedPromoCode(null);
-          appliedPromoCodeRef.current = null;
-          setPromoDiscount(0);
-          await refreshDailyCart();
-        }
+        await removeCouponAPI().catch(() => {});
+        setAppliedPromoCode(null);
+        appliedPromoCodeRef.current = null;
+        setPromoDiscount(0);
+        await refreshDailyCart();
       })();
-    }, 320);
+    }, 200);
     return () => clearTimeout(id);
   }, [isLoggedIn, itemsSignature, refreshDailyCart]);
 

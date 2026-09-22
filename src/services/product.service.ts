@@ -557,6 +557,7 @@ export const productService = {
     storeId?: number;
     availabilityType?: string;
     pageSize?: number;
+    label?: string;
     signal?: AbortSignal;
   }): Promise<{ products: any[]; nextUrl: string | null }> {
     const pageSize = opts.pageSize ?? STORE_PRODUCT_LIST_PAGE_SIZE;
@@ -566,6 +567,7 @@ export const productService = {
     };
     if (opts.categorySlug) params.category = opts.categorySlug;
     if (opts.ordering) params.ordering = opts.ordering;
+    if (opts.label) params.label = opts.label;
     if (opts.storeId != null && Number.isFinite(Number(opts.storeId))) {
       params.store_id = Number(opts.storeId);
     }

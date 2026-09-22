@@ -173,10 +173,14 @@ function cartProductSignatureFromItems(
   items: Array<{
     productId?: number | string;
     variant?: { id?: number } | null;
+    quantity?: number;
   }>,
 ): string {
   return items
-    .map((it) => `${it.productId ?? 0}:${it.variant?.id ?? 0}`)
+    .map(
+      (it) =>
+        `${it.productId ?? 0}:${it.variant?.id ?? 0}:${it.quantity ?? 0}`,
+    )
     .sort()
     .join('|');
 }
@@ -575,7 +579,6 @@ const Cart: React.FC = () => {
   const [showPromoModal, setShowPromoModal] = useState(false);
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const appliedPromoCodeRef = useRef<string | null>(null);
-  const cartProductSignatureRef = useRef('');
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState<number>(0);
   const [promoInlineMessage, setPromoInlineMessage] = useState<{
@@ -847,21 +850,28 @@ const Cart: React.FC = () => {
     };
   }, []);
 
+  const cartItemsPromoSigRef = useRef('');
   useEffect(() => {
     const sig = cartProductSignatureFromItems(items);
-    const prev = cartProductSignatureRef.current;
-    if (prev) {
-      const prevSet = new Set(prev.split('|').filter(Boolean));
-      const addedNew = sig
-        .split('|')
-        .filter(Boolean)
-        .some((key) => !prevSet.has(key));
-      if (addedNew && appliedPromoCodeRef.current) {
-        void handleRemovePromoCode();
-      }
+    const prev = cartItemsPromoSigRef.current;
+    cartItemsPromoSigRef.current = sig;
+    if (!isLoggedIn || !prev || prev === sig || !appliedPromoCodeRef.current) {
+      return;
     }
-    cartProductSignatureRef.current = sig;
-  }, [items]);
+    void (async () => {
+      await removeCouponAPI().catch(() => {});
+      setAppliedPromoCode(null);
+      appliedPromoCodeRef.current = null;
+      setPromoDiscount(0);
+      try {
+        const raw = await cartService.getCartData();
+        const cartData = await reconcileCartStoreWithAccountSelection(raw);
+        applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [isLoggedIn, items, reconcileCartStoreWithAccountSelection]);
 
   // Preload Razorpay SDK when basket opens so checkout is not blocked on first load
   useEffect(() => {
@@ -1052,26 +1062,6 @@ const Cart: React.FC = () => {
           setIsLoadingCartTotals(true);
           const raw = await cartService.getCartData();
           const cartData = await reconcileCartStoreWithAccountSelection(raw);
-          const activeCode = appliedPromoCodeRef.current;
-          if (activeCode) {
-            try {
-              const response = await applyCouponAPI(activeCode);
-              const discountAmt = parseFloat(String(response.discount_amount ?? 0));
-              setPromoDiscount(Number.isFinite(discountAmt) ? discountAmt : 0);
-              if (response.total !== undefined || response.subtotal !== undefined) {
-                const d = Number.isFinite(discountAmt) ? discountAmt : 0;
-                setCartTotals((prev) => mergeTotalsFromApplyResponse(response, prev, d));
-              } else {
-                applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
-              }
-              setAppliedPromoCode(activeCode);
-              return;
-            } catch {
-              await removeCouponAPI().catch(() => {});
-              setAppliedPromoCode(null);
-              setPromoDiscount(0);
-            }
-          }
           applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
           if (cartData.coupon_code) {
             setAppliedPromoCode(String(cartData.coupon_code));
