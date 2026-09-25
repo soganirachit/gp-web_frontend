@@ -17,6 +17,14 @@ export const REQUIRED_TOAST = {
   MONEY_ADDED_WALLET: "Money added to wallet",
   SUBSCRIPTION_RESUMED: "Subscription resumed",
   SUBSCRIPTION_UPDATED: "Subscription updated",
+  SUBSCRIPTION_RESUME_FIRST: "Please resume the subscription first.",
+  SUBSCRIPTION_RECHARGE_WALLET_FIRST: "Please recharge your wallet first.",
+  SUBSCRIPTION_UPDATE_STORE_OFFLINE:
+    "This store is currently offline. You can update the subscription when the store is back online.",
+  SUBSCRIPTION_RESUME_WALLET_HOLD:
+    "This subscription is paused due to Insufficient Wallet Balance. Recharge your wallet to resume deliveries.",
+  SUBSCRIPTION_RESUME_STORE_OFFLINE:
+    "This subscription is paused because the store is currently offline. It will resume when the store is back online.",
   ACCOUNT_DELETED: "Account deleted successfully",
   MESSAGE_SENT: "Message sent successfully",
   COPIED: "Copied!",
@@ -116,6 +124,8 @@ export const REQUIRED_TOAST = {
   NETWORK_ISSUE: "Network issue or timeout. Check your connection and try again.",
   OTP_DELIVERY_FAILED: "OTP delivery failed. Please tap Resend in a moment.",
   PRESS_AGAIN_TO_EXIT: "Press again to exit",
+  PRODUCT_UNAVAILABLE_AT_STORE:
+    "Product is currently unavailable at this store",
 } as const;
 
 /** Flat list for toast approval policy (excludes template with `{N}`). */

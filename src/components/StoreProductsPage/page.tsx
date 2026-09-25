@@ -17,6 +17,7 @@ import { SearchBar } from "../common/SearchBar";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { GUEST_STORE_UPDATED_EVENT, storeService } from "../../services/store.service";
+import { CATALOG_PRODUCTS_REFRESH_EVENT } from "../../utils/productUnavailableAtStore";
 import { getApiUrl } from "../../config/api.config";
 import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
@@ -42,6 +43,7 @@ const StoreProductsPages: React.FC = () => {
   const { isLoggedIn } = useAuth();
   const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
   const [guestStoreEpoch, setGuestStoreEpoch] = useState(0);
+  const [catalogRefreshEpoch, setCatalogRefreshEpoch] = useState(0);
 
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -98,6 +100,13 @@ const StoreProductsPages: React.FC = () => {
     return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, onPick);
   }, [isLoggedIn]);
 
+  useEffect(() => {
+    const onCatalogRefresh = () => setCatalogRefreshEpoch((e) => e + 1);
+    window.addEventListener(CATALOG_PRODUCTS_REFRESH_EVENT, onCatalogRefresh);
+    return () =>
+      window.removeEventListener(CATALOG_PRODUCTS_REFRESH_EVENT, onCatalogRefresh);
+  }, []);
+
   // Fetch products — first API page only (6 items); scroll loads `next` pages (same pattern as My Orders).
   useEffect(() => {
     const fetchData = async () => {
@@ -142,7 +151,7 @@ const StoreProductsPages: React.FC = () => {
     };
 
     void fetchData();
-  }, [categorySlug, stateCategoryName, isLoggedIn, guestStoreEpoch, sortBy, availabilityChannel]);
+  }, [categorySlug, stateCategoryName, isLoggedIn, guestStoreEpoch, catalogRefreshEpoch, sortBy, availabilityChannel]);
 
   const getItemPrice = (item: any): number => getDiscoveryEffectivePrice(item);
 

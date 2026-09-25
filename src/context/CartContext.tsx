@@ -23,6 +23,8 @@ export interface CartItem {
   inventoryId?: number; // Direct inventory ID (can be variant.id or product inventory_id)
   customizedMessage?: string;
   categorySlug?: string; // Category slug for conditional features like customized message
+  isAvailable?: boolean;
+  unavailableReason?: string | null;
   // Note: deliveryDate and timeSlot are stored at cart level, not per item
 }
 
@@ -552,6 +554,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
               : null,
             // Prefer API category slug; fall back to any preserved local value
             categorySlug: (product as any)?.category?.slug || existingItem?.categorySlug,
+            isAvailable: apiItem.is_available !== false,
+            unavailableReason: apiItem.unavailable_reason ?? null,
           };
           
           console.log('Mapped cart item:', { 

@@ -16,6 +16,7 @@ import {
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { resolveGpDailyZoneAtLatLng } from "../../services/subscriptionZone.service";
 import { guestHasSavedBrowseAddress } from "../../utils/guestAddressEntry";
+import { peekLandingAddressReturn } from "../../utils/applySharedBrowseDeliveryAddress";
 
 function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace("#", "").trim();
@@ -179,20 +180,28 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
     storeService.setTemporaryStoreId(storeId);
     notifyGuestTemporaryStoreUpdated();
     completeWithStore();
+    const fromLanding = peekLandingAddressReturn();
     const addressPath =
-      feature === "gpDaily"
-        ? "/gp-daily/address-selection"
-        : "/gp-store/address-selection";
+      fromLanding || feature === "gpStore"
+        ? "/gp-store/address-selection"
+        : "/gp-daily/address-selection";
     if (redirectToAddressAfterPick) {
       const loginPath =
-        feature === "gpDaily" ? "/gp-daily/login" : "/gp-store/login";
+        fromLanding || feature === "gpStore" ? "/gp-store/login" : "/gp-daily/login";
+      const selectionState = {
+        fromHome: true,
+        guestBrowse: true,
+        ...(fromLanding
+          ? { fromLandingHome: true, returnUrl: "/home" }
+          : {}),
+      };
       if (guestHasSavedBrowseAddress()) {
         navigate(loginPath, {
-          state: { returnUrl: addressPath },
+          state: { returnUrl: addressPath, ...selectionState },
         });
         return;
       }
-      navigate(addressPath, { state: { fromHome: true, guestBrowse: true } });
+      navigate(addressPath, { state: selectionState });
       return;
     }
     if (feature === "gpDaily") {

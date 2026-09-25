@@ -1,6 +1,6 @@
 import { format, addDays } from "date-fns";
 import type { Subscription } from "../services/subscription.service";
-import { isSubscriptionPausedForInsufficientWallet } from "./gpDailySubscriptionWalletPause";
+import { isSubscriptionPausedForInsufficientWallet, INSUFFICIENT_WALLET_BALANCE_LABEL } from "./gpDailySubscriptionWalletPause";
 
 /** Mon … Sun labels for UI (delivery int 0 = Monday). */
 export const WEEK_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
@@ -70,10 +70,10 @@ function startOfDay(d: Date): Date {
   return x;
 }
 
-/** True once local calendar day D has started (after 12:00 AM on D). */
+/** True once local calendar day D has started (12:00 AM on D, inclusive). */
 export function isPastSameDaySubscriptionDeliveryCutoff(now: Date = new Date()): boolean {
   const midnight = startOfDay(now);
-  return now.getTime() > midnight.getTime();
+  return now.getTime() >= midnight.getTime();
 }
 
 /** Parse API date-only fields in local calendar (avoids UTC `YYYY-MM-DD` shifting). */
@@ -154,7 +154,10 @@ function isFutureSubscriptionDeliveryCalendarDay(date: Date, now: Date): boolean
   return true;
 }
 
-/** Schedule-first next delivery (ignores stale API "today" after midnight). */
+/**
+ * Next delivery date for an active subscription.
+ * After 12:00 AM, never return today — earliest is the next subscribed weekday.
+ */
 export function resolveUpcomingSubscriptionDeliveryDate(
   subscription: Subscription,
 ): Date | null {
@@ -162,20 +165,18 @@ export function resolveUpcomingSubscriptionDeliveryDate(
   const start = subscription.startDate
     ? parseSubscriptionCalendarDate(subscription.startDate)
     : null;
-  const apiNext = subscription.nextDeliveryDate
-    ? parseSubscriptionCalendarDate(subscription.nextDeliveryDate)
-    : null;
+  const apiNext = getApiNextDeliveryDate(subscription);
 
   if (start && isFutureSubscriptionDeliveryCalendarDay(start, now)) {
     return start;
   }
 
-  const fromSchedule = computeNextDeliveryFromSubscribedDays(subscription);
-  if (fromSchedule) return startOfDay(fromSchedule);
-
   if (apiNext && isFutureSubscriptionDeliveryCalendarDay(apiNext, now)) {
     return apiNext;
   }
+
+  const fromSchedule = computeNextDeliveryFromSubscribedDays(subscription);
+  if (fromSchedule) return startOfDay(fromSchedule);
 
   return null;
 }
@@ -189,9 +190,6 @@ export function formatNextDeliveryDateLine(date: Date): string {
 
   if (d0.getTime() === tomorrow.getTime()) {
     return `Tomorrow - ${part}`;
-  }
-  if (d0.getTime() === today.getTime()) {
-    return `Today - ${part}`;
   }
   return part;
 }
@@ -218,28 +216,24 @@ export function getPausedResumeDate(subscription: Subscription): Date | null {
   if (isSubscriptionPausedForInsufficientWallet(subscription)) {
     return null;
   }
-  const candidates: Date[] = [];
-  const next = subscription.nextDeliveryDate;
-  if (next && !Number.isNaN(next.getTime())) candidates.push(next);
-  const until = subscription.pausedUntilDate;
-  if (until && !Number.isNaN(until.getTime())) candidates.push(until);
-  if (!candidates.length) return null;
-  const resume = candidates.sort((a, b) => a.getTime() - b.getTime())[0];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const resumeDay = new Date(resume);
-  resumeDay.setHours(0, 0, 0, 0);
-  if (resumeDay.getTime() < today.getTime()) return null;
-  return resume;
+  const next = parseSubscriptionDateField(subscription.nextDeliveryDate);
+  if (next) {
+    const today = startOfDay(new Date());
+    if (next.getTime() >= today.getTime()) return next;
+  }
+  const until = parseSubscriptionDateField(subscription.pausedUntilDate);
+  if (until) {
+    const resume = addDays(until, 1);
+    const today = startOfDay(new Date());
+    if (resume.getTime() >= today.getTime()) return resume;
+  }
+  return null;
 }
 
 /** Paused copy — wallet pauses omit "paused till"; manual pauses show future resume date. */
 export function formatPausedDeliveryLine(subscription: Subscription): string {
   if (isSubscriptionPausedForInsufficientWallet(subscription)) {
-    const display =
-      (subscription as { pauseReasonDisplay?: string }).pauseReasonDisplay ||
-      "Insufficient Wallet Balance";
-    return display;
+    return `Paused — ${INSUFFICIENT_WALLET_BALANCE_LABEL}`;
   }
   const resume = getPausedResumeDate(subscription);
   if (resume) {

@@ -6,6 +6,7 @@ import {
   markRazorpayCheckoutClosed,
   markRazorpayCheckoutOpen,
 } from "../utils/razorpayCheckoutSession";
+import { errorWithApiCode } from "../utils/apiErrorMessage";
 
 // Ensure API URL includes /api/v1 if not already in base URL
 const getPaymentApiUrl = () => {
@@ -222,7 +223,7 @@ class PaymentService {
       if (response.data && response.data.success === false) {
         const errorMessage = response.data.message || 'Authentication failed';
         console.error('API returned error:', errorMessage, response.data);
-        throw new Error(errorMessage);
+        throw errorWithApiCode(errorMessage, response.data);
       }
 
       // Some APIs wrap the actual payload under a `data` key
@@ -244,7 +245,7 @@ class PaymentService {
         });
       }
 
-      throw new Error(getUserFacingPaymentError(error));
+      throw errorWithApiCode(getUserFacingPaymentError(error), error);
     }
   }
 

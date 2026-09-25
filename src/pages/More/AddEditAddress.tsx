@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MdLocationOn, MdMyLocation } from 'react-icons/md';
-import { addressService, Address, stripUnknownAddressToken } from '../../services/address.service';
+import { addressService, Address, stripUnknownAddressToken, composeCompleteAddress } from '../../services/address.service';
 import { validateGpDailyDeliveryAreaFromCoordinates } from '../../services/subscriptionZone.service';
 import { toast } from 'react-hot-toast';
 import { GoogleMap, Autocomplete } from '@react-google-maps/api';
@@ -24,6 +24,10 @@ import {
   isLikelyNetworkError,
   messageFromGeolocationPositionError,
 } from '../../utils/geolocationMessages';
+import {
+  readStoredUserCoordinates,
+  requestBrowserGeolocation,
+} from '../../utils/requestBrowserGeolocation';
 import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
 import {
   formatPhoneForDisplay,
@@ -100,6 +104,8 @@ const AddEditAddress: React.FC = () => {
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const placesSearchInputRef = useRef<HTMLInputElement | null>(null);
   const isCompleteAddressFocusedRef = useRef(false);
+  /** User customized Complete Address; do not treat it as a map search or overwrite it until the pin moves. */
+  const completeAddressEditedRef = useRef(false);
   const { isLoaded, loadError } = useGoogleMaps();
   const placesAutocompleteMountKey = useMemo(
     () => `${location.pathname}-${existingAddress?.id ?? 'new'}-${location.key}`,
@@ -162,97 +168,67 @@ const AddEditAddress: React.FC = () => {
   const [locationValidationShakeKey, setLocationValidationShakeKey] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const applyAddressToForm = (addr: Address) => {
+    const addressType = addr.type || 'Home';
+    setFormData({
+      completeAddress: composeCompleteAddress(addr.houseNo, addr.streetName),
+      floor: stripUnknownAddressToken(addr.floor),
+      landmark: stripUnknownAddressToken(addr.landmark),
+      type: addressType,
+    });
+    if (addressType === 'Others' || (addressType !== 'Home' && addressType !== 'Work')) {
+      setSelectedType('Others');
+      setCustomTypeName(addressType === 'Others' ? '' : addressType);
+    } else {
+      setSelectedType(addressType as 'Home' | 'Work');
+    }
+    setPincode(addr.pincode || '');
+    if (addr.name) setName(addr.name);
+    if (addr.associatedPhoneNumber) {
+      setPhone(formatPhoneForDisplay(addr.associatedPhoneNumber));
+    }
+    if (addr.coordinates) {
+      try {
+        const [lat, lng] = addr.coordinates.split(',').map(Number);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          setSelectedPosition({ lat, lng });
+          if (mapRef.current) {
+            mapRef.current.panTo({ lat, lng });
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing coordinates:', error);
+      }
+    }
+  };
+
   useEffect(() => {
-    // Prevent double execution in StrictMode
     if (hasInitialized.current) return;
     hasInitialized.current = true;
 
-    if (isEdit && existingAddress) {
-      // Construct fullAddress, avoiding duplication
-      // If area is the same as streetName, don't include it twice
-      const addressParts = [
-        existingAddress.houseNo,
-        existingAddress.streetName
-      ].filter(Boolean);
-      
-      // Only add area if it's different from streetName and not empty
-      if (existingAddress.area && 
-          existingAddress.area.trim() !== existingAddress.streetName?.trim() &&
-          existingAddress.area.trim() !== 'unknown') {
-        addressParts.push(existingAddress.area);
-      }
-      
-      const fullAddress = addressParts.join(', ');
-
-      const addressType = existingAddress.type || 'Home';
-      const line2 = (existingAddress.streetName || '').trim();
-      let floorFromLine2 = '';
-      let streetForDisplay = line2;
-      const savedFloor = stripUnknownAddressToken(existingAddress.floor);
-      if (!savedFloor && line2.includes(',')) {
-        const [first, ...rest] = line2.split(',').map((s) => s.trim());
-        if (first) {
-          floorFromLine2 = first;
-          streetForDisplay = rest.join(', ') || '';
-        }
-      }
-      const displayParts = [existingAddress.houseNo, savedFloor ? line2 : (streetForDisplay || line2)].filter(Boolean);
-
-      setFormData({
-        completeAddress: displayParts.join(', ') || fullAddress || '',
-        floor: savedFloor || floorFromLine2,
-        landmark: stripUnknownAddressToken(existingAddress.landmark || existingAddress.area),
-        type: addressType,
-      });
-      // If type is "Others" or a custom type (not Home/Work), set it to Others and store custom name
-      if (addressType === 'Others' || (addressType !== 'Home' && addressType !== 'Work')) {
-        setSelectedType('Others');
-        setCustomTypeName(addressType === 'Others' ? '' : addressType);
-      } else {
-        setSelectedType(addressType as 'Home' | 'Work');
-      }
-      setPincode(existingAddress.pincode || '');
-      // If editing, use the name/phone from the address record if available
-      if (existingAddress.name) {
-        setName(existingAddress.name);
-      }
-      if (existingAddress.associatedPhoneNumber) {
-        setPhone(formatPhoneForDisplay(existingAddress.associatedPhoneNumber));
-      }
-      
-      // Parse and set coordinates from existing address
-      if (existingAddress.coordinates) {
-        try {
-          const [lat, lng] = existingAddress.coordinates.split(',').map(Number);
-          if (!isNaN(lat) && !isNaN(lng)) {
-            setSelectedPosition({ lat, lng });
-            // Update map center when map is loaded
-            if (mapRef.current) {
-              mapRef.current.panTo({ lat, lng });
-            }
+    const boot = async () => {
+      if (isEdit && existingAddress) {
+        applyAddressToForm(existingAddress);
+        if (existingAddress.id) {
+          try {
+            const fresh = await addressService.getAddressById(existingAddress.id);
+            applyAddressToForm(fresh);
+          } catch {
+            /* keep route-state values */
           }
-        } catch (error) {
-          console.error('Error parsing coordinates:', error);
         }
+        return;
       }
-    } else if (!pendingPrefillCoords.current) {
-      getCurrentLocation();
-    }
-
-    // Fetch user details for default name/phone
-    const fetchUserDetails = async () => {
-      // Don't overwrite if editing (values already set from existing address)
-      if (isEdit && existingAddress) return;
-
+      if (!pendingPrefillCoords.current) {
+        getCurrentLocation();
+      }
       try {
         const customers = await customerService.getAllCustomers();
         if (customers.length > 0) {
           const user = customers[0];
-          // Set name if available
           if (user.firstName || user.lastName) {
             setName(`${user.firstName} ${user.lastName}`.trim());
           }
-          // Set phone if available
           if (user.phoneNumber) {
             setPhone(formatPhoneForDisplay(user.phoneNumber));
           }
@@ -262,7 +238,7 @@ const AddEditAddress: React.FC = () => {
       }
     };
 
-    fetchUserDetails();
+    void boot();
   }, [isEdit, existingAddress]);
 
   const onLoad = useCallback((map: google.maps.Map) => {
@@ -375,10 +351,9 @@ const AddEditAddress: React.FC = () => {
       setIsSubmitting(true);
       setFormError(null);
 
-      // Parse completeAddress to extract components
-      const addressParts = formData.completeAddress.split(',').map(s => s.trim());
-      const houseNo = stripUnknownAddressToken(addressParts[0]);
-      const streetFromAddress = stripUnknownAddressToken(addressParts.slice(1).join(', '));
+      // Complete Address is one user-owned string. Do not split on commas (that left
+      // "Ram nagar" in address_line2 and PATCH dropped the empty street, so it came back).
+      const complete = stripUnknownAddressToken(formData.completeAddress);
       const floorPart = stripUnknownAddressToken(formData.floor);
 
       // Determine the final type: use custom name if provided, otherwise use selected type
@@ -395,13 +370,13 @@ const AddEditAddress: React.FC = () => {
         city: stripUnknownAddressToken(mapAnchor?.city) || stripUnknownAddressToken(existingAddress?.city),
         coordinates: `${selectedPosition.lat},${selectedPosition.lng}`,
         district: stripUnknownAddressToken(mapAnchor?.city) || stripUnknownAddressToken(existingAddress?.city),
-        houseNo: houseNo,
+        houseNo: complete,
         floor: floorPart,
         landmark: stripUnknownAddressToken(formData.landmark),
-        area: stripUnknownAddressToken(formData.landmark),
+        area: '',
         state: stripUnknownAddressToken(mapAnchor?.state) || stripUnknownAddressToken(existingAddress?.state),
         pincode: pincode.trim() || mapAnchor?.pincode?.trim() || '',
-        streetName: streetFromAddress,
+        streetName: '',
         type: finalType as any, // Allow custom type names (e.g., "friends")
         setAsDefault: false // explicitly initialize as false
       };
@@ -446,7 +421,9 @@ const AddEditAddress: React.FC = () => {
     options?: { updateCompleteAddress?: boolean },
   ) => {
     const formattedAddress = place.formatted_address || '';
-    const shouldUpdateCompleteAddress = options?.updateCompleteAddress ?? true;
+    const shouldUpdateCompleteAddress =
+      options?.updateCompleteAddress ??
+      (!completeAddressEditedRef.current && !isCompleteAddressFocusedRef.current);
 
     const addressComponents: Record<string, string> = {};
     place.address_components?.forEach((component) => {
@@ -520,6 +497,7 @@ const AddEditAddress: React.FC = () => {
     place: google.maps.GeocoderResult | google.maps.places.PlaceResult,
     position: { lat: number; lng: number },
   ) => {
+    completeAddressEditedRef.current = false;
     setSelectedPosition(position);
     panMapToPlaceResult(place as google.maps.places.PlaceResult, mapRef.current);
     applyGeocodedPlaceToForm(place as google.maps.GeocoderResult, position);
@@ -539,22 +517,56 @@ const AddEditAddress: React.FC = () => {
     });
   };
 
-  const forwardGeocodeTypedAddress = async (address: string) => {
-    const trimmed = address.trim();
-    if (trimmed.length < 5 || !window.google?.maps) return;
-    try {
-      const geocoder = new google.maps.Geocoder();
-      const { results } = await geocoder.geocode({
-        address: trimmed,
-        componentRestrictions: { country: 'in' },
-      });
-      if (!results?.[0]?.geometry?.location) return;
-      const lat = results[0].geometry.location.lat();
-      const lng = results[0].geometry.location.lng();
-      applyPlaceToMapAndForm(results[0], { lat, lng });
-    } catch (error) {
-      console.error('Forward geocode failed:', error);
+  const applyDeviceCoordinatesToForm = async (latitude: number, longitude: number) => {
+    completeAddressEditedRef.current = false;
+    setSelectedPosition({ lat: latitude, lng: longitude });
+    if (mapRef.current) {
+      mapRef.current.panTo({ lat: latitude, lng: longitude });
     }
+
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    let filled = false;
+    if (apiKey) {
+      try {
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${encodeURIComponent(apiKey)}`,
+        );
+        const data = await response.json();
+        if (data.status === 'OK' && data.results?.[0]) {
+          applyGeocodedPlaceToForm(data.results[0], {
+            lat: latitude,
+            lng: longitude,
+          });
+          filled = true;
+        }
+      } catch (_) {
+        /* try OSM */
+      }
+    }
+    if (!filled) {
+      try {
+        const osm = await reverseGeocodeWithOsm(latitude, longitude);
+        if (osm) {
+          const line = osm.formatted || osm.line;
+          if (!isCompleteAddressFocusedRef.current && !completeAddressEditedRef.current) {
+            setFormData((prev) => ({ ...prev, completeAddress: line }));
+            syncPlacesSearchInput(line);
+          }
+          if (osm.pin) setPincode(osm.pin);
+          setMapAnchor({
+            lat: latitude,
+            lng: longitude,
+            formattedAddress: osm.formatted,
+            completeAddress: line,
+            pincode: osm.pin || undefined,
+          });
+        }
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    setShowMapLocationHint(true);
+    window.setTimeout(() => setShowMapLocationHint(false), 4000);
   };
 
   const getCurrentLocation = () => {
@@ -562,95 +574,43 @@ const AddEditAddress: React.FC = () => {
     isLocationRequestInProgress.current = true;
     setIsLocating(true);
 
-    if (!navigator.geolocation) {
-      const errorMsg = GEO_MSG_UNSUPPORTED;
-      if (lastToastMessage.current !== errorMsg) {
-        lastToastMessage.current = errorMsg;
-        toast.error(errorMsg);
-      }
-      isLocationRequestInProgress.current = false;
-      setIsLocating(false);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          setSelectedPosition({ lat: latitude, lng: longitude });
-          if (mapRef.current) {
-            mapRef.current.panTo({ lat: latitude, lng: longitude });
+    void (async () => {
+      try {
+        const position = await requestBrowserGeolocation();
+        await applyDeviceCoordinatesToForm(
+          position.coords.latitude,
+          position.coords.longitude,
+        );
+      } catch (error) {
+        const stored = readStoredUserCoordinates();
+        if (stored) {
+          try {
+            await applyDeviceCoordinatesToForm(stored.lat, stored.lng);
+            return;
+          } catch {
+            /* fall through to toast */
           }
-
-          const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-          let filled = false;
-          if (apiKey) {
-            try {
-              const response = await fetch(
-                `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${encodeURIComponent(apiKey)}`,
-              );
-              const data = await response.json();
-              if (data.status === 'OK' && data.results?.[0]) {
-                applyGeocodedPlaceToForm(data.results[0], {
-                  lat: latitude,
-                  lng: longitude,
-                });
-                filled = true;
-              }
-            } catch (_) {
-              /* try OSM */
-            }
-          }
-          if (!filled) {
-            try {
-              const osm = await reverseGeocodeWithOsm(latitude, longitude);
-              if (osm) {
-                const line = osm.formatted || osm.line;
-                if (!isCompleteAddressFocusedRef.current) {
-                  setFormData((prev) => ({ ...prev, completeAddress: line }));
-                  syncPlacesSearchInput(line);
-                }
-                if (osm.pin) setPincode(osm.pin);
-                setMapAnchor({
-                  lat: latitude,
-                  lng: longitude,
-                  formattedAddress: osm.formatted,
-                  completeAddress: line,
-                  pincode: osm.pin || undefined,
-                });
-              }
-            } catch (_) {
-              /* ignore */
-            }
-          }
-          setShowMapLocationHint(true);
-          window.setTimeout(() => setShowMapLocationHint(false), 4000);
-        } catch (error) {
-          console.error('Error fetching address:', error);
-          const errorMsg = isLikelyNetworkError(error)
-            ? GEO_MSG_NETWORK
-            : "We couldn't load address details for this spot. Drag the pin or search for your address.";
-          if (lastToastMessage.current !== errorMsg) {
-            lastToastMessage.current = errorMsg;
-            toast.error(errorMsg);
-          }
-        } finally {
-          isLocationRequestInProgress.current = false;
-          setIsLocating(false);
         }
-      },
-      (error) => {
-        console.error('Error accessing location:', error);
-        const errorMsg = messageFromGeolocationPositionError(error);
+        const geoErr =
+          error && typeof error === 'object' && 'code' in error
+            ? (error as GeolocationPositionError)
+            : null;
+        const errorMsg = !navigator.geolocation
+          ? GEO_MSG_UNSUPPORTED
+          : geoErr
+            ? messageFromGeolocationPositionError(geoErr)
+            : isLikelyNetworkError(error)
+              ? GEO_MSG_NETWORK
+              : messageFromGeolocationPositionError(null);
         if (lastToastMessage.current !== errorMsg) {
           lastToastMessage.current = errorMsg;
           toast.error(errorMsg);
         }
+      } finally {
         isLocationRequestInProgress.current = false;
         setIsLocating(false);
-      },
-      { enableHighAccuracy: false, timeout: 20_000, maximumAge: 60_000 },
-    );
+      }
+    })();
   };
 
   const reverseGeocodeMapCenter = async (lat: number, lng: number) => {
@@ -660,7 +620,8 @@ const AddEditAddress: React.FC = () => {
         const { results } = await geocoder.geocode({ location: { lat, lng } });
         if (results?.[0]) {
           applyGeocodedPlaceToForm(results[0], { lat, lng }, {
-            updateCompleteAddress: !isCompleteAddressFocusedRef.current,
+            updateCompleteAddress:
+              !isCompleteAddressFocusedRef.current && !completeAddressEditedRef.current,
           });
           return;
         }
@@ -672,7 +633,7 @@ const AddEditAddress: React.FC = () => {
       const osm = await reverseGeocodeWithOsm(lat, lng);
       if (osm) {
         const line = osm.formatted || osm.line;
-        if (!isCompleteAddressFocusedRef.current) {
+        if (!isCompleteAddressFocusedRef.current && !completeAddressEditedRef.current) {
           setFormData((prev) => ({ ...prev, completeAddress: line }));
           syncPlacesSearchInput(line);
         }
@@ -716,6 +677,7 @@ const AddEditAddress: React.FC = () => {
     if (mapRef.current) {
       const center = mapRef.current.getCenter();
       if (center) {
+        completeAddressEditedRef.current = false;
         const newPosition = {
           lat: center.lat(),
           lng: center.lng(),
@@ -970,9 +932,10 @@ const AddEditAddress: React.FC = () => {
             <textarea
               placeholder="House/Flat No., Building Name, Area, City, State"
               value={formData.completeAddress}
-              onChange={(e) =>
-                setFormData({ ...formData, completeAddress: e.target.value })
-              }
+              onChange={(e) => {
+                completeAddressEditedRef.current = true;
+                setFormData({ ...formData, completeAddress: e.target.value });
+              }}
               onFocus={(e) => {
                 isCompleteAddressFocusedRef.current = true;
                 e.currentTarget.style.borderColor = theme.colors.primary;

@@ -78,7 +78,24 @@ export interface AddressInput {
 
 const API_URL = `${getApiUrl()}/users/addresses`;
 const ADDRESS_UPDATE_FAILED_MESSAGE = "Failed to update address";
-const PATCH_KEEP_EMPTY = new Set(["landmark", "floor"]);
+/** Fields the full address form may clear — empty string must still be PATCHed. */
+const PATCH_KEEP_EMPTY = new Set(["landmark", "floor", "address_line2"]);
+
+/** Join line1 + line2 for the Complete Address box without duplicating or injecting landmark. */
+export function composeCompleteAddress(
+  line1?: string | null,
+  line2?: string | null,
+): string {
+  const a = stripUnknownAddressToken(line1);
+  const b = stripUnknownAddressToken(line2);
+  if (!a) return b;
+  if (!b) return a;
+  const aNorm = a.toLowerCase();
+  const bNorm = b.toLowerCase();
+  if (aNorm.includes(bNorm)) return a;
+  if (bNorm.includes(aNorm)) return b;
+  return `${a}, ${b}`;
+}
 
 // Helper: Convert API address to frontend format
 const mapApiToFrontend = (apiAddr: ApiAddress): Address => {
@@ -133,7 +150,7 @@ const mapApiToFrontend = (apiAddr: ApiAddress): Address => {
     streetName: line2,
     floor,
     landmark: landmarkSanitized,
-    area: landmarkSanitized || line2,
+    area: landmarkSanitized,
     city: city,
     state: state,
     pincode: pincode,
@@ -210,6 +227,52 @@ const mapFrontendToApi = (input: AddressInput): Record<string, any> => {
   return apiData;
 };
 
+/** PATCH only fields the caller supplied (avoids clearing omitted columns). */
+function mapPartialFrontendToApi(input: Partial<AddressInput>): Record<string, any> {
+  const full = mapFrontendToApi({
+    houseNo: input.houseNo ?? "",
+    streetName: input.streetName ?? "",
+    area: input.area ?? input.landmark ?? "",
+    floor: input.floor ?? "",
+    landmark: input.landmark ?? input.area ?? "",
+    city: input.city ?? "",
+    state: input.state ?? "",
+    pincode: input.pincode ?? "",
+    associatedPhoneNumber: input.associatedPhoneNumber ?? "",
+    type: input.type ?? "Home",
+    setAsDefault: input.setAsDefault ?? false,
+    coordinates: input.coordinates,
+    name: input.name,
+    societyName: input.societyName,
+    district: input.district,
+  });
+
+  const out: Record<string, any> = {};
+  const assign = (apiKey: string, value: unknown) => {
+    if (PATCH_KEEP_EMPTY.has(apiKey) || (value !== "" && value != null && value !== undefined)) {
+      out[apiKey] = value;
+    }
+  };
+
+  if ("houseNo" in input) assign("address_line1", full.address_line1);
+  if ("streetName" in input) assign("address_line2", full.address_line2);
+  if ("floor" in input) assign("floor", full.floor);
+  if ("landmark" in input || "area" in input) assign("landmark", full.landmark);
+  if ("city" in input) assign("city", full.city);
+  if ("state" in input) assign("state", full.state);
+  if ("pincode" in input) assign("pincode", full.pincode);
+  if ("type" in input) assign("address_type", full.address_type);
+  if ("setAsDefault" in input) assign("is_default", full.is_default);
+  if ("name" in input && input.name) assign("receiver_name", full.receiver_name);
+  if ("associatedPhoneNumber" in input && input.associatedPhoneNumber) {
+    assign("receiver_phone", full.receiver_phone);
+  }
+  if ("coordinates" in input && input.coordinates) {
+    if (full.latitude != null) out.latitude = full.latitude;
+    if (full.longitude != null) out.longitude = full.longitude;
+  }
+  return out;
+}
 
 class AddressService {
   async getAllAddresses(): Promise<Address[]> {
@@ -267,19 +330,23 @@ class AddressService {
 
   async updateAddress(id: string, addressInput: Partial<AddressInput>): Promise<Address> {
     try {
-      // Build the full API payload then strip keys that were not provided.
-      // Sending only the changed fields via PATCH (partial update).
-      const fullApiData = mapFrontendToApi(addressInput as AddressInput);
-      const apiData: Record<string, any> = {};
-      Object.entries(fullApiData).forEach(([key, value]) => {
-        if (PATCH_KEEP_EMPTY.has(key) || (value !== "" && value !== null && value !== undefined)) {
-          apiData[key] = value;
-        }
-      });
+      const apiData = mapPartialFrontendToApi(addressInput);
       const response = await api.patch(`${API_URL}/${id}/`, apiData);
 
       if (response.data.success && response.data.data) {
-        return mapApiToFrontend(response.data.data);
+        const updated = mapApiToFrontend(response.data.data);
+        try {
+          const stored = localStorage.getItem("selectedDeliveryAddress");
+          if (stored) {
+            const parsed = JSON.parse(stored) as { id?: string };
+            if (String(parsed.id) === String(updated.id)) {
+              localStorage.setItem("selectedDeliveryAddress", JSON.stringify(updated));
+            }
+          }
+        } catch {
+          /* ignore stale cache */
+        }
+        return updated;
       }
       throw new Error(response.data.message || ADDRESS_UPDATE_FAILED_MESSAGE);
     } catch (error) {

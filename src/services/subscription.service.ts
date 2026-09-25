@@ -6,8 +6,30 @@
 import api from "./api";
 import { getSubscriptionsUrl } from "../config/api.config";
 import { pickPrimaryImageUrl, type ProductImageLike } from "../utils/pickPrimaryImageUrl";
+import { errorMessageFromCatch } from "../utils/apiErrorMessage";
+import { REQUIRED_TOAST } from "../constants/requiredToastMessages";
 
 const base = () => getSubscriptionsUrl();
+
+function assertResumeBecameActive(payload: unknown): void {
+  const rec =
+    payload && typeof payload === "object"
+      ? (payload as Record<string, unknown>)
+      : {};
+  if (rec.success === false) {
+    throw new Error(
+      String(rec.message || rec.error || REQUIRED_TOAST.COULD_NOT_RESUME),
+    );
+  }
+  const raw =
+    rec.data && typeof rec.data === "object"
+      ? (rec.data as Record<string, unknown>)
+      : rec;
+  const status = String(raw.status ?? "").toUpperCase();
+  if (status && status !== "ACTIVE") {
+    throw new Error(REQUIRED_TOAST.COULD_NOT_RESUME);
+  }
+}
 
 function unwrapList(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
@@ -23,6 +45,21 @@ function unwrapList(payload: unknown): unknown[] {
     }
   }
   return [];
+}
+
+/** Parse `YYYY-MM-DD` API dates in local calendar (avoid UTC `Date` shift). */
+function parseApiDateOnlyField(
+  value: unknown,
+): Date | undefined {
+  if (value == null || String(value).trim() === "") return undefined;
+  const s = String(value).trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (m) {
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return Number.isNaN(d.getTime()) ? undefined : d;
+  }
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
 const WEEKDAY_KEYS = [
@@ -216,15 +253,11 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
           : undefined;
 
   const nextRaw = raw.next_delivery_date ?? raw.nextDeliveryDate;
-  const nextDeliveryDate =
-    nextRaw != null && String(nextRaw).trim() !== "" ? new Date(String(nextRaw)) : undefined;
+  const nextDeliveryDate = parseApiDateOnlyField(nextRaw);
 
   const pausedUntilRaw =
     raw.paused_until_date ?? raw.pausedUntilDate ?? raw.resume_date ?? raw.resumeDate;
-  const pausedUntilDate =
-    pausedUntilRaw != null && String(pausedUntilRaw).trim() !== ""
-      ? new Date(String(pausedUntilRaw))
-      : undefined;
+  const pausedUntilDate = parseApiDateOnlyField(pausedUntilRaw);
 
   return {
     id: String(raw.id ?? ""),
@@ -242,11 +275,7 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
           : undefined,
     deliveryDayInts: deliveryDayInts.length > 0 ? deliveryDayInts : undefined,
     deliveryPreference,
-    startDate: raw.start_date
-      ? new Date(String(raw.start_date))
-      : raw.startDate
-        ? new Date(String(raw.startDate))
-        : new Date(),
+    startDate: parseApiDateOnlyField(raw.start_date ?? raw.startDate) ?? new Date(0),
     endDate: raw.end_date
       ? new Date(String(raw.end_date))
       : raw.endDate
@@ -274,13 +303,21 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
       pausedUntilDate && !Number.isNaN(pausedUntilDate.getTime()) ? pausedUntilDate : undefined,
     paymentMethod: String(raw.payment_method ?? raw.paymentMethod ?? "wallet").toLowerCase(),
     pauseReason: (() => {
-      const rawReason = raw.pause_reason ?? raw.pauseReason;
+      const display = raw.pause_reason_display ?? raw.pauseReasonDisplay;
+      const rawReason = display ?? raw.pause_reason ?? raw.pauseReason;
       return rawReason != null && String(rawReason).trim()
         ? String(rawReason).trim()
         : undefined;
     })(),
     pausedByInsufficientWallet: Boolean(
       raw.paused_by_insufficient_wallet ?? raw.pausedByInsufficientWallet,
+    ),
+    pauseSource:
+      raw.pause_source != null || raw.pauseSource != null
+        ? String(raw.pause_source ?? raw.pauseSource).trim() || undefined
+        : undefined,
+    isPausedAutomatically: Boolean(
+      raw.is_paused_automatically ?? raw.isPausedAutomatically,
     ),
     createdAt: raw.created_at ? new Date(String(raw.created_at)) : new Date(),
     productDetails: plan
@@ -371,6 +408,9 @@ export interface Subscription {
   pauseReason?: string;
   /** True when auto-paused for low wallet (`paused_by_insufficient_wallet`). */
   pausedByInsufficientWallet?: boolean;
+  /** API `pause_source`: insufficient_wallet | store_offline | manual */
+  pauseSource?: string;
+  isPausedAutomatically?: boolean;
 }
 
 export interface SubscriptionInitiateResponse {
@@ -687,20 +727,25 @@ class SubscriptionService {
    * generates as expected.
    */
   async toggleSubscriptionStatus(subscriptionId: string, resumeDate?: Date) {
-    if (resumeDate) {
-      const pausedUntil = new Date(resumeDate);
-      pausedUntil.setHours(0, 0, 0, 0);
-      pausedUntil.setDate(pausedUntil.getDate() - 1);
-      const pausedUntilYmd = `${pausedUntil.getFullYear()}-${String(
-        pausedUntil.getMonth() + 1,
-      ).padStart(2, "0")}-${String(pausedUntil.getDate()).padStart(2, "0")}`;
-      const { data } = await api.post(`${base()}/${subscriptionId}/pause/`, {
-        paused_until_date: pausedUntilYmd,
-      });
+    try {
+      if (resumeDate) {
+        const pausedUntil = new Date(resumeDate);
+        pausedUntil.setHours(0, 0, 0, 0);
+        pausedUntil.setDate(pausedUntil.getDate() - 1);
+        const pausedUntilYmd = `${pausedUntil.getFullYear()}-${String(
+          pausedUntil.getMonth() + 1,
+        ).padStart(2, "0")}-${String(pausedUntil.getDate()).padStart(2, "0")}`;
+        const { data } = await api.post(`${base()}/${subscriptionId}/pause/`, {
+          paused_until_date: pausedUntilYmd,
+        });
+        return data;
+      }
+      const { data } = await api.post(`${base()}/${subscriptionId}/resume/`);
+      assertResumeBecameActive(data);
       return data;
+    } catch (error: unknown) {
+      throw new Error(errorMessageFromCatch(error, REQUIRED_TOAST.COULD_NOT_RESUME));
     }
-    const { data } = await api.post(`${base()}/${subscriptionId}/resume/`);
-    return data;
   }
 
   async cancelSubscription(subscriptionId: string, cancellationReason: string) {
@@ -737,7 +782,12 @@ class SubscriptionService {
   }
 
   async resumeSubscription(subscriptionId: string): Promise<void> {
-    await api.post(`${base()}/${subscriptionId}/resume/`);
+    try {
+      const { data } = await api.post(`${base()}/${subscriptionId}/resume/`);
+      assertResumeBecameActive(data);
+    } catch (error: unknown) {
+      throw new Error(errorMessageFromCatch(error, REQUIRED_TOAST.COULD_NOT_RESUME));
+    }
   }
 
   /**
@@ -797,24 +847,28 @@ class SubscriptionService {
       body.quantity = normalizedItems[0].quantity;
     }
 
-    const { data: res } = await api.patch(
-      `${base()}/${subscriptionId}/update/`,
-      body
-    );
-
-    const payload = res as Record<string, unknown>;
-    const raw =
-      (payload.data as Record<string, unknown> | undefined) ||
-      (payload.subscription as Record<string, unknown> | undefined);
-    if (!raw && payload.id) {
-      return mapSubscriptionFromApi(payload);
-    }
-    if (!raw) {
-      throw new Error(
-        (payload.error as string) || (payload.message as string) || "Failed to update subscription"
+    try {
+      const { data: res } = await api.patch(
+        `${base()}/${subscriptionId}/update/`,
+        body
       );
+
+      const payload = res as Record<string, unknown>;
+      const raw =
+        (payload.data as Record<string, unknown> | undefined) ||
+        (payload.subscription as Record<string, unknown> | undefined);
+      if (!raw && payload.id) {
+        return mapSubscriptionFromApi(payload);
+      }
+      if (!raw) {
+        throw new Error(
+          (payload.error as string) || (payload.message as string) || "Failed to update subscription"
+        );
+      }
+      return mapSubscriptionFromApi(raw);
+    } catch (error: unknown) {
+      throw new Error(errorMessageFromCatch(error, "Failed to update subscription"));
     }
-    return mapSubscriptionFromApi(raw);
   }
 }
 

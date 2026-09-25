@@ -55,25 +55,19 @@ import {
 import { walletService } from "../../services/wallet.service";
 import {
   InsufficientWalletModal,
-  computeMinimumSubscriptionWalletRecharge,
   type InsufficientWalletDetails,
 } from "../daily/InsufficientWalletModal";
 import { pickActiveSubscriptionDailyUnitRupees } from "../../utils/gpDailyWalletHold";
-import { isSubscriptionPausedForInsufficientWallet } from "../../utils/gpDailySubscriptionWalletPause";
+import {
+  getSubscriptionPauseReasonLabel,
+  isSubscriptionPausedForInsufficientWallet,
+  isSubscriptionPausedForStoreOffline,
+  pausedSubscriptionUpdateToast,
+} from "../../utils/gpDailySubscriptionWalletPause";
 import { resolveSubscriptionPerDeliveryDisplayTotal } from "../../utils/gpDailySubscriptionPricingSnapshot";
 import { navigateToGpDailyWalletForRecharge } from "../../utils/gpDailyWalletRechargeRedirect";
 import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
 const GP_DAILY_BASE = "/gp-daily";
-
-function formatPauseReasonLabel(reason?: string): string {
-  const r = String(reason ?? "").trim();
-  if (!r) return "";
-  const lower = r.toLowerCase();
-  if (lower.includes("insufficient") || lower.includes("wallet")) {
-    return "Insufficient Wallet Balance";
-  }
-  return r.replace(/_/g, " ");
-}
 
 function historyOrderDelivered(o: Record<string, unknown>): boolean {
   const st = String(o.status ?? "").toLowerCase();
@@ -413,40 +407,48 @@ const ManageMySubscription: React.FC = () => {
     const subscription = subscriptions.find((s) => String(s.id) === subId);
     if (!subscription) return;
 
+    if (isSubscriptionPausedForStoreOffline(subscription)) {
+      toast.error(REQUIRED_TOAST.SUBSCRIPTION_RESUME_STORE_OFFLINE, {
+        id: REQUIRED_TOAST.SUBSCRIPTION_RESUME_STORE_OFFLINE,
+      });
+      return;
+    }
+
     const perDeliveryTotal = pickActiveSubscriptionDailyUnitRupees(subscription);
     const walletHoldPause = isSubscriptionPausedForInsufficientWallet(subscription);
-    const usesWallet =
-      String(subscription.paymentMethod ?? "wallet").toLowerCase() !== "cod";
+
+    const openWalletRechargePrompt = async (toastMessage: string) => {
+      toast.error(toastMessage, { id: toastMessage });
+      try {
+        const { balance: walletBalance } = await walletService.getWalletBalance();
+        const shortage = Math.max(0, perDeliveryTotal - walletBalance);
+        setSelectedSubscription(subscription);
+        setInsufficientWalletModal({
+          currentBalance: walletBalance,
+          requiredAmount: Math.max(perDeliveryTotal, 1),
+          shortageAmount: shortage,
+          contextLabel: "Recharge your wallet to resume deliveries",
+        });
+      } catch {
+        /* toast already shown */
+      }
+    };
 
     try {
-      if (usesWallet && perDeliveryTotal > 0) {
-        const { balance: walletBalance } = await walletService.getWalletBalance();
-        const { threeDayRequiredAmount } = computeMinimumSubscriptionWalletRecharge(
-          perDeliveryTotal,
-          0,
-        );
-        const walletTooLow = walletBalance < threeDayRequiredAmount;
-        if (walletHoldPause && walletTooLow) {
-          const shortage = Math.max(0, threeDayRequiredAmount - walletBalance);
-          setSelectedSubscription(subscription);
-          toast.error(REQUIRED_TOAST.WALLET_LOW_SUBSCRIPTION);
-          setInsufficientWalletModal({
-            currentBalance: walletBalance,
-            requiredAmount: perDeliveryTotal,
-            shortageAmount: shortage,
-            contextLabel: "Recharge your wallet to resume deliveries",
-          });
-          return;
-        }
-      }
-
       setResumingSubId(subId);
       await subscriptionService.toggleSubscriptionStatus(subId);
-      toast.success("Subscription resumed");
+      toast.success(REQUIRED_TOAST.SUBSCRIPTION_RESUMED);
       await fetchSubscriptionDetails({ silent: true, highlightSubId: subId });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Could not resume";
-      toast.error(msg);
+      const msg =
+        err instanceof Error ? err.message : REQUIRED_TOAST.COULD_NOT_RESUME;
+      if (walletHoldPause) {
+        await openWalletRechargePrompt(
+          msg || REQUIRED_TOAST.SUBSCRIPTION_RESUME_WALLET_HOLD,
+        );
+      } else {
+        toast.error(msg, { id: msg });
+      }
     } finally {
       setResumingSubId(null);
     }
@@ -470,6 +472,12 @@ const ManageMySubscription: React.FC = () => {
   // Handle updating subscription days
   const handleUpdateSubscription = async () => {
     if (!selectedSubscription) return;
+
+    const blocked = pausedSubscriptionUpdateToast(selectedSubscription);
+    if (blocked) {
+      toast.error(blocked, { id: blocked });
+      return;
+    }
 
     // Validate minimum 3 days selection
     if (editingDays.length < 3) {
@@ -496,7 +504,7 @@ const ManageMySubscription: React.FC = () => {
       });
       setShowEditModal(false);
       setValidationError("");
-      toast.success("Subscription updated successfully!");
+      toast.success(REQUIRED_TOAST.SUBSCRIPTION_UPDATED);
     } catch (error: any) {
       console.error("Error updating subscription:", error);
       toast.error(error.message || "Failed to update subscription");
@@ -548,6 +556,7 @@ const ManageMySubscription: React.FC = () => {
     const isPaused =
       subscription.status === "PAUSED" || subscription.status === "INACTIVE";
     const nextDeliveryLabel = getNextDeliveryLine(subscription);
+    const pauseReasonLabel = getSubscriptionPauseReasonLabel(subscription);
 
     const lineItems =
       subscription.lineItems && subscription.lineItems.length > 0
@@ -698,6 +707,11 @@ const ManageMySubscription: React.FC = () => {
                           className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium text-gray-800 transition-colors hover:bg-gray-50"
                           onClick={() => {
                             setOpenActionsMenuId(null);
+                            const blocked = pausedSubscriptionUpdateToast(subscription);
+                            if (blocked) {
+                              toast.error(blocked, { id: blocked });
+                              return;
+                            }
                             setSelectedSubscription(subscription);
                             navigate("/gp-daily/modify-Subscription", {
                               state: { subscription },
@@ -899,17 +913,9 @@ const ManageMySubscription: React.FC = () => {
             ) : null}
           </div>
         ) : null}
-        {isPaused &&
-        (subscription.pauseReason ||
-          isSubscriptionPausedForInsufficientWallet(subscription)) ? (
+        {isPaused && pauseReasonLabel ? (
           <p className="mt-2 text-[13px] font-medium text-[#6B7280]">
-            Reason:{" "}
-            {formatPauseReasonLabel(
-              subscription.pauseReason ||
-                (isSubscriptionPausedForInsufficientWallet(subscription)
-                  ? "insufficient_wallet"
-                  : ""),
-            )}
+            Reason: {pauseReasonLabel}
           </p>
         ) : null}
       </div>

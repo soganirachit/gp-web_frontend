@@ -10,6 +10,8 @@ export interface CartItemResponse {
   unit_price: string;
   total_price: string;
   special_instructions?: string;
+  is_available?: boolean;
+  unavailable_reason?: string | null;
   product: {
     id: number;
     name: string;
@@ -17,6 +19,8 @@ export interface CartItemResponse {
     primary_image: string | null;
     unit?: string;
     unit_value?: string;
+    is_available?: boolean;
+    is_active?: boolean;
   };
   variant?: {
     id: number;
@@ -32,6 +36,7 @@ export interface CartData {
   store_name: string;
   items: CartItemResponse[];
   items_count: number;
+  has_unavailable_items?: boolean;
   subtotal: string;
   tax_amount: string;
   discount_amount: string;

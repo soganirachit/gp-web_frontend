@@ -39,10 +39,11 @@ import { OPTIMIZED_ILLUSTRATIONS } from "../../config/optimizedIllustrations";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { storeService } from "../../services/store.service";
+import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
 import {
-  errorMessageFromCatch,
-  isHttpNotFoundError,
-} from "../../utils/apiErrorMessage";
+  isProductDetailNotFoundError,
+  redirectForUnavailableProduct,
+} from "../../utils/productUnavailableAtStore";
 import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
 import {
   extractCartStockApiMessage,
@@ -85,7 +86,6 @@ import { useOrderingStoreOffline } from "../../hooks/useOrderingStoreOffline";
 import { useCartStoreReplaceGate } from "../../hooks/useCartStoreReplaceGate";
 import {
   STORE_OFFLINE_CART_BODY,
-  STORE_OFFLINE_ORDER_BUTTON_LABEL,
 } from "../../config/homeHeroStatusCopy";
 
 // Add interface for content items
@@ -260,9 +260,8 @@ const ProductPage: React.FC = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [productUnavailable, setProductUnavailable] = useState(false);
   const productUnavailableRedirectRef = useRef(false);
-  const PRODUCT_UNAVAILABLE_TOAST =
-    "This product is currently unavailable on the store.";
   const [activeTab, setActiveTab] = useState<"Description" | "Details" | "More">("Description");
   const [combineProducts, setCombineProducts] = useState<Product[]>([]);
 
@@ -462,8 +461,8 @@ const ProductPage: React.FC = () => {
         setProduct(productData);
         await loadBestSellers(slug, productData?.id ?? null, catalogSidForDaily ?? null);
       } catch (productError) {
-        if (isHttpNotFoundError(productError)) {
-          setError(PRODUCT_UNAVAILABLE_TOAST);
+        if (isProductDetailNotFoundError(productError)) {
+          setProductUnavailable(true);
           return;
         }
         // Legacy base packs only: GET /basepacks/{id}/ — do not call with a product slug (404).
@@ -553,6 +552,11 @@ const ProductPage: React.FC = () => {
       fetchOtherPacks();
     }
   }, [slug, feature, productListAvailability]);
+
+  useEffect(() => {
+    setProductUnavailable(false);
+    productUnavailableRedirectRef.current = false;
+  }, [slug]);
 
   // Fetch product data on mount
   useEffect(() => {
@@ -1045,10 +1049,6 @@ const ProductPage: React.FC = () => {
       });
       return;
     }
-    if (orderingStoreOffline) {
-      toast.error(STORE_OFFLINE_CART_BODY, { id: STORE_OFFLINE_CART_BODY });
-      return;
-    }
     if (feature === "gpStore") return;
     if (!localStorage.getItem("phoneNumber")) {
       setPendingProductAddAfterLogin(String(slug ?? ""));
@@ -1285,22 +1285,14 @@ const ProductPage: React.FC = () => {
   }, [fetchGarlandProducts]);
 
   useEffect(() => {
-    if (loading || productUnavailableRedirectRef.current) return;
-    if (error !== PRODUCT_UNAVAILABLE_TOAST) return;
-    productUnavailableRedirectRef.current = true;
-    toast.error(PRODUCT_UNAVAILABLE_TOAST);
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate(basePath);
+    if (loading || !productUnavailable || productUnavailableRedirectRef.current) {
+      return;
     }
-  }, [error, loading, navigate, basePath]);
+    productUnavailableRedirectRef.current = true;
+    redirectForUnavailableProduct(navigate, basePath);
+  }, [productUnavailable, loading, navigate, basePath]);
 
-  if (loading || isCheckingBalance) {
-    return <ProductDetailSkeleton />;
-  }
-
-  if (error === PRODUCT_UNAVAILABLE_TOAST) {
+  if (loading || isCheckingBalance || productUnavailable) {
     return <ProductDetailSkeleton />;
   }
 
@@ -1807,13 +1799,9 @@ const ProductPage: React.FC = () => {
               type="button"
               onClick={() => void handleAddToBasket()}
               className="mb-6 mt-6 flex w-full items-center justify-center rounded-[25px] bg-[#FAA222] py-3.5 text-base font-semibold text-gray-900 transition-colors hover:bg-[#e8941a] disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!product || addingToBasket || orderingStoreOffline}
+              disabled={!product || addingToBasket}
             >
-              {orderingStoreOffline
-                ? STORE_OFFLINE_ORDER_BUTTON_LABEL
-                : addingToBasket
-                  ? "Adding…"
-                  : "Add to Basket"}
+              {addingToBasket ? "Adding…" : "Add to Basket"}
             </button>
           )}
 

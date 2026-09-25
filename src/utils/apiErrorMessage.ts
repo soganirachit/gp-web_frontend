@@ -40,7 +40,13 @@ export function formatApiErrorBody(body: unknown): string {
 
   const errors = b.errors;
   if (errors != null && typeof errors === "object" && !Array.isArray(errors)) {
-    const fieldLines = formatNestedFieldErrors(errors as Record<string, unknown>);
+    const sanitized: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(errors as Record<string, unknown>)) {
+      // Machine codes belong in `errors.code`, not customer-facing copy.
+      if (k === "code" && typeof v === "string" && !v.includes(" ")) continue;
+      sanitized[k] = v;
+    }
+    const fieldLines = formatNestedFieldErrors(sanitized);
     if (fieldLines) pushUnique(fieldLines);
   }
 
@@ -105,7 +111,72 @@ export function isCartLineUnavailableMessage(message: string): boolean {
   if (isCartItemNotFoundMessage(message)) return true;
   const m = String(message ?? "").toLowerCase().trim();
   if (!m) return false;
-  return m.includes("product") && m.includes("not found");
+  if (isStoreOrderingClosedMessage(m)) return false;
+  return (
+    (m.includes("product") && m.includes("not found")) ||
+    m.includes("currently unavailable") ||
+    m.includes("no longer available") ||
+    m.includes("out of stock")
+  );
+}
+
+function readApiErrorCodeFromBody(body: unknown): string | undefined {
+  if (body == null || typeof body !== "object") return undefined;
+  const b = body as Record<string, unknown>;
+  const errors = b.errors;
+  if (errors && typeof errors === "object" && !Array.isArray(errors)) {
+    const code = (errors as Record<string, unknown>).code;
+    if (typeof code === "string" && code.trim()) return code.trim();
+  }
+  if (typeof b.code === "string" && b.code.trim()) return b.code.trim();
+  return undefined;
+}
+
+/** Machine `errors.code` from Axios/DRF bodies or helpers that stamped `apiErrorCode`. */
+export function apiErrorCodeFromCatch(err: unknown): string | undefined {
+  if (err && typeof err === "object" && "apiErrorCode" in err) {
+    const stamped = (err as { apiErrorCode?: unknown }).apiErrorCode;
+    if (typeof stamped === "string" && stamped.trim()) return stamped.trim();
+  }
+  if (axios.isAxiosError(err)) {
+    return readApiErrorCodeFromBody(err.response?.data);
+  }
+  if (err && typeof err === "object") {
+    return readApiErrorCodeFromBody(err);
+  }
+  return undefined;
+}
+
+/** Store closed / offline — never treat this as a missing cart line. */
+export function isStoreOrderingClosedMessage(message: string): boolean {
+  const m = String(message ?? "").toLowerCase();
+  if (!m.trim()) return false;
+  return (
+    m.includes("closed for the day") ||
+    m.includes("opening hours") ||
+    m.includes("currently offline") ||
+    m.includes("not accepting orders") ||
+    m.includes("no longer active") ||
+    m.includes("store is currently offline") ||
+    m.includes("store offline")
+  );
+}
+
+export function isStoreOrderingClosedError(err: unknown, message?: string): boolean {
+  const code = apiErrorCodeFromCatch(err);
+  if (code === "store_offline" || code === "store_closed") return true;
+  const msg = message ?? errorMessageFromCatch(err, "");
+  return isStoreOrderingClosedMessage(msg);
+}
+
+/** Preserve `errors.code` when wrapping Axios/DRF failures in `Error`. */
+export function errorWithApiCode(message: string, source: unknown): Error {
+  const err = new Error(message);
+  const code = apiErrorCodeFromCatch(source);
+  if (code) {
+    (err as Error & { apiErrorCode?: string }).apiErrorCode = code;
+  }
+  return err;
 }
 
 function globalHttpStatusToast(status: number | undefined): string | null {

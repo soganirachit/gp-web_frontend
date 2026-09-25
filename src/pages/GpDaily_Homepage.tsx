@@ -19,6 +19,7 @@ import {
 import {
   computeGpDailyWalletBanner,
   PAUSE_REASON_INSUFFICIENT_WALLET,
+  pickActiveSubscriptionDailyUnitRupees,
   shouldShowGpDailyWalletAlertCard,
   shouldShowGpDailyOrderInHoldCard,
   shouldShowGpDailyRunningLowCard,
@@ -29,6 +30,7 @@ import {
 } from "../utils/gpDailyWalletPauseSchedule";
 import { subscriptionsDueForAutoResume } from "../utils/subscriptionAutoResume";
 import { storeService, GUEST_STORE_UPDATED_EVENT, GPS_CATALOG_LOCATION_UPDATED_EVENT } from "../services/store.service";
+import { CATALOG_PRODUCTS_REFRESH_EVENT } from "../utils/productUnavailableAtStore";
 import { resolveGpDailyCatalogStoreId, resolveGpDailyOfflineStoreCandidates } from "../utils/gpDailyCatalogStore";
 import { formatNamasteGreeting, hasRealUserFirstName } from "../utils/namasteGreeting";
 import type { Product as ProductType } from "../services/product.service";
@@ -36,6 +38,11 @@ import { addressService } from "../services/address.service";
 import { validateGpDailyDeliveryAreaFromCoordinates } from "../services/subscriptionZone.service";
 import { customerService } from "../services/getcustomer.service";
 import { toast } from "react-hot-toast";
+import { REQUIRED_TOAST } from "../constants/requiredToastMessages";
+import {
+  isSubscriptionPausedForInsufficientWallet,
+  isSubscriptionPausedForStoreOffline,
+} from "../utils/gpDailySubscriptionWalletPause";
 import ProductCard from "../components/common/ProductCard";
 import { BrandIntroPyramidCopy } from "../components/common/BrandIntroPyramidCopy";
 import { GpDailyHomeSection } from "../components/daily/GpDailyHomeSection";
@@ -718,6 +725,17 @@ const Home2: React.FC = () => {
   }, [fetchLatestAddress, refreshDailyBannerStoreId]);
 
   useEffect(() => {
+    const onCatalogRefresh = () => {
+      void fetchProducts();
+    };
+    window.addEventListener(CATALOG_PRODUCTS_REFRESH_EVENT, onCatalogRefresh);
+    return () =>
+      window.removeEventListener(CATALOG_PRODUCTS_REFRESH_EVENT, onCatalogRefresh);
+    // fetchProducts is defined in this component scope and reads latest store/catalog state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if (location.pathname !== basePath) return;
     void fetchLatestAddress();
     void refreshDailyBannerStoreId();
@@ -1147,14 +1165,45 @@ const Home2: React.FC = () => {
   const handleNamasteResume = async (e: React.MouseEvent, subId: string) => {
     e.preventDefault();
     e.stopPropagation();
+    const subscription =
+      activeSubscriptions.find((s) => String(s.id) === String(subId)) ??
+      customerSubscriptions.find((s) => String(s.id) === String(subId));
+    if (subscription && isSubscriptionPausedForStoreOffline(subscription)) {
+      toast.error(REQUIRED_TOAST.SUBSCRIPTION_RESUME_STORE_OFFLINE, {
+        id: REQUIRED_TOAST.SUBSCRIPTION_RESUME_STORE_OFFLINE,
+      });
+      return;
+    }
     try {
       setResumingSubId(subId);
       await subscriptionService.toggleSubscriptionStatus(subId);
-      toast.success("Subscription resumed");
+      toast.success(REQUIRED_TOAST.SUBSCRIPTION_RESUMED);
       await fetchSubscriptions({ silent: true });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Could not resume";
-      toast.error(msg);
+      const msg =
+        err instanceof Error ? err.message : REQUIRED_TOAST.COULD_NOT_RESUME;
+      const walletHold =
+        subscription && isSubscriptionPausedForInsufficientWallet(subscription);
+      toast.error(
+        walletHold
+          ? msg || REQUIRED_TOAST.SUBSCRIPTION_RESUME_WALLET_HOLD
+          : msg,
+        {
+          id: walletHold
+            ? REQUIRED_TOAST.SUBSCRIPTION_RECHARGE_WALLET_FIRST
+            : msg,
+        },
+      );
+      if (walletHold && subscription) {
+        const perDelivery = pickActiveSubscriptionDailyUnitRupees(subscription);
+        const shortage = Math.max(0, perDelivery - walletBalance);
+        setInsufficientWalletModal({
+          currentBalance: walletBalance,
+          requiredAmount: Math.max(perDelivery, 1),
+          shortageAmount: shortage,
+          contextLabel: "Recharge your wallet to resume deliveries",
+        });
+      }
     } finally {
       setResumingSubId(null);
     }
@@ -1259,6 +1308,7 @@ const Home2: React.FC = () => {
   );
   const walletAutoPauseInFlightRef = useRef(false);
   const walletAutoResumeInFlightRef = useRef(false);
+  const skippedAutoResumeIdsRef = useRef<Set<string>>(new Set());
 
   const walletBanner = useMemo(
     () =>
@@ -1323,7 +1373,10 @@ const Home2: React.FC = () => {
 
   useEffect(() => {
     if (!isLoggedIn || walletAutoResumeInFlightRef.current) return;
-    const due = subscriptionsDueForAutoResume(activeSubscriptions);
+    const due = subscriptionsDueForAutoResume(activeSubscriptions).filter((sub) => {
+      const id = String(sub.id ?? sub.subscription_id ?? "").trim();
+      return id && !skippedAutoResumeIdsRef.current.has(id);
+    });
     if (due.length === 0) return;
 
     walletAutoResumeInFlightRef.current = true;
@@ -1332,11 +1385,13 @@ const Home2: React.FC = () => {
         for (const sub of due) {
           const id = String(sub.id ?? sub.subscription_id ?? "").trim();
           if (!id) continue;
-          await subscriptionService.resumeSubscription(id);
+          try {
+            await subscriptionService.resumeSubscription(id);
+          } catch {
+            skippedAutoResumeIdsRef.current.add(id);
+          }
         }
         await fetchSubscriptions({ silent: true });
-      } catch {
-        /* backend Celery should resume + notify */
       } finally {
         walletAutoResumeInFlightRef.current = false;
       }
@@ -1654,7 +1709,7 @@ const Home2: React.FC = () => {
                   <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                     <p className={gpDailyHome.walletHoldText}>
                       {orderOnHold.showOrderInHold
-                        ? "Order On Hold"
+                        ? "Order on hold!"
                         : "Wallet Running Low"}
                     </p>
                     <p className={gpDailyHome.holdCardBody}>

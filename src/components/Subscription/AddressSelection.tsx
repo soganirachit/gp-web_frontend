@@ -23,6 +23,11 @@ import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { storeService } from "../../services/store.service";
 import {
+  applySharedBrowseDeliveryAddress,
+  consumeLandingAddressReturn,
+  peekLandingAddressReturn,
+} from "../../utils/applySharedBrowseDeliveryAddress";
+import {
   GUEST_NEAREST_STORE_PREFIX,
   GUEST_NOT_SERVICEABLE_BODY,
   GUEST_NOT_SERVICEABLE_TITLE,
@@ -30,6 +35,14 @@ import {
   GUEST_ORDERING_FOR_SOMEONE_TITLE,
 } from "../../config/guestBrowseAddressCopy";
 import { GUEST_SELECTED_LOCATION_TITLE } from "../../utils/guestHeaderLocation";
+import {
+  GEO_MSG_UNSUPPORTED,
+  messageFromGeolocationPositionError,
+} from "../../utils/geolocationMessages";
+import {
+  readStoredUserCoordinates,
+  requestBrowserGeolocation,
+} from "../../utils/requestBrowserGeolocation";
 import { AddressSelectionSkeleton } from "../common/PageSkeletons";
 import {
   formatPhoneForDisplay,
@@ -73,6 +86,16 @@ const AddressSelection: React.FC = () => {
   const guestAlreadySavedAddress =
     !isLoggedIn && guestHasSavedBrowseAddress();
   const isGuestEntry = !isLoggedIn && !guestAlreadySavedAddress;
+  const routeState = (location.state ?? {}) as {
+    fromHome?: boolean;
+    fromLandingHome?: boolean;
+    returnUrl?: string;
+    guestBrowse?: boolean;
+  };
+  const fromLandingHome =
+    routeState.fromLandingHome === true ||
+    routeState.returnUrl === "/home" ||
+    peekLandingAddressReturn();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const [loading, setLoading] = useState(true);
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -103,6 +126,7 @@ const AddressSelection: React.FC = () => {
   const [locationValidationShakeKey, setLocationValidationShakeKey] = useState(0);
   /** Brief on-map hint when GPS / geocode succeeds (replaces toast) */
   const [showMapLocationHint, setShowMapLocationHint] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   /** After saving a new address, show on-screen confirmation (replaces toast) */
   const [showAddressAddedInline, setShowAddressAddedInline] = useState(false);
 
@@ -112,17 +136,11 @@ const AddressSelection: React.FC = () => {
     message: string;
   } | null>(null);
   const [confirmingDailyCartStoreChange, setConfirmingDailyCartStoreChange] = useState(false);
-  /** Browser geolocation + reverse geocode — shown as first card when available. */
-  const [liveDeviceLocation, setLiveDeviceLocation] = useState<{
-    lat: number;
-    lng: number;
-    formattedAddress: string;
-  } | null>(null);
-  const liveGeoRequestedRef = useRef(false);
 
   const [formData, setFormData] = useState({
     houseNo: "",
     streetName: "",
+    floor: "",
     area: "",
     landmark: "",
     associatedPhoneNumber: "",
@@ -210,57 +228,6 @@ const AddressSelection: React.FC = () => {
 
     loadUserData();
   }, [isGuestEntry]);
-
-  useEffect(() => {
-    if (!isLoaded || showAddForm || loadError) return;
-    if (liveGeoRequestedRef.current) return;
-    if (typeof navigator === "undefined" || !navigator.geolocation) return;
-    liveGeoRequestedRef.current = true;
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        let formatted = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-        try {
-          if (window.google?.maps?.Geocoder) {
-            const geocoder = new google.maps.Geocoder();
-            const res = await geocoder.geocode({ location: { lat, lng } });
-            const first = res.results?.[0]?.formatted_address;
-            if (first?.trim()) formatted = first.trim();
-          }
-        } catch {
-          /* keep coordinate fallback */
-        }
-        setLiveDeviceLocation({ lat, lng, formattedAddress: formatted });
-      },
-      () => {
-        /* Permission denied or unavailable — saved addresses still work; no toast on page open. */
-      },
-      { enableHighAccuracy: false, timeout: 20_000, maximumAge: 120_000 },
-    );
-  }, [isLoaded, showAddForm, loadError]);
-
-  const buildLiveDeviceAddress = useCallback(
-    (lat: number, lng: number, formattedAddress: string): Address => ({
-      id: LIVE_DEVICE_ADDRESS_ID,
-      userId: "",
-      houseNo: "",
-      streetName: "",
-      landmark: "",
-      area: formattedAddress,
-      city: "",
-      state: "",
-      pincode: "",
-      associatedPhoneNumber: "",
-      isDefault: false,
-      type: "Others",
-      coordinates: `${lat},${lng}`,
-      createdAt: "",
-      updatedAt: "",
-    }),
-    [],
-  );
 
   const handleAuthError = (error: Error) => {
     const isAuthError =
@@ -477,6 +444,7 @@ const AddressSelection: React.FC = () => {
       const addressData = {
         houseNo: formData.houseNo,
         streetName: formData.streetName,
+        floor: stripUnknownAddressToken(formData.floor),
         area: stripUnknownAddressToken(formData.landmark || formData.area),
         landmark: stripUnknownAddressToken(formData.landmark || formData.area),
         city: stripUnknownAddressToken(formData.city),
@@ -501,6 +469,7 @@ const AddressSelection: React.FC = () => {
       setFormData({
         houseNo: "",
         streetName: "",
+        floor: "",
         area: "",
         landmark: "",
         associatedPhoneNumber: "",
@@ -564,6 +533,10 @@ const AddressSelection: React.FC = () => {
         toast.error('Invalid coordinates format');
         setAddressValidation({ isValid: false, message: 'Invalid coordinates format' });
         return false;
+      }
+
+      if (fromLandingHome) {
+        return true;
       }
 
       const validation =
@@ -631,8 +604,8 @@ const AddressSelection: React.FC = () => {
                   `${basePath}/address-selection`,
               initialCoordinates: `${coords.lat},${coords.lng}`,
               initialFormattedAddress:
-                liveDeviceLocation?.formattedAddress ||
                 addressToUse.streetName ||
+                addressToUse.area ||
                 "",
             },
           });
@@ -653,17 +626,26 @@ const AddressSelection: React.FC = () => {
     setSelectedAddress(addressToUse);
     localStorage.setItem("selectedDeliveryAddress", JSON.stringify(addressToUse));
 
-    if (location.state?.fromHome) {
+    if (location.state?.fromHome || fromLandingHome) {
       try {
         if (String(addressToUse.id) === LIVE_DEVICE_ADDRESS_ID) {
           await storeService.applyUseCurrentGpsForCatalog();
           toast.success("Using your current location for the store");
+        } else if (fromLandingHome) {
+          await applySharedBrowseDeliveryAddress(addressToUse);
+          toast.success("Delivery location updated");
         } else {
           await storeService.applyBrowseAddressForCatalog(addressToUse);
           toast.success("Delivery location updated");
         }
         window.dispatchEvent(new Event("addressUpdated"));
-        navigate(basePath, { replace: true });
+        const landingDest = consumeLandingAddressReturn();
+        const dest =
+          landingDest ||
+          (typeof routeState.returnUrl === "string" && routeState.returnUrl
+            ? routeState.returnUrl
+            : basePath);
+        navigate(dest, { replace: true });
       } catch (err: unknown) {
         const msg =
           err instanceof Error
@@ -1188,7 +1170,7 @@ const AddressSelection: React.FC = () => {
           navigate(`${basePath}/login`, {
             state: { returnUrl: `${basePath}/subscription/confirm` },
           });
-        } else if (errorMessage.includes("Insufficient wallet balance")) {
+        } else if (errorMessage.toLowerCase().includes("insufficient wallet")) {
           const pricePerPack =
             Number(parsedData.pricePerPack) || Number(parsedData.amount) || 0;
           const deliveryCount = Number(parsedData.deliveryCount) || 7;
@@ -1304,61 +1286,73 @@ const AddressSelection: React.FC = () => {
   };
 
   const getCurrentLocation = () => {
-    // Prevent duplicate calls
     if (isLocationRequestInProgress.current) return;
     isLocationRequestInProgress.current = true;
+    setIsLocating(true);
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          setSelectedPosition({ lat: latitude, lng: longitude });
-          if (mapRef.current) {
-            mapRef.current.panTo({ lat: latitude, lng: longitude });
-          }
-
-          try {
-            const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-            const response = await fetch(
-              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`
-            );
-            const data = await response.json();
-
-            if (data.results && data.results.length > 0) {
-              applyGeocodeJsonToForm(data, latitude, longitude);
-
-              setShowMapLocationHint(true);
-              window.setTimeout(() => setShowMapLocationHint(false), 4000);
-            }
-          } catch (error) {
-            console.error('Error fetching address:', error);
-            const errorMsg = 'Failed to fetch location details';
+    void (async () => {
+      try {
+        let lat: number;
+        let lng: number;
+        try {
+          const position = await requestBrowserGeolocation();
+          lat = position.coords.latitude;
+          lng = position.coords.longitude;
+        } catch (error) {
+          const stored = readStoredUserCoordinates();
+          if (!stored) {
+            const geoErr =
+              error && typeof error === "object" && "code" in error
+                ? (error as GeolocationPositionError)
+                : null;
+            const errorMsg = !navigator.geolocation
+              ? GEO_MSG_UNSUPPORTED
+              : messageFromGeolocationPositionError(geoErr);
             if (lastToastMessage.current !== errorMsg) {
               lastToastMessage.current = errorMsg;
               toast.error(errorMsg);
             }
-          } finally {
-            isLocationRequestInProgress.current = false;
+            return;
           }
-        },
-        (error) => {
-          console.error('Error accessing location:', error);
-          const errorMsg = 'Failed to access location';
-          if (lastToastMessage.current !== errorMsg) {
-            lastToastMessage.current = errorMsg;
-            toast.error(errorMsg);
-          }
-          isLocationRequestInProgress.current = false;
+          lat = stored.lat;
+          lng = stored.lng;
         }
-      );
-    } else {
-      const errorMsg = 'Geolocation is not supported by your browser';
-      if (lastToastMessage.current !== errorMsg) {
-        lastToastMessage.current = errorMsg;
-        toast.error(errorMsg);
+
+        setSelectedPosition({ lat, lng });
+        if (mapRef.current) {
+          mapRef.current.panTo({ lat, lng });
+        }
+
+        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+        if (apiKey) {
+          try {
+            const response = await fetch(
+              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`
+            );
+            const data = await response.json();
+
+            if (data.results && data.results.length > 0) {
+              applyGeocodeJsonToForm(data, lat, lng);
+              setShowMapLocationHint(true);
+              window.setTimeout(() => setShowMapLocationHint(false), 4000);
+            }
+          } catch (error) {
+            const errorMsg = "Failed to fetch location details";
+            if (lastToastMessage.current !== errorMsg) {
+              lastToastMessage.current = errorMsg;
+              toast.error(errorMsg);
+            }
+          }
+        } else {
+          setFormData((prev) => ({ ...prev, coordinates: `${lat},${lng}` }));
+          setShowMapLocationHint(true);
+          window.setTimeout(() => setShowMapLocationHint(false), 4000);
+        }
+      } finally {
+        isLocationRequestInProgress.current = false;
+        setIsLocating(false);
       }
-      isLocationRequestInProgress.current = false;
-    }
+    })();
   };
 
   const handleMapDrag = () => {
@@ -1453,10 +1447,12 @@ const AddressSelection: React.FC = () => {
               <button
                 type="button"
                 onClick={getCurrentLocation}
-                className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-sm hover:bg-gray-50"
+                disabled={isLocating}
+                aria-busy={isLocating}
+                className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-sm hover:bg-gray-50 disabled:opacity-60 disabled:pointer-events-none"
               >
                 <MdMyLocation className="text-orange-500 h-3 w-3" />
-                <span>Locate me</span>
+                <span>{isLocating ? "Locating" : "Locate me"}</span>
               </button>
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
                 <MdLocationOn className="text-orange-500 text-4xl drop-shadow-lg animate-bounce" />
@@ -1495,6 +1491,15 @@ const AddressSelection: React.FC = () => {
                 onChange={handleInputChange}
                 className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm"
                 required
+              />
+
+              <input
+                type="text"
+                name="floor"
+                placeholder="Floor (optional), e.g. 2nd Floor"
+                value={formData.floor}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 text-sm"
               />
 
               <div>
@@ -1586,7 +1591,13 @@ const AddressSelection: React.FC = () => {
             <div className="-mx-4 mb-4 flex items-center gap-3 bg-[#f8f6f1] px-4 py-4 sticky top-0 z-10">
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => {
+                if (fromLandingHome || routeState.returnUrl === "/home") {
+                  navigate("/home");
+                  return;
+                }
+                navigate(-1);
+              }}
                 className="-ml-2 rounded-full p-2 transition-colors hover:bg-black/5"
               >
                 <IoArrowBack size={24} className="text-gray-900" />
@@ -1617,67 +1628,6 @@ const AddressSelection: React.FC = () => {
 
             {/* Address List — layout matches My Addresses: left details + right map */}
             <div className="mb-6 space-y-4">
-              {liveDeviceLocation ? (
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() =>
-                    void handleAddressSelect(
-                      buildLiveDeviceAddress(
-                        liveDeviceLocation.lat,
-                        liveDeviceLocation.lng,
-                        liveDeviceLocation.formattedAddress,
-                      ),
-                    )
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      void handleAddressSelect(
-                        buildLiveDeviceAddress(
-                          liveDeviceLocation.lat,
-                          liveDeviceLocation.lng,
-                          liveDeviceLocation.formattedAddress,
-                        ),
-                      );
-                    }
-                  }}
-                  className={`cursor-pointer rounded-3xl p-5 shadow-sm transition-all ${
-                    selectedAddress?.id === LIVE_DEVICE_ADDRESS_ID
-                      ? "border-2 border-[#19411F] bg-[#F2FEF4] ring-1 ring-[#19411F]/20"
-                      : "border border-gray-200 bg-white"
-                  }`}
-                >
-                  <div className="flex justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#DCFCE7]">
-                          <MdMyLocation className="h-5 w-5 text-[#166534]" aria-hidden />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-900">Current Location</h3>
-                        {selectedAddress?.id === LIVE_DEVICE_ADDRESS_ID ? (
-                          <span className="flex-shrink-0 rounded-2xl bg-[#DCFCE7] px-2 py-1 text-xs font-semibold text-[#166534]">
-                            Selected
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mb-1 min-w-0 max-w-full text-sm leading-relaxed text-gray-700 [overflow-wrap:anywhere]">
-                        {liveDeviceLocation.formattedAddress}
-                      </p>
-                    
-                    </div>
-                    <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                      {isLoaded ? (
-                        <AddressThumbnailMap
-                          coordinates={`${liveDeviceLocation.lat},${liveDeviceLocation.lng}`}
-                        />
-                      ) : (
-                        <div className="h-full w-full animate-pulse bg-gray-200" />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
               {displayAddresses.map((address) => {
                 const icon = getTypeIcon(address.type || "home");
                 const addressTypeLower = address.type?.toLowerCase() || "";

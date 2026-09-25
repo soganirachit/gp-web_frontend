@@ -24,6 +24,7 @@ import scooterIcon from "../../assets/svg/gp_daily svg/scooter.svg";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
 import { HorizontalScrollSection } from "../common/HorizontalScrollSection";
 import { resolveGpDailyCatalogStoreId } from "../../utils/gpDailyCatalogStore";
+import { CATALOG_PRODUCTS_REFRESH_EVENT } from "../../utils/productUnavailableAtStore";
 
 function dailySortByToApiOrdering(sortType: string): string | undefined {
   switch (sortType) {
@@ -59,8 +60,16 @@ const ProductBrowsePage: React.FC = () => {
   const [nextProductPageUrl, setNextProductPageUrl] = useState<string | null>(null);
   const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [catalogRefreshEpoch, setCatalogRefreshEpoch] = useState(0);
 
   const basePath = "/gp-daily";
+
+  useEffect(() => {
+    const onCatalogRefresh = () => setCatalogRefreshEpoch((e) => e + 1);
+    window.addEventListener(CATALOG_PRODUCTS_REFRESH_EVENT, onCatalogRefresh);
+    return () =>
+      window.removeEventListener(CATALOG_PRODUCTS_REFRESH_EVENT, onCatalogRefresh);
+  }, []);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -165,7 +174,7 @@ const ProductBrowsePage: React.FC = () => {
     };
 
     run();
-  }, [categorySlug, stateCategoryName, sortBy, availabilityChannel]);
+  }, [categorySlug, stateCategoryName, sortBy, availabilityChannel, catalogRefreshEpoch]);
 
   useEffect(() => {
     if (!categorySlug || stateCategoryName) return;

@@ -27,6 +27,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
   const [formData, setFormData] = useState<AddressInput>({
     houseNo: "",
     streetName: "",
+    floor: "",
     area: "",
     city: "",
     state: "",
@@ -171,6 +172,23 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
               value={formData.streetName}
               onChange={handleInputChange}
               required
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="floor"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Floor (optional)
+            </label>
+            <input
+              type="text"
+              id="floor"
+              name="floor"
+              value={formData.floor ?? ""}
+              onChange={handleInputChange}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
             />
           </div>

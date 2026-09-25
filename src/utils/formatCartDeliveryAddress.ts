@@ -30,16 +30,31 @@ export function sanitizeAddressDisplayPart(
 
 export function formatCartDeliveryAddress(address: CartDeliveryAddressLike | null): string {
   if (!address) return '';
-  const street = [
+  const streetParts: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of [
     address.houseNo,
     address.floor,
     address.streetName,
     address.area,
     address.landmark,
-  ]
-    .map((x) => sanitizeAddressDisplayPart(x == null ? '' : String(x)))
-    .filter(Boolean)
-    .join(', ');
+  ]) {
+    const t = sanitizeAddressDisplayPart(raw == null ? "" : String(raw));
+    if (!t) continue;
+    const key = looseCompact(t);
+    if (!key || seen.has(key)) continue;
+    let duplicate = false;
+    for (const prev of seen) {
+      if (prev.includes(key) || key.includes(prev)) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (duplicate) continue;
+    seen.add(key);
+    streetParts.push(t);
+  }
+  const street = streetParts.join(", ");
   const cityState = [address.city, address.state]
     .map((x) => sanitizeAddressDisplayPart(x == null ? '' : String(x)))
     .filter(Boolean)

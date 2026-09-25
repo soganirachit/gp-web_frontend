@@ -63,7 +63,7 @@ function storeIsOperationalWeb(s: Store): boolean {
 }
 
 export function isStoreOffline(store: Store): boolean {
-  return store.is_online === false;
+  return shouldShowStoreOfflineHero(store);
 }
 
 export function isCartStoreOffline(
@@ -121,10 +121,15 @@ export interface Store {
   latitude: string;
   longitude: string;
   is_active: boolean;
-  /** From GET /stores/ — false means store is temporarily offline for ordering */
+  /** Manual override — false means staff marked the store offline */
   is_online?: boolean;
   opening_time: string;
   closing_time: string;
+  opening_hours_configured?: boolean;
+  is_within_opening_hours?: boolean;
+  /** Backend-computed: false when manual off, outside hours, or hours not set */
+  is_accepting_orders?: boolean;
+  customer_offline_reason?: "inactive" | "manual" | "hours_not_set" | "outside_hours" | null;
   /** ₹ per km — billed as distance × rate (legacy flat `delivery_fee` may still appear on older payloads). */
   delivery_fee_per_km?: string;
   delivery_fee: string;
@@ -839,7 +844,7 @@ export const storeService = new StoreService();
 
 export interface Banner {
   id: number;
-  title: string;
+  title?: string;
   subtitle?: string;
   cta_label?: string;
   cta_link?: string;

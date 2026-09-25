@@ -51,13 +51,23 @@ function normalizeBannersFromResponse(body: unknown): Banner[] {
 }
 
 function resolveBannerCta(banner: Banner): { label: string; link: string } | null {
-  const link = String(banner.cta_link || banner.secondary_cta_link || "").trim();
-  const label = String(banner.cta_label || banner.secondary_cta_label || "").trim();
-  if (!link && !label) return null;
-  return {
-    link: link || "#",
-    label: label || "Shop Now",
-  };
+  const primaryLink = String(banner.cta_link || "").trim();
+  const primaryLabel = String(banner.cta_label || "").trim();
+  if (primaryLink && primaryLabel) {
+    return { link: primaryLink, label: primaryLabel };
+  }
+  const secondaryLink = String(banner.secondary_cta_link || "").trim();
+  const secondaryLabel = String(banner.secondary_cta_label || "").trim();
+  if (secondaryLink && secondaryLabel) {
+    return { link: secondaryLink, label: secondaryLabel };
+  }
+  return null;
+}
+
+function resolveBannerNavLink(banner: Banner): string {
+  const cta = resolveBannerCta(banner);
+  if (cta) return cta.link;
+  return String(banner.cta_link || banner.secondary_cta_link || "").trim();
 }
 
 
@@ -313,9 +323,12 @@ export function OffersBannerCarousel({
         key={banner.id}
         className={`relative w-full ${dailyBannerHeightClass} ${cardRadiusClass} overflow-hidden cursor-pointer select-none shadow-md border border-gray-200/60`}
         style={{ animation: 'bannerFadeIn 0.4s ease-out' }}
-        onClick={() => handleNavigate(bannerCta?.link || banner.cta_link)}
+        onClick={() => {
+          const link = resolveBannerNavLink(banner);
+          if (link) handleNavigate(link);
+        }}
         role="button"
-        aria-label={banner.title}
+        aria-label={banner.title?.trim() || "Promotional offer"}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -324,7 +337,7 @@ export function OffersBannerCarousel({
         {hasImage ? (
           <SessionCachedImage
             src={banner.image_url!}
-            alt={banner.title}
+            alt={banner.title?.trim() || "Offer banner"}
             priority
             fill
             className="h-full w-full object-cover object-center bg-[#f8f6f1]"
@@ -343,9 +356,11 @@ export function OffersBannerCarousel({
         {/* Content pinned to bottom — title left, CTA right */}
         <div className="absolute bottom-0 left-0 right-0 z-10 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 sm:gap-3">
           <div className="flex-1 min-w-0">
+            {banner.title?.trim() ? (
             <p className="text-white font-bold text-sm sm:text-base leading-snug drop-shadow-md line-clamp-2">
               {banner.title}
             </p>
+            ) : null}
             {banner.subtitle && (
               <p className="text-white/90 text-xs sm:text-sm mt-0.5 line-clamp-1">
                 {banner.subtitle}

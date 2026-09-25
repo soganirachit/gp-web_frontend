@@ -1,8 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { productService } from "../services/product.service";
 import { GpDailyHomeSkeleton } from "../components/common/PageSkeletons";
 import { tryOpenAndroidAppForProductPath } from "../utils/tryOpenAndroidAppLink";
+import {
+  isProductDetailNotFoundError,
+  redirectForUnavailableProduct,
+} from "../utils/productUnavailableAtStore";
 
 /**
  * Universal product URL: https://customerapp.mygendaphool.com/products/:slug
@@ -10,9 +14,10 @@ import { tryOpenAndroidAppForProductPath } from "../utils/tryOpenAndroidAppLink"
  */
 const ProductDeepLinkPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const [targetPath, setTargetPath] = useState<string | null>(null);
-  const [notFound, setNotFound] = useState(false);
   const triedAndroidAppOpen = useRef(false);
+  const handledUnavailable = useRef(false);
 
   useEffect(() => {
     if (!slug?.trim() || triedAndroidAppOpen.current) return;
@@ -22,7 +27,10 @@ const ProductDeepLinkPage: React.FC = () => {
 
   useEffect(() => {
     if (!slug?.trim()) {
-      setNotFound(true);
+      if (!handledUnavailable.current) {
+        handledUnavailable.current = true;
+        redirectForUnavailableProduct(navigate, "/gp-store");
+      }
       return;
     }
     let cancelled = false;
@@ -41,22 +49,18 @@ const ProductDeepLinkPage: React.FC = () => {
         setTargetPath(
           isDaily ? `/gp-daily/product/${encoded}` : `/gp-store/product/${encoded}`,
         );
-      } catch {
-        if (!cancelled) setNotFound(true);
+      } catch (error) {
+        if (cancelled || handledUnavailable.current) return;
+        if (isProductDetailNotFoundError(error)) {
+          handledUnavailable.current = true;
+          redirectForUnavailableProduct(navigate, "/gp-store");
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [slug]);
-
-  if (notFound) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f8f6f1] px-6">
-        <p className="text-center text-gray-600">Product not found</p>
-      </div>
-    );
-  }
+  }, [slug, navigate]);
 
   if (targetPath) {
     return <Navigate to={targetPath} replace />;

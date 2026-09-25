@@ -36,6 +36,10 @@ import { resolveLabelSectionTitle } from "../../utils/productLabelDisplay";
 import { ProductImageTag } from "../common/ProductImageTag";
 import { HorizontalScrollSection } from "../common/HorizontalScrollSection";
 import { errorMessageFromCatch } from "../../utils/apiErrorMessage";
+import {
+  isProductDetailNotFoundError,
+  redirectForUnavailableProduct,
+} from "../../utils/productUnavailableAtStore";
 import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
 import {
   extractCartStockApiMessage,
@@ -49,12 +53,7 @@ import {
   DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES,
   formatFreeDeliveryThresholdForDisplay,
 } from "../../services/store.service";
-import { useOrderingStoreOffline } from "../../hooks/useOrderingStoreOffline";
 import { useCartStoreReplaceGate } from "../../hooks/useCartStoreReplaceGate";
-import {
-  STORE_OFFLINE_CART_BODY,
-  STORE_OFFLINE_ORDER_BUTTON_LABEL,
-} from "../../config/homeHeroStatusCopy";
 
 interface ProductImage {
   id: number;
@@ -128,7 +127,6 @@ const gallerySlideVariants = {
 };
 
 const StorePage: React.FC = () => {
-  const orderingStoreOffline = useOrderingStoreOffline();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -146,6 +144,8 @@ const StorePage: React.FC = () => {
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [productUnavailable, setProductUnavailable] = useState(false);
+  const productUnavailableRedirectRef = useRef(false);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [freeDeliveryThresholdDisplay, setFreeDeliveryThresholdDisplay] =
     useState<string>(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
@@ -288,14 +288,34 @@ const StorePage: React.FC = () => {
       }
 
       await resolveFreeDeliveryDisplay(productData);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching product:", error);
-      setError(error.message || "Failed to fetch product details");
+      if (isProductDetailNotFoundError(error)) {
+        setProductUnavailable(true);
+        setFreeDeliveryThresholdDisplay(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
+        return;
+      }
+      setError(
+        error instanceof Error ? error.message : "Failed to fetch product details",
+      );
       setFreeDeliveryThresholdDisplay(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    setProductUnavailable(false);
+    productUnavailableRedirectRef.current = false;
+  }, [slug]);
+
+  useEffect(() => {
+    if (loading || !productUnavailable || productUnavailableRedirectRef.current) {
+      return;
+    }
+    productUnavailableRedirectRef.current = true;
+    redirectForUnavailableProduct(navigate, basePath);
+  }, [productUnavailable, loading, navigate, basePath]);
 
   useEffect(() => {
     fetchProductBySlug();
@@ -407,11 +427,6 @@ const StorePage: React.FC = () => {
       toast.error("Product information not available", {
         id: "Product information not available",
       });
-      return;
-    }
-
-    if (orderingStoreOffline) {
-      toast.error(STORE_OFFLINE_CART_BODY, { id: STORE_OFFLINE_CART_BODY });
       return;
     }
 
@@ -758,7 +773,7 @@ const StorePage: React.FC = () => {
     }));
   }, [product, selectedVariant]);
 
-  if (loading || isCheckingBalance) {
+  if (loading || isCheckingBalance || productUnavailable) {
     return <ProductDetailSkeleton />;
   }
 
@@ -1168,15 +1183,12 @@ const StorePage: React.FC = () => {
               disabled={
                 !product ||
                 product.in_stock === false ||
-                product.is_available === false ||
-                orderingStoreOffline
+                product.is_available === false
               }
             >
-              {orderingStoreOffline
-                ? STORE_OFFLINE_ORDER_BUTTON_LABEL
-                : product?.in_stock !== false && product?.is_available !== false
-                  ? "Add to Basket"
-                  : "Out of Stock"}
+              {product?.in_stock !== false && product?.is_available !== false
+                ? "Add to Basket"
+                : "Out of Stock"}
             </button>
           )}
 

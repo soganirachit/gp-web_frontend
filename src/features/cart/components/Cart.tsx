@@ -16,7 +16,13 @@ import {
 import {
   STORE_OFFLINE_CART_BODY,
   STORE_OFFLINE_CART_TITLE,
+  STORE_OFFLINE_ORDER_BUTTON_LABEL,
 } from '../../../config/homeHeroStatusCopy';
+import { isOrderingBlockedByStoreOffline } from '../../../utils/homeLocationHeroState';
+import {
+  shouldShowStoreOfflineHero,
+  storeOrderingClosedMessage,
+} from '../../../utils/storeOperatingHours';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow, startOfDay } from 'date-fns';
@@ -47,11 +53,13 @@ import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
 import { formatCartDeliveryAddress } from '../../../utils/formatCartDeliveryAddress';
 import { CartConfirmModal } from '../../../components/cart/CartConfirmModal';
+import { useCartUnavailableProductDialog } from '../../../hooks/useCartUnavailableProductDialog';
 import {
   SWITCH_STORE_CONFIRM_MESSAGE,
   SWITCH_STORE_CONFIRM_TITLE,
 } from '../../../utils/cartConfirmCopy';
 import { errorMessageFromCatch, isCartLineUnavailableMessage } from '../../../utils/apiErrorMessage';
+import { presentCheckoutFailure } from '../../../utils/presentCheckoutFailure';
 import {
   extractCartStockApiMessage,
   formatCartStockInlineMessage,
@@ -113,6 +121,7 @@ const minutesToTimeStr = (mins: number): string => {
 interface ApplyCouponResponse {
   message?: string;
   discount_amount?: number | string;
+  coupon_discount?: number | string;
   coupon_code?: string;
   subtotal?: number | string;
   total?: number | string;
@@ -167,22 +176,6 @@ function promoDiscountFromCartData(cartData: CartData): number {
   const fromCoupon = parseFloat(String(cartData.coupon_discount ?? ''));
   if (Number.isFinite(fromCoupon) && fromCoupon > 0) return fromCoupon;
   return parseFloat(String(cartData.discount_amount ?? '0')) || 0;
-}
-
-function cartProductSignatureFromItems(
-  items: Array<{
-    productId?: number | string;
-    variant?: { id?: number } | null;
-    quantity?: number;
-  }>,
-): string {
-  return items
-    .map(
-      (it) =>
-        `${it.productId ?? 0}:${it.variant?.id ?? 0}:${it.quantity ?? 0}`,
-    )
-    .sort()
-    .join('|');
 }
 
 function parseAddressCoordinates(address: Address | null): { lat: number; lng: number } | null {
@@ -777,7 +770,7 @@ const Cart: React.FC = () => {
       setIsApplyingPromo(true);
       const response = await applyCouponAPI(code);
 
-      const discountAmt = parseFloat(String(response.discount_amount ?? 0));
+      const discountAmt = parseFloat(String(response.coupon_discount ?? response.discount_amount ?? 0));
       setPromoDiscount(Number.isFinite(discountAmt) ? discountAmt : 0);
 
       // If the response contains updated totals, use them directly
@@ -835,43 +828,9 @@ const Cart: React.FC = () => {
     }
   };
 
-  // Automatically remove applied promo when leaving the basket page
   useEffect(() => {
     appliedPromoCodeRef.current = appliedPromoCode;
   }, [appliedPromoCode]);
-
-  useEffect(() => {
-    return () => {
-      if (appliedPromoCodeRef.current) {
-        removeCouponAPI().catch((err) => {
-          console.error('Failed to auto-remove promo code on navigation:', err);
-        });
-      }
-    };
-  }, []);
-
-  const cartItemsPromoSigRef = useRef('');
-  useEffect(() => {
-    const sig = cartProductSignatureFromItems(items);
-    const prev = cartItemsPromoSigRef.current;
-    cartItemsPromoSigRef.current = sig;
-    if (!isLoggedIn || !prev || prev === sig || !appliedPromoCodeRef.current) {
-      return;
-    }
-    void (async () => {
-      await removeCouponAPI().catch(() => {});
-      setAppliedPromoCode(null);
-      appliedPromoCodeRef.current = null;
-      setPromoDiscount(0);
-      try {
-        const raw = await cartService.getCartData();
-        const cartData = await reconcileCartStoreWithAccountSelection(raw);
-        applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
-      } catch {
-        /* ignore */
-      }
-    })();
-  }, [isLoggedIn, items, reconcileCartStoreWithAccountSelection]);
 
   // Preload Razorpay SDK when basket opens so checkout is not blocked on first load
   useEffect(() => {
@@ -1066,7 +1025,7 @@ const Cart: React.FC = () => {
           if (cartData.coupon_code) {
             setAppliedPromoCode(String(cartData.coupon_code));
             setPromoDiscount(promoDiscountFromCartData(cartData));
-          } else if (!appliedPromoCodeRef.current) {
+          } else {
             setAppliedPromoCode(null);
             setPromoDiscount(0);
           }
@@ -1101,13 +1060,43 @@ const Cart: React.FC = () => {
     let cancelled = false;
     void (async () => {
       try {
+        const blocked = await isOrderingBlockedByStoreOffline({
+          storeId: cartStoreId,
+          storeIds: [cartStoreId].filter(
+            (id): id is number =>
+              id != null && Number.isFinite(Number(id)) && Number(id) > 0,
+          ),
+          lat: coords.lat,
+          lng: coords.lng,
+        });
+        if (cancelled) return;
+        if (blocked) {
+          setDeliveryStoreOffline(true);
+          const operational = await storeService.getNearestStore(coords.lat, coords.lng);
+          if (
+            operational &&
+            operational.id !== cartStoreId &&
+            !shouldShowStoreOfflineHero(operational)
+          ) {
+            setSuggestedStoreForAddress({ id: operational.id, name: operational.name });
+          } else {
+            setSuggestedStoreForAddress(null);
+          }
+          deliveryStoreSyncKey.current = key;
+          return;
+        }
+
         const storesList = await storeService.getAllStores(coords.lat, coords.lng);
         if (cancelled) return;
 
         if (cartStoreId != null && isCartStoreOffline(cartStoreId, storesList)) {
           setDeliveryStoreOffline(true);
           const operational = await storeService.getNearestStore(coords.lat, coords.lng);
-          if (operational && operational.id !== cartStoreId) {
+          if (
+            operational &&
+            operational.id !== cartStoreId &&
+            !shouldShowStoreOfflineHero(operational)
+          ) {
             setSuggestedStoreForAddress({ id: operational.id, name: operational.name });
           } else {
             setSuggestedStoreForAddress(null);
@@ -1118,7 +1107,7 @@ const Cart: React.FC = () => {
 
         const operational = await storeService.getNearestStore(coords.lat, coords.lng);
         if (cancelled) return;
-        if (operational) {
+        if (operational && !shouldShowStoreOfflineHero(operational)) {
           setDeliveryStoreOffline(false);
           if (cartStoreId != null && operational.id !== cartStoreId) {
             const currentRow = storesList.find((s) => s.id === cartStoreId);
@@ -1150,7 +1139,7 @@ const Cart: React.FC = () => {
           deliveryStoreSyncKey.current = key;
           return;
         }
-        if (nearestAny.is_online === false) {
+        if (shouldShowStoreOfflineHero(nearestAny)) {
           setDeliveryStoreOffline(true);
           deliveryStoreSyncKey.current = key;
           return;
@@ -1485,7 +1474,7 @@ const Cart: React.FC = () => {
   };
 
   const hasStaleCartLine = useMemo(
-    () => items.some((it) => lineCartStaleByItemId[it.id]),
+    () => items.some((it) => it.isAvailable === false || lineCartStaleByItemId[it.id]),
     [items, lineCartStaleByItemId],
   );
 
@@ -1558,6 +1547,24 @@ const Cart: React.FC = () => {
       toast.error('Failed to remove item. Please try again.');
     }
   };
+
+  const removeUnavailableLine = useCallback(async (itemId: string) => {
+    await removeFromCart(itemId);
+  }, [removeFromCart]);
+
+  const unavailableCartLines = useMemo(
+    () =>
+      items.map((it) => ({
+        id: it.id,
+        name: it.name,
+        isUnavailable: it.isAvailable === false || Boolean(lineCartStaleByItemId[it.id]),
+      })),
+    [items, lineCartStaleByItemId],
+  );
+  const { modal: unavailableProductModal } = useCartUnavailableProductDialog(
+    unavailableCartLines,
+    removeUnavailableLine,
+  );
 
   const handleEditAddress = () => {
     const addressPath = feature === 'gpStore' ? '/gp-store/address-selection' : '/gp-daily/address-selection';
@@ -1676,6 +1683,15 @@ const Cart: React.FC = () => {
       return;
     }
 
+    const serverHasUnavailable = Boolean(
+      latestCartData?.has_unavailable_items ||
+      latestCartData?.items?.some((line) => line.is_available === false),
+    );
+    if (serverHasUnavailable) {
+      toast.error('Remove unavailable items from your basket before checkout.');
+      return;
+    }
+
     if (!defaultAddress) {
       toast.error(REQUIRED_TOAST.CHOOSE_DELIVERY_ADDRESS_CHECKOUT);
       navigate(`${basePath}/addresses`);
@@ -1741,26 +1757,55 @@ const Cart: React.FC = () => {
       const storeIdForCheckout =
         typeof cartForStore.store === 'number' ? cartForStore.store : null;
 
+      const storesNearAddress = await storeService.getAllStores(
+        checkoutCoords.lat,
+        checkoutCoords.lng,
+      );
+      const storeRow =
+        storeIdForCheckout != null
+          ? storesNearAddress.find((s) => s.id === storeIdForCheckout)
+          : undefined;
+      if (storeRow && shouldShowStoreOfflineHero(storeRow)) {
+        setDeliveryStoreOffline(true);
+        const msg = storeOrderingClosedMessage(storeRow);
+        toast.error(msg);
+        setCheckoutInlineError(msg);
+        return;
+      }
+
+      const blocked = await isOrderingBlockedByStoreOffline({
+        storeId: storeIdForCheckout,
+        storeIds: [storeIdForCheckout].filter(
+          (id): id is number =>
+            id != null && Number.isFinite(Number(id)) && Number(id) > 0,
+        ),
+        lat: checkoutCoords.lat,
+        lng: checkoutCoords.lng,
+      });
+      if (blocked) {
+        setDeliveryStoreOffline(true);
+        const msg = storeRow
+          ? storeOrderingClosedMessage(storeRow)
+          : REQUIRED_TOAST.STORE_OFFLINE;
+        toast.error(msg);
+        setCheckoutInlineError(msg);
+        return;
+      }
+
       const operational = await storeService.getNearestStore(
         checkoutCoords.lat,
         checkoutCoords.lng,
       );
-      if (operational) {
+      if (operational && !shouldShowStoreOfflineHero(operational)) {
         if (storeIdForCheckout != null && storeIdForCheckout !== operational.id) {
-          const storesList = await storeService.getAllStores(
-            checkoutCoords.lat,
-            checkoutCoords.lng,
-          );
-          const currentRow = storesList.find((s) => s.id === storeIdForCheckout);
+          const currentRow = storesNearAddress.find((s) => s.id === storeIdForCheckout);
           if (!(currentRow && storeIsWithinDeliveryRadius(currentRow))) {
             toast.error(REQUIRED_TOAST.USE_SWITCH_STORE);
             return;
           }
         }
-        setDeliveryStoreOffline(false);
       } else {
-        const storesNear = await storeService.getAllStores(checkoutCoords.lat, checkoutCoords.lng);
-        const sorted = [...storesNear].sort((a, b) => {
+        const sorted = [...storesNearAddress].sort((a, b) => {
           const da = Number(a.distance_km);
           const db = Number(b.distance_km);
           const na = Number.isFinite(da) ? da : Number.POSITIVE_INFINITY;
@@ -1768,23 +1813,13 @@ const Cart: React.FC = () => {
           return na - nb;
         });
         const nearestAny = sorted[0];
-        if (nearestAny?.is_online === false) {
+        if (nearestAny && shouldShowStoreOfflineHero(nearestAny)) {
           setDeliveryStoreOffline(true);
-          toast.error(REQUIRED_TOAST.NEAREST_STORE_OFFLINE);
+          const msg = storeOrderingClosedMessage(nearestAny);
+          toast.error(msg);
+          setCheckoutInlineError(msg);
           return;
         }
-        setDeliveryStoreOffline(false);
-      }
-
-      const storesNearAddress = await storeService.getAllStores(
-        checkoutCoords.lat,
-        checkoutCoords.lng,
-      );
-      const storeRow = storesNearAddress.find((s) => s.id === storeIdForCheckout);
-      if (storeRow && storeRow.is_online === false) {
-        setDeliveryStoreOffline(true);
-        toast.error(REQUIRED_TOAST.STORE_OFFLINE);
-        return;
       }
     } catch (e: unknown) {
       toast.error(errorMessageFromCatch(e, 'Could not verify the store for this delivery address.'));
@@ -1829,11 +1864,12 @@ const Cart: React.FC = () => {
         total
       );
     } catch (error: unknown) {
-      const msg =
-        error instanceof Error
-          ? error.message
-          : 'Failed to initiate payment. Please try again.';
-      toast.error(msg);
+      presentCheckoutFailure({
+        error,
+        fallback: 'Failed to initiate payment. Please try again.',
+        setDeliveryStoreOffline,
+        setCheckoutInlineError,
+      });
       setIsProcessingPayment(false);
       checkoutInFlightRef.current = false;
     }
@@ -2098,7 +2134,7 @@ const Cart: React.FC = () => {
             <>
               {/* Product Items */}
               {items.map((item) => {
-                const lineStale = lineCartStaleByItemId[item.id];
+                const lineStale = item.isAvailable === false || lineCartStaleByItemId[item.id];
                 return (
                 <div key={item.id} className="relative mx-0.5 mb-3 overflow-hidden rounded-[25px] bg-white p-4 shadow-sm">
                   <button
@@ -2110,16 +2146,7 @@ const Cart: React.FC = () => {
                     <IoTrashOutline className="h-[15px] w-[15px]" aria-hidden />
                   </button>
 
-                  {lineStale ? (
-                    <div
-                      className="absolute inset-0 z-20 flex items-center justify-center bg-white/55 backdrop-blur-[1px]"
-                      aria-hidden
-                    >
-                      <p className="text-center text-base font-semibold text-red-600">Out of stock</p>
-                    </div>
-                  ) : null}
-
-                  <div className={`flex items-start gap-3 ${lineStale ? 'pointer-events-none select-none opacity-40' : ''}`}>
+                  <div className={`flex items-start gap-3 ${lineStale ? 'pointer-events-none select-none' : ''}`}>
                     <button
                       type="button"
                       onClick={() => navigateToProductDetail(item)}
@@ -2587,7 +2614,10 @@ const Cart: React.FC = () => {
 
               {/* Checkout */}
               {checkoutInlineError ? (
-                <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+                <div
+                  className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700"
+                  role="alert"
+                >
                   {checkoutInlineError}
                 </div>
               ) : null}
@@ -2610,7 +2640,9 @@ const Cart: React.FC = () => {
                   ? 'Confirming your order…'
                   : isProcessingPayment
                     ? 'Preparing payment…'
-                    : 'Checkout'}
+                    : deliveryStoreOffline
+                      ? STORE_OFFLINE_ORDER_BUTTON_LABEL
+                      : 'Checkout'}
               </button>
             </>
           </div>
@@ -2627,6 +2659,7 @@ const Cart: React.FC = () => {
         onCancel={cancelSuggestedStoreSwitchModal}
         titleId="gp-store-switch-store-title"
       />
+      {unavailableProductModal}
 
       {/* Promo Code Modal */}
       {showPromoModal && (

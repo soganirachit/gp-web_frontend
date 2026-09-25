@@ -1,17 +1,15 @@
 import type { Address } from "../services/address.service";
+import { composeCompleteAddress } from "../services/address.service";
 import { storeService } from "../services/store.service";
+import { sanitizeAddressDisplayPart } from "./formatCartDeliveryAddress";
 
 export function formatSavedAddressLine(address: Address): string {
-  return [
-    address.houseNo,
-    address.streetName,
-    address.area,
-    address.city,
-    address.state,
-    address.pincode,
-  ]
+  const line = composeCompleteAddress(address.houseNo, address.streetName);
+  const extras = [address.city, address.state, address.pincode]
+    .map((p) => sanitizeAddressDisplayPart(p == null ? "" : String(p)))
     .filter(Boolean)
-    .join(", ");
+    .filter((p) => !line.toLowerCase().includes(p.toLowerCase()));
+  return [line, ...extras].filter(Boolean).join(", ");
 }
 
 /**

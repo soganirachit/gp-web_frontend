@@ -166,7 +166,7 @@ async function areKnownStoresOffline(
       allList ??= await getStoresListCached();
       store = findStoreInList(allList, sid);
     }
-    if (store && isStoreOffline(store)) return true;
+    if (store && shouldShowStoreOfflineHero(store)) return true;
   }
   return false;
 }
@@ -211,7 +211,7 @@ async function isNearestStoreOffline(
     deviceLat!,
     deviceLng!,
   );
-  return !!(nearest && isStoreOffline(nearest));
+  return !!(nearest && shouldShowStoreOfflineHero(nearest));
 }
 
 async function isNearestStoreOfflineForHero(

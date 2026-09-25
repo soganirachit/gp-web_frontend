@@ -7,8 +7,12 @@ import { useFeatureTheme } from '../context/FeatureThemeContext';
 import { MdLocationOn, MdKeyboardArrowDown, MdAccessTime } from 'react-icons/md';
 import { FaLeaf, FaUsers, FaBox } from 'react-icons/fa';
 import { motion } from 'framer-motion';
-import { addressService, Address } from '../services/address.service';
-import { storeService, GUEST_STORE_UPDATED_EVENT } from '../services/store.service';
+import { addressService } from '../services/address.service';
+import { pickHomeCatalogHeaderAddress, formatSavedAddressLine } from '../utils/resolveHomeCatalogHeaderAddress';
+import { guestHasSavedBrowseAddress } from '../utils/guestAddressEntry';
+import { GP_OPEN_GUEST_AREA_MODAL_EVENT } from '../config/guestAreaModalCopy';
+import { markLandingAddressReturn } from '../utils/applySharedBrowseDeliveryAddress';
+import { storeService, GUEST_STORE_UPDATED_EVENT, GPS_CATALOG_LOCATION_UPDATED_EVENT } from '../services/store.service';
 import { OffersBannerCarousel } from '../components/OffersBannerCarousel';
 import { HorizontalScrollSection } from '../components/common/HorizontalScrollSection';
 import {
@@ -127,23 +131,10 @@ const HomePage: React.FC = () => {
     try {
       setIsLoadingAddress(true);
       const addresses = await addressService.getAllAddresses();
-
-      // Get default address first, otherwise get the latest address
-      const defaultAddress = addresses.find(addr => addr.isDefault);
-      const selectedAddress = defaultAddress || addresses
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-      [0];
+      const selectedAddress = pickHomeCatalogHeaderAddress(addresses);
 
       if (selectedAddress) {
-        const formattedAddress = [
-          selectedAddress.houseNo,
-          selectedAddress.streetName,
-          selectedAddress.area,
-          selectedAddress.city,
-          selectedAddress.state,
-          selectedAddress.pincode
-        ].filter(Boolean).join(', ');
-
+        const formattedAddress = formatSavedAddressLine(selectedAddress);
         setDeliveryLocation(formattedAddress);
         setAddressType(selectedAddress.type || 'Home');
       } else {
@@ -169,8 +160,10 @@ const HomePage: React.FC = () => {
     };
 
     window.addEventListener('addressUpdated', handleAddressUpdate);
+    window.addEventListener(GPS_CATALOG_LOCATION_UPDATED_EVENT, handleAddressUpdate);
     return () => {
       window.removeEventListener('addressUpdated', handleAddressUpdate);
+      window.removeEventListener(GPS_CATALOG_LOCATION_UPDATED_EVENT, handleAddressUpdate);
     };
   }, [fetchLatestAddress]);
 
@@ -203,8 +196,32 @@ const HomePage: React.FC = () => {
   }, []);
 
   const handleLocationClick = () => {
-    const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
-    navigate(`${basePath}/addresses`);
+    markLandingAddressReturn();
+    if (!isLoggedIn) {
+      if (guestHasSavedBrowseAddress()) {
+        navigate('/gp-store/login', {
+          state: {
+            from: '/home',
+            returnUrl: '/gp-store/address-selection',
+            fromLandingHome: true,
+          },
+        });
+        return;
+      }
+      window.dispatchEvent(
+        new CustomEvent(GP_OPEN_GUEST_AREA_MODAL_EVENT, {
+          detail: {
+            dismissible: true,
+            variant: 'need_location',
+            redirectToAddressAfterPick: true,
+          },
+        }),
+      );
+      return;
+    }
+    navigate('/gp-store/address-selection', {
+      state: { fromHome: true, fromLandingHome: true, returnUrl: '/home' },
+    });
   };
 
   const handleProfileClick = () => {

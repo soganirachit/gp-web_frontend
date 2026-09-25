@@ -6,10 +6,11 @@ type CartConfirmModalProps = {
   title: string;
   message: string;
   confirmLabel?: string;
-  cancelLabel?: string;
+  /** Pass `null` to hide the secondary button (OK-only dialogs). */
+  cancelLabel?: string | null;
   loading?: boolean;
   onConfirm: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
   titleId?: string;
 };
 
@@ -26,6 +27,7 @@ export const CartConfirmModal: React.FC<CartConfirmModalProps> = ({
   titleId = "cart-confirm-modal-title",
 }) => {
   const { theme, feature } = useFeatureTheme();
+  const showCancel = cancelLabel != null;
 
   if (!open) return null;
 
@@ -59,14 +61,16 @@ export const CartConfirmModal: React.FC<CartConfirmModalProps> = ({
           >
             {loading ? "Please wait…" : confirmLabel}
           </button>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={onCancel}
-            className="w-full rounded-lg py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {cancelLabel}
-          </button>
+          {showCancel ? (
+            <button
+              type="button"
+              disabled={loading}
+              onClick={onCancel}
+              className="w-full rounded-lg py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {cancelLabel}
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

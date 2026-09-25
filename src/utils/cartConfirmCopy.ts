@@ -7,3 +7,10 @@ export const REPLACE_CART_CONFIRM_TITLE = "Replace basket items?";
 
 export const REPLACE_CART_CONFIRM_MESSAGE =
   "Your basket has items from a different location. Items that are not available at the new store will be removed and the rest will be kept.";
+
+export const PRODUCT_UNAVAILABLE_MODAL_TITLE = "Product unavailable";
+
+export function productUnavailableOnStoreMessage(productName: string): string {
+  const name = productName.trim() || "This product";
+  return `${name} is currently not available on store.`;
+}

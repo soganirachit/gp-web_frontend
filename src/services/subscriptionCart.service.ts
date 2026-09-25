@@ -1,7 +1,7 @@
 import { isAxiosError } from "axios";
 import api from "./api";
 import { getApiUrl } from "../config/api.config";
-import { errorMessageFromCatch } from "../utils/apiErrorMessage";
+import { errorMessageFromCatch, errorWithApiCode } from "../utils/apiErrorMessage";
 import { checkSubscriptionZone as postCheckSubscriptionZone } from "./subscriptionZone.service";
 
 export type DailyCartPaymentMethod = "wallet" | "cod";
@@ -17,6 +17,8 @@ export interface DailyCartItem {
   quantity: number;
   unit_price?: string | number;
   total_price?: string | number;
+  is_available?: boolean;
+  unavailable_reason?: string | null;
   [k: string]: unknown;
 }
 
@@ -238,9 +240,16 @@ export const subscriptionCartService = {
   }): Promise<unknown> {
     try {
       const res = await api.post(`${getApiUrl()}/subscriptions/cart/checkout/`, params);
+      const body = res.data as { success?: boolean; message?: string } | undefined;
+      if (body && body.success === false) {
+        throw errorWithApiCode(
+          errorMessageFromCatch(body, "Checkout failed"),
+          body,
+        );
+      }
       return res.data;
     } catch (e: unknown) {
-      throw new Error(errorMessageFromCatch(e, "Checkout failed"));
+      throw errorWithApiCode(errorMessageFromCatch(e, "Checkout failed"), e);
     }
   },
 

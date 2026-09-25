@@ -23,6 +23,7 @@ import {
   GPS_CATALOG_LOCATION_UPDATED_EVENT,
   storeService,
 } from "../services/store.service";
+import { CATALOG_PRODUCTS_REFRESH_EVENT } from "../utils/productUnavailableAtStore";
 import { toast } from "react-hot-toast";
 import { StoreHomeSkeleton } from "../components/common/PageSkeletons";
 import { SearchBar } from "../components/common/SearchBar";
@@ -447,12 +448,14 @@ const GpStore_Homepage: React.FC = () => {
         };
         window.addEventListener(GPS_CATALOG_LOCATION_UPDATED_EVENT, onCatalog);
         window.addEventListener("addressUpdated", onCatalog);
+        window.addEventListener(CATALOG_PRODUCTS_REFRESH_EVENT, onCatalog);
         return () => {
             window.removeEventListener(
                 GPS_CATALOG_LOCATION_UPDATED_EVENT,
                 onCatalog,
             );
             window.removeEventListener("addressUpdated", onCatalog);
+            window.removeEventListener(CATALOG_PRODUCTS_REFRESH_EVENT, onCatalog);
         };
         // Event handler uses the latest fetch* and fetchLatestAddress from the render when the listener is attached.
         // eslint-disable-next-line react-hooks/exhaustive-deps

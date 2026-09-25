@@ -30,7 +30,8 @@ export function isOutsideStoreOperatingHours(
 ): boolean {
   const open = parseTimeToMinutes(store.opening_time);
   const close = parseTimeToMinutes(store.closing_time);
-  if (open == null || close == null) return false;
+  if (open == null || close == null) return true;
+  if (open === 0 && close === 0) return true;
 
   const nowMinutes = getIstMinutesNow(now);
   if (close > open) {
@@ -42,11 +43,51 @@ export function isOutsideStoreOperatingHours(
   return false;
 }
 
-/** Show offline hero when outside hours or API marks store offline. */
+/** Show offline hero when the store is not accepting customer orders. */
 export function shouldShowStoreOfflineHero(
-  store: Pick<Store, "opening_time" | "closing_time" | "is_online">,
+  store: Pick<
+    Store,
+    | "opening_time"
+    | "closing_time"
+    | "is_online"
+    | "is_accepting_orders"
+    | "opening_hours_configured"
+  >,
   now = new Date(),
 ): boolean {
+  if (typeof store.is_accepting_orders === "boolean") {
+    return !store.is_accepting_orders;
+  }
+  if (store.opening_hours_configured === false) return true;
   if (isOutsideStoreOperatingHours(store, now)) return true;
   return store.is_online === false;
+}
+
+/** Customer-facing copy when checkout is blocked by store hours / offline. */
+export function storeOrderingClosedMessage(
+  store: Pick<
+    Store,
+    | "customer_offline_reason"
+    | "opening_time"
+    | "closing_time"
+    | "is_online"
+    | "is_accepting_orders"
+    | "opening_hours_configured"
+  >,
+): string {
+  const reason = store.customer_offline_reason;
+  if (reason === "inactive") return "This store is no longer active.";
+  if (reason === "manual") {
+    return "This store is currently offline and not accepting orders.";
+  }
+  if (reason === "hours_not_set") {
+    return "This store has not set opening hours yet and is not accepting orders.";
+  }
+  if (reason === "outside_hours") {
+    return "This store is closed for the day. Please try again during opening hours.";
+  }
+  if (shouldShowStoreOfflineHero(store)) {
+    return "This store is currently offline and not accepting orders.";
+  }
+  return "This store is currently offline and not accepting orders.";
 }

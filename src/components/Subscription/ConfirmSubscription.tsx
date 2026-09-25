@@ -754,7 +754,7 @@ const ConfirmSubscription: React.FC = () => {
           navigate(`${basePath}/login`, {
             state: { returnUrl: `${basePath}/subscription/confirm` },
           });
-        } else if (errorMessage.includes("Insufficient wallet balance")) {
+        } else if (errorMessage.toLowerCase().includes("insufficient wallet")) {
           const totalRequired =
             Number(subscriptionDetails.sellingPrice || subscriptionDetails.amount) *
             Number(subscriptionDetails.deliveryCount || 7);

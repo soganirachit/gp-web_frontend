@@ -16,7 +16,11 @@ import {
 import {
   STORE_OFFLINE_CART_BODY,
   STORE_OFFLINE_CART_TITLE,
+  STORE_OFFLINE_ORDER_BUTTON_LABEL,
 } from '../../../config/homeHeroStatusCopy';
+import {
+  shouldShowStoreOfflineHero,
+} from '../../../utils/storeOperatingHours';
 import { isOrderingBlockedByStoreOffline } from '../../../utils/homeLocationHeroState';
 import { resolveGpDailyCatalogStoreId } from '../../../utils/gpDailyCatalogStore';
 import { useOrderingStoreOffline } from '../../../hooks/useOrderingStoreOffline';
@@ -30,6 +34,7 @@ import {
 import { notifyDailyCartUpdated } from '../../../utils/dailyCartEvents';
 import { saveGpDailySubscriptionPricingSnapshot } from '../../../utils/gpDailySubscriptionPricingSnapshot';
 import { CartConfirmModal } from '../../../components/cart/CartConfirmModal';
+import { useCartUnavailableProductDialog } from '../../../hooks/useCartUnavailableProductDialog';
 import {
   SWITCH_STORE_CONFIRM_MESSAGE,
   SWITCH_STORE_CONFIRM_TITLE,
@@ -76,6 +81,7 @@ import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
 import { formatCartDeliveryAddress } from '../../../utils/formatCartDeliveryAddress';
 import { errorMessageFromCatch, isCartLineUnavailableMessage } from '../../../utils/apiErrorMessage';
+import { presentCheckoutFailure } from '../../../utils/presentCheckoutFailure';
 import {
   extractCartStockApiMessage,
   formatCartStockInlineMessage,
@@ -707,7 +713,7 @@ const Cart: React.FC = () => {
       if (promoCode) {
         setAppliedPromoCode(promoCode);
         setPromoDiscount(promoDiscountFromDailyCart(cart));
-      } else if (!appliedPromoCodeRef.current) {
+      } else {
         setAppliedPromoCode(null);
         setPromoDiscount(0);
       }
@@ -837,6 +843,12 @@ const Cart: React.FC = () => {
               : null,
         customizedMessage: undefined as any,
         categorySlug: String(p?.category_slug ?? ''),
+        isAvailable: anyIt?.is_available !== false && p?.is_available !== false && p?.is_active !== false,
+        unavailableReason:
+          anyIt?.unavailable_reason ??
+          (p?.is_available === false || p?.is_active === false
+            ? 'This product is currently unavailable.'
+            : null),
       };
     });
   }, [dailyCart]);
@@ -933,7 +945,6 @@ const Cart: React.FC = () => {
   const [showPromoModal, setShowPromoModal] = useState(false);
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const appliedPromoCodeRef = useRef<string | null>(null);
-  const promoTotalsRefreshSigRef = useRef<string | null>(null);
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState<number>(0);
   const [promoInlineMessage, setPromoInlineMessage] = useState<{
@@ -981,7 +992,7 @@ const Cart: React.FC = () => {
   }, [deliveryFrequency, selectedDays, weekDays]);
 
   const hasStaleDailyLine = useMemo(
-    () => items.some((it) => lineCartStaleByItemId[it.id]),
+    () => items.some((it) => it.isAvailable === false || lineCartStaleByItemId[it.id]),
     [items, lineCartStaleByItemId],
   );
 
@@ -1285,40 +1296,9 @@ const Cart: React.FC = () => {
     }
   };
 
-  // Automatically remove applied promo when leaving the basket page
   useEffect(() => {
     appliedPromoCodeRef.current = appliedPromoCode;
   }, [appliedPromoCode]);
-
-  useEffect(() => {
-    return () => {
-      if (appliedPromoCodeRef.current) {
-        removeCouponAPI().catch((err) => {
-          console.error('Failed to auto-remove promo code on navigation:', err);
-        });
-      }
-    };
-  }, []);
-
-  // Remove promo when basket contents change (user must re-apply on updated basket).
-  useEffect(() => {
-    const sig = itemsSignature;
-    const prev = promoTotalsRefreshSigRef.current;
-    promoTotalsRefreshSigRef.current = sig;
-    if (!isLoggedIn || !prev || prev === sig) return;
-    if (!appliedPromoCodeRef.current) return;
-
-    const id = window.setTimeout(() => {
-      void (async () => {
-        await removeCouponAPI().catch(() => {});
-        setAppliedPromoCode(null);
-        appliedPromoCodeRef.current = null;
-        setPromoDiscount(0);
-        await refreshDailyCart();
-      })();
-    }, 200);
-    return () => clearTimeout(id);
-  }, [isLoggedIn, itemsSignature, refreshDailyCart]);
 
   // Preload Razorpay SDK when basket opens so checkout is not blocked on first load
   useEffect(() => {
@@ -1497,7 +1477,7 @@ const Cart: React.FC = () => {
 
         const operational = await storeService.getNearestStore(coords.lat, coords.lng);
         if (cancelled) return;
-        if (operational) {
+        if (operational && !shouldShowStoreOfflineHero(operational)) {
           setDeliveryStoreOffline(false);
           if (cartStoreId != null && operational.id !== cartStoreId) {
             const currentRow = storesList.find((s) => s.id === cartStoreId);
@@ -1529,7 +1509,7 @@ const Cart: React.FC = () => {
           deliveryStoreSyncKey.current = key;
           return;
         }
-        if (nearestAny.is_online === false) {
+        if (shouldShowStoreOfflineHero(nearestAny)) {
           setDeliveryStoreOffline(true);
           deliveryStoreSyncKey.current = key;
           return;
@@ -1935,6 +1915,29 @@ const Cart: React.FC = () => {
     }
   };
 
+  const removeUnavailableLine = useCallback(async (itemId: string) => {
+    const toRemove = items.find((it) => it.id === itemId);
+    const dailyCartItemId = Number((toRemove as any)?.apiCartItemId ?? itemId);
+    if (Number.isFinite(dailyCartItemId) && dailyCartItemId > 0) {
+      await subscriptionCartService.removeItem(dailyCartItemId);
+    }
+    await refreshDailyCart();
+  }, [items, refreshDailyCart]);
+
+  const unavailableCartLines = useMemo(
+    () =>
+      items.map((it) => ({
+        id: it.id,
+        name: it.name,
+        isUnavailable: it.isAvailable === false || Boolean(lineCartStaleByItemId[it.id]),
+      })),
+    [items, lineCartStaleByItemId],
+  );
+  const { modal: unavailableProductModal } = useCartUnavailableProductDialog(
+    unavailableCartLines,
+    removeUnavailableLine,
+  );
+
   const handleEditAddress = () => {
     navigate(`${basePath}/address-selection`, { state: { fromCart: true } });
   };
@@ -2150,13 +2153,15 @@ const Cart: React.FC = () => {
       });
       return;
     } catch (e: unknown) {
-      const msg = errorMessageFromCatch(e, 'Checkout failed');
-      if (isCartLineUnavailableMessage(msg)) {
-        toast.error('Remove unavailable items from your basket before checkout.');
-        void refreshDailyCart();
-      } else {
-        setCheckoutInlineError(msg);
-      }
+      presentCheckoutFailure({
+        error: e,
+        fallback: 'Checkout failed',
+        setDeliveryStoreOffline,
+        setCheckoutInlineError,
+        onUnavailableLines: () => {
+          void refreshDailyCart();
+        },
+      });
       return;
     } finally {
       setIsProcessingPayment(false);
@@ -2425,7 +2430,7 @@ const Cart: React.FC = () => {
             <>
               {/* Product Items */}
               {items.map((item) => {
-                const lineStale = lineCartStaleByItemId[item.id];
+                const lineStale = item.isAvailable === false || lineCartStaleByItemId[item.id];
                 return (
                 <div
                   key={item.id}
@@ -2440,17 +2445,8 @@ const Cart: React.FC = () => {
                     <IoTrashOutline className="h-[15px] w-[15px]" aria-hidden />
                   </button>
 
-                  {lineStale ? (
-                    <div
-                      className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[1px]"
-                      aria-hidden
-                    >
-                      <p className="text-center text-base font-semibold text-red-600">Out of stock</p>
-                    </div>
-                  ) : null}
-
                   <div
-                    className={`flex items-stretch gap-3 ${lineStale ? 'pointer-events-none select-none opacity-40' : ''}`}
+                    className={`flex items-stretch gap-3 ${lineStale ? 'pointer-events-none select-none' : ''}`}
                   >
                     <button
                       type="button"
@@ -2837,6 +2833,14 @@ const Cart: React.FC = () => {
               )}
 
               {/* Checkout */}
+              {checkoutInlineError ? (
+                <div
+                  className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700"
+                  role="alert"
+                >
+                  {checkoutInlineError}
+                </div>
+              ) : null}
               <button
                 onClick={handleCheckout}
                 disabled={
@@ -2857,13 +2861,10 @@ const Cart: React.FC = () => {
                   ? 'Confirming your order…'
                   : isProcessingPayment
                     ? 'Preparing payment…'
-                    : 'Subscribe'}
+                    : storeOfflineBlocked
+                      ? STORE_OFFLINE_ORDER_BUTTON_LABEL
+                      : 'Subscribe'}
               </button>
-              {checkoutInlineError ? (
-                <p className="mt-2 text-center text-xs font-medium text-red-600">
-                  {checkoutInlineError}
-                </p>
-              ) : null}
             </>
           </div>
         )}
@@ -2879,6 +2880,7 @@ const Cart: React.FC = () => {
         onCancel={cancelSuggestedStoreSwitchModal}
         titleId="gp-daily-switch-store-title"
       />
+      {unavailableProductModal}
 
       <CartConfirmModal
         open={subscriptionStoreChangePrompt != null}

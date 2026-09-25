@@ -1,4 +1,8 @@
 import type { Subscription } from "../services/subscription.service";
+import {
+  isSubscriptionPausedForInsufficientWallet,
+  isSubscriptionPausedForStoreOffline,
+} from "./gpDailySubscriptionWalletPause";
 
 function subscriptionId(sub: Record<string, unknown>): string {
   return String(sub.id ?? sub.subscription_id ?? sub.subscriptionId ?? "").trim();
@@ -14,6 +18,8 @@ function getPauseReason(sub: Record<string, unknown>): string {
 
 export function shouldAutoResumeSubscription(sub: Record<string, unknown>): boolean {
   if (normalizeStatus(sub) !== "paused") return false;
+  if (isSubscriptionPausedForInsufficientWallet(sub)) return false;
+  if (isSubscriptionPausedForStoreOffline(sub)) return false;
   const reason = getPauseReason(sub).toLowerCase();
   if (reason.includes("wallet") || reason.includes("insufficient")) return false;
   const raw = sub.paused_until_date ?? sub.pausedUntilDate;

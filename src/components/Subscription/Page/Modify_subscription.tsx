@@ -15,6 +15,7 @@ import {
 } from "../../../components/daily/InsufficientWalletModal";
 import { REQUIRED_TOAST } from "../../../constants/requiredToastMessages";
 import { rechargeWalletInApp } from "../../../utils/walletRechargeCheckout";
+import { pausedSubscriptionUpdateToast } from "../../../utils/gpDailySubscriptionWalletPause";
 
 const WEEK_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
@@ -84,6 +85,8 @@ const ModifySubscription: React.FC = () => {
 
   const formatQty = (q: number) =>
     Number.isFinite(q) ? (Number.isInteger(q) ? String(q) : String(q)) : "1";
+
+  const pausedUpdateMessage = pausedSubscriptionUpdateToast(subscription);
 
   useEffect(() => {
     if (!subscriptionFromNav?.id) {
@@ -311,6 +314,12 @@ const ModifySubscription: React.FC = () => {
   const handleSaveChanges = async () => {
     if (!subscription) return;
 
+    const blocked = pausedUpdateMessage;
+    if (blocked) {
+      toast.error(blocked, { id: blocked });
+      return;
+    }
+
     if (deliveryType === "custom" && selectedDays.length < 3) {
       toast.error("Please select at least 3 delivery days");
       return;
@@ -406,7 +415,7 @@ const ModifySubscription: React.FC = () => {
 
       await subscriptionService.updateSubscription(subscription.id, updateBody);
 
-      toast.success("Subscription updated successfully!");
+      toast.success(REQUIRED_TOAST.SUBSCRIPTION_UPDATED);
       navigate("/gp-daily/manage-my-subscription");
     } catch (error: unknown) {
       console.error("Error updating subscription:", error);
@@ -455,6 +464,15 @@ const ModifySubscription: React.FC = () => {
             Modify Subscription
           </h1>
         </header>
+
+        {pausedUpdateMessage ? (
+          <div
+            className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-900"
+            role="status"
+          >
+            {pausedUpdateMessage}
+          </div>
+        ) : null}
 
         {/* Packs in this subscription */}
         <section className="mb-5">
@@ -674,7 +692,11 @@ const ModifySubscription: React.FC = () => {
           <button
             type="button"
             onClick={handleSaveChanges}
-            disabled={isUpdating || (hasCostIncrease && walletShortageDetails != null)}
+            disabled={
+              isUpdating ||
+              Boolean(pausedUpdateMessage) ||
+              (hasCostIncrease && walletShortageDetails != null)
+            }
             className="flex-1 rounded-xl py-3.5 text-sm font-bold text-black transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
             style={{ backgroundColor: primary }}
           >

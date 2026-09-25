@@ -35,9 +35,9 @@ export function messageFromGeolocationPositionError(
         ? REQUIRED_TOAST.TURN_ON_LOCATION
         : REQUIRED_TOAST.LOCATION_PERMISSION_DENIED_STILL_MANUAL;
     case 2:
-      return REQUIRED_TOAST.FAILED_GET_LOCATION;
+      return GEO_MSG_UNAVAILABLE;
     case 3:
-      return REQUIRED_TOAST.FAILED_GET_LOCATION;
+      return GEO_MSG_TIMEOUT;
     default:
       return REQUIRED_TOAST.FAILED_GET_LOCATION;
   }
