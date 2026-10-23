@@ -8,8 +8,12 @@ import { MdLocationOn, MdKeyboardArrowDown, MdAccessTime } from 'react-icons/md'
 import { FaLeaf, FaUsers, FaBox } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { addressService } from '../services/address.service';
-import { pickHomeCatalogHeaderAddress, formatSavedAddressLine } from '../utils/resolveHomeCatalogHeaderAddress';
-import { guestHasSavedBrowseAddress } from '../utils/guestAddressEntry';
+import { pickSessionHeaderAddress, formatSavedAddressLine } from '../utils/resolveHomeCatalogHeaderAddress';
+import { LOCATION_SESSION_UPDATED_EVENT, isGuestLocationFrozen } from '../utils/locationSession';
+import {
+  guestAddressFormNavState,
+  guestHasSavedBrowseAddress,
+} from '../utils/guestAddressEntry';
 import { GP_OPEN_GUEST_AREA_MODAL_EVENT } from '../config/guestAreaModalCopy';
 import { markLandingAddressReturn } from '../utils/applySharedBrowseDeliveryAddress';
 import { storeService, GUEST_STORE_UPDATED_EVENT, GPS_CATALOG_LOCATION_UPDATED_EVENT } from '../services/store.service';
@@ -43,9 +47,9 @@ import {
 import locationhomeIcon from '../assets/svg/gp_daily svg/locationhome.svg';
 import { SOCIAL_URLS } from '../config/socialUrls';
 import {
-  fetchGuestDeviceLocationLabel,
   GUEST_HEADER_LOCATION_TITLE,
   GUEST_LOCATION_UNAVAILABLE_HINT,
+  resolveGuestHeaderLocationLabel,
 } from '../utils/guestHeaderLocation';
 import {
   landingService,
@@ -120,26 +124,34 @@ const HomePage: React.FC = () => {
   // Function to fetch the latest address from API (only when logged in — avoids wrong JWT for guests)
   const fetchLatestAddress = useCallback(async () => {
     if (!isLoggedIn) {
-      setAddressType(GUEST_HEADER_LOCATION_TITLE);
-      setDeliveryLocation('');
+      if (isGuestLocationFrozen()) {
+        const guestAddr = storeService.getGuestBrowseAddress();
+        if (guestAddr) {
+          setAddressType(guestAddr.label?.trim() || 'Location');
+          setDeliveryLocation(guestAddr.formattedLine);
+          setIsLoadingAddress(false);
+          return;
+        }
+      }
       setIsLoadingAddress(true);
-      const label = await fetchGuestDeviceLocationLabel();
-      setDeliveryLocation(label);
+      const header = await resolveGuestHeaderLocationLabel();
+      setAddressType(header.title);
+      setDeliveryLocation(header.line);
       setIsLoadingAddress(false);
       return;
     }
     try {
       setIsLoadingAddress(true);
       const addresses = await addressService.getAllAddresses();
-      const selectedAddress = pickHomeCatalogHeaderAddress(addresses);
+      const selectedAddress = pickSessionHeaderAddress(addresses);
 
       if (selectedAddress) {
         const formattedAddress = formatSavedAddressLine(selectedAddress);
         setDeliveryLocation(formattedAddress);
         setAddressType(selectedAddress.type || 'Home');
       } else {
-        setDeliveryLocation('');
-        setAddressType('Home');
+        setAddressType(GUEST_HEADER_LOCATION_TITLE);
+        setDeliveryLocation(localStorage.getItem('userLocation') || '');
       }
     } catch (error) {
       console.error('Error fetching address:', error);
@@ -161,9 +173,11 @@ const HomePage: React.FC = () => {
 
     window.addEventListener('addressUpdated', handleAddressUpdate);
     window.addEventListener(GPS_CATALOG_LOCATION_UPDATED_EVENT, handleAddressUpdate);
+    window.addEventListener(LOCATION_SESSION_UPDATED_EVENT, handleAddressUpdate);
     return () => {
       window.removeEventListener('addressUpdated', handleAddressUpdate);
       window.removeEventListener(GPS_CATALOG_LOCATION_UPDATED_EVENT, handleAddressUpdate);
+      window.removeEventListener(LOCATION_SESSION_UPDATED_EVENT, handleAddressUpdate);
     };
   }, [fetchLatestAddress]);
 
@@ -199,12 +213,11 @@ const HomePage: React.FC = () => {
     markLandingAddressReturn();
     if (!isLoggedIn) {
       if (guestHasSavedBrowseAddress()) {
-        navigate('/gp-store/login', {
-          state: {
-            from: '/home',
-            returnUrl: '/gp-store/address-selection',
+        navigate('/gp-store/address-selection', {
+          state: guestAddressFormNavState({
             fromLandingHome: true,
-          },
+            returnUrl: '/home',
+          }),
         });
         return;
       }

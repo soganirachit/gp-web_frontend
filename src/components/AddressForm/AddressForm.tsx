@@ -112,7 +112,11 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
       }
       navigate("/addresses");
     } catch (error) {
-      toast.error("Failed to save address");
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to save address",
+      );
     } finally {
       setLoading(false);
     }

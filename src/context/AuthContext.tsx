@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { storeService } from '../services/store.service';
+import { resetLocationSession } from '../utils/locationSession';
 
 interface AuthContextType {
   isLoggedIn: boolean;
@@ -53,8 +54,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoggedIn(true);
     setPhoneNumber(phone);
 
-    // Clear temporary store ID when user logs in
     storeService.clearTemporaryStoreId();
+    resetLocationSession();
   };
 
   const logout = async () => {
@@ -63,6 +64,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setIsLoggedIn(false);
     setPhoneNumber(null);
+    resetLocationSession();
+    storeService.clearGuestBrowseAddress();
 
     if (!result.success) {
       console.warn('Logout API call had issues, but local logout completed:', result.message);

@@ -53,17 +53,42 @@ function pickLineItemsForDailyTotal(
   return detailLines;
 }
 
+/** Wallet may go this far negative; generation and charge stop at this floor. */
+export const GP_DAILY_WALLET_NEGATIVE_LIMIT = 100;
+
+function couponDiscountRupees(
+  sub: Subscription | null | undefined,
+  mergedExtra?: Record<string, unknown> | null,
+): number {
+  const m = {
+    ...((sub ?? {}) as unknown as Record<string, unknown>),
+    ...(mergedExtra ?? {}),
+  };
+  const n = Number(sub?.couponDiscount ?? m.coupon_discount ?? m.couponDiscount ?? 0);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 /** Per-day subscription unit (₹) for GP Daily low-balance / “order on hold” rules — mirrors mobile `GpDailyHomeScreen`. */
 export function pickActiveSubscriptionDailyUnitRupees(
   sub: Subscription | null | undefined,
   mergedExtra?: Record<string, unknown> | null,
 ): number {
+  const shownDaily = Number(
+    (sub as { dailyAmount?: number } | null | undefined)?.dailyAmount
+      ?? (mergedExtra as Record<string, unknown> | null | undefined)?.daily_amount
+      ?? (mergedExtra as Record<string, unknown> | null | undefined)?.dailyAmount,
+  );
+  if (Number.isFinite(shownDaily) && shownDaily > 0) {
+    return shownDaily;
+  }
+
   const lineItems = pickLineItemsForDailyTotal(sub, mergedExtra);
   if (lineItems.length > 0) {
     const productTotal = sumDailyProductFromLineItems(lineItems);
     if (productTotal > 0) {
       const fee = resolveDeliveryFeeRupees(sub, mergedExtra);
-      return fee > 0 ? productTotal + fee : productTotal;
+      const gross = fee > 0 ? productTotal + fee : productTotal;
+      return Math.max(0, gross - couponDiscountRupees(sub, mergedExtra));
     }
   }
 
@@ -280,7 +305,7 @@ function computeWalletRunway(
     const cost = costForCalendarDay(ctxs, d);
     if (cost <= 0) continue;
 
-    if (remaining >= cost) {
+    if (remaining + GP_DAILY_WALLET_NEGATIVE_LIMIT >= cost) {
       remaining -= cost;
       lastCoveredDate = d;
     } else {
@@ -439,8 +464,10 @@ export function computeGpDailyWalletBanner(
   }
 
   const todayCost = skipToday ? 0 : costForCalendarDay(ctxs, today);
-  const cannotCoverToday = todayCost > 0 && balance < todayCost;
-  const belowOneDayTotal = oneDayTotal > 0 && balance < oneDayTotal;
+  const cannotCoverToday =
+    todayCost > 0 && balance + GP_DAILY_WALLET_NEGATIVE_LIMIT < todayCost;
+  const belowOneDayTotal =
+    oneDayTotal > 0 && balance + GP_DAILY_WALLET_NEGATIVE_LIMIT < oneDayTotal;
 
   const { lastCoveredDate, firstUncoveredDeliveryDate } = computeWalletRunway(
     balance,

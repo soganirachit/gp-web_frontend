@@ -4,6 +4,7 @@ import { storeService, notifyGpsCatalogLocationUpdated } from "../services/store
 import { cartService } from "../services/cart.service";
 import { applyGpDailyBrowseDeliveryAddress } from "./gpDailyAddressStoreChange";
 import { formatSavedAddressLine } from "./resolveHomeCatalogHeaderAddress";
+import { markManualSavedAddress, setLocationSession } from "./locationSession";
 
 const LANDING_ADDRESS_RETURN_KEY = "gpLandingAddressReturn";
 
@@ -66,6 +67,7 @@ export async function applySharedBrowseDeliveryAddress(
   }
 
   persistSelectedBrowseAddress(address);
+  markManualSavedAddress(address);
 
   try {
     await applyGpDailyBrowseDeliveryAddress(address);
@@ -79,6 +81,7 @@ export async function applySharedBrowseDeliveryAddress(
     );
     if (cov.isValid) {
       const store = await storeService.getSelectableNearestStore(lat, lng);
+      setLocationSession({ storeId: store?.id ?? null }, false);
       if (store) {
         const current = storeService.getSelectedStoreId();
         if (current !== store.id) {
@@ -90,6 +93,8 @@ export async function applySharedBrowseDeliveryAddress(
           await storeService.switchStore(store.id);
         }
       }
+    } else {
+      setLocationSession({ storeId: null }, false);
     }
   } catch {
     /* Store may be outside radius — keep the selected address */

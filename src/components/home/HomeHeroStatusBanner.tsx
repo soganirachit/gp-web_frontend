@@ -1,95 +1,150 @@
 import React from "react";
-import { IoChevronForward, IoLocationOutline } from "react-icons/io5";
+import { IoLocationOutline } from "react-icons/io5";
 import { OPTIMIZED_ILLUSTRATIONS } from "../../config/optimizedIllustrations";
 import {
-  AREA_COMING_SOON_HERO_SUBTITLE,
-  AREA_COMING_SOON_HERO_TITLE,
-  STORE_OFFLINE_HERO_SUBTITLE,
-  STORE_OFFLINE_HERO_TITLE,
-  type HomeHeroStatusVariant,
+  AREA_COMING_SOON_HINT,
+  AREA_COMING_SOON_MESSAGE,
+  comingSoonGreeting,
 } from "../../config/homeHeroStatusCopy";
+import {
+  GP_DAILY_OFFLINE_HINT,
+  GP_DAILY_OFFLINE_MESSAGE,
+  gpDailyOfflineGreeting,
+} from "../../config/gpDailyOfflineHeroCopy";
+import {
+  gpDailyHome,
+  GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS,
+  GP_DAILY_SCOOTER_HERO_IMG_CLASS,
+  GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS,
+  GP_STORE_HERO_TRUCK_COPY_PAD_CLASS,
+  GP_STORE_HERO_TRUCK_IMG_CLASS,
+  GP_STORE_HERO_TRUCK_WRAPPER_CLASS,
+} from "../../utils/gpDailyHomeDesignSystem";
+import type { HomeHeroStatusVariant } from "../../config/homeHeroStatusCopy";
 
 type Props = {
   variant: HomeHeroStatusVariant;
   onChangeLocation?: () => void;
   className?: string;
-  /** Match GP Daily home `font-serif` headings. */
+  /** Match GP Daily home scooter hero; Store uses the truck. */
   typography?: "default" | "daily";
+  userFirstName?: string;
+  isLoggedIn?: boolean;
 };
+
+function ScooterGroundLines() {
+  return (
+    <div
+      className="pointer-events-none absolute bottom-0 right-1 flex items-end gap-2.5"
+      aria-hidden
+    >
+      <span className="h-0.5 w-9 rounded-full bg-[#E8985E]/85" />
+      <span className="mb-0.5 h-0.5 w-[3.25rem] rounded-full bg-[#E8985E]/85" />
+    </div>
+  );
+}
 
 export const HomeHeroStatusBanner: React.FC<Props> = ({
   variant,
   onChangeLocation,
   className = "",
   typography = "default",
+  userFirstName = "",
+  isLoggedIn = false,
 }) => {
-  const isDailyTypography = typography === "daily";
+  const isDaily = typography === "daily";
   const isOffline = variant === "store_offline";
-  const title = isOffline ? STORE_OFFLINE_HERO_TITLE : AREA_COMING_SOON_HERO_TITLE;
-  const subtitle = isOffline
-    ? STORE_OFFLINE_HERO_SUBTITLE
-    : AREA_COMING_SOON_HERO_SUBTITLE;
+  const title = isOffline
+    ? gpDailyOfflineGreeting(userFirstName)
+    : comingSoonGreeting(userFirstName);
+  const message = isOffline ? GP_DAILY_OFFLINE_MESSAGE : AREA_COMING_SOON_MESSAGE;
+  const hint = isOffline ? GP_DAILY_OFFLINE_HINT : AREA_COMING_SOON_HINT;
+  const clickable = !isOffline && !!onChangeLocation;
 
   const inner = (
-    <>
-      <span
-        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
-          isOffline ? "bg-[#19411f]/15" : "bg-red-500/10"
-        }`}
-        aria-hidden
-      >
-        {isOffline ? (
-          <img
-            src={OPTIMIZED_ILLUSTRATIONS.truckHome}
-            alt=""
-            className="h-6 w-10 object-contain object-center"
-          />
-        ) : (
-          <IoLocationOutline className="h-6 w-6 text-red-600" />
-        )}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p
+    <div className={`relative mt-4 sm:mt-5 ${className}`}>
+      <div className="mb-2.5 flex items-center justify-between gap-2 pl-3 pr-1">
+        <h2
           className={
-            isDailyTypography
-              ? "font-serif text-[1.75rem] font-semibold leading-8 tracking-tight text-[#222222]"
-              : "text-[24px] font-bold leading-snug tracking-tight text-gray-900/95"
+            isLoggedIn ? gpDailyHome.greeting : gpDailyHome.storeHeroGreeting
           }
         >
           {title}
-        </p>
-        <p
-          className={
-            isDailyTypography
-              ? "mt-1 font-serif text-lg font-medium leading-[1.35] text-[#374151]"
-              : "mt-1 text-lg font-medium leading-[1.35] text-gray-600/90"
-          }
-        >
-          {subtitle}
-        </p>
+        </h2>
       </div>
-      {!isOffline && onChangeLocation ? (
-        <IoChevronForward
-          className="h-[18px] w-[18px] shrink-0 text-gray-800/45"
-          aria-hidden
-        />
-      ) : null}
-    </>
+
+      <div
+        className={
+          isDaily
+            ? "relative min-h-[6rem] pb-1 sm:min-h-[6.5rem]"
+            : "relative min-h-[5.5rem] sm:min-h-[6rem]"
+        }
+      >
+        <div
+          className={`relative z-10 min-w-0 ${
+            isDaily
+              ? GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS
+              : GP_STORE_HERO_TRUCK_COPY_PAD_CLASS
+          } ${gpDailyHome.namasteHeroInset}`}
+        >
+          <div className="flex min-h-7 items-start gap-2.5 text-[#222222]">
+            <IoLocationOutline
+              className={`${gpDailyHome.namasteIcon} mt-0.5 text-[#222222]`}
+              aria-hidden
+            />
+            <div className="min-w-0 flex-1">
+              <p className={gpDailyHome.namasteDetail}>{message}</p>
+              <div
+                className="my-2 h-px w-1/2 max-w-[50%] bg-[#222222]"
+                aria-hidden
+              />
+              <p className="text-xs font-normal leading-4 text-[#808080]">
+                {hint}
+                {clickable ? (
+                  <span className="ml-1 text-[#222222]/45" aria-hidden>
+                    {" "}
+                    ›
+                  </span>
+                ) : null}
+              </p>
+            </div>
+          </div>
+        </div>
+        {isDaily ? (
+          <div className={GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS}>
+            <img
+              src={OPTIMIZED_ILLUSTRATIONS.dailyScooter}
+              alt=""
+              aria-hidden
+              className={GP_DAILY_SCOOTER_HERO_IMG_CLASS}
+            />
+            <ScooterGroundLines />
+          </div>
+        ) : (
+          <div className={GP_STORE_HERO_TRUCK_WRAPPER_CLASS}>
+            <img
+              src={OPTIMIZED_ILLUSTRATIONS.truckHome}
+              alt=""
+              aria-hidden
+              className={GP_STORE_HERO_TRUCK_IMG_CLASS}
+            />
+          </div>
+        )}
+      </div>
+    </div>
   );
 
-  const stripClass = `mt-3.5 flex items-center gap-2.5 py-0.5 ${className}`;
-
-  if (!isOffline && onChangeLocation) {
+  if (clickable) {
     return (
       <button
         type="button"
         onClick={onChangeLocation}
-        className={`${stripClass} w-full text-left transition-opacity hover:opacity-80`}
+        className="w-full text-left transition-opacity hover:opacity-80"
       >
         {inner}
       </button>
     );
   }
 
-  return <div className={stripClass}>{inner}</div>;
+  return inner;
 };

@@ -9,14 +9,17 @@ import {
   Store,
 } from "../../services/store.service";
 import {
+  GUEST_AREA_MODAL_HINT,
   GUEST_AREA_MODAL_TITLE,
   guestAreaSubtitleForVariant,
   type GuestAreaModalVariant,
 } from "../../config/guestAreaModalCopy";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import { gpDailyHome } from "../../utils/gpDailyHomeDesignSystem";
 import { resolveGpDailyZoneAtLatLng } from "../../services/subscriptionZone.service";
-import { guestHasSavedBrowseAddress } from "../../utils/guestAddressEntry";
 import { peekLandingAddressReturn } from "../../utils/applySharedBrowseDeliveryAddress";
+import { markManualGuest, setLocationSession } from "../../utils/locationSession";
+import { persistGuestCityLabel } from "../../utils/guestHeaderLocation";
 
 function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace("#", "").trim();
@@ -40,17 +43,25 @@ function pickRandomStore(stores: Store[]): Store | null {
   return stores[Math.floor(Math.random() * stores.length)]!;
 }
 
-async function resolveDailyGuestStoreIdFromCityStores(
+function coordsOfStore(store: Store): { lat: number; lng: number } | null {
+  const lat = parseFloat(String(store.latitude ?? ""));
+  const lng = parseFloat(String(store.longitude ?? ""));
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
+async function resolveDailyGuestStoreFromCityStores(
   stores: Store[],
-): Promise<number | null> {
+): Promise<{ storeId: number; coords: { lat: number; lng: number } } | null> {
   const sorted = [...stores].sort((a, b) => a.name.localeCompare(b.name));
   for (const s of sorted) {
-    const lat = parseFloat(String(s.latitude ?? ""));
-    const lng = parseFloat(String(s.longitude ?? ""));
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const coords = coordsOfStore(s);
+    if (!coords) continue;
     try {
-      const r = await resolveGpDailyZoneAtLatLng(lat, lng);
-      if (r.eligible && r.storeId != null && r.storeId > 0) return r.storeId;
+      const r = await resolveGpDailyZoneAtLatLng(coords.lat, coords.lng);
+      if (r.eligible && r.storeId != null && r.storeId > 0) {
+        return { storeId: r.storeId, coords };
+      }
     } catch {
       /* try next store in city */
     }
@@ -176,8 +187,19 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
     onClose();
   };
 
-  const finalizeStore = (storeId: number) => {
+  const finalizeStore = (
+    storeId: number,
+    coords?: { lat: number; lng: number } | null,
+    cityName?: string,
+  ) => {
+    if (cityName?.trim()) persistGuestCityLabel(cityName);
+    markManualGuest(coords ?? null);
     storeService.setTemporaryStoreId(storeId);
+    if (feature === "gpDaily") {
+      setLocationSession({ dailyStoreId: storeId }, false);
+    } else {
+      setLocationSession({ storeId: storeId }, false);
+    }
     notifyGuestTemporaryStoreUpdated();
     completeWithStore();
     const fromLanding = peekLandingAddressReturn();
@@ -186,8 +208,6 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
         ? "/gp-store/address-selection"
         : "/gp-daily/address-selection";
     if (redirectToAddressAfterPick) {
-      const loginPath =
-        fromLanding || feature === "gpStore" ? "/gp-store/login" : "/gp-daily/login";
       const selectionState = {
         fromHome: true,
         guestBrowse: true,
@@ -195,12 +215,6 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
           ? { fromLandingHome: true, returnUrl: "/home" }
           : {}),
       };
-      if (guestHasSavedBrowseAddress()) {
-        navigate(loginPath, {
-          state: { returnUrl: addressPath, ...selectionState },
-        });
-        return;
-      }
       navigate(addressPath, { state: selectionState });
       return;
     }
@@ -223,8 +237,13 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
         return;
       }
       let storeId: number | null = null;
+      let coords: { lat: number; lng: number } | null = null;
       if (feature === "gpDaily") {
-        storeId = await resolveDailyGuestStoreIdFromCityStores(storesInCity);
+        const daily = await resolveDailyGuestStoreFromCityStores(storesInCity);
+        if (daily) {
+          storeId = daily.storeId;
+          coords = daily.coords;
+        }
       }
       if (storeId == null) {
         const store = pickRandomStore(storesInCity);
@@ -233,8 +252,9 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
           return;
         }
         storeId = store.id;
+        coords = coordsOfStore(store);
       }
-      finalizeStore(storeId);
+      finalizeStore(storeId, coords, city.name);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not load stores.");
     } finally {
@@ -287,7 +307,7 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
                 style={{ color: primary }}
                 aria-label="Close"
               >
-                <IoClose className="text-2xl" />
+                <IoClose className="h-5 w-5" />
               </button>
             ) : null}
 
@@ -301,30 +321,35 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.06, duration: 0.28 }}
-                className="flex items-start gap-3"
               >
-                <div
-                  className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-                  style={{ backgroundColor: hexToRgba(primary, 0.12) }}
-                  aria-hidden
+                <h2
+                  id="guest-service-area-title"
+                  className={`${gpDailyHome.storeHeroGreeting} pr-8 mb-2.5`}
                 >
-                  <IoLocationOutline className="h-5 w-5" style={{ color: primary }} />
-                </div>
-                <div className="min-w-0 flex-1 pr-2">
-                  <h2
-                    id="guest-service-area-title"
-                    className="text-lg font-bold leading-snug text-gray-900 sm:text-xl"
-                  >
-                    {GUEST_AREA_MODAL_TITLE}
-                  </h2>
-                  <motion.p
-                    className="mt-1.5 text-sm leading-relaxed text-gray-600"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1, duration: 0.28 }}
-                  >
-                    {subtitle}
-                  </motion.p>
+                  {GUEST_AREA_MODAL_TITLE}
+                </h2>
+                <div className="flex min-h-7 items-start gap-2.5 text-[#222222]">
+                  <IoLocationOutline
+                    className={`${gpDailyHome.namasteIcon} mt-0.5 shrink-0 text-[#222222]`}
+                    aria-hidden
+                  />
+                  <div className="min-w-0 flex-1 pr-2">
+                    <motion.p
+                      className={gpDailyHome.namasteDetail}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1, duration: 0.28 }}
+                    >
+                      {subtitle}
+                    </motion.p>
+                    <div
+                      className="my-2 h-px w-1/2 max-w-[50%] bg-[#222222]"
+                      aria-hidden
+                    />
+                    <p className="text-xs font-normal leading-4 text-[#808080]">
+                      {GUEST_AREA_MODAL_HINT}
+                    </p>
+                  </div>
                 </div>
               </motion.div>
             </div>
@@ -390,7 +415,7 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
                         type="button"
                         disabled={loading}
                         onClick={() => void onCityPick(city)}
-                        className="w-full rounded-xl border-2 px-4 py-3 text-left text-sm font-medium text-gray-900 transition-colors disabled:opacity-60"
+                        className="w-full rounded-xl border-2 px-4 py-3 text-left transition-colors disabled:opacity-60"
                         style={{
                           backgroundColor: chrome.rowBg,
                           borderColor: chrome.borderSoft,
@@ -404,9 +429,11 @@ export const GuestServiceAreaModal: React.FC<GuestServiceAreaModalProps> = ({
                           e.currentTarget.style.borderColor = chrome.borderSoft;
                         }}
                       >
-                        <span className="block">{city.name}</span>
+                        <span className="block font-serif text-sm font-semibold leading-snug text-[#222222]">
+                          {city.name}
+                        </span>
                         {city.state ? (
-                          <span className="text-xs font-normal text-gray-500">
+                          <span className="text-xs font-normal leading-4 text-[#808080]">
                             {city.state}
                           </span>
                         ) : null}

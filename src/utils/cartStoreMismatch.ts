@@ -7,7 +7,8 @@ import {
   isSubscriptionCartStoreChangeConfirmation,
   normalizeSubscriptionCartSetAddressResponse,
 } from "../services/subscriptionCart.service";
-import { pickHomeCatalogHeaderAddress } from "./resolveHomeCatalogHeaderAddress";
+import { pickSessionHeaderAddress } from "./resolveHomeCatalogHeaderAddress";
+import { getLocationSession } from "./locationSession";
 
 export type CartChannel = "gpStore" | "gpDaily";
 
@@ -25,6 +26,8 @@ export function resolveBrowseCatalogStoreId(
   if (channel === "gpStore") {
     return storeService.getStoreIdForProducts();
   }
+  const daily = getLocationSession().dailyStoreId;
+  if (daily != null && Number.isFinite(daily) && daily > 0) return daily;
   return storeService.getTemporaryStoreId();
 }
 
@@ -75,7 +78,7 @@ export async function detectCartStoreMismatch(
 async function resolveBrowseDeliveryAddressId(): Promise<number | null> {
   try {
     const addresses = await addressService.getAllAddresses();
-    const addr = pickHomeCatalogHeaderAddress(addresses);
+    const addr = pickSessionHeaderAddress(addresses);
     const id = Number(addr?.id);
     return Number.isFinite(id) && id > 0 ? id : null;
   } catch {

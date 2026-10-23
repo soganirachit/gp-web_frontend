@@ -9,6 +9,7 @@ import {
 import { resolveGpDailyZoneAtLatLng } from "../services/subscriptionZone.service";
 import { formatSavedAddressLine } from "./resolveHomeCatalogHeaderAddress";
 import { notifyDailyCartUpdated } from "./dailyCartEvents";
+import { setLocationSession } from "./locationSession";
 
 export const GP_DAILY_ADDRESS_STORE_CHANGE_EVENT = "gp-daily-address-store-change";
 
@@ -64,6 +65,7 @@ export async function applyGpDailyBrowseDeliveryAddress(
   }
 
   storeService.setTemporaryStoreId(zone.storeId);
+  setLocationSession({ dailyStoreId: zone.storeId }, false);
 
   const addressId = Number(address.id);
   if (!Number.isFinite(addressId) || addressId <= 0) {
@@ -89,6 +91,7 @@ export async function applyGpDailyBrowseDeliveryAddress(
   const cartStoreId = cart?.store_id != null ? Number(cart.store_id) : null;
   if (cartStoreId != null && Number.isFinite(cartStoreId)) {
     storeService.setTemporaryStoreId(cartStoreId);
+    setLocationSession({ dailyStoreId: cartStoreId }, false);
     try {
       await storeService.switchStore(cartStoreId);
     } catch {
@@ -112,6 +115,7 @@ export async function confirmGpDailyAddressStoreChange(
   const cartStoreId = cart?.store_id != null ? Number(cart.store_id) : null;
   if (cartStoreId != null && Number.isFinite(cartStoreId)) {
     storeService.setTemporaryStoreId(cartStoreId);
+    setLocationSession({ dailyStoreId: cartStoreId }, false);
     try {
       await storeService.switchStore(cartStoreId);
     } catch {

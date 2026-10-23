@@ -1,4 +1,8 @@
 import type { Address } from "../services/address.service";
+import {
+  pickSavedAddressNearGps,
+  SAVED_ADDRESS_MATCH_METERS,
+} from "./pickSavedAddressNearGps";
 
 /** Synthetic id for the live GPS row on choose-location (not a backend address). */
 export const LIVE_DEVICE_ADDRESS_ID = "__gf_live_device__";
@@ -14,41 +18,14 @@ export function parseAddressCoordinates(
   return { lat: parts[0], lng: parts[1] };
 }
 
-function distanceMeters(
-  a: { lat: number; lng: number },
-  b: { lat: number; lng: number },
-): number {
-  const R = 6371000;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat);
-  const lat2 = toRad(b.lat);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-
-/** Match GPS pin to a saved address when within ~120m (same building / pin drop). */
+/** Match GPS pin to a saved address when within ~120m (closest, default tie, A–Z). */
 export function findSavedAddressAtCoordinates(
   lat: number,
   lng: number,
   addresses: Address[],
-  maxMeters = 120,
+  maxMeters = SAVED_ADDRESS_MATCH_METERS,
 ): Address | null {
-  let best: Address | null = null;
-  let bestDist = maxMeters;
-  for (const addr of addresses) {
-    const c = parseAddressCoordinates(addr.coordinates);
-    if (!c) continue;
-    const d = distanceMeters({ lat, lng }, c);
-    if (d <= bestDist) {
-      bestDist = d;
-      best = addr;
-    }
-  }
-  return best;
+  return pickSavedAddressNearGps(lat, lng, addresses, maxMeters);
 }
 
 /** If live GPS matches a saved address, use the saved row (real delivery_address_id). */

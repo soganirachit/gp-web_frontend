@@ -1,14 +1,23 @@
 import { storeService } from "../services/store.service";
 import { subscriptionCartService } from "../services/subscriptionCart.service";
+import {
+  dailyCatalogStoreIdFromSession,
+  getLocationSession,
+} from "./locationSession";
 
 /**
- * GP Daily product/category APIs: prefer subscription cart `store_id` (zone from delivery
- * address). Otherwise use the guest/area temporary store only — not GP Store “selected store”
- * from account settings (`selectedStoreId`).
+ * GP Daily product/category APIs: prefer the session Daily zone store, then
+ * subscription cart `store_id`. Do not fall back to GP Store leftover temp
+ * while the session has a pin (Store-yes / Daily-no).
  */
 export async function resolveGpDailyCatalogStoreId(): Promise<number | undefined> {
+  const fromSession = dailyCatalogStoreIdFromSession(
+    getLocationSession(),
+    storeService.getTemporaryStoreId(),
+  );
+  if (fromSession != null) return fromSession;
   const token = localStorage.getItem("access_token");
-  if (token) {
+  if (token && !getLocationSession().lat && !getLocationSession().lng) {
     try {
       const cart = await subscriptionCartService.getDailyCart();
       const cid = cart?.store_id;
@@ -17,8 +26,7 @@ export async function resolveGpDailyCatalogStoreId(): Promise<number | undefined
       /* cart fetch optional — fall through */
     }
   }
-  const temp = storeService.getTemporaryStoreId();
-  return temp ?? undefined;
+  return undefined;
 }
 
 /**
@@ -29,14 +37,12 @@ export async function resolveGpDailyOfflineStoreCandidates(
   zoneStoreId?: number | null,
   extraStoreIds: number[] = [],
 ): Promise<{ primaryStoreId: number | null; storeIds: number[] }> {
-  const fromProducts = storeService.getStoreIdForProducts();
   const fromCatalog = await resolveGpDailyCatalogStoreId().catch(() => undefined);
-  const tempStoreId = storeService.getTemporaryStoreId();
+  const dailyLive = getLocationSession().dailyStoreId;
   const storeIds = [
-    fromProducts,
     fromCatalog,
+    dailyLive,
     zoneStoreId,
-    tempStoreId,
     ...extraStoreIds,
   ].filter(
     (id): id is number =>
@@ -44,7 +50,7 @@ export async function resolveGpDailyOfflineStoreCandidates(
   );
   const uniqueIds = [...new Set(storeIds.map(Number))];
   return {
-    primaryStoreId: fromProducts ?? fromCatalog ?? zoneStoreId ?? null,
+    primaryStoreId: fromCatalog ?? dailyLive ?? zoneStoreId ?? null,
     storeIds: uniqueIds,
   };
 }

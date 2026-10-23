@@ -2,6 +2,7 @@ import type { Address } from "../services/address.service";
 import { composeCompleteAddress } from "../services/address.service";
 import { storeService } from "../services/store.service";
 import { sanitizeAddressDisplayPart } from "./formatCartDeliveryAddress";
+import { getLocationSession } from "./locationSession";
 
 export function formatSavedAddressLine(address: Address): string {
   const line = composeCompleteAddress(address.houseNo, address.streetName);
@@ -53,4 +54,34 @@ export function pickHomeCatalogHeaderAddress(
       new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   );
   return sorted[0] ?? null;
+}
+
+/**
+ * Header address from the Auto/Manual session pin.
+ * Auto GPS with no saved match returns null (caller shows “Current location”).
+ */
+export function pickSessionHeaderAddress(
+  addresses: Address[],
+): Address | null {
+  const session = getLocationSession();
+  if (session.addressId) {
+    const fromSession = addresses.find(
+      (a) => String(a.id) === String(session.addressId),
+    );
+    if (fromSession) return fromSession;
+  }
+  if (
+    session.mode === "auto" &&
+    session.lat != null &&
+    session.lng != null &&
+    !session.addressId
+  ) {
+    return null;
+  }
+  if (session.mode === "manual") {
+    return pickHomeCatalogHeaderAddress(addresses);
+  }
+  const defaultAddress = addresses.find((addr) => addr.isDefault);
+  if (defaultAddress) return defaultAddress;
+  return pickHomeCatalogHeaderAddress(addresses);
 }

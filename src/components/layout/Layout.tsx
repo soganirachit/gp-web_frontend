@@ -3,6 +3,8 @@ import { useLocation } from "react-router-dom";
 import BottomNav from "./BottomNav";
 import { WebOrderPushBridge } from "./WebOrderPushBridge";
 import { GuestStoreLocationBootstrap } from "../store/GuestStoreLocationBootstrap";
+import { LocationSessionHost } from "../location/LocationSessionHost";
+import { GpDailyAddressStoreChangeHost } from "../daily/GpDailyAddressStoreChangeHost";
 import { FeatureThemeProvider } from "../../context/FeatureThemeContext";
 import { FadingOutlet } from "../common/PageFade";
 import { trackPageView } from "../../lib/metaPixel";
@@ -102,6 +104,8 @@ const Layout: React.FC = () => {
       data-testid="gp-root-layout"
     >
       <GuestStoreLocationBootstrap />
+      <LocationSessionHost />
+      <GpDailyAddressStoreChangeHost />
       {/* Fixed Header - Hide on auth routes */}
       {/* {!isAuthRoute && <FixedHeader />} */}
 

@@ -6,9 +6,18 @@ import { IoArrowBack } from "react-icons/io5";
 import { toast } from "react-hot-toast";
 import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
 import { addressService, Address, stripUnknownAddressToken } from "../../services/address.service";
-import { GoogleMap } from "@react-google-maps/api";
+import { GoogleMap, Autocomplete } from "@react-google-maps/api";
 import { useGoogleMaps } from "../../hooks/useGoogleMaps";
 import { GOOGLE_MAP_TOUCH_PAN_OPTIONS } from "../../utils/googleMapTouchPanOptions";
+import {
+  ONBOARDING_STYLE_PLACES_AUTOCOMPLETE_OPTIONS,
+  attachPlacesAutocompleteToMapBounds,
+  panMapToPlaceResult,
+} from "../../utils/googlePlacesAutocompleteConfig";
+import {
+  GP_MAP_SEARCH_INPUT_CLASSES,
+  MapSearchEndIcon,
+} from "../common/SearchBar";
 import ReactDOM from "react-dom/client";
 import { orderService } from "../../services/order.service";
 import { subscriptionService } from "../../services/subscription.service";
@@ -28,6 +37,8 @@ import {
   peekLandingAddressReturn,
 } from "../../utils/applySharedBrowseDeliveryAddress";
 import {
+  GUEST_EDIT_DELIVERY_SUBTITLE,
+  GUEST_EDIT_DELIVERY_TITLE,
   GUEST_NEAREST_STORE_PREFIX,
   GUEST_NOT_SERVICEABLE_BODY,
   GUEST_NOT_SERVICEABLE_TITLE,
@@ -73,7 +84,11 @@ import {
   InsufficientWalletModal,
   type InsufficientWalletDetails,
 } from "../daily/InsufficientWalletModal";
-import { guestHasSavedBrowseAddress } from "../../utils/guestAddressEntry";
+import {
+  formFieldsFromGuestBrowseAddress,
+  guestHasSavedBrowseAddress,
+} from "../../utils/guestAddressEntry";
+import { getSessionPin } from "../../utils/locationSession";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
 
 const AddressSelection: React.FC = () => {
@@ -81,11 +96,9 @@ const AddressSelection: React.FC = () => {
   const location = useLocation();
   const { feature, theme } = useFeatureTheme();
   const { isLoggedIn } = useAuth();
-  const isGuestBrowse =
-    (location.state as { guestBrowse?: boolean } | null)?.guestBrowse === true;
-  const guestAlreadySavedAddress =
-    !isLoggedIn && guestHasSavedBrowseAddress();
-  const isGuestEntry = !isLoggedIn && !guestAlreadySavedAddress;
+  const isGuestEntry = !isLoggedIn;
+  const isGuestEditingSavedAddress =
+    isGuestEntry && guestHasSavedBrowseAddress();
   const routeState = (location.state ?? {}) as {
     fromHome?: boolean;
     fromLandingHome?: boolean;
@@ -111,6 +124,13 @@ const AddressSelection: React.FC = () => {
 
   // Map related states
   const mapRef = useRef<google.maps.Map | null>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const placesSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const placesAutocompleteMountKey = useMemo(
+    () => `${location.pathname}-${location.key}`,
+    [location.pathname, location.key],
+  );
+  const [mapSearchQuery, setMapSearchQuery] = useState("");
   const { isLoaded, loadError } = useGoogleMaps();
   const isLocationRequestInProgress = useRef(false);
   const lastToastMessage = useRef<string | null>(null);
@@ -204,6 +224,25 @@ const AddressSelection: React.FC = () => {
     if (isGuestEntry) {
       setLoading(false);
       setShowAddForm(true);
+      const snap = storeService.getGuestBrowseAddress();
+      if (snap) {
+        const fields = formFieldsFromGuestBrowseAddress(snap);
+        setFormData((prev) => ({ ...prev, ...fields }));
+        const coords = parseAddressCoordinates(snap.coordinates);
+        if (coords) setSelectedPosition(coords);
+        if (snap.formattedLine?.trim()) {
+          setMapSearchQuery(snap.formattedLine.trim());
+        }
+      } else {
+        const pin = getSessionPin();
+        if (pin) {
+          setSelectedPosition(pin);
+          setFormData((prev) => ({
+            ...prev,
+            coordinates: `${pin.lat},${pin.lng}`,
+          }));
+        }
+      }
       return;
     }
 
@@ -228,6 +267,14 @@ const AddressSelection: React.FC = () => {
 
     loadUserData();
   }, [isGuestEntry]);
+
+  useEffect(() => {
+    if (!showAddForm || !isLoaded) return;
+    const text = mapSearchQuery.trim();
+    if (!text) return;
+    const el = placesSearchInputRef.current;
+    if (el && !el.value.trim()) el.value = text;
+  }, [showAddForm, isLoaded, mapSearchQuery]);
 
   const handleAuthError = (error: Error) => {
     const isAuthError =
@@ -379,6 +426,11 @@ const AddressSelection: React.FC = () => {
             formattedLine: line || GUEST_SELECTED_LOCATION_TITLE,
             coordinates,
             label: GUEST_SELECTED_LOCATION_TITLE,
+            houseNo: String(formData.houseNo || "").trim(),
+            streetName: String(formData.streetName || "").trim(),
+            floor: String(formData.floor || "").trim(),
+            area: String(formData.area || "").trim(),
+            landmark: String(formData.landmark || "").trim(),
           },
           catalog,
         );
@@ -1233,9 +1285,78 @@ const AddressSelection: React.FC = () => {
     }
   };
 
+  const syncPlacesSearchInput = (text: string) => {
+    const el = placesSearchInputRef.current;
+    if (el) el.value = text;
+    setMapSearchQuery(text);
+  };
+
+  const clearMapSearch = () => {
+    syncPlacesSearchInput("");
+    placesSearchInputRef.current?.focus();
+  };
+
+  const applyAddressComponentsToForm = (
+    components: google.maps.GeocoderAddressComponent[] | undefined,
+    lat: number,
+    lng: number,
+    formattedAddress?: string,
+  ) => {
+    const parsed: Record<string, string> = {};
+    components?.forEach((component) => {
+      component.types.forEach((type: string) => {
+        if (type === "street_number" && !parsed.houseNo) {
+          parsed.houseNo = component.long_name;
+        }
+        if (type === "route" && !parsed.streetName) {
+          parsed.streetName = component.long_name;
+        }
+        if (
+          (type === "sublocality_level_1" ||
+            type === "sublocality" ||
+            type === "neighborhood") &&
+          !parsed.area
+        ) {
+          parsed.area = component.long_name;
+        }
+        if (type === "locality" && !parsed.city) {
+          parsed.city = component.long_name;
+        }
+        if (type === "administrative_area_level_1" && !parsed.state) {
+          parsed.state = component.long_name;
+        }
+        if (type === "postal_code" && !parsed.pincode) {
+          parsed.pincode = component.long_name;
+        }
+        if (type === "administrative_area_level_2" && !parsed.district) {
+          parsed.district = component.long_name;
+        }
+      });
+    });
+    const streetLine = [parsed.streetName, parsed.area]
+      .map((s) => String(s || "").trim())
+      .filter(Boolean)
+      .join(", ");
+    setFormData((prev) => ({
+      ...prev,
+      houseNo: parsed.houseNo || prev.houseNo,
+      streetName: streetLine || parsed.streetName || prev.streetName,
+      area: parsed.area || prev.area,
+      city: parsed.city || prev.city,
+      state: parsed.state || prev.state,
+      pincode: parsed.pincode || prev.pincode,
+      district: parsed.district || prev.district,
+      coordinates: `${lat},${lng}`,
+    }));
+    if (formattedAddress?.trim()) {
+      syncPlacesSearchInput(formattedAddress.trim());
+    }
+  };
+
   // Map related functions
   const onLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
+    attachPlacesAutocompleteToMapBounds(autocompleteRef.current, map);
   }, []);
 
   const onUnmount = useCallback(() => {
@@ -1244,45 +1365,41 @@ const AddressSelection: React.FC = () => {
 
   /** Merge Geocoding API JSON `results` into address form fields (used by GPS and map drag). */
   const applyGeocodeJsonToForm = (data: { results?: unknown[] }, lat: number, lng: number) => {
-    if (!data.results?.length) return;
-    const formattedAddress: Record<string, string> = {};
-
-    (data.results as { address_components?: google.maps.GeocoderAddressComponent[] }[]).forEach(
-      (result) => {
-        if (!result.address_components) return;
-        result.address_components.forEach((component) => {
-          component.types.forEach((type: string) => {
-            if (type === 'street_number' && !formattedAddress.houseNo) {
-              formattedAddress.houseNo = component.long_name;
-            }
-            if (type === 'route' && !formattedAddress.streetName) {
-              formattedAddress.streetName = component.long_name;
-            }
-            if (type === 'sublocality_level_1' && !formattedAddress.area) {
-              formattedAddress.area = component.long_name;
-            }
-            if (type === 'locality' && !formattedAddress.city) {
-              formattedAddress.city = component.long_name;
-            }
-            if (type === 'administrative_area_level_1' && !formattedAddress.state) {
-              formattedAddress.state = component.long_name;
-            }
-            if (type === 'postal_code' && !formattedAddress.pincode) {
-              formattedAddress.pincode = component.long_name;
-            }
-            if (type === 'administrative_area_level_2' && !formattedAddress.district) {
-              formattedAddress.district = component.long_name;
-            }
-          });
-        });
-      }
+    const first = data.results?.[0] as
+      | {
+          address_components?: google.maps.GeocoderAddressComponent[];
+          formatted_address?: string;
+        }
+      | undefined;
+    if (!first) return;
+    applyAddressComponentsToForm(
+      first.address_components,
+      lat,
+      lng,
+      first.formatted_address,
     );
+  };
 
-    setFormData((prev) => ({
-      ...prev,
-      ...formattedAddress,
-      coordinates: `${lat},${lng}`,
-    }));
+  const handlePlacesAutocompleteSelection = (
+    ac: google.maps.places.Autocomplete | null,
+  ) => {
+    if (!ac) return;
+    const place = ac.getPlace();
+    if (!place.geometry?.location) return;
+    const lat = place.geometry.location.lat();
+    const lng = place.geometry.location.lng();
+    setSelectedPosition({ lat, lng });
+    panMapToPlaceResult(place, mapRef.current);
+    applyAddressComponentsToForm(
+      place.address_components,
+      lat,
+      lng,
+      place.formatted_address || place.name,
+    );
+    setLocationValidation(null);
+    setLocationValidationShakeKey(0);
+    setShowMapLocationHint(true);
+    window.setTimeout(() => setShowMapLocationHint(false), 4000);
   };
 
   const getCurrentLocation = () => {
@@ -1399,7 +1516,11 @@ const AddressSelection: React.FC = () => {
           <>
             <UniformPageHeader
               title={
-                isGuestEntry ? "Add delivery address" : "Add New Address"
+                isGuestEditingSavedAddress
+                  ? GUEST_EDIT_DELIVERY_TITLE
+                  : isGuestEntry
+                    ? "Add delivery address"
+                    : "Add New Address"
               }
               onBack={() =>
                 isGuestEntry ? navigate(-1) : setShowAddForm(false)
@@ -1410,15 +1531,68 @@ const AddressSelection: React.FC = () => {
             {isGuestEntry ? (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                 <p className="text-sm font-semibold text-gray-900">
-                  {GUEST_ORDERING_FOR_SOMEONE_TITLE}
+                  {isGuestEditingSavedAddress
+                    ? GUEST_EDIT_DELIVERY_TITLE
+                    : GUEST_ORDERING_FOR_SOMEONE_TITLE}
                 </p>
                 <p className="mt-1 text-sm text-gray-600">
-                  {GUEST_ORDERING_FOR_SOMEONE_SUBTITLE}
+                  {isGuestEditingSavedAddress
+                    ? GUEST_EDIT_DELIVERY_SUBTITLE
+                    : GUEST_ORDERING_FOR_SOMEONE_SUBTITLE}
                 </p>
               </div>
             ) : null}
             {/* Map Section */}
-            <div className="w-full h-[200px] md:h-[300px] relative rounded-lg overflow-hidden mb-4">
+            <div className="w-full h-[280px] md:h-[340px] relative rounded-lg overflow-hidden mb-4 bg-[#F5F5DC]">
+              <div className="absolute top-3 left-3 right-3 z-30">
+                {isLoaded ? (
+                  <Autocomplete
+                    key={placesAutocompleteMountKey}
+                    options={ONBOARDING_STYLE_PLACES_AUTOCOMPLETE_OPTIONS}
+                    onLoad={(ac) => {
+                      autocompleteRef.current = ac;
+                      attachPlacesAutocompleteToMapBounds(ac, mapRef.current);
+                    }}
+                    onPlaceChanged={() =>
+                      handlePlacesAutocompleteSelection(autocompleteRef.current)
+                    }
+                  >
+                    <div className="relative">
+                      <input
+                        ref={placesSearchInputRef}
+                        type="text"
+                        placeholder="Search anything...."
+                        defaultValue=""
+                        aria-label="Search location"
+                        onChange={(e) => setMapSearchQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.preventDefault();
+                        }}
+                        className={GP_MAP_SEARCH_INPUT_CLASSES}
+                        style={
+                          {
+                            "--tw-ring-color": theme.colors.primary,
+                          } as React.CSSProperties
+                        }
+                      />
+                      <MapSearchEndIcon
+                        hasText={mapSearchQuery.trim().length > 0}
+                        onClear={clearMapSearch}
+                      />
+                    </div>
+                  </Autocomplete>
+                ) : (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Loading map..."
+                      disabled
+                      className={`${GP_MAP_SEARCH_INPUT_CLASSES} text-gray-400`}
+                    />
+                    <MapSearchEndIcon hasText={false} />
+                  </div>
+                )}
+              </div>
               {isLoaded ? (
                 <GoogleMap
                   mapContainerStyle={{
@@ -1449,7 +1623,7 @@ const AddressSelection: React.FC = () => {
                 onClick={getCurrentLocation}
                 disabled={isLocating}
                 aria-busy={isLocating}
-                className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-sm hover:bg-gray-50 disabled:opacity-60 disabled:pointer-events-none"
+                className="absolute bottom-3 left-1/2 z-20 transform -translate-x-1/2 bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-sm hover:bg-gray-50 disabled:opacity-60 disabled:pointer-events-none"
               >
                 <MdMyLocation className="text-orange-500 h-3 w-3" />
                 <span>{isLocating ? "Locating" : "Locate me"}</span>
@@ -1459,11 +1633,11 @@ const AddressSelection: React.FC = () => {
               </div>
               {showMapLocationHint && (
                 <div
-                  className="absolute top-3 left-1/2 z-30 -translate-x-1/2 max-w-[90%] rounded-full px-3 py-1.5 text-center text-xs font-medium text-white shadow-md"
+                  className="absolute top-[3.85rem] left-1/2 z-30 -translate-x-1/2 max-w-[90%] rounded-full px-3 py-1.5 text-center text-xs font-medium text-white shadow-md"
                   style={{ backgroundColor: theme.colors.primary }}
                   role="status"
                 >
-                  Location detected — adjust pin if needed
+                  Location found — adjust pin if needed
                 </div>
               )}
             </div>
@@ -1578,7 +1752,9 @@ const AddressSelection: React.FC = () => {
                   ? 'Checking delivery area...'
                   : loading
                     ? 'Saving...'
-                    : isGuestEntry
+                    : isGuestEditingSavedAddress
+                      ? "Save address"
+                      : isGuestEntry
                       ? 'Confirm address'
                       : 'Save Address'}
               </button>
@@ -1663,20 +1839,22 @@ const AddressSelection: React.FC = () => {
                     >
                       <div className="flex justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <div className="mb-2 flex items-center gap-3">
+                          <div className="mb-2 flex min-w-0 items-start gap-3">
                             <div
-                              className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${iconBgClass}`}
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${iconBgClass}`}
                             >
                               <img src={icon} alt={address.type || "Address"} className="h-5 w-5" />
                             </div>
-                            <h3 className="text-lg font-semibold capitalize text-gray-800">
-                              {address.type || "Home"}
-                            </h3>
-                            {isSelected ? (
-                              <span className="flex-shrink-0 rounded-2xl bg-[#DCFCE7] px-2 py-1 text-xs font-semibold text-[#166534]">
-                                Selected
-                              </span>
-                            ) : null}
+                            <div className="min-w-0 flex-1">
+                              <h3 className="truncate text-lg font-semibold capitalize leading-tight text-gray-800">
+                                {address.type || "Home"}
+                              </h3>
+                              {isSelected ? (
+                                <span className="mt-1 inline-flex rounded-2xl bg-[#DCFCE7] px-2 py-0.5 text-xs font-semibold leading-5 text-[#166534]">
+                                  Selected
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
                           <p className="mb-1 min-w-0 max-w-full break-words pr-2 text-sm leading-relaxed text-gray-500 line-clamp-2 [overflow-wrap:anywhere]">
                             {formatCartDeliveryAddress({
@@ -1704,7 +1882,7 @@ const AddressSelection: React.FC = () => {
                             </div>
                           ) : null}
                         </div>
-                        <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                        <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-gray-100 sm:h-28 sm:w-28">
                           {address.coordinates ? (
                             <AddressThumbnailMap coordinates={address.coordinates} />
                           ) : (

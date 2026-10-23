@@ -11,7 +11,8 @@ import {
   IoLogInOutline,
 } from 'react-icons/io5';
 import { customerService } from '@/services/getcustomer.service';
-import { storeService, Store } from '../../services/store.service';
+import { storeService, Store, storeIsWithinDeliveryRadius } from '../../services/store.service';
+import { storeAcceptsCustomerOrders } from '../../utils/storeOperatingHours';
 import { addressService } from '../../services/address.service';
 import { SettingsListSkeleton } from '../../components/common/PageSkeletons';
 import { useAuth } from '../../context/AuthContext';
@@ -471,8 +472,8 @@ const Settings: React.FC = () => {
     setDeleteBlockMessage(null);
   };
 
-  /** Backend GET /stores/ sets is_online; missing field treated as online */
-  const storeIsOnline = (store: Store) => store.is_online !== false;
+  /** Hours-closed and staff-offline stores are not selectable. */
+  const storeIsOnline = (store: Store) => storeAcceptsCustomerOrders(store);
 
   /** Parse store max radius (API may return string e.g. "10.00"). */
   const parseMaxDeliveryRadiusKm = (store: Store): number | null => {
@@ -480,17 +481,6 @@ const Settings: React.FC = () => {
     if (raw == null || raw === "") return null;
     const n = parseFloat(String(raw));
     return Number.isFinite(n) ? n : null;
-  };
-
-  /**
-   * With lat/lng, API includes distance_km. Only selectable if within store max radius (inclusive, matches backend).
-   * If distance or radius is missing, do not block (same as listing without location).
-   */
-  const storeIsWithinDeliveryRadius = (store: Store): boolean => {
-    const maxR = parseMaxDeliveryRadiusKm(store);
-    const d = store.distance_km;
-    if (maxR == null || d == null || Number.isNaN(d)) return true;
-    return d <= maxR;
   };
 
   const storeIsSelectable = (store: Store) => storeIsOnline(store) && storeIsWithinDeliveryRadius(store);

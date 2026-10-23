@@ -150,6 +150,7 @@ const ChooseLocation: React.FC = () => {
         addresses,
       );
       if (!savedMatch) {
+        await storeService.applyUseCurrentGpsForCatalog();
         navigate(`${basePath}/addresses/add`, {
           state: {
             returnUrl: returnUrl ?? `${basePath}/cart`,
@@ -158,7 +159,7 @@ const ChooseLocation: React.FC = () => {
         });
         return;
       }
-      await storeService.applyBrowseAddressForCatalog(savedMatch);
+      await storeService.applyUseCurrentGpsForCatalog();
       toast.success("Using your saved address at this location");
       if (returnUrl) {
         navigate(returnUrl);

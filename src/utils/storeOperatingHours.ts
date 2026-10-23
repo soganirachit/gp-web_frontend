@@ -43,6 +43,21 @@ export function isOutsideStoreOperatingHours(
   return false;
 }
 
+/** True when the store can take customer orders right now (hours + staff toggle). */
+export function storeAcceptsCustomerOrders(
+  store: Pick<
+    Store,
+    | "opening_time"
+    | "closing_time"
+    | "is_online"
+    | "is_accepting_orders"
+    | "opening_hours_configured"
+  >,
+  now = new Date(),
+): boolean {
+  return !shouldShowStoreOfflineHero(store, now);
+}
+
 /** Show offline hero when the store is not accepting customer orders. */
 export function shouldShowStoreOfflineHero(
   store: Pick<

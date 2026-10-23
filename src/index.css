@@ -293,6 +293,32 @@
   animation: subscription-card-highlight 1.4s ease-out;
 }
 
+/* Google Places dropdown — sit above map overlays, match address search chrome. */
+.pac-container {
+  z-index: 10050;
+  margin-top: 4px;
+  overflow: hidden;
+  border: 1px solid #808080;
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  font-family: inherit;
+}
+.pac-item {
+  cursor: pointer;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.875rem;
+  line-height: 1.35;
+  color: #222222;
+}
+.pac-item:hover,
+.pac-item-selected {
+  background-color: #f8f6f1;
+}
+.pac-item-query {
+  font-size: 0.875rem;
+  color: #222222;
+}
+
 /*
  * react-hot-toast bottom-center: each toast row is position:absolute; left:0; right:0;
  * display:flex; justify-content:center — the row must stay full width.

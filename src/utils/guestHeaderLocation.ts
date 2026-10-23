@@ -1,3 +1,8 @@
+import {
+  getSessionPin,
+  isGuestLocationFrozen,
+} from "./locationSession";
+
 /** Shown as the bold title in the header address row when the customer is not logged in. */
 export const GUEST_HEADER_LOCATION_TITLE = "Current location";
 
@@ -111,6 +116,51 @@ function pickCityFromGoogleResults(
     }
   }
   return "";
+}
+
+export function persistGuestCityLabel(city: string): void {
+  const trimmed = city.trim();
+  if (!trimmed || typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem("userLocation", trimmed);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Guest header line: session pin (Auto GPS or frozen city/store pin), never leftover
+ * device GPS while Manual. Falls back to stored city, then live GPS only in Auto.
+ */
+export async function resolveGuestHeaderLocationLabel(): Promise<{
+  title: string;
+  line: string;
+}> {
+  const frozen = isGuestLocationFrozen();
+  const title = frozen
+    ? GUEST_SELECTED_LOCATION_TITLE
+    : GUEST_HEADER_LOCATION_TITLE;
+  const stored =
+    typeof localStorage !== "undefined"
+      ? (localStorage.getItem("userLocation") || "").trim()
+      : "";
+  if (frozen && stored) {
+    return { title, line: stored };
+  }
+  const pin = getSessionPin();
+  if (pin) {
+    const city = (await reverseGeocodeCityOnlyForGuest(pin.lat, pin.lng)).trim();
+    if (city) {
+      persistGuestCityLabel(city);
+      return { title, line: city };
+    }
+  }
+  if (frozen) {
+    return { title, line: stored };
+  }
+  const gpsLabel = (await fetchGuestDeviceLocationLabel()).trim();
+  if (gpsLabel) return { title, line: gpsLabel };
+  return { title, line: stored };
 }
 
 /**

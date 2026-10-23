@@ -23,6 +23,7 @@ import orderTickIcon from '../../assets/svg/gp_store_svg/ordertick.svg';
 import orderDeliveredIcon from '../../assets/svg/gp_store_svg/orderdelivered.svg';
 import { OPTIMIZED_ILLUSTRATIONS } from '../../config/optimizedIllustrations';
 import { formatPhoneForDisplay } from '../../utils/phoneDisplay';
+import { formatDeliveryAddress } from '../../utils/formatDeliveryAddress';
 import { invoiceService, type OrderInvoicePayload } from '../../services/invoice.service';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
 import { UniformPageHeader } from '../layout/UniformPageHeader';
@@ -77,6 +78,7 @@ interface DeliveryAddress {
   address_type: string;
   address_line1: string;
   address_line2: string;
+  floor?: string;
   landmark: string;
   city: string;
   state: string;
@@ -85,27 +87,12 @@ interface DeliveryAddress {
   receiver_phone: string;
 }
 
-/** Street / locality line from API fields. */
-function buildStreetLineFromDelivery(addr: DeliveryAddress): string {
-  return [addr.address_line1, addr.address_line2, addr.landmark].filter(Boolean).join(', ');
-}
-
-/**
- * City + state + pin line only when it adds information (API often duplicates this in line1).
- */
-function cityStatePinLineIfDistinct(addr: DeliveryAddress, street: string): string | null {
-  const cityState = [addr.city, addr.state].filter(Boolean).join(', ');
-  const pin = (addr.pincode || '').trim();
-  const line =
-    !cityState && !pin ? '' : !cityState ? pin : !pin ? cityState : `${cityState} - ${pin}`;
-  if (!line) return null;
-  const st = street.replace(/\s+/g, ' ').trim().toLowerCase();
-  const ln = line.replace(/\s+/g, ' ').trim().toLowerCase();
-  if (!st) return line;
-  if (st.includes(ln)) return null;
-  const loose = (s: string) => s.replace(/[\s,:-]+/g, '');
-  if (loose(st).includes(loose(ln)) && loose(ln).length >= 8) return null;
-  return line;
+function deliveryAddressTypeLabel(type?: string | null): string {
+  const t = String(type || "").trim().toLowerCase();
+  if (t === "home") return "Home";
+  if (t === "work" || t === "office") return "Work";
+  if (!t || t === "other" || t === "others") return "Other";
+  return String(type).trim();
 }
 
 interface SubscriptionInfo {
@@ -121,6 +108,8 @@ interface OrderDetails {
   order_number: string;
   store_name: string;
   delivery_address: DeliveryAddress | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
   order_type: string;
   order_type_label?: string;
   subscription_info?: SubscriptionInfo | null;
@@ -365,7 +354,7 @@ const OrderDetails: React.FC = () => {
     try {
       const date = new Date(dateString);
       return {
-        date: format(date, 'EEE MMM, d'),
+        date: format(date, 'd MMM'),
         time: format(date, 'h:mm a'),
       };
     } catch {
@@ -439,7 +428,7 @@ const OrderDetails: React.FC = () => {
   const renderDeliverySchedule = () => {
     if (!deliveryScheduleText) return null;
     return (
-      <div className="mt-3 flex min-w-0 items-start gap-2">
+      <div className="flex min-w-0 items-start gap-2">
         <IoTimeOutline
           className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-500"
           aria-hidden
@@ -507,7 +496,7 @@ const OrderDetails: React.FC = () => {
   // Always show confirmed
   if (confirmedEvent) {
     timelinePoints.push({
-      label: 'Order Confirmed',
+      label: 'Confirmed',
       icon: orderTickIcon,
       date: formatDateTime(confirmedEvent.created_at).date,
       time: formatDateTime(confirmedEvent.created_at).time,
@@ -515,7 +504,7 @@ const OrderDetails: React.FC = () => {
     });
   } else {
     timelinePoints.push({
-      label: 'Order Confirmed',
+      label: 'Confirmed',
       icon: orderTickIcon,
       date: formatDateTime(order.created_at).date,
       time: formatDateTime(order.created_at).time,
@@ -526,7 +515,7 @@ const OrderDetails: React.FC = () => {
   if (readyEvent || customerStatusKey === 'ready') {
     const readyAt = readyEvent?.created_at || order.confirmed_at || order.created_at;
     timelinePoints.push({
-      label: 'Ready for Delivery',
+      label: 'Ready',
       icon: orderTickIcon,
       date: formatDateTime(readyAt).date,
       time: formatDateTime(readyAt).time,
@@ -545,7 +534,7 @@ const OrderDetails: React.FC = () => {
 
   if (outForDeliveryEvent) {
     timelinePoints.push({
-      label: 'Out for Delivery',
+      label: 'On the way',
       icon: OPTIMIZED_ILLUSTRATIONS.truckHome,
       date: formatDateTime(outForDeliveryEvent.created_at).date,
       time: formatDateTime(outForDeliveryEvent.created_at).time,
@@ -628,10 +617,10 @@ const OrderDetails: React.FC = () => {
           <div className="space-y-4">
             {/* Order Item Card */}
             <div className="p-4">
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <h2 className="text-lg font-bold text-gray-900">Order Items</h2>
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                <h2 className="min-w-0 text-lg font-bold text-gray-900">Order Items</h2>
                 <span
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold ${getCustomerOrderStatusBadgeClass(order.status, { isDaily })} flex-shrink-0`}
+                  className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1 text-xs font-semibold ${getCustomerOrderStatusBadgeClass(order.status, { isDaily })}`}
                 >
                   {getCustomerOrderStatusLabel(order.status)}
                 </span>
@@ -705,50 +694,58 @@ const OrderDetails: React.FC = () => {
             {/* Delivery Timeline */}
             <div className="bg-white rounded-2xl p-4 shadow-sm">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Delivery Timeline</h2>
-              <div className="relative">
-                {/* Horizontal Timeline Line - centered vertically with circles */}
-                {timelinePoints.length > 1 && (
-                  <div className={`absolute left-12 right-12 top-4 h-0.5 ${timelineAccentClass}`}></div>
-                )}
-
-                <div className={`flex ${timelinePoints.length === 1 ? 'justify-center' : 'justify-between'} items-start`}>
-                  {timelinePoints.map((point, index) => (
-                    <div key={index} className="flex flex-col items-center relative z-10">
+              <div className={`flex items-start ${timelinePoints.length === 1 ? "justify-center" : ""}`}>
+                {timelinePoints.map((point, index) => (
+                  <div
+                    key={`${point.status}-${index}`}
+                    className="relative flex min-w-0 flex-1 flex-col items-center"
+                  >
+                    {index < timelinePoints.length - 1 ? (
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center mb-2 ${timelineAccentClass}`}
-                      >
-                        {point.icon === 'cancel' ? (
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 4L4 12M4 4L12 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        ) : (
-                          <img
-                            src={point.icon}
-                            alt={point.label}
-                            className={`w-8 h-6 ${
-                              isDaily
+                        className={`absolute left-1/2 top-4 h-0.5 w-full ${timelineAccentClass}`}
+                        aria-hidden
+                      />
+                    ) : null}
+                    <div
+                      className={`relative z-10 mb-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${timelineAccentClass}`}
+                    >
+                      {point.icon === 'cancel' ? (
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M12 4L4 12M4 4L12 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      ) : (
+                        <img
+                          src={point.icon}
+                          alt={point.label}
+                          className={`h-6 w-8 ${
+                            isDaily
+                              ? 'brightness-0 invert'
+                              : point.status === 'out_for_delivery'
                                 ? 'brightness-0 invert'
-                                : point.status === 'out_for_delivery'
-                                  ? 'brightness-0 invert'
-                                  : ''
-                            }`}
-                          />
-                        )}
-                      </div>
-                      <div className="text-center">
-                        <p className="font-semibold text-gray-900 text-sm mb-1">{point.label}</p>
-                        <p className="text-xs text-gray-600">{point.date}</p>
-                        <p className="text-xs text-gray-600">{point.time}</p>
-                      </div>
+                                : ''
+                          }`}
+                        />
+                      )}
                     </div>
-                  ))}
-                </div>
+                    <p className="w-full px-0.5 text-center text-[11px] font-semibold leading-snug text-gray-900 sm:text-sm">
+                      {point.label}
+                    </p>
+                    <p className="mt-0.5 whitespace-nowrap text-[10px] leading-tight text-gray-600 sm:text-xs">
+                      {point.date}
+                    </p>
+                    <p className="whitespace-nowrap text-[10px] leading-tight text-gray-600 sm:text-xs">
+                      {point.time}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
 
             {/* Delivery Details */}
             {(order.delivery_address ||
               order.store_name ||
+              order.customer_name ||
+              order.customer_phone ||
               orderHasDeliverySchedule(order, isDaily)) && (
               <div className="bg-white rounded-2xl p-4 shadow-sm">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Delivery Details</h2>
@@ -761,64 +758,89 @@ const OrderDetails: React.FC = () => {
                       />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-gray-900">Store</p>
-                        <p className="mt-0.5 text-sm leading-snug text-gray-600">
+                        <p className="mt-0.5 break-words text-sm leading-snug text-gray-600">
                           {order.store_name}
                         </p>
                       </div>
                     </div>
                   ) : null}
-                  {order.delivery_address ? (
-                    <>
+                  <div className="flex min-w-0 items-start gap-2">
+                    <MdLocationOn
+                      className="mt-0.5 flex-shrink-0 text-lg text-gray-500"
+                      aria-hidden
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Delivery address
+                      </p>
+                      {(() => {
+                        const addr = order.delivery_address;
+                        const formatted = addr
+                          ? formatDeliveryAddress(addr as unknown as Record<string, unknown>)
+                          : "";
+                        const typeLabel = addr
+                          ? deliveryAddressTypeLabel(addr.address_type)
+                          : "";
+                        if (!formatted) {
+                          return (
+                            <p className="mt-0.5 text-sm leading-snug text-gray-600">
+                              Not available
+                            </p>
+                          );
+                        }
+                        return (
+                          <>
+                            {typeLabel ? (
+                              <p className="mt-0.5 text-sm font-medium leading-snug text-gray-900">
+                                {typeLabel}
+                              </p>
+                            ) : null}
+                            <p className="mt-0.5 break-words text-sm leading-snug text-gray-600 [overflow-wrap:anywhere]">
+                              {formatted}
+                            </p>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  {(() => {
+                    const receiverName = (
+                      order.delivery_address?.receiver_name ||
+                      order.customer_name ||
+                      ""
+                    ).trim();
+                    const receiverPhone =
+                      formatPhoneForDisplay(
+                        order.delivery_address?.receiver_phone ||
+                          order.customer_phone ||
+                          "",
+                      ) ||
+                      order.delivery_address?.receiver_phone ||
+                      order.customer_phone ||
+                      "";
+                    if (!receiverName && !receiverPhone) return null;
+                    return (
                       <div className="flex min-w-0 items-start gap-2">
-                        <MdLocationOn
-                          className="mt-0.5 flex-shrink-0 text-lg text-gray-500"
-                          aria-hidden
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium leading-snug text-gray-900">
-                            {order.delivery_address.address_type === 'home'
-                              ? 'Home'
-                              : order.delivery_address.address_type === 'work'
-                                ? 'Work'
-                                : 'Other'}
-                          </p>
-                          {(() => {
-                            const addr = order.delivery_address;
-                            if (!addr) return null;
-                            const street = buildStreetLineFromDelivery(addr);
-                            const cityLine = cityStatePinLineIfDistinct(addr, street);
-                            return (
-                              <>
-                                {street ? (
-                                  <p className="mt-0.5 text-sm leading-snug text-gray-600">{street}</p>
-                                ) : null}
-                                {cityLine ? (
-                                  <p className="mt-0.5 text-sm leading-snug text-gray-600">{cityLine}</p>
-                                ) : null}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                      <div className="mt-3 flex min-w-0 items-start gap-2">
                         <IoPersonOutline
                           className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-500"
                           aria-hidden
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium leading-snug text-gray-900">
-                            {order.delivery_address.receiver_name}
-                          </p>
-                          <p className="mt-0.5 text-sm leading-snug text-gray-600">
-                            {formatPhoneForDisplay(order.delivery_address.receiver_phone) ||
-                              order.delivery_address.receiver_phone}
-                          </p>
+                          {receiverName ? (
+                            <p className="break-words text-sm font-medium leading-snug text-gray-900">
+                              {receiverName}
+                            </p>
+                          ) : null}
+                          {receiverPhone ? (
+                            <p className="mt-0.5 break-words text-sm leading-snug text-gray-600">
+                              {receiverPhone}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
-                      {renderDeliverySchedule()}
-                    </>
-                  ) : null}
-                  {!order.delivery_address ? renderDeliverySchedule() : null}
+                    );
+                  })()}
+                  {renderDeliverySchedule()}
                 </div>
               </div>
             )}

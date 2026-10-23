@@ -31,11 +31,16 @@ import ErrorBoundary from "../components/ErrorBoundary";
 import SearchIcon from "../assets/icon/Search.png";
 import { useAuth } from "../context/AuthContext";
 import { GP_OPEN_GUEST_AREA_MODAL_EVENT } from "../config/guestAreaModalCopy";
-import { guestHasSavedBrowseAddress } from "../utils/guestAddressEntry";
+import {
+  coordsFromGuestBrowseAddress,
+  guestAddressFormNavState,
+  guestHasSavedBrowseAddress,
+} from "../utils/guestAddressEntry";
 import {
   formatSavedAddressLine,
-  pickHomeCatalogHeaderAddress,
+  pickSessionHeaderAddress,
 } from "../utils/resolveHomeCatalogHeaderAddress";
+import { LOCATION_SESSION_UPDATED_EVENT, getSessionPin, isGuestLocationFrozen } from "../utils/locationSession";
 import { HomeHeroStatusBanner } from "../components/home/HomeHeroStatusBanner";
 import { GpStoreOfflineHero } from "../components/store/GpStoreOfflineHero";
 import { BrandIntroPyramidCopy } from "../components/common/BrandIntroPyramidCopy";
@@ -66,9 +71,9 @@ import {
 } from "../components/common/ProfileAvatarButton";
 import { formatProductTitleCase } from "../lib/formatProductTitleCase";
 import {
-  fetchGuestDeviceLocationLabel,
   GUEST_HEADER_LOCATION_TITLE,
   GUEST_LOCATION_UNAVAILABLE_HINT,
+  resolveGuestHeaderLocationLabel,
   resolveGuestHeaderPrimaryLabel,
 } from "../utils/guestHeaderLocation";
 import {
@@ -326,32 +331,36 @@ const GpStore_Homepage: React.FC = () => {
             setIsLoadingAddress(true);
             if (!isLoggedIn) {
                 const guestAddr = storeService.getGuestBrowseAddress();
-                if (guestAddr) {
+                if (isGuestLocationFrozen() && guestAddr) {
                     setAddressType(resolveGuestHeaderPrimaryLabel(guestAddr.label));
                     setDeliveryLocation(guestAddr.formattedLine);
+                    deliveryCoordsRef.current = coordsFromGuestBrowseAddress(guestAddr);
+                    setDeliveryCoordsTick((t) => t + 1);
                     setIsLoadingAddress(false);
                     return;
                 }
-                setAddressType(GUEST_HEADER_LOCATION_TITLE);
-                setDeliveryLocation("");
                 setIsLoadingAddress(true);
                 try {
-                    const label = await fetchGuestDeviceLocationLabel();
-                    setDeliveryLocation(label);
+                    const header = await resolveGuestHeaderLocationLabel();
+                    setAddressType(header.title);
+                    setDeliveryLocation(header.line);
+                    deliveryCoordsRef.current = getSessionPin();
+                    setDeliveryCoordsTick((t) => t + 1);
                 } finally {
                     setIsLoadingAddress(false);
                 }
                 return;
             }
             const addresses = await addressService.getAllAddresses();
-            const selectedAddress = pickHomeCatalogHeaderAddress(addresses);
+            const selectedAddress = pickSessionHeaderAddress(addresses);
 
             if (selectedAddress) {
                 applyHeaderAddress(selectedAddress);
             } else {
-                setDeliveryLocation("");
-                setAddressType("Home");
-                deliveryCoordsRef.current = null;
+                setAddressType(GUEST_HEADER_LOCATION_TITLE);
+                setDeliveryLocation(localStorage.getItem("userLocation") || "");
+                deliveryCoordsRef.current = getSessionPin();
+                setDeliveryCoordsTick((t) => t + 1);
             }
         } catch (error) {
             console.error("Error fetching address:", error);
@@ -447,6 +456,7 @@ const GpStore_Homepage: React.FC = () => {
             void fetchBestSellers();
         };
         window.addEventListener(GPS_CATALOG_LOCATION_UPDATED_EVENT, onCatalog);
+        window.addEventListener(LOCATION_SESSION_UPDATED_EVENT, onCatalog);
         window.addEventListener("addressUpdated", onCatalog);
         window.addEventListener(CATALOG_PRODUCTS_REFRESH_EVENT, onCatalog);
         return () => {
@@ -454,6 +464,7 @@ const GpStore_Homepage: React.FC = () => {
                 GPS_CATALOG_LOCATION_UPDATED_EVENT,
                 onCatalog,
             );
+            window.removeEventListener(LOCATION_SESSION_UPDATED_EVENT, onCatalog);
             window.removeEventListener("addressUpdated", onCatalog);
             window.removeEventListener(CATALOG_PRODUCTS_REFRESH_EVENT, onCatalog);
         };
@@ -469,11 +480,8 @@ const GpStore_Homepage: React.FC = () => {
     const handleLocationClick = () => {
         if (!isLoggedIn) {
             if (guestHasSavedBrowseAddress()) {
-                navigate(`${basePath}/login`, {
-                    state: {
-                        from: location.pathname,
-                        returnUrl: `${basePath}/address-selection`,
-                    },
+                navigate(`${basePath}/address-selection`, {
+                    state: guestAddressFormNavState(),
                 });
                 return;
             }
@@ -585,6 +593,8 @@ const GpStore_Homepage: React.FC = () => {
                             ) : homeHeroStatus !== "default" ? (
                                 <HomeHeroStatusBanner
                                     variant={homeHeroStatus}
+                                    userFirstName={userFirstName || ""}
+                                    isLoggedIn={isLoggedIn}
                                     onChangeLocation={
                                         homeHeroStatus === "area_coming_soon"
                                             ? handleLocationClick

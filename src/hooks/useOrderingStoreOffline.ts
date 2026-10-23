@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { GUEST_STORE_UPDATED_EVENT, storeService } from "../services/store.service";
+import {
+  GPS_CATALOG_LOCATION_UPDATED_EVENT,
+  GUEST_STORE_UPDATED_EVENT,
+  storeService,
+} from "../services/store.service";
+import { LOCATION_SESSION_UPDATED_EVENT } from "../utils/locationSession";
 import { resolveGpDailyCatalogStoreId } from "../utils/gpDailyCatalogStore";
 import {
   invalidateOrderingOfflineCache,
@@ -49,9 +54,16 @@ export function useOrderingStoreOffline(cartStoreId?: number | null) {
       void refresh();
     };
     window.addEventListener(GUEST_STORE_UPDATED_EVENT, onStoreChange);
+    window.addEventListener(GPS_CATALOG_LOCATION_UPDATED_EVENT, onStoreChange);
+    window.addEventListener(LOCATION_SESSION_UPDATED_EVENT, onStoreChange);
     window.addEventListener("addressUpdated", onStoreChange);
     return () => {
       window.removeEventListener(GUEST_STORE_UPDATED_EVENT, onStoreChange);
+      window.removeEventListener(
+        GPS_CATALOG_LOCATION_UPDATED_EVENT,
+        onStoreChange,
+      );
+      window.removeEventListener(LOCATION_SESSION_UPDATED_EVENT, onStoreChange);
       window.removeEventListener("addressUpdated", onStoreChange);
     };
   }, [refresh]);

@@ -13,7 +13,15 @@ import {
   GEO_MSG_UNSUPPORTED,
   messageFromGeolocationPositionError,
 } from "../utils/geolocationMessages";
-import { shouldShowStoreOfflineHero } from "../utils/storeOperatingHours";
+import { shouldShowStoreOfflineHero, storeAcceptsCustomerOrders } from "../utils/storeOperatingHours";
+import { pickNearestStoreForPin } from "../utils/storeSelection";
+import {
+  getLocationSession,
+  markManualSavedAddress,
+  markManualGuest,
+  setLocationSession,
+} from "../utils/locationSession";
+import { parseAddressCoordinates } from "../utils/addressCoordinates";
 
 /** Dispatched on `window` after a guest picks a store from the city picker (home / products refresh). */
 export const GUEST_STORE_UPDATED_EVENT = "gp-guest-temporary-store-updated";
@@ -28,6 +36,11 @@ export type GuestBrowseAddressSnapshot = {
   formattedLine: string;
   coordinates: string;
   label?: string;
+  houseNo?: string;
+  streetName?: string;
+  floor?: string;
+  area?: string;
+  landmark?: string;
 };
 
 export type GuestBrowseApplyResult = {
@@ -58,13 +71,14 @@ export interface CityOption {
 }
 
 function storeIsOperationalWeb(s: Store): boolean {
-  if (typeof s.is_online === "boolean") return s.is_online;
-  return true;
+  return storeAcceptsCustomerOrders(s);
 }
 
 export function isStoreOffline(store: Store): boolean {
   return shouldShowStoreOfflineHero(store);
 }
+
+export { storeIsWithinDeliveryRadius, pickNearestStoreForPin } from "../utils/storeSelection";
 
 export function isCartStoreOffline(
   cartStoreId: number | null | undefined,
@@ -75,25 +89,6 @@ export function isCartStoreOffline(
   }
   const row = stores.find((s) => s.id === Number(cartStoreId));
   return !!row && isStoreOffline(row);
-}
-
-function parseMaxDeliveryRadiusKm(s: Store): number | null {
-  const raw = s.max_delivery_radius_km;
-  if (raw == null || raw === "") return null;
-  const n = parseFloat(String(raw));
-  return Number.isFinite(n) ? n : null;
-}
-
-/** Same rule as mobile: `distance_km` vs `max_delivery_radius_km` from GET /stores/?lat=&lng= */
-export function storeIsWithinDeliveryRadius(s: Store): boolean {
-  const maxR = parseMaxDeliveryRadiusKm(s);
-  const d = s.distance_km;
-  if (maxR == null || d == null || Number.isNaN(Number(d))) return true;
-  return Number(d) <= maxR;
-}
-
-function storeIsSelectableWeb(s: Store): boolean {
-  return storeIsOperationalWeb(s) && storeIsWithinDeliveryRadius(s);
 }
 
 /** Normalize for comparing API `city` with the city the user selected. */
@@ -361,15 +356,7 @@ class StoreService {
 
   private async findFirstSelectableStoreNear(latitude: number, longitude: number): Promise<Store | null> {
     const stores = await this.getAllStores(latitude, longitude);
-    if (!stores.length) return null;
-    const sorted = [...stores].sort((a, b) => {
-      const da = Number(a.distance_km);
-      const db = Number(b.distance_km);
-      const na = Number.isFinite(da) ? da : Number.POSITIVE_INFINITY;
-      const nb = Number.isFinite(db) ? db : Number.POSITIVE_INFINITY;
-      return na - nb;
-    });
-    return sorted.find(storeIsSelectableWeb) ?? null;
+    return pickNearestStoreForPin(stores).store;
   }
 
   private rejectCityPicker(message?: string): never {
@@ -392,12 +379,15 @@ class StoreService {
         const zone = await resolveGpDailyZoneAtLatLng(latitude, longitude);
         if (!zone.eligible || zone.storeId == null) {
           this.clearTemporaryStoreId();
+          setLocationSession({ dailyStoreId: null }, false);
           this.rejectCityPicker(zone.message);
         }
         this.setTemporaryStoreId(zone.storeId);
+        setLocationSession({ dailyStoreId: zone.storeId }, false);
         return zone.storeId;
       } catch {
         this.clearTemporaryStoreId();
+        setLocationSession({ dailyStoreId: null }, false);
         this.rejectCityPicker();
       }
     }
@@ -412,23 +402,20 @@ class StoreService {
 
     if (!coverageOk) {
       this.clearTemporaryStoreId();
+      setLocationSession({ storeId: null }, false);
       this.rejectCityPicker();
     }
 
-    let store = await this.getNearestStore(latitude, longitude);
-    if (store && !storeIsSelectableWeb(store)) {
-      store = null;
-    }
-    if (!store) {
-      store = await this.findFirstSelectableStoreNear(latitude, longitude);
-    }
+    const store = await this.getSelectableNearestStore(latitude, longitude);
 
     if (store) {
       this.setTemporaryStoreId(store.id);
+      setLocationSession({ storeId: store.id }, false);
       return store.id;
     }
 
     this.clearTemporaryStoreId();
+    setLocationSession({ storeId: null }, false);
     this.rejectCityPicker();
   }
 
@@ -492,6 +479,7 @@ class StoreService {
     const sid = Number(res.store?.id);
     if (!Number.isFinite(sid) || sid <= 0) return;
     this.setTemporaryStoreId(sid);
+    setLocationSession({ dailyStoreId: sid }, false);
   }
 
   /**
@@ -531,6 +519,8 @@ class StoreService {
     catalog: "store" | "daily",
   ): Promise<GuestBrowseApplyResult> {
     this.setGuestBrowseAddress(snapshot);
+    const browseCoords = parseAddressCoordinates(snapshot.coordinates);
+    markManualGuest(browseCoords);
     const parts = snapshot.coordinates.split(",").map((s) => parseFloat(s.trim()));
     const lat = parts[0];
     const lng = parts[1];
@@ -543,12 +533,14 @@ class StoreService {
         const zone = await resolveGpDailyZoneAtLatLng(lat, lng);
         if (!zone.eligible || zone.storeId == null) {
           this.clearTemporaryStoreId();
+          setLocationSession({ dailyStoreId: null }, false);
           return {
             serviceable: false,
             message: zone.message?.trim() || GUEST_NOT_SERVICEABLE_BODY,
           };
         }
         this.setTemporaryStoreId(zone.storeId);
+        setLocationSession({ dailyStoreId: zone.storeId }, false);
         notifyGpsCatalogLocationUpdated();
         return {
           serviceable: true,
@@ -558,6 +550,7 @@ class StoreService {
         };
       } catch {
         this.clearTemporaryStoreId();
+        setLocationSession({ dailyStoreId: null }, false);
         return { serviceable: false, message: GUEST_NOT_SERVICEABLE_BODY };
       }
     }
@@ -577,6 +570,7 @@ class StoreService {
       };
     } catch {
       this.clearTemporaryStoreId();
+      setLocationSession({ storeId: null }, false);
       return { serviceable: false, message: GUEST_NOT_SERVICEABLE_BODY };
     }
   }
@@ -585,6 +579,8 @@ class StoreService {
    * Get store ID - returns logged-in user's store ID if available, otherwise temporary store ID
    */
   getStoreIdForProducts(): number | null {
+    const live = getLocationSession().storeId;
+    if (live != null && Number.isFinite(live) && live > 0) return live;
     if (localStorage.getItem("phoneNumber")) {
       return this.getSelectedStoreId() ?? this.getTemporaryStoreId();
     }
@@ -611,27 +607,27 @@ class StoreService {
   }
 
   /**
-   * Nearest operational store for coordinates, or next selectable by distance
-   * (when /nearest/ returns out-of-radius offline).
+   * Closest store that covers the pin and is accepting orders.
+   * If every covering store is hours-closed or staff-offline, the closest
+   * covering store is still returned so the offline hero can show.
    */
   async getSelectableNearestStore(
     latitude: number,
     longitude: number,
   ): Promise<Store | null> {
-    let store = await this.getNearestStore(latitude, longitude);
-    if (store && !storeIsSelectableWeb(store)) {
-      store = null;
-    }
-    if (!store) {
-      store = await this.findFirstSelectableStoreNear(latitude, longitude);
-    }
-    return store;
+    return this.findFirstSelectableStoreNear(latitude, longitude);
   }
 
   /**
    * GP Store “Choose location” — guest: temporary store from pin; user: switch cart + assigned store.
    */
-  async applyBrowseAddressForCatalog(address: Address): Promise<void> {
+  async applyBrowseAddressForCatalog(
+    address: Address,
+    options?: { manual?: boolean },
+  ): Promise<void> {
+    if (options?.manual !== false) {
+      markManualSavedAddress(address);
+    }
     const parts = (address.coordinates || "")
       .split(",")
       .map((s) => parseFloat(s.trim()));
@@ -672,6 +668,7 @@ class StoreService {
         return;
       } catch (e) {
         this.setGpStoreCatalogAddressOverrideId(null);
+        setLocationSession({ dailyStoreId: null }, false);
         throw e;
       }
     }
@@ -681,6 +678,7 @@ class StoreService {
     );
     if (!cov.isValid) {
       this.setGpStoreCatalogAddressOverrideId(null);
+      setLocationSession({ storeId: null }, false);
       throw new Error(
         "We are not delivering to this address from your current store. Choose another address or switch store from Account.",
       );
@@ -689,8 +687,10 @@ class StoreService {
     const store = await this.getSelectableNearestStore(lat, lng);
     if (!store) {
       this.setGpStoreCatalogAddressOverrideId(null);
+      setLocationSession({ storeId: null }, false);
       throw new Error(REQUIRED_TOAST.NOT_DELIVERING_LOCATION);
     }
+    setLocationSession({ storeId: store.id }, false);
     const current = this.getSelectedStoreId();
     if (current === store.id) {
       notifyGpsCatalogLocationUpdated();
@@ -709,76 +709,15 @@ class StoreService {
    * Use device GPS for catalog (clears saved-address override). Guest + logged-in.
    */
   async applyUseCurrentGpsForCatalog(): Promise<void> {
-    this.setGpStoreCatalogAddressOverrideId(null);
-    if (!navigator.geolocation) {
-      throw new Error(GEO_MSG_UNSUPPORTED);
-    }
-    await new Promise<void>((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            const { latitude, longitude } = position.coords;
-            if (!localStorage.getItem("phoneNumber")) {
-              try {
-                await this.resolveGuestStoreFromCoordinates(
-                  latitude,
-                  longitude,
-                );
-              } catch (e) {
-                reject(
-                  e instanceof Error
-                    ? e
-                    : new Error("Could not resolve store for your location."),
-                );
-                return;
-              }
-              notifyGpsCatalogLocationUpdated();
-              resolve();
-              return;
-            }
-            const cov = await addressService.validateAddressInDeliveryArea(
-              `${latitude},${longitude}`,
-            );
-            if (!cov.isValid) {
-              throw new Error(
-                "We are not delivering to your current location. Pick a saved address on the map.",
-              );
-            }
-            const store = await this.getSelectableNearestStore(
-              latitude,
-              longitude,
-            );
-            if (!store) {
-              throw new Error(REQUIRED_TOAST.NOT_DELIVERING_LOCATION);
-            }
-            const current = this.getSelectedStoreId();
-            if (current === store.id) {
-              notifyGpsCatalogLocationUpdated();
-              resolve();
-              return;
-            }
-            try {
-              await cartService.switchCartStore(store.id);
-            } catch {
-              /* ignore */
-            }
-            await this.switchStore(store.id);
-            notifyGpsCatalogLocationUpdated();
-            resolve();
-          } catch (e) {
-            reject(
-              e instanceof Error
-                ? e
-                : new Error("Could not update store for your location."),
-            );
-          }
-        },
-        (geoErr) => {
-          reject(new Error(messageFromGeolocationPositionError(geoErr)));
-        },
-        { enableHighAccuracy: false, timeout: 20_000, maximumAge: 60_000 },
-      );
-    });
+    const { resumeAutoAndResolve } = await import("./locationSession.service");
+    const path =
+      typeof window !== "undefined" ? window.location.pathname : "/home";
+    const channel = path.startsWith("/gp-daily")
+      ? "daily"
+      : path.startsWith("/gp-store")
+        ? "store"
+        : "home";
+    await resumeAutoAndResolve(channel);
   }
 
   /**

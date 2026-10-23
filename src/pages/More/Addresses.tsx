@@ -28,6 +28,7 @@ const Addresses: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [catalogPinId, setCatalogPinId] = useState<string | null>(null);
 
   const { isLoaded } = useJsApiLoader({
@@ -78,8 +79,13 @@ const Addresses: React.FC = () => {
       await addressService.deleteAddress(deleteId);
       setAddresses(addresses.filter(a => a.id !== deleteId));
       setDeleteId(null);
-    } catch (error: any) {
-      // Error handling
+    } catch (error: unknown) {
+      setDeleteId(null);
+      setActionError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'This address could not be deleted.',
+      );
     } finally {
       setActionInProgress(false);
     }
@@ -317,6 +323,24 @@ const Addresses: React.FC = () => {
         </div>
 
         {/* Delete Confirmation Modal */}
+        {actionError && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm px-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+              <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">
+                Cannot delete address
+              </h3>
+              <p className="text-gray-600 text-center mb-6">{actionError}</p>
+              <button
+                type="button"
+                onClick={() => setActionError(null)}
+                className="w-full py-3.5 bg-gray-50 text-gray-700 font-semibold rounded-xl hover:bg-gray-100 transition-colors"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
+
         {deleteId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm px-4">
             <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">

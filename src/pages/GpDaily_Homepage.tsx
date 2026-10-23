@@ -83,7 +83,10 @@ import {
   type InsufficientWalletDetails,
 } from "../components/daily/InsufficientWalletModal";
 import { navigateToGpDailyWalletForRecharge } from "../utils/gpDailyWalletRechargeRedirect";
-import { guestHasSavedBrowseAddress } from "../utils/guestAddressEntry";
+import {
+  guestAddressFormNavState,
+  guestHasSavedBrowseAddress,
+} from "../utils/guestAddressEntry";
 import {
   formatNamasteDeliveryLine,
   subscriptionProductLabel,
@@ -93,15 +96,21 @@ type NamasteWebCarouselSlide =
   | { kind: "today_order"; slide: NamasteTodayOrderSlide }
   | { kind: "subscription"; sub: Subscription };
 import {
-  fetchGuestDeviceLocationLabel,
   GUEST_HEADER_LOCATION_TITLE,
   GUEST_LOCATION_UNAVAILABLE_HINT,
+  resolveGuestHeaderLocationLabel,
   resolveGuestHeaderPrimaryLabel,
 } from "../utils/guestHeaderLocation";
 import {
   formatSavedAddressLine,
-  pickHomeCatalogHeaderAddress,
+  pickSessionHeaderAddress,
 } from "../utils/resolveHomeCatalogHeaderAddress";
+import {
+  LOCATION_SESSION_UPDATED_EVENT,
+  getLocationSession,
+  getSessionPin,
+  isGuestLocationFrozen,
+} from "../utils/locationSession";
 import {
   GP_OPEN_GUEST_AREA_MODAL_EVENT,
 } from "../config/guestAreaModalCopy";
@@ -275,31 +284,35 @@ const Home2: React.FC = () => {
   const refreshHomeHeroStatus = useCallback(async () => {
     storeService.clearOfflineStoreListCache();
     const storeId =
-      storeService.getStoreIdForProducts() ??
+      getLocationSession().dailyStoreId ??
       (await resolveGpDailyCatalogStoreId()) ??
       null;
     const { primaryStoreId, storeIds } =
       await resolveGpDailyOfflineStoreCandidates(storeId);
     const sid = storeId ?? primaryStoreId;
-    const guestTempId = storeService.getTemporaryStoreId();
     const inServiceArea =
       deliveryZoneStatus?.isValid === true ||
-      guestTempId != null ||
-      sid != null ||
-      storeIds.length > 0;
+      getLocationSession().dailyStoreId != null ||
+      (sid != null && storeIds.length > 0);
     let deviceLat: number | null = null;
     let deviceLng: number | null = null;
-    try {
-      const raw = localStorage.getItem("userCoordinates");
-      if (raw) {
-        const parsed = JSON.parse(raw) as { lat?: number; lng?: number };
-        if (typeof parsed.lat === "number" && typeof parsed.lng === "number") {
-          deviceLat = parsed.lat;
-          deviceLng = parsed.lng;
+    const sessionPin = getSessionPin();
+    if (sessionPin) {
+      deviceLat = sessionPin.lat;
+      deviceLng = sessionPin.lng;
+    } else {
+      try {
+        const raw = localStorage.getItem("userCoordinates");
+        if (raw) {
+          const parsed = JSON.parse(raw) as { lat?: number; lng?: number };
+          if (typeof parsed.lat === "number" && typeof parsed.lng === "number") {
+            deviceLat = parsed.lat;
+            deviceLng = parsed.lng;
+          }
         }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
     }
 
     const catalogStoreIds = [
@@ -507,18 +520,14 @@ const Home2: React.FC = () => {
       setIsLoadingProducts(true);
       setProductsFetchError(null);
 
-      if (!localStorage.getItem("phoneNumber")) {
-        const existing = storeService.getTemporaryStoreId();
-        if (!existing) {
-          try {
-            await storeService.getStoreFromLocation();
-          } catch {
-            /* browse still works without store; API may return broader catalog */
-          }
-        }
-      }
       const catalogSid = await resolveGpDailyCatalogStoreId();
       const sid = catalogSid || undefined;
+      if (!sid && getSessionPin()) {
+        setAllPackProducts([]);
+        setPujaPackProducts([]);
+        setExoticPackProducts([]);
+        return;
+      }
 
       const [allPage, pujaPage, exoticPage] = await Promise.all([
         productService.getStoreProductListFirstPage({
@@ -588,7 +597,10 @@ const Home2: React.FC = () => {
   const validateDeliveryZone = async (showToast = false) => {
     try {
       setIsValidatingDeliveryZone(true);
-      const storedCoordinates = localStorage.getItem("userCoordinates");
+      const pin = getSessionPin();
+      const storedCoordinates = pin
+        ? `${pin.lat},${pin.lng}`
+        : localStorage.getItem("userCoordinates");
       if (storedCoordinates) {
         let coordinates: string;
 
@@ -637,27 +649,26 @@ const Home2: React.FC = () => {
       setIsLoadingAddress(true);
       if (!localStorage.getItem("phoneNumber")) {
         const guestAddr = storeService.getGuestBrowseAddress();
-        if (guestAddr) {
+        if (isGuestLocationFrozen() && guestAddr) {
           setAddressType(resolveGuestHeaderPrimaryLabel(guestAddr.label));
           setDeliveryLocation(guestAddr.formattedLine);
           return;
         }
-        setAddressType(GUEST_HEADER_LOCATION_TITLE);
-        setDeliveryLocation("");
-        const label = await fetchGuestDeviceLocationLabel();
-        setDeliveryLocation(label);
+        const header = await resolveGuestHeaderLocationLabel();
+        setAddressType(header.title);
+        setDeliveryLocation(header.line);
         return;
       }
 
       const addresses = await addressService.getAllAddresses();
-      const selectedAddress = pickHomeCatalogHeaderAddress(addresses);
+      const selectedAddress = pickSessionHeaderAddress(addresses);
 
       if (selectedAddress) {
         setDeliveryLocation(formatSavedAddressLine(selectedAddress));
         setAddressType(selectedAddress.type || "Home");
       } else {
-        setDeliveryLocation("");
-        setAddressType("Home");
+        setAddressType(GUEST_HEADER_LOCATION_TITLE);
+        setDeliveryLocation(localStorage.getItem("userLocation") || "");
       }
     } catch (error) {
       console.error("Error fetching address:", error);
@@ -710,8 +721,11 @@ const Home2: React.FC = () => {
     const onCatalogLocationChange = () => {
       void fetchLatestAddress();
       void refreshDailyBannerStoreId();
+      void fetchProducts();
+      void refreshHomeHeroStatus();
     };
     window.addEventListener(GPS_CATALOG_LOCATION_UPDATED_EVENT, onCatalogLocationChange);
+    window.addEventListener(LOCATION_SESSION_UPDATED_EVENT, onCatalogLocationChange);
     window.addEventListener(GUEST_STORE_UPDATED_EVENT, onCatalogLocationChange);
     window.addEventListener("addressUpdated", onCatalogLocationChange);
     return () => {
@@ -719,10 +733,11 @@ const Home2: React.FC = () => {
         GPS_CATALOG_LOCATION_UPDATED_EVENT,
         onCatalogLocationChange,
       );
+      window.removeEventListener(LOCATION_SESSION_UPDATED_EVENT, onCatalogLocationChange);
       window.removeEventListener(GUEST_STORE_UPDATED_EVENT, onCatalogLocationChange);
       window.removeEventListener("addressUpdated", onCatalogLocationChange);
     };
-  }, [fetchLatestAddress, refreshDailyBannerStoreId]);
+  }, [fetchLatestAddress, refreshDailyBannerStoreId, refreshHomeHeroStatus]);
 
   useEffect(() => {
     const onCatalogRefresh = () => {
@@ -794,8 +809,8 @@ const Home2: React.FC = () => {
   const handleLocationClick = () => {
     if (!isLoggedIn) {
       if (guestHasSavedBrowseAddress()) {
-        navigate(`${basePath}/login`, {
-          state: { from: location.pathname, returnUrl: `${basePath}/address-selection` },
+        navigate(`${basePath}/address-selection`, {
+          state: guestAddressFormNavState(),
         });
         return;
       }
@@ -1526,6 +1541,8 @@ const Home2: React.FC = () => {
                 <HomeHeroStatusBanner
                   variant={homeHeroStatus}
                   typography="daily"
+                  userFirstName={userFirstName || ""}
+                  isLoggedIn={isLoggedIn}
                   onChangeLocation={
                     homeHeroStatus === "area_coming_soon"
                       ? handleLocationClick

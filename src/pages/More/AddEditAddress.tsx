@@ -35,6 +35,7 @@ import {
   isValidIndianMobile10,
 } from '../../utils/phoneDisplay';
 import type { MapPinAnchor } from '../../utils/validateTypedAddressMatchesMapPin';
+import { storeService } from '../../services/store.service';
 
 /** When Google Geocoding REST is unavailable or returns nothing, fill fields from OSM (usage policy: identify app). */
 async function reverseGeocodeWithOsm(
@@ -384,18 +385,30 @@ const AddEditAddress: React.FC = () => {
       if (isEdit && existingAddress?.id) {
         // Exclude setAsDefault for update if it causes issues, or the backend doesn't support it on update
         const { setAsDefault, ...updateData } = addressData;
-        await addressService.updateAddress(existingAddress.id, updateData);
+        const updated = await addressService.updateAddress(existingAddress.id, updateData);
         toast.success(REQUIRED_TOAST.ADDRESS_UPDATED);
+        if (routeState.fromAddressSelection || routeState.fromHome || routeState.initialCoordinates) {
+          await storeService.applyBrowseAddressForCatalog(updated).catch(() => undefined);
+        }
       } else {
-        await addressService.createAddress(addressData);
+        const created = await addressService.createAddress(addressData);
         toast.success(REQUIRED_TOAST.ADDRESS_ADDED);
+        if (routeState.fromAddressSelection || routeState.fromHome || routeState.initialCoordinates) {
+          await storeService.applyBrowseAddressForCatalog(created).catch(() => undefined);
+        }
       }
       navigateAfterAddressAction();
     } catch (error) {
       console.error('Failed to save address:', error);
-      const failMsg = isEdit
-        ? REQUIRED_TOAST.FAILED_UPDATE_ADDRESS
-        : REQUIRED_TOAST.FAILED_ADD_ADDRESS;
+      const backendMsg = error instanceof Error ? error.message.trim() : '';
+      const failMsg =
+        backendMsg &&
+        backendMsg !== REQUIRED_TOAST.FAILED_UPDATE_ADDRESS &&
+        backendMsg !== REQUIRED_TOAST.FAILED_ADD_ADDRESS
+          ? backendMsg
+          : isEdit
+            ? REQUIRED_TOAST.FAILED_UPDATE_ADDRESS
+            : REQUIRED_TOAST.FAILED_ADD_ADDRESS;
       setFormError(failMsg);
       toast.error(failMsg);
     } finally {
