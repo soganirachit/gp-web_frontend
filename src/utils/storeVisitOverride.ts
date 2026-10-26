@@ -68,3 +68,26 @@ export function preferStoreIdForVisit(input: {
     null
   );
 }
+
+/**
+ * Account Select Store after a stores fetch for the current pin.
+ * A visit Account pick stays. Otherwise the nearest covering store for this
+ * pin wins — leftover session/localStorage ids from the previous location
+ * must not keep Sodala (or any prior store) when the pin moved.
+ */
+export function accountStoreIdForCurrentPin(input: {
+  overrideId: number | null;
+  nearestId: number | null;
+  selectableIds: number[];
+}): number | null {
+  const take = (id: number | null) => {
+    if (id == null || !Number.isFinite(id) || id <= 0) return null;
+    return id;
+  };
+  const override = take(input.overrideId);
+  if (override != null) return override;
+  const selectable = new Set(input.selectableIds);
+  const nearest = take(input.nearestId);
+  if (nearest != null && selectable.has(nearest)) return nearest;
+  return input.selectableIds[0] ?? null;
+}

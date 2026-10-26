@@ -13,7 +13,7 @@ function distanceKm(s: Store): number {
   return Number.isFinite(d) ? d : Number.POSITIVE_INFINITY;
 }
 
-/** Same rule as mobile: `distance_km` vs `max_delivery_radius_km` from GET /stores/?lat=&lng= */
+/** Same rule as mobile: road `distance_km` vs `max_delivery_radius_km` from GET /stores/?lat=&lng= */
 export function storeIsWithinDeliveryRadius(s: Store): boolean {
   const maxR = parseMaxDeliveryRadiusKm(s);
   const d = s.distance_km;

@@ -272,7 +272,7 @@ async function resolveGuestAuto(channel: LocationChannel): Promise<void> {
   }
 }
 
-async function maybeSkipStickyManualOnNewLoad(): Promise<void> {
+export async function maybeSkipStickyManualOnNewLoad(): Promise<void> {
   if (!lockStickyManualNewLoadPolicy()) return;
   if (getLocationSession().mode !== "manual") return;
   const gps = await readGps();

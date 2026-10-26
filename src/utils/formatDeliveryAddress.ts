@@ -73,3 +73,18 @@ export function formatDeliveryAddressOrFallback(
   const formatted = formatDeliveryAddress(addr);
   return formatted || "Not available";
 }
+
+/**
+ * GP Daily "Deliver to" on Manage Subscription: always address_line1
+ * from the frozen subscription payload (not city/state, not a live address-book lookup).
+ */
+export function formatSubscriptionDeliverTo(
+  addr: Record<string, unknown> | null | undefined,
+): string {
+  if (!addr || typeof addr !== "object") return "Delivery address on file";
+  const line1 = cleanPart(
+    addr.address_line1 ?? addr.houseNo ?? addr.line1,
+  );
+  if (line1) return line1;
+  return formatDeliveryAddress(addr) || "Delivery address on file";
+}

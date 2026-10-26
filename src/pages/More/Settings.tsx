@@ -13,6 +13,7 @@ import {
 import { customerService } from '@/services/getcustomer.service';
 import {
   GUEST_STORE_UPDATED_EVENT,
+  GPS_CATALOG_LOCATION_UPDATED_EVENT,
   storeService,
   Store,
   storeIsWithinDeliveryRadius,
@@ -37,6 +38,8 @@ import {
   getLocationSession,
   LOCATION_SESSION_UPDATED_EVENT,
 } from '../../utils/locationSession';
+import { resolveStoreDistancePin } from '../../utils/resolveStoreDistancePin';
+import { pickNearestStoreForPin, sortStoresClosestFirst } from '../../utils/storeSelection';
 import { DAILY_WALLET_PATH } from '../../config/routes.config';
 import { toast } from 'react-hot-toast';
 import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
@@ -197,7 +200,11 @@ const Settings: React.FC = () => {
       void fetchStores();
     };
     window.addEventListener(LOCATION_SESSION_UPDATED_EVENT, onSession);
-    return () => window.removeEventListener(LOCATION_SESSION_UPDATED_EVENT, onSession);
+    window.addEventListener(GPS_CATALOG_LOCATION_UPDATED_EVENT, onSession);
+    return () => {
+      window.removeEventListener(LOCATION_SESSION_UPDATED_EVENT, onSession);
+      window.removeEventListener(GPS_CATALOG_LOCATION_UPDATED_EVENT, onSession);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feature, isLoggedIn, showAsLoggedOut, location.pathname, basePath]);
 
@@ -218,61 +225,20 @@ const Settings: React.FC = () => {
     };
   }, [isStoreDropdownOpen]);
 
-  /** Parse "lat,lng" or JSON { lat, lng } from localStorage (same keys as home / delivery flows). */
-  const parseStoredUserCoordinates = (): { lat: number; lng: number } | null => {
-    const raw = localStorage.getItem('userCoordinates');
-    if (!raw) return null;
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed?.lat != null && parsed?.lng != null) {
-        const lat = Number(parsed.lat);
-        const lng = Number(parsed.lng);
-        if (!Number.isNaN(lat) && !Number.isNaN(lng)) return { lat, lng };
-      }
-    } catch {
-      const parts = raw.split(',').map((s) => parseFloat(s.trim()));
-      if (parts.length >= 2 && !Number.isNaN(parts[0]) && !Number.isNaN(parts[1])) {
-        return { lat: parts[0], lng: parts[1] };
-      }
-    }
-    return null;
-  };
-
-  const resolveLatLngForStores = (
-    addresses: Awaited<ReturnType<typeof addressService.getAllAddresses>>
-  ): { lat: number; lng: number } | null => {
-    const tryParse = (coord: string | undefined): { lat: number; lng: number } | null => {
-      if (!coord?.trim()) return null;
-      const [a, b] = coord.split(',').map((s) => parseFloat(s.trim()));
-      if (!Number.isNaN(a) && !Number.isNaN(b)) return { lat: a, lng: b };
-      return null;
-    };
-
-    const ordered = [...addresses].sort((a, b) => {
-      if (a.isDefault && !b.isDefault) return -1;
-      if (!a.isDefault && b.isDefault) return 1;
-      return 0;
-    });
-    for (const addr of ordered) {
-      const p = tryParse(addr.coordinates);
-      if (p) return p;
-    }
-    return parseStoredUserCoordinates();
-  };
-
   const fetchStores = async (opts?: { refreshListOnly?: boolean }) => {
     if (feature !== "gpStore") return;
     const refreshListOnly = opts?.refreshListOnly === true;
     try {
       if (!refreshListOnly) setIsLoadingStores(true);
       const addresses = await addressService.getAllAddresses();
-      const loc = resolveLatLngForStores(addresses);
+      const loc = resolveStoreDistancePin(addresses);
 
-      // GET /stores/ includes is_online per store (online vs offline for ordering)
-      const [storesList, nearestStore] = await Promise.all([
-        loc ? storeService.getAllStores(loc.lat, loc.lng) : storeService.getAllStores(),
-        loc ? storeService.getNearestStore(loc.lat, loc.lng) : Promise.resolve(null as Store | null),
-      ]);
+      // GET /stores/?lat=&lng= attaches distance_km vs the visit pin (GPS / picked location).
+      const storesListRaw = loc
+        ? await storeService.getAllStores(loc.lat, loc.lng)
+        : await storeService.getAllStores();
+      const storesList = sortStoresClosestFirst(storesListRaw);
+      const nearestStore = loc ? pickNearestStoreForPin(storesList).store : null;
 
       setStores(storesList);
 
@@ -753,7 +719,7 @@ const Settings: React.FC = () => {
                             }
                             if (!withinRadius) {
                               setStoreSelectionError(
-                                'This store is outside the delivery range for your address. Update your address or choose a closer store.'
+                                'This store is outside the delivery range for your current location. Choose a closer store or change location.'
                               );
                               return;
                             }
@@ -798,7 +764,7 @@ const Settings: React.FC = () => {
                               <div className="truncate">{store.name}</div>
                               {store.distance_km != null && (
                                 <div className="mt-0.5 text-xs text-gray-500">
-                                  {store.distance_km.toFixed(1)} km away
+                                  {store.distance_km.toFixed(1)} km by road
                                   {parseMaxDeliveryRadiusKm(store) != null && (
                                     <span className="text-gray-400">
                                       {' '}
@@ -809,7 +775,7 @@ const Settings: React.FC = () => {
                               )}
                               {!withinRadius && store.distance_km != null && parseMaxDeliveryRadiusKm(store) != null && (
                                 <div className="mt-1 text-xs font-medium text-amber-700">
-                                  Outside delivery area from your address
+                                  Outside delivery area from your current location
                                 </div>
                               )}
                             </div>

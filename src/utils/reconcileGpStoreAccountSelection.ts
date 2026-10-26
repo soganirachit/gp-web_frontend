@@ -7,8 +7,8 @@ import {
 import { storeAcceptsCustomerOrders } from "./storeOperatingHours";
 import { getLocationSession, setLocationSession } from "./locationSession";
 import {
+  accountStoreIdForCurrentPin,
   getStoreVisitOverrideId,
-  preferStoreIdForVisit,
   setStoreVisitOverrideId,
 } from "./storeVisitOverride";
 
@@ -18,8 +18,9 @@ function storeIsSelectableForOrders(store: Store): boolean {
 
 /**
  * Pick the store Account + cart APIs should use (logged-in GP Store).
- * Visit Account pick wins for this SPA session. Location / GPS wins again
- * after a hard refresh (override is gone).
+ * Visit Account pick wins for this SPA session. Otherwise the nearest
+ * covering store for the current location pin wins (leftover session ids
+ * from a previous pin are ignored). Hard refresh drops the visit override.
  */
 export function pickGpStoreForAccount(
   storesList: Store[],
@@ -28,11 +29,9 @@ export function pickGpStoreForAccount(
   const byId = (id: number | null | undefined) =>
     id != null ? storesList.find((s) => s.id === id) ?? null : null;
 
-  const pickedId = preferStoreIdForVisit({
+  const pickedId = accountStoreIdForCurrentPin({
     overrideId: getStoreVisitOverrideId(),
-    sessionId: getLocationSession().storeId,
     nearestId: nearestStore?.id ?? null,
-    savedId: storeService.getSelectedStoreId(),
     selectableIds: storesList
       .filter((s) => storeIsSelectableForOrders(s))
       .map((s) => s.id),

@@ -67,7 +67,7 @@ import {
   pausedSubscriptionUpdateToast,
 } from "../../utils/gpDailySubscriptionWalletPause";
 import { resolveSubscriptionPerDeliveryDisplayTotal } from "../../utils/gpDailySubscriptionPricingSnapshot";
-import { formatDeliveryAddress } from "../../utils/formatDeliveryAddress";
+import { formatSubscriptionDeliverTo } from "../../utils/formatDeliveryAddress";
 import { navigateToGpDailyWalletForRecharge } from "../../utils/gpDailyWalletRechargeRedirect";
 import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
 const GP_DAILY_BASE = "/gp-daily";
@@ -106,21 +106,7 @@ function formatSubscriptionDeliveryLine(
   const raw = subscription.deliveryAddress as
     | (Subscription["deliveryAddress"] & Record<string, unknown>)
     | undefined;
-  if (!raw) return "Delivery address on file";
-
-  const fromApiFields = formatDeliveryAddress(raw as Record<string, unknown>);
-  if (fromApiFields) return fromApiFields;
-
-  const parts = [
-    [raw.houseNo, raw.streetName].filter(Boolean).join(" "),
-    raw.area,
-    raw.city,
-    raw.state,
-    raw.pincode,
-  ]
-    .map((p) => String(p ?? "").trim())
-    .filter(Boolean);
-  return parts.join(", ") || "Delivery address on file";
+  return formatSubscriptionDeliverTo(raw);
 }
 
 function isSubscriptionOrderType(o: Record<string, unknown>): boolean {

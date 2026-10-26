@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useId } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useId, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { IoWalletOutline, IoTimeOutline, IoRefresh } from "react-icons/io5";
 
@@ -58,6 +58,12 @@ import { UniformPageHeader } from "../../layout/UniformPageHeader";
 import { gpDailyHome } from "../../../utils/gpDailyHomeDesignSystem";
 import { tryCompleteGpDailyPendingSubscriptionAfterRecharge } from "../../../utils/resumeGpDailySubscriptionCheckout";
 import { shouldResumeGpDailyCheckoutAfterWalletRecharge } from "../../../utils/walletRechargeNavigation";
+import {
+  pendingWalletTopUpPollKey,
+  sameWalletTxnList,
+  WALLET_PENDING_POLL_INTERVAL_MS,
+  WALLET_PENDING_POLL_MAX_ATTEMPTS,
+} from "../../../utils/walletPageRefresh";
 import { UserNotice } from "../../common/UserNotice";
 import { USER_NOTICES } from "../../../constants/userNotices";
 
@@ -196,25 +202,30 @@ const Wallet = () => {
     removePendingPayment,
   } = useNetworkRecovery();
 
-  // Add useCallback to memoize fetchWalletBalance
-  const fetchWalletBalance = useCallback(async () => {
-    try {
-      setIsLoadingBalance(true);
-      const response = await walletService.getWalletBalance();
+  /**
+   * After the first paint, later wallet GETs must not flip `isLoadingBalance`.
+   * That flag unmounts the whole page into a skeleton; pairing it with the
+   * pending-top-up poll made the low-balance screen blink forever.
+   */
+  const hasPaintedWalletRef = useRef(false);
 
+  const fetchWalletBalance = useCallback(async () => {
+    const showFullPageLoader = !hasPaintedWalletRef.current;
+    try {
+      if (showFullPageLoader) setIsLoadingBalance(true);
+      const response = await walletService.getWalletBalance();
 
       const { balance = 0, transactions = [], transactionLogs = [] } = response || {};
 
       setBalance(balance);
-      setTransactions(transactions);
+      setTransactions((prev) => (sameWalletTxnList(prev, transactions) ? prev : transactions));
       setTransactionLogs(transactionLogs);
-
-
+      hasPaintedWalletRef.current = true;
     } catch (error: any) {
       console.error('Error fetching wallet:', error);
       toast.error("Failed to fetch wallet balance");
     } finally {
-      setIsLoadingBalance(false);
+      if (showFullPageLoader) setIsLoadingBalance(false);
     }
   }, []);
 
@@ -440,7 +451,6 @@ const Wallet = () => {
     fetchWalletBalance,
     navigate,
     location.pathname,
-    location.state,
     isLoggedIn,
     basePath,
   ]);
@@ -489,22 +499,35 @@ const Wallet = () => {
    * order detail once and remember the first product label. Listed under
    * “Recent Transactions” instead of the raw order ID. We tolerate failures so
    * the wallet keeps rendering even if the orders API is unavailable.
+   *
+   * Labels live in a ref so this effect does not re-run when the map updates
+   * (that + a live `transactions` array was cancelling in-flight lookups).
    */
+  const orderLabelByNumberRef = useRef(orderLabelByNumber);
+  orderLabelByNumberRef.current = orderLabelByNumber;
+  const orderLabelInFlightRef = useRef(new Set<string>());
+
   useEffect(() => {
-    const orderNumbers = new Set<string>();
+    const orderNumbers: string[] = [];
     transactions.forEach((t) => {
       const desc = normalizeWalletTransactionDescription(t);
       const orderNumber = extractOrderNumberFromTxnDescription(desc);
-      if (orderNumber && !(orderNumber in orderLabelByNumber)) {
-        orderNumbers.add(orderNumber);
+      if (
+        orderNumber &&
+        !(orderNumber in orderLabelByNumberRef.current) &&
+        !orderLabelInFlightRef.current.has(orderNumber)
+      ) {
+        orderNumbers.push(orderNumber);
       }
     });
-    if (orderNumbers.size === 0) return;
+    if (orderNumbers.length === 0) return;
+
+    for (const num of orderNumbers) orderLabelInFlightRef.current.add(num);
 
     let cancelled = false;
     void (async () => {
       const entries = await Promise.all(
-        Array.from(orderNumbers).map(async (num) => {
+        orderNumbers.map(async (num) => {
           try {
             const detail = await orderService.getOrderByOrderNumber(num);
             if (!detail || typeof detail !== "object") {
@@ -520,6 +543,7 @@ const Wallet = () => {
           }
         }),
       );
+      for (const num of orderNumbers) orderLabelInFlightRef.current.delete(num);
       if (cancelled) return;
       setOrderLabelByNumber((prev) => {
         const next = { ...prev };
@@ -532,7 +556,7 @@ const Wallet = () => {
     return () => {
       cancelled = true;
     };
-  }, [transactions, orderLabelByNumber]);
+  }, [transactions]);
 
   const filteredWalletRows = useMemo(() => {
     const all = [...transactions, ...(transactionLogs || [])];
@@ -549,27 +573,30 @@ const Wallet = () => {
     return rows;
   }, [transactions, transactionLogs, feature, showDepositHistoryOnly]);
 
-  /** Poll Razorpay status per open top-up Payment (not a time-based guess). */
+  /**
+   * Poll Razorpay only while a CREDIT top-up is still pending. Key the effect
+   * on the order-id set, not `transactions`, so a silent wallet refresh does
+   * not reset attempt counts or start another immediate GET /wallet/.
+   */
+  const pendingTopUpPollKey = useMemo(
+    () => pendingWalletTopUpPollKey(transactions),
+    [transactions],
+  );
+
   useEffect(() => {
-    const pendingOrders = [
-      ...new Set(
-        transactions
-          .filter(
-            (t) =>
-              String(t.status ?? "").toLowerCase() === "pending" &&
-              Boolean(t.razorpayOrderId?.trim()),
-          )
-          .map((t) => t.razorpayOrderId!.trim()),
-      ),
-    ];
+    if (!pendingTopUpPollKey) return;
+    const pendingOrders = pendingTopUpPollKey.split("|").filter(Boolean);
     if (pendingOrders.length === 0) return;
 
     let cancelled = false;
     let attempts = 0;
-    const maxAttempts = 12;
+    let intervalId = 0;
 
     const tick = async () => {
-      if (cancelled || attempts >= maxAttempts) return;
+      if (cancelled || attempts >= WALLET_PENDING_POLL_MAX_ATTEMPTS) {
+        window.clearInterval(intervalId);
+        return;
+      }
       attempts += 1;
       for (const orderId of pendingOrders) {
         try {
@@ -584,12 +611,15 @@ const Wallet = () => {
     };
 
     void tick();
-    const intervalId = window.setInterval(() => void tick(), 4000);
+    intervalId = window.setInterval(
+      () => void tick(),
+      WALLET_PENDING_POLL_INTERVAL_MS,
+    );
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [transactions, fetchWalletBalance]);
+  }, [pendingTopUpPollKey, fetchWalletBalance]);
 
   /** Most recent credit (app: last successful deposit from `transaction_type` / type). */
   const latestWalletRechargeAmount = useMemo(() => {

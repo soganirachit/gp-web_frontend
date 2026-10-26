@@ -161,6 +161,7 @@ function mapSubscriptionDeliveryAddress(
   if (!line1 && !line2 && !landmark && !city) return undefined;
   return {
     id: String(a.id ?? ""),
+    address_line1: line1,
     houseNo: line1,
     streetName: line2,
     area: landmark,
@@ -413,6 +414,7 @@ export interface Subscription {
   zoneName?: string;
   deliveryAddress?: {
     id: string;
+    address_line1?: string;
     houseNo: string;
     streetName: string;
     area: string;

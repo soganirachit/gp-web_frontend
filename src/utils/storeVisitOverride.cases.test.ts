@@ -3,6 +3,7 @@
  * Run: npx tsx src/utils/storeVisitOverride.cases.test.ts
  */
 import {
+  accountStoreIdForCurrentPin,
   clearStoreVisitOverride,
   getStoreVisitOverrideId,
   preferStoreIdForVisit,
@@ -94,6 +95,24 @@ assert(
     selectableIds: selectable,
   }) === 26,
   "stale session id that is not selectable yields nearest",
+);
+
+assert(
+  accountStoreIdForCurrentPin({
+    overrideId: 52,
+    nearestId: 26,
+    selectableIds: selectable,
+  }) === 52,
+  "Account pick still wins after a pin change during this visit",
+);
+
+assert(
+  accountStoreIdForCurrentPin({
+    overrideId: null,
+    nearestId: 88,
+    selectableIds: [26, 88],
+  }) === 88,
+  "without Account pick, leftover session store is ignored — nearest for the new pin wins",
 );
 
 if (failed) {

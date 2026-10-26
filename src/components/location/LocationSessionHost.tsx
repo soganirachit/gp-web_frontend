@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
   handleGpsWatchSample,
+  maybeSkipStickyManualOnNewLoad,
   refreshLocationForChannel,
 } from "../../services/locationSession.service";
 import { channelFromPathname } from "../../utils/locationSession";
@@ -21,6 +22,10 @@ export function LocationSessionHost() {
   const pendingRef = useRef<ReturnType<typeof channelFromPathname>>(null);
   const loggedInRef = useRef(isLoggedIn);
   loggedInRef.current = isLoggedIn;
+
+  useEffect(() => {
+    void maybeSkipStickyManualOnNewLoad();
+  }, []);
 
   useEffect(() => {
     const channel = channelFromPathname(pathname);
