@@ -26,6 +26,7 @@ import {
 import { CATALOG_PRODUCTS_REFRESH_EVENT } from "../utils/productUnavailableAtStore";
 import { toast } from "react-hot-toast";
 import { StoreHomeSkeleton } from "../components/common/PageSkeletons";
+import Spinner from "../components/common/Spinner";
 import { SearchBar } from "../components/common/SearchBar";
 import ErrorBoundary from "../components/ErrorBoundary";
 import SearchIcon from "../assets/icon/Search.png";
@@ -34,13 +35,14 @@ import { GP_OPEN_GUEST_AREA_MODAL_EVENT } from "../config/guestAreaModalCopy";
 import {
   coordsFromGuestBrowseAddress,
   guestAddressFormNavState,
-  guestHasSavedBrowseAddress,
+  guestShouldOpenAddressFormFromHeader,
 } from "../utils/guestAddressEntry";
 import {
   formatSavedAddressLine,
   pickSessionHeaderAddress,
 } from "../utils/resolveHomeCatalogHeaderAddress";
 import { LOCATION_SESSION_UPDATED_EVENT, getSessionPin, isGuestLocationFrozen } from "../utils/locationSession";
+import { readSelectedDeliveryAddress } from "../utils/selectedDeliveryAddressStorage";
 import { HomeHeroStatusBanner } from "../components/home/HomeHeroStatusBanner";
 import { GpStoreOfflineHero } from "../components/store/GpStoreOfflineHero";
 import { BrandIntroPyramidCopy } from "../components/common/BrandIntroPyramidCopy";
@@ -122,6 +124,7 @@ const GpStore_Homepage: React.FC = () => {
     const [homeHeroStatus, setHomeHeroStatus] = useState<HomeHeroStatus>("default");
     const deliveryCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
     const [deliveryCoordsTick, setDeliveryCoordsTick] = useState(0);
+    const initialBootDoneRef = useRef(false);
 
     const refreshHomeHeroStatus = useCallback(async () => {
         storeService.clearOfflineStoreListCache();
@@ -364,18 +367,9 @@ const GpStore_Homepage: React.FC = () => {
             }
         } catch (error) {
             console.error("Error fetching address:", error);
-            const stored = localStorage.getItem("selectedDeliveryAddress");
-            if (stored) {
-                try {
-                    const parsed = JSON.parse(stored) as Parameters<
-                        typeof formatSavedAddressLine
-                    >[0] & { type?: string };
-                    applyHeaderAddress(parsed);
-                } catch {
-                    setDeliveryLocation(localStorage.getItem("userLocation") || "");
-                    setAddressType("Home");
-                    deliveryCoordsRef.current = null;
-                }
+            const parsed = readSelectedDeliveryAddress();
+            if (parsed) {
+                applyHeaderAddress(parsed);
             } else {
                 setDeliveryLocation(localStorage.getItem("userLocation") || "");
                 setAddressType("Home");
@@ -479,7 +473,7 @@ const GpStore_Homepage: React.FC = () => {
 
     const handleLocationClick = () => {
         if (!isLoggedIn) {
-            if (guestHasSavedBrowseAddress()) {
+            if (guestShouldOpenAddressFormFromHeader()) {
                 navigate(`${basePath}/address-selection`, {
                     state: guestAddressFormNavState(),
                 });
@@ -510,9 +504,17 @@ const GpStore_Homepage: React.FC = () => {
 
     const isPageLoading = isLoadingAddress || isLoadingProducts || isLoadingCategories || isLoadingBestSellers;
 
-    if (isPageLoading) {
+    if (!isPageLoading) {
+        initialBootDoneRef.current = true;
+    }
+
+    if (isPageLoading && !initialBootDoneRef.current) {
         return <StoreHomeSkeleton />;
     }
+
+    const catalogRefreshing =
+        initialBootDoneRef.current &&
+        (isLoadingProducts || isLoadingCategories || isLoadingBestSellers);
 
     const filteredBestSellers = bestSellers;
     const bestSellerSectionTitle = resolveLabelSectionTitle("best-seller", filteredBestSellers);
@@ -527,6 +529,16 @@ const GpStore_Homepage: React.FC = () => {
             />
             <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom overflow-x-hidden">
                 <div className="mx-auto w-full min-w-0 max-w-[min(800px,100vw)]">
+                    {catalogRefreshing ? (
+                        <div
+                            className="flex items-center justify-center gap-2 border-b border-[#19411f]/10 bg-[#f8f6f1] px-4 py-2 text-sm text-gray-600"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            <Spinner size={18} />
+                            Updating catalog…
+                        </div>
+                    ) : null}
                     {/* Top Header with Green Background */}
                     <div className="relative px-4 pt-0 " style={{
                         background: 'linear-gradient(to bottom, #DAFFD9, #D8F0D7)',

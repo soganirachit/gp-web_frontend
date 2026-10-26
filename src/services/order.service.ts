@@ -188,7 +188,9 @@ class OrderService {
      */
     async getOrderByOrderNumber(orderNumber: string) {
         try {
-            const response = await api.get(`${getApiUrl()}/orders/${orderNumber}/`);
+            const response = await api.get(
+                `${getApiUrl()}/orders/${encodeURIComponent(orderNumber)}/`,
+            );
             if (response.status === 200) {
                 if (response.data.success && response.data.data) {
                     return response.data.data;

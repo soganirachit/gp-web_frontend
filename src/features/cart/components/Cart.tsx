@@ -9,6 +9,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useFeatureTheme } from '../../../context/FeatureThemeContext';
 import { addressService, Address } from '../../../services/address.service';
 import {
+  GUEST_STORE_UPDATED_EVENT,
   storeService,
   storeIsWithinDeliveryRadius,
   isCartStoreOffline,
@@ -34,6 +35,7 @@ import { paymentService } from '../../../services/payment.service';
 import { orderService } from '../../../services/order.service';
 import { customerService } from '../../../services/getcustomer.service';
 import { cartService, type CartData } from '../../../services/cart.service';
+import { getStoreVisitOverrideId } from '../../../utils/storeVisitOverride';
 import Spinner from '../../../components/common/Spinner';
 import { CartPageSkeleton } from '../../../components/common/PageSkeletons';
 import { GP_SHEET_DESKTOP_ALIGN_CLASSES } from '../../../components/common/SearchBar';
@@ -52,12 +54,17 @@ import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
 import { formatCartDeliveryAddress } from '../../../utils/formatCartDeliveryAddress';
+import { readSelectedDeliveryAddress } from '../../../utils/selectedDeliveryAddressStorage';
 import { CartConfirmModal } from '../../../components/cart/CartConfirmModal';
 import { useCartUnavailableProductDialog } from '../../../hooks/useCartUnavailableProductDialog';
 import {
   SWITCH_STORE_CONFIRM_MESSAGE,
   SWITCH_STORE_CONFIRM_TITLE,
 } from '../../../utils/cartConfirmCopy';
+import {
+  countRemovedCartSwitchItems,
+  toastAfterSuggestedStoreSwitch,
+} from '../../../utils/cartStoreSwitchFeedback';
 import { errorMessageFromCatch, isCartLineUnavailableMessage } from '../../../utils/apiErrorMessage';
 import { presentCheckoutFailure } from '../../../utils/presentCheckoutFailure';
 import {
@@ -67,6 +74,8 @@ import {
 } from '../../../utils/cartStockInlineMessage';
 import { DELIVERY_DATE_MAX_DAYS_FROM_TODAY } from '../../../constants/deliveryBooking';
 import { REQUIRED_TOAST } from '../../../constants/requiredToastMessages';
+import { UserNotice } from '../../../components/common/UserNotice';
+import { USER_NOTICES } from '../../../constants/userNotices';
 import { LIVE_DEVICE_ADDRESS_ID } from '../../../utils/addressCoordinates';
 import {
   getSlotWindowMinutes,
@@ -219,15 +228,31 @@ interface Coupon {
   first_order_only: boolean;
   scope: string;
   discount_label: string;  // e.g. "10% off (up to ₹100)" – use this directly
+  can_apply?: boolean;
+  ineligibility_reason?: string | null;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
+export class StoreCouponsNeedStoreError extends Error {
+  constructor() {
+    super("STORE_NOT_SELECTED");
+    this.name = "StoreCouponsNeedStoreError";
+  }
+}
+
 const fetchCoupons = async (): Promise<Coupon[]> => {
   const storeId = storeService.getStoreIdForProducts();
-  if (storeId == null) return [];
+  if (storeId == null) {
+    throw new StoreCouponsNeedStoreError();
+  }
   const res = await api.get(`${getApiUrl()}/cart/coupons/?store_id=${storeId}`);
   const json = res.data;
+  if (json && typeof json === "object" && (json as { success?: boolean }).success === false) {
+    throw new Error(
+      String((json as { message?: string }).message || "Failed to load promo codes"),
+    );
+  }
   return Array.isArray(json) ? json : (json.data ?? json.results ?? json.coupons ?? []);
 };
 
@@ -263,6 +288,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [isFetchingCoupons, setIsFetchingCoupons] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [needsStore, setNeedsStore] = useState(false);
   /** Inline feedback below manual entry (replaces toast for apply success/error) */
   const [applyHint, setApplyHint] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   /** Keep sheet anchored to bottom like app; only adapt maxHeight for keyboard/view changes. */
@@ -289,27 +315,36 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
     try {
       setIsFetchingCoupons(true);
       setFetchError(null);
+      setNeedsStore(false);
       const data = await fetchCoupons();
       setCoupons(data);
-    } catch {
-      setFetchError('Could not load available coupons.');
+    } catch (e) {
+      if (e instanceof StoreCouponsNeedStoreError) {
+        setNeedsStore(true);
+        setCoupons([]);
+        setFetchError(null);
+      } else {
+        setFetchError(
+          e instanceof Error ? e.message : 'Could not load available coupons.',
+        );
+      }
     } finally {
       setIsFetchingCoupons(false);
     }
   };
 
-  // Fetch as soon as the modal mounts
-  useEffect(() => { loadCoupons(); }, []);
+  useEffect(() => {
+    void loadCoupons();
+    const onStore = () => void loadCoupons();
+    window.addEventListener(GUEST_STORE_UPDATED_EVENT, onStore);
+    return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, onStore);
+  }, []);
 
   const runApply = async (code: string) => {
     setApplyHint(null);
     try {
       const result = await onApply(code);
-      const serverMsg = result && typeof result === 'object' && 'successMessage' in result ? result.successMessage : undefined;
-      setApplyHint({
-        kind: 'success',
-        text: (typeof serverMsg === 'string' && serverMsg.trim()) || `“${code}” applied successfully.`,
-      });
+      onClose();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Could not apply this code.';
       setApplyHint({ kind: 'error', text: msg });
@@ -418,12 +453,27 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                   Retry
                 </button>
               </div>
+            ) : needsStore ? (
+              <div className="text-center py-6">
+                <p className="text-sm text-gray-600">
+                  Choose your GP Store in Account or wait for the cart to detect your store, then tap Retry.
+                </p>
+                <button
+                  onClick={loadCoupons}
+                  className="mt-2 text-sm text-[#19411F] font-medium hover:underline"
+                >
+                  Retry
+                </button>
+              </div>
             ) : coupons.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-6">No coupons available right now.</p>
             ) : (
               <div className="space-y-3">
                 {coupons.map((coupon) => {
                   const isApplied = appliedCode === coupon.code;
+                  const cannotApply =
+                    coupon.can_apply === false || Boolean(coupon.ineligibility_reason);
+                  const blockReason = coupon.ineligibility_reason ?? "";
                   return (
                     <div
                       key={coupon.id}
@@ -448,25 +498,39 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({ onClose, onApply, isApp
                             <p className="text-xs text-gray-500 mt-0.5 truncate">{coupon.description}</p>
                           )}
                           {/* Min order */}
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            Min. order ₹{coupon.min_order_amount}
-                          </p>
+                          {coupon.min_order_amount ? (
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              Min. order ₹{coupon.min_order_amount}
+                            </p>
+                          ) : null}
+                          {blockReason ? (
+                            <p className="mt-1 text-xs font-semibold text-red-600">
+                              {blockReason}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
 
                       <button
-                        onClick={() => void runApply(coupon.code)}
-                        disabled={isApplying}
+                        onClick={() => {
+                          if (!isApplied && cannotApply) return;
+                          void runApply(coupon.code);
+                        }}
+                        disabled={isApplying || (!isApplied && cannotApply)}
                         className={`ml-3 flex-shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
                           isApplied
                             ? 'bg-[#19411F] text-white'
-                            : 'bg-white border border-[#19411F] text-[#19411F] hover:bg-[#19411F] hover:text-white'
+                            : cannotApply
+                              ? 'cursor-not-allowed border border-gray-300 bg-gray-200 text-gray-500'
+                              : 'bg-white border border-[#19411F] text-[#19411F] hover:bg-[#19411F] hover:text-white'
                         }`}
                       >
                         {isApplied ? (
                           <><FaCheck className="text-xs" /> Applied</>
                         ) : isApplying ? (
                           'Applying...'
+                        ) : cannotApply ? (
+                          'N/A'
                         ) : (
                           'Apply'
                         )}
@@ -490,7 +554,7 @@ const Cart: React.FC = () => {
   const location = useLocation();
   const { isLoggedIn, phoneNumber: authPhoneNumber } = useAuth();
   const { feature, theme } = useFeatureTheme();
-  const browseProductsPath = feature === 'gpStore' ? '/gp-store/products' : '/gp-daily/Products';
+  const browseProductsPath = feature === 'gpStore' ? '/gp-store/products' : '/gp-daily/products';
   const { storePendingPayment, removePendingPayment, retryWithBackoff, recoverPendingPayments } =
     useNetworkRecovery();
   const {
@@ -555,7 +619,11 @@ const Cart: React.FC = () => {
   const [editMessage, setEditMessage] = useState<string>('');
   const datePickerRef = useRef<HTMLDivElement>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isPreparingCheckout, setIsPreparingCheckout] = useState(false);
   const [checkoutInlineError, setCheckoutInlineError] = useState<string | null>(null);
+  const [paymentUserNotice, setPaymentUserNotice] = useState<
+    "cancelled" | "unconfirmed" | null
+  >(null);
   /** After Razorpay succeeds — verify / poll order (avoid “Preparing payment” copy here). */
   const [isConfirmingOrder, setIsConfirmingOrder] = useState(false);
   const [shouldTriggerPayment, setShouldTriggerPayment] = useState(false);
@@ -637,7 +705,8 @@ const Cart: React.FC = () => {
       const cartStoreNum = Number(cartData.store as number | string);
       if (!Number.isFinite(cartStoreNum)) return cartData;
       try {
-        const persisted = storeService.getSelectedStoreId();
+        const persisted =
+          getStoreVisitOverrideId() ?? storeService.getSelectedStoreId();
         if (persisted == null) {
           await storeService.switchStore(cartStoreNum);
           return cartData;
@@ -877,67 +946,113 @@ const Cart: React.FC = () => {
 
   // Fetch available delivery slots for a given date from the backend.
   // Falls back to empty array on error — checkout button will show a message.
-  const fetchSlotsForDate = async (date: Date) => {
-    const normalizedDate = startOfDay(date);
-    const formattedDate = format(normalizedDate, 'dd MMM yyyy');
-    setIsLoadingSlots(true);
-    try {
-      const storeId = cartStoreId ?? storeService.getStoreIdForProducts();
-      if (storeId == null) {
+  const fetchSlotsForDate = useCallback(
+    async (date: Date, opts?: { clearSlotSelection?: boolean }) => {
+      const normalizedDate = startOfDay(date);
+      const formattedDate = format(normalizedDate, 'dd MMM yyyy');
+      setIsLoadingSlots(true);
+      try {
+        const storeId =
+          storeService.getSelectedStoreId() ??
+          cartStoreId ??
+          storeService.getStoreIdForProducts();
+        if (storeId == null) {
+          setAvailableSlots([]);
+          setSelectedSlotId(null);
+          setSelectedTimeSlot('');
+          return;
+        }
+        const params = new URLSearchParams();
+        params.set('store_id', String(storeId));
+        const response = await api.get(`/delivery/slots/available/?${params.toString()}`);
+        const raw = Array.isArray(response.data)
+          ? response.data
+          : (response.data?.data ?? response.data?.results ?? []);
+        const slots: DeliverySlot[] = sortSlotsByStart(
+          raw
+            .filter((item: any) => item?.is_available !== false && item?.slot)
+            .map((item: any) => {
+              const s = item.slot;
+              return {
+                id: s.id,
+                slot_name: s.slot_name,
+                start_time: s.start_time,
+                end_time: s.end_time,
+              };
+            }),
+        );
+        setAvailableSlots(slots);
+        const selectableSlots = slots.filter((slot) =>
+          isSlotSelectable(slot, normalizedDate),
+        );
+        if (selectableSlots.length > 0) {
+          const restoreId = opts?.clearSlotSelection ? undefined : deliveryInfo?.slotId;
+          const restored = restoreId
+            ? selectableSlots.find((s) => s.id === restoreId)
+            : null;
+          const toSelect = restored ?? selectableSlots[0];
+          setSelectedSlotId(toSelect.id);
+          setSelectedTimeSlot(getSlotDisplayLabel(toSelect));
+          updateDeliveryInfo({
+            ...(deliveryInfo ?? {}),
+            deliveryDate: formattedDate,
+            selectedDate: normalizedDate,
+            timeSlot: getSlotDisplayLabel(toSelect),
+            slotId: toSelect.id,
+          });
+        } else {
+          setSelectedSlotId(null);
+          setSelectedTimeSlot('');
+          updateDeliveryInfo({
+            ...(deliveryInfo ?? {}),
+            deliveryDate: formattedDate,
+            selectedDate: normalizedDate,
+            timeSlot: '',
+            slotId: undefined,
+          });
+        }
+      } catch {
         setAvailableSlots([]);
         setSelectedSlotId(null);
         setSelectedTimeSlot('');
-        return;
+      } finally {
+        setIsLoadingSlots(false);
       }
-      const params = new URLSearchParams();
-      params.set('store_id', String(storeId));
-      const response = await api.get(`/delivery/slots/available/?${params.toString()}`);
-      const raw = Array.isArray(response.data) ? response.data : (response.data?.data ?? response.data?.results ?? []);
-      // API returns [{ slot: { id, slot_name, start_time, end_time }, is_available }, ...] — flatten and filter
-      const slots: DeliverySlot[] = sortSlotsByStart(
-        raw
-          .filter((item: any) => item?.is_available !== false && item?.slot)
-          .map((item: any) => {
-            const s = item.slot;
-            return { id: s.id, slot_name: s.slot_name, start_time: s.start_time, end_time: s.end_time };
-          }),
-      );
-      setAvailableSlots(slots);
-      const selectableSlots = slots.filter((slot) => isSlotSelectable(slot, normalizedDate));
-      // Auto-select only selectable slots for today; keep existing behavior for other dates.
-      if (selectableSlots.length > 0) {
-        const restored = deliveryInfo?.slotId
-          ? selectableSlots.find(s => s.id === deliveryInfo.slotId)
-          : null;
-        const toSelect = restored ?? selectableSlots[0];
-        setSelectedSlotId(toSelect.id);
-        setSelectedTimeSlot(getSlotDisplayLabel(toSelect));
-        updateDeliveryInfo({
-          ...(deliveryInfo ?? {}),
-          deliveryDate: formattedDate,
-          selectedDate: normalizedDate,
-          timeSlot: getSlotDisplayLabel(toSelect),
-          slotId: toSelect.id,
-        });
-      } else {
-        setSelectedSlotId(null);
-        setSelectedTimeSlot('');
-        updateDeliveryInfo({
-          ...(deliveryInfo ?? {}),
-          deliveryDate: formattedDate,
-          selectedDate: normalizedDate,
-          timeSlot: '',
-          slotId: undefined,
-        });
-      }
-    } catch {
-      setAvailableSlots([]);
-      setSelectedSlotId(null);
-      setSelectedTimeSlot('');
-    } finally {
-      setIsLoadingSlots(false);
-    }
-  };
+    },
+    [cartStoreId, deliveryInfo, updateDeliveryInfo],
+  );
+
+  useEffect(() => {
+    const onStoreUpdated = () => {
+      const sid = storeService.getSelectedStoreId();
+      if (sid != null) setCartStoreId(sid);
+      void (async () => {
+        if (isLoggedIn) {
+          try {
+            const raw = await cartService.getCartData();
+            const cartData = await reconcileCartStoreWithAccountSelection(raw);
+            applyServerCartData(cartData, setCartTotals, setCartStoreName, setCartStoreId);
+          } catch {
+            /* cart totals optional */
+          }
+        }
+        const day =
+          deliveryInfo?.selectedDate instanceof Date
+            ? deliveryInfo.selectedDate
+            : deliveryInfo?.selectedDate
+              ? new Date(deliveryInfo.selectedDate)
+              : addDays(startOfDay(new Date()), 1);
+        await fetchSlotsForDate(day, { clearSlotSelection: true });
+      })();
+    };
+    window.addEventListener(GUEST_STORE_UPDATED_EVENT, onStoreUpdated);
+    return () => window.removeEventListener(GUEST_STORE_UPDATED_EVENT, onStoreUpdated);
+  }, [
+    isLoggedIn,
+    deliveryInfo?.selectedDate,
+    fetchSlotsForDate,
+    reconcileCartStoreWithAccountSelection,
+  ]);
 
   // If "Today" has no bookable slots, hide it and move selection off "today" (e.g. to tomorrow).
   useEffect(() => {
@@ -1267,21 +1382,11 @@ const Cart: React.FC = () => {
         setIsLoadingAddress(false);
         return;
       }
-      const storedAddress = localStorage.getItem('selectedDeliveryAddress');
+      const storedAddress = readSelectedDeliveryAddress();
       if (storedAddress) {
-        try {
-          const parsed = JSON.parse(storedAddress);
-          const currentUserId = localStorage.getItem('userId');
-          const addrUserId = parsed?.userId?.toString();
-          if (currentUserId && addrUserId && addrUserId !== currentUserId) {
-            // Stale address from a different user session — discard it
-            localStorage.removeItem('selectedDeliveryAddress');
-          } else {
-            setDefaultAddress(parsed);
-            setIsLoadingAddress(false);
-            return;
-          }
-        } catch (_) {}
+        setDefaultAddress(storedAddress);
+        setIsLoadingAddress(false);
+        return;
       }
       try {
         setIsLoadingAddress(true);
@@ -1579,7 +1684,8 @@ const Cart: React.FC = () => {
     const target = suggestedStoreForAddress;
     try {
       setIsSwitchingSuggestedStore(true);
-      await cartService.switchCartStore(target.id);
+      const cartRes = await cartService.switchCartStore(target.id);
+      const removedCount = countRemovedCartSwitchItems(cartRes);
       await storeService.switchStore(target.id);
       deliveryStoreSyncKey.current = '';
       await loadCartFromAPI();
@@ -1597,7 +1703,7 @@ const Cart: React.FC = () => {
       }
       setSuggestedStoreForAddress(null);
       setShowSuggestedStoreSwitchModal(false);
-      toast.success(`Store switched to ${target.name}.`);
+      toastAfterSuggestedStoreSwitch(target.name, removedCount);
     } catch (e: unknown) {
       toast.error(errorMessageFromCatch(e, 'Could not switch store for this address.'));
     } finally {
@@ -1649,8 +1755,16 @@ const Cart: React.FC = () => {
   };
 
   const handleCheckout = async () => {
-    if (checkoutInFlightRef.current || isProcessingPayment || isConfirmingOrder) return;
+    if (
+      checkoutInFlightRef.current ||
+      isProcessingPayment ||
+      isConfirmingOrder ||
+      isPreparingCheckout
+    ) {
+      return;
+    }
     setCheckoutInlineError(null);
+    setPaymentUserNotice(null);
     const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
     if (!navigator.onLine) {
       toast.error(REQUIRED_TOAST.OFFLINE_CHECKOUT);
@@ -1667,6 +1781,8 @@ const Cart: React.FC = () => {
       return;
     }
 
+    setIsPreparingCheckout(true);
+    try {
     let latestCartData: CartData | null = null;
     try {
       await syncCartToAPI();
@@ -1873,6 +1989,9 @@ const Cart: React.FC = () => {
       setIsProcessingPayment(false);
       checkoutInFlightRef.current = false;
     }
+    } finally {
+      setIsPreparingCheckout(false);
+    }
   };
 
   // Shared logic: given verified order/payment data, clear cart and navigate to success
@@ -1968,7 +2087,8 @@ const Cart: React.FC = () => {
       if (!recovered) {
         // Payment was taken by Razorpay but we couldn't confirm the order.
         // Keep the pending payment in localStorage so it can be retried on next app load.
-        toast.error(REQUIRED_TOAST.PAYMENT_NOT_CONFIRMED);
+        setPaymentUserNotice('unconfirmed');
+        toast.error(REQUIRED_TOAST.PAYMENT_NOT_CONFIRMED, { id: 'payment-not-confirmed' });
         setCheckoutInlineError(REQUIRED_TOAST.PAYMENT_NOT_CONFIRMED);
         checkoutInFlightRef.current = false;
         // Trigger immediate global retry; do not wait for focus/page reload.
@@ -2004,7 +2124,8 @@ const Cart: React.FC = () => {
     checkoutDismissedRef.current = true;
     if (isPaymentModalDismissed(error) || /cancel/i.test(error.message || '')) {
       handlePlainRazorpayDismiss(razorpayOrderId);
-      setCheckoutInlineError(getPlainDismissUserMessage());
+      setPaymentUserNotice('cancelled');
+      setCheckoutInlineError(null);
     } else {
       const msg = error.message?.trim() || REQUIRED_TOAST.PAYMENT_NOT_COMPLETED;
       toast.error(
@@ -2612,8 +2733,60 @@ const Cart: React.FC = () => {
                 </div>
               )}
 
+              {isConfirmingOrder ? (
+                <UserNotice
+                  variant="info"
+                  title={USER_NOTICES.PAYMENT_CONFIRMING_TITLE}
+                  className="mb-3"
+                  role="status"
+                >
+                  {USER_NOTICES.PAYMENT_CONFIRMING_BODY}
+                </UserNotice>
+              ) : null}
+              {paymentUserNotice === 'cancelled' ? (
+                <UserNotice
+                  variant="warning"
+                  title={USER_NOTICES.PAYMENT_CANCELLED_TITLE}
+                  className="mb-3"
+                  role="status"
+                >
+                  {USER_NOTICES.PAYMENT_CANCELLED_BODY}
+                </UserNotice>
+              ) : null}
+              {paymentUserNotice === 'unconfirmed' ? (
+                <UserNotice
+                  variant="error"
+                  title={USER_NOTICES.PAYMENT_UNCONFIRMED_TITLE}
+                  className="mb-3"
+                  role="alert"
+                  actions={[
+                    {
+                      label: 'View my orders',
+                      to: `${feature === 'gpStore' ? '/gp-store' : '/gp-daily'}/orders`,
+                    },
+                  ]}
+                >
+                  {USER_NOTICES.PAYMENT_UNCONFIRMED_BODY}
+                </UserNotice>
+              ) : null}
+              {defaultAddress &&
+              String(defaultAddress.id) === LIVE_DEVICE_ADDRESS_ID ? (
+                <UserNotice
+                  variant="warning"
+                  title={USER_NOTICES.GPS_ADDRESS_TITLE}
+                  className="mb-3"
+                  actions={[
+                    {
+                      label: 'Save address',
+                      to: `${feature === 'gpStore' ? '/gp-store' : '/gp-daily'}/addresses/add`,
+                    },
+                  ]}
+                >
+                  {USER_NOTICES.GPS_ADDRESS_BODY}
+                </UserNotice>
+              ) : null}
               {/* Checkout */}
-              {checkoutInlineError ? (
+              {checkoutInlineError && !paymentUserNotice ? (
                 <div
                   className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700"
                   role="alert"
@@ -2622,8 +2795,10 @@ const Cart: React.FC = () => {
                 </div>
               ) : null}
               <button
+                type="button"
                 onClick={handleCheckout}
                 disabled={
+                  isPreparingCheckout ||
                   isProcessingPayment ||
                   isConfirmingOrder ||
                   hasStaleCartLine ||
@@ -2631,18 +2806,25 @@ const Cart: React.FC = () => {
                   deliveryBlockedByStoreMismatch ||
                   deliveryStoreOffline
                 }
-                className="w-full bg-[#19411F] text-white py-4 rounded-[25px] text-base font-semibold hover:bg-[#1e5a1c] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                aria-busy={
+                  isPreparingCheckout || isProcessingPayment || isConfirmingOrder
+                    ? true
+                    : undefined
+                }
+                className="w-full bg-[#19411F] text-white py-4 rounded-[25px] text-base font-semibold hover:bg-[#1e5a1c] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
               >
-                {(isProcessingPayment || isConfirmingOrder) && (
+                {(isPreparingCheckout || isProcessingPayment || isConfirmingOrder) && (
                   <Spinner size={22} variant="light" className="!inline-flex" />
                 )}
                 {isConfirmingOrder
                   ? 'Confirming your order…'
                   : isProcessingPayment
                     ? 'Preparing payment…'
-                    : deliveryStoreOffline
-                      ? STORE_OFFLINE_ORDER_BUTTON_LABEL
-                      : 'Checkout'}
+                    : isPreparingCheckout
+                      ? 'Updating basket…'
+                      : deliveryStoreOffline
+                        ? STORE_OFFLINE_ORDER_BUTTON_LABEL
+                        : 'Checkout'}
               </button>
             </>
           </div>

@@ -42,6 +42,12 @@ import {
 } from "../../utils/productUnavailableAtStore";
 import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
 import {
+  CUSTOMER_ERRORS,
+  customerErrorFromCatch,
+} from "../../constants/customerFacingErrors";
+import { ROUTES, walletPathForFeature } from "../../config/routes.config";
+import { GpButton } from "../ui/GpButton";
+import {
   extractCartStockApiMessage,
   formatCartStockInlineMessage,
   isCartStockOrAvailabilityInlineError,
@@ -54,6 +60,10 @@ import {
   formatFreeDeliveryThresholdForDisplay,
 } from "../../services/store.service";
 import { useCartStoreReplaceGate } from "../../hooks/useCartStoreReplaceGate";
+import {
+  productSlugRouteDiffersFromParam,
+  sanitizeProductRouteSlug,
+} from "../../utils/productSlug";
 
 interface ProductImage {
   id: number;
@@ -127,7 +137,8 @@ const gallerySlideVariants = {
 };
 
 const StorePage: React.FC = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug: slugParam } = useParams<{ slug: string }>();
+  const slug = sanitizeProductRouteSlug(slugParam);
   const navigate = useNavigate();
   const location = useLocation();
   const { items, addToCart, updateQuantity, removeFromCart, updateCustomizedMessage, loadCartFromAPI } =
@@ -147,6 +158,7 @@ const StorePage: React.FC = () => {
   const [productUnavailable, setProductUnavailable] = useState(false);
   const productUnavailableRedirectRef = useRef(false);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [freeDeliveryThresholdDisplay, setFreeDeliveryThresholdDisplay] =
     useState<string>(DEFAULT_FREE_DELIVERY_THRESHOLD_RUPEES);
   const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
@@ -305,6 +317,14 @@ const StorePage: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!productSlugRouteDiffersFromParam(slugParam, slug)) return;
+    navigate(
+      `${basePath}/product/${encodeURIComponent(slug)}${location.search}`,
+      { replace: true, state: location.state },
+    );
+  }, [slug, slugParam, basePath, location.search, location.state, navigate]);
+
+  useEffect(() => {
     setProductUnavailable(false);
     productUnavailableRedirectRef.current = false;
   }, [slug]);
@@ -424,8 +444,8 @@ const StorePage: React.FC = () => {
   };
   const createStoreOrder = async () => {
     if (!product) {
-      toast.error("Product information not available", {
-        id: "Product information not available",
+      toast.error(CUSTOMER_ERRORS.PRODUCT_INFO_MISSING, {
+        id: "pdp-product-missing",
       });
       return;
     }
@@ -435,6 +455,7 @@ const StorePage: React.FC = () => {
     const { price } = getPriceDisplay();
     const productImage = getProductImage();
 
+    setIsAddingToCart(true);
     try {
       await runWithStoreCheck(async () => {
         await addToCart({
@@ -457,7 +478,10 @@ const StorePage: React.FC = () => {
             : undefined,
         });
 
-        toast.success("Added to basket", { id: "Added to basket", duration: 3000 });
+        toast.success(REQUIRED_TOAST.ADDED_TO_BASKET, {
+          id: "pdp-added-to-basket",
+          duration: 3000,
+        });
         trackAddToCart({ id: product.id, name: product.name, price, quantity: 1 });
       });
     } catch (error: unknown) {
@@ -468,9 +492,11 @@ const StorePage: React.FC = () => {
       } else {
         const msg =
           apiMessage.trim() ||
-          errorMessageFromCatch(error, "Failed to add product to basket. Please try again.");
+          customerErrorFromCatch(error, REQUIRED_TOAST.FAILED_ADD_TO_BASKET);
         toast.error(msg, { id: msg.length > 100 ? msg.slice(0, 100) : msg });
       }
+    } finally {
+      setIsAddingToCart(false);
     }
   };
 
@@ -575,7 +601,7 @@ const StorePage: React.FC = () => {
       }
 
       // Navigate to address selection
-      navigate("/address-selection", {
+      navigate(ROUTES.store.addressSelection, {
         state: { productSlug: slug, product: product },
       });
       toast.success("Proceeding to address selection", {
@@ -588,10 +614,13 @@ const StorePage: React.FC = () => {
       ) {
         const authMsg = error.message || "Please login to continue";
         toast.error(authMsg, { id: authMsg });
-        navigate("/login", { state: { returnUrl: `/gp-store/product/${slug}` } });
+        navigate(ROUTES.store.login, {
+          state: { returnUrl: ROUTES.store.product(slug ?? "") },
+        });
         return;
       }
-      const subFailMsg = error.message || "Failed to proceed with subscription";
+      const subFailMsg =
+        error.message || CUSTOMER_ERRORS.SUBSCRIPTION_PROCEED_FAILED;
       toast.error(subFailMsg, { id: subFailMsg });
     } finally {
       setIsCheckingBalance(false);
@@ -600,11 +629,11 @@ const StorePage: React.FC = () => {
 
   const handleRechargeWallet = () => {
     setShowInsufficientBalanceModal(false);
-    navigate("/wallet", {
+    navigate(walletPathForFeature("gpDaily"), {
       state: {
         requiredAmount: balanceDetails.shortageAmount,
         currentBalance: balanceDetails.currentBalance,
-        returnUrl: `/gp-store/product/${slug}`,
+        returnUrl: ROUTES.store.product(slug ?? ""),
         subscriptionType: balanceDetails.subscriptionType,
         minimumDays: 7,
         maximumDays: selectedType === "Daily" ? 30 : 14,
@@ -826,10 +855,12 @@ const StorePage: React.FC = () => {
         <div className="p-4 pt-6 sticky top-0 bg-[#f8f6f1] z-10">
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => navigate(-1)}
-              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
+              className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors active:scale-95"
+              aria-label="Go back"
             >
-              <IoArrowBack size={24} />
+              <IoArrowBack size={24} aria-hidden />
             </button>
             <h1 className="min-w-0 flex-1 text-2xl font-bold font-serif text-gray-900 truncate">
               {categoryName}
@@ -924,7 +955,7 @@ const StorePage: React.FC = () => {
                   {orderedImages.map((_, idx) => (
                     <span
                       key={idx}
-                      className={`h-1.5 rounded-full transition-all ${
+                      className={`h-1.5 rounded-full transition-[width,background-color] duration-200 ${
                         idx === selectedImageIndex
                           ? 'w-5 bg-[#19411F]'
                           : 'w-1.5 bg-gray-300'
@@ -958,8 +989,8 @@ const StorePage: React.FC = () => {
                     description: product.short_description || product.description,
                   });
                 }}
-                className="flex h-8 w-8 shrink-0 items-center justify-center text-[#374151] hover:bg-black/5 rounded-full"
-                aria-label="Share product"
+                className="flex h-8 w-8 shrink-0 items-center justify-center text-[#374151] hover:bg-black/5 rounded-full active:scale-95 transition-transform"
+                aria-label={`Share ${product.name}`}
               >
                 <ShareNodesIcon className="text-xl text-[#374151]" size={20} />
               </button>
@@ -1031,7 +1062,7 @@ const StorePage: React.FC = () => {
                       setStockLimitMessage(null);
                       setSelectedVariant(variant);
                     }}
-                    className={`flex min-h-[5.5rem] min-w-[108px] flex-shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 px-3 py-3 text-center transition-all ${
+                    className={`flex min-h-[5.5rem] min-w-[108px] flex-shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 px-3 py-3 text-center transition-[border-color,background-color,box-shadow] duration-150 ${
                       selected
                         ? "border-[#19411F] bg-[#E6F4EA]"
                         : "border-gray-200 bg-white"
@@ -1177,9 +1208,12 @@ const StorePage: React.FC = () => {
                 : "Out of Stock"}
             </button>
           ) : (
-            <button
-              onClick={createStoreOrder}
-              className="w-full bg-[#19411F] mt-6 text-white py-3.5 rounded-[25px] text-base font-semibold mb-6 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            <GpButton
+              fullWidth
+              className="mt-6 mb-6 rounded-[25px]"
+              onClick={() => void createStoreOrder()}
+              loading={isAddingToCart}
+              loadingLabel="Adding…"
               disabled={
                 !product ||
                 product.in_stock === false ||
@@ -1189,7 +1223,7 @@ const StorePage: React.FC = () => {
               {product?.in_stock !== false && product?.is_available !== false
                 ? "Add to Basket"
                 : "Out of Stock"}
-            </button>
+            </GpButton>
           )}
 
           {/* Tabs and Content Card */}

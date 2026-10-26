@@ -1,4 +1,5 @@
 import type { NavigateFunction } from "react-router-dom";
+import { DAILY_WALLET_PATH } from "../config/routes.config";
 
 /** Shown under Proceed to Pay when wallet was opened from a subscription recharge flow. */
 export const GP_DAILY_SUBSCRIPTION_WALLET_RECHARGE_HINT =
@@ -17,7 +18,7 @@ export function navigateToGpDailyWalletForRecharge(
   },
 ): void {
   const shortage = Math.max(0, Math.ceil(options.shortageAmount));
-  navigate(`${basePath}/wallet`, {
+  navigate(DAILY_WALLET_PATH, {
     state: {
       returnUrl: options.returnUrl ?? `${basePath}/basket`,
       requiredAmount: shortage,

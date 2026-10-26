@@ -20,6 +20,8 @@ import {
   type SupportNavState,
 } from '../../utils/supportNavigation';
 import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
+import { UserNotice } from '../../components/common/UserNotice';
+import { USER_NOTICES } from '../../constants/userNotices';
 import { useSupportChatWebSocket } from '../../hooks/useSupportChatWebSocket';
 import { UNIFORM_PAGE_HEADER_TITLE_CLASS } from '../../components/layout/UniformPageHeader';
 
@@ -223,6 +225,7 @@ const SupportTicketChat: React.FC = () => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [filePreviewUrls, setFilePreviewUrls] = useState<string[]>([]);
   const [imageGallery, setImageGallery] = useState<ImageGalleryState>(null);
@@ -395,6 +398,7 @@ const SupportTicketChat: React.FC = () => {
 
     try {
       setSending(true);
+      setSendError(false);
       let allOk = true;
       if (toSend.length === 0) {
         const res = await supportService.addMessage(
@@ -420,11 +424,13 @@ const SupportTicketChat: React.FC = () => {
         await fetchTicketDetails(false);
         scrollToBottom();
       } else {
-        toast.error('Failed to send message. Please try again.');
+        setSendError(true);
+        toast.error(REQUIRED_TOAST.FAILED_SEND_MESSAGE, { id: 'support-send-fail' });
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      toast.error('Failed to send message. Please try again.');
+      setSendError(true);
+      toast.error(REQUIRED_TOAST.FAILED_SEND_MESSAGE, { id: 'support-send-fail' });
     } finally {
       setSending(false);
     }
@@ -742,6 +748,16 @@ const SupportTicketChat: React.FC = () => {
         {/* Message Input — docked above global bottom nav via parent height */}
         {ticket && !isSupportTicketClosedLike(ticketSt) && (
           <div className="support-composer-dock z-30 p-3 sm:p-4">
+            {sendError ? (
+              <UserNotice
+                variant="error"
+                title={USER_NOTICES.CHAT_SEND_FAILED_TITLE}
+                className="mb-3"
+                role="alert"
+              >
+                {USER_NOTICES.CHAT_SEND_FAILED_BODY}
+              </UserNotice>
+            ) : null}
             {filePreviewUrls.length > 0 ? (
               <div className="mb-3">
                 {filePreviewUrls.length === 1 ? (

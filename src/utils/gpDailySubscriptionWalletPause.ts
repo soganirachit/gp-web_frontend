@@ -6,6 +6,23 @@ export const INSUFFICIENT_WALLET_BALANCE_LABEL = "Insufficient Wallet Balance";
 
 const STORE_OFFLINE_PAUSE_LABEL = "Store temporarily offline";
 
+export function normalizeSubscriptionStatus(status: unknown): string {
+  return String(status ?? "").toUpperCase();
+}
+
+export function isOnHoldStatus(status: unknown): boolean {
+  return normalizeSubscriptionStatus(status) === "ON_HOLD";
+}
+
+export function isUserPausedStatus(status: unknown): boolean {
+  const s = normalizeSubscriptionStatus(status);
+  return s === "PAUSED" || s === "INACTIVE";
+}
+
+export function isPausedOrOnHoldStatus(status: unknown): boolean {
+  return isOnHoldStatus(status) || isUserPausedStatus(status);
+}
+
 export function isInsufficientWalletPauseReason(reason?: string | null): boolean {
   const lower = String(reason ?? "")
     .trim()
@@ -62,7 +79,7 @@ export function getSubscriptionPauseReasonLabel(
 ): string | null {
   if (!sub) return null;
   const status = String(sub.status ?? "").toUpperCase();
-  if (status !== "PAUSED" && status !== "INACTIVE") {
+  if (status !== "PAUSED" && status !== "INACTIVE" && status !== "ON_HOLD") {
     return null;
   }
 
@@ -115,10 +132,9 @@ export function isSubscriptionPausedForStoreOffline(
 }
 
 function isPausedStatus(sub: Subscription | Record<string, unknown>): boolean {
-  const status = String(
-    (sub as Subscription).status ?? (sub as Record<string, unknown>).status ?? "",
-  ).toUpperCase();
-  return status === "PAUSED" || status === "INACTIVE";
+  return isPausedOrOnHoldStatus(
+    (sub as Subscription).status ?? (sub as Record<string, unknown>).status,
+  );
 }
 
 /** Toast when a paused customer tries to change days/quantity. Null if update may proceed. */
@@ -141,16 +157,12 @@ export function pausedSubscriptionUpdateToast(
   return REQUIRED_TOAST.SUBSCRIPTION_RESUME_FIRST;
 }
 
-/** Toast if Resume must not call the API. Null if resume may be attempted. */
+/**
+ * Resume always hits the API so wallet/store conditions are re-checked.
+ * Client-side blocks are informational only — return null.
+ */
 export function pausedSubscriptionResumeBlockToast(
-  sub: Subscription | Record<string, unknown> | null | undefined,
+  _sub: Subscription | Record<string, unknown> | null | undefined,
 ): string | null {
-  if (!sub || !isPausedStatus(sub)) return null;
-  if (isSubscriptionPausedForInsufficientWallet(sub)) {
-    return REQUIRED_TOAST.SUBSCRIPTION_RESUME_WALLET_HOLD;
-  }
-  if (isSubscriptionPausedForStoreOffline(sub)) {
-    return REQUIRED_TOAST.SUBSCRIPTION_RESUME_STORE_OFFLINE;
-  }
   return null;
 }

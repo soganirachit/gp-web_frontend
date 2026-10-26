@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { ROUTES } from "../../config/routes.config";
 import { FaArrowLeft, FaMapMarkerAlt } from "react-icons/fa";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
@@ -18,6 +19,10 @@ interface AddressFormProps {
 
 const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const addressesPath = location.pathname.startsWith("/gp-store")
+    ? ROUTES.store.addresses
+    : ROUTES.daily.addresses;
   const [loading, setLoading] = useState(false);
   const [validatingCoordinates, setValidatingCoordinates] = useState(false);
   const [validationResult, setValidationResult] = useState<{
@@ -110,7 +115,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ mode, initialAddress }) => {
         await addressService.updateAddress(initialAddress.id, formData);
         toast.success("Address updated successfully");
       }
-      navigate("/addresses");
+      navigate(addressesPath);
     } catch (error) {
       toast.error(
         error instanceof Error && error.message

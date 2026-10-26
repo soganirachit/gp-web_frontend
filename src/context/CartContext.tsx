@@ -4,6 +4,7 @@ import { cartService } from '../services/cart.service';
 import { storeService } from '../services/store.service';
 import { REQUIRED_TOAST } from '../constants/requiredToastMessages';
 import { errorMessageFromCatch } from '../utils/apiErrorMessage';
+import { CartAddFailedError } from '../utils/cartAddFailed';
 
 export interface CartItem {
   id: string; // Unique cart item ID (UI level)
@@ -67,7 +68,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const pendingAddsRef = useRef<Set<string>>(new Set()); // Track items being added (ref — no re-render needed)
   const shouldSyncOnLoginRef = useRef(false); // Flag to indicate we need to sync after login
-  const [items, setItems] = useState<CartItem[]>(() => {
+  const [items, setItemsState] = useState<CartItem[]>(() => {
     // Load from localStorage on mount
     // Check if user is logged in to decide which cart to load
     const token = localStorage.getItem('access_token');
@@ -96,6 +97,20 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     }
     return [];
   });
+
+  const itemsRef = useRef<CartItem[]>(items);
+  const setItems = (next: CartItem[] | ((prev: CartItem[]) => CartItem[])) => {
+    if (typeof next === 'function') {
+      setItemsState((prev) => {
+        const updated = next(prev);
+        itemsRef.current = updated;
+        return updated;
+      });
+    } else {
+      itemsRef.current = next;
+      setItemsState(next);
+    }
+  };
 
   const [deliveryInfo, setDeliveryInfo] = useState<CartDeliveryInfo | null>(() => {
     // Load from localStorage on mount
@@ -162,20 +177,21 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const addToCart = async (item: Omit<CartItem, 'id'>) => {
     const token = localStorage.getItem('access_token');
-    
+    const cartSnapshot = itemsRef.current;
+
     // Check if item with same product and variant already exists
-    const existingItemIndex = items.findIndex(
+    const existingItemIndex = cartSnapshot.findIndex(
       (cartItem) =>
         cartItem.productId === item.productId &&
         cartItem.variant?.id === item.variant?.id
     );
 
     if (existingItemIndex >= 0) {
-      const snapshot = items;
-      const existingItem = items[existingItemIndex];
+      const snapshot = cartSnapshot;
+      const existingItem = cartSnapshot[existingItemIndex];
       const newQuantity = existingItem.quantity + item.quantity;
       
-      const updatedItems = [...items];
+      const updatedItems = [...cartSnapshot];
       updatedItems[existingItemIndex].quantity = newQuantity;
       setItems(updatedItems);
       
@@ -190,6 +206,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
           console.error('Error updating cart item in API:', error);
           setItems(snapshot);
           toast.error(errorMessageFromCatch(error, REQUIRED_TOAST.COULD_NOT_UPDATE_BASKET));
+          throw new CartAddFailedError();
         }
       } else if (token && existingItem.productId) {
         try {
@@ -204,7 +221,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             console.log('Token exists:', !!token, 'ProductId:', existingItem.productId);
             setItems(snapshot);
             toast.error(REQUIRED_TOAST.CHOOSE_STORE_BEFORE_BASKET);
-            return;
+            throw new CartAddFailedError(REQUIRED_TOAST.CHOOSE_STORE_BEFORE_BASKET);
           }
           console.log('Adding to cart with storeId:', storeId, 'productId:', existingItem.productId);
           await cartService.addToCart(
@@ -220,6 +237,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
           console.error('Error adding cart item to API:', error);
           setItems(snapshot);
           toast.error(errorMessageFromCatch(error, REQUIRED_TOAST.COULD_NOT_UPDATE_BASKET));
+          throw new CartAddFailedError();
         }
       }
     } else {
@@ -228,7 +246,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         ...item,
         id: generateCartItemId(),
       };
-      setItems([...items, newItem]);
+      setItems([...cartSnapshot, newItem]);
       
       // Sync to API if logged in
       if (token && newItem.productId) {
@@ -252,7 +270,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             pendingAddsRef.current.delete(newItem.id);
             setItems((prev) => prev.filter((i) => i.id !== newItem.id));
             toast.error(REQUIRED_TOAST.CHOOSE_STORE_BEFORE_BASKET);
-            return;
+            throw new CartAddFailedError(REQUIRED_TOAST.CHOOSE_STORE_BEFORE_BASKET);
           }
           console.log('Calling addToCart API with storeId:', storeId, 'productId:', newItem.productId, 'quantity:', newItem.quantity);
           try {
@@ -288,6 +306,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
           pendingAddsRef.current.delete(newItem.id);
           setItems((prev) => prev.filter((i) => i.id !== newItem.id));
           toast.error(errorMessageFromCatch(error, REQUIRED_TOAST.FAILED_ADD_TO_BASKET));
+          throw new CartAddFailedError();
         }
       }
     }
@@ -499,19 +518,21 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       
       // Always reload from API, but merge with local items if API items are empty
       // This handles cases where API hasn't processed the add yet
+      const localItems = itemsRef.current;
+
       if (cartData.items && cartData.items.length > 0) {
         // Replace local cart with API cart items
         // Try to preserve existing item IDs to maintain component state
         const existingItemsMap = new Map();
         // Map by apiCartItemId first (most reliable)
-        items.forEach(item => {
+        localItems.forEach(item => {
           if (item.apiCartItemId) {
             existingItemsMap.set(item.apiCartItemId, item);
           }
         });
         // Also map by (productId, variantId) as fallback for same product different variants
         const compositeKey = (pid: number, vid?: number | null) => `${pid}-${vid ?? 'base'}`;
-        items.forEach(item => {
+        localItems.forEach(item => {
           const key = compositeKey(item.productId, item.variant?.id);
           if (item.productId && !existingItemsMap.has(key)) {
             existingItemsMap.set(key, item);
@@ -574,7 +595,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         // API cart is empty - but don't clear local cart if we have:
         // 1. Pending adds (items being added to API)
         // 2. Items without apiCartItemId (from temp cart, need syncing)
-        const hasUnsavedItems = items.some(item => !item.apiCartItemId);
+        const hasUnsavedItems = localItems.some(item => !item.apiCartItemId);
         if (pendingAddsRef.current.size === 0 && !hasUnsavedItems) {
           console.log('API cart is empty and no pending adds or unsaved items, clearing local cart');
           setItems([]);
@@ -582,10 +603,10 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
           console.log('API cart is empty but have pending adds or unsaved items, keeping local cart items', {
             pendingAdds: pendingAddsRef.current.size,
             hasUnsavedItems,
-            itemsCount: items.length
+            itemsCount: localItems.length
           });
-          // Keep local items - they will be synced when API processes them
-          // Don't call setItems([]) - preserve existing items
+          // Re-apply ref snapshot so a concurrent reload cannot leave stale React state empty
+          setItems([...itemsRef.current]);
         }
       }
     } catch (error: any) {

@@ -35,5 +35,12 @@ export function redirectForUnavailableProduct(
     id: "product-unavailable-at-store",
   });
   notifyCatalogProductsRefresh();
-  navigate(basePath, { replace: true });
+  const productsPath =
+    basePath.startsWith("/gp-daily")
+      ? "/gp-daily/products"
+      : "/gp-store/products";
+  navigate(productsPath, {
+    replace: true,
+    state: { catalogNotice: "product_unavailable" },
+  });
 }

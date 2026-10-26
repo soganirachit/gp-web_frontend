@@ -168,20 +168,20 @@ export const gpDailyHome = {
 
 
 
-/** Reserve ~30% of hero width for scooter illustration (70% text). */
+/** Reserve space for scooter — fluid so iOS Safari text scaling does not clip the art. */
 export const GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS =
-  "pr-[30%] sm:pr-[28%]";
+  "pr-[min(38vw,10.5rem)] sm:pr-[30%]";
 
 export const GP_DAILY_SCOOTER_HERO_IMG_CLASS =
-  "h-[5.25rem] w-[9.75rem] object-contain object-right sm:h-[6.5rem] sm:w-[11.75rem]";
+  "h-[clamp(4.25rem,22vw,6.5rem)] w-[min(38vw,9.75rem)] max-w-[9.75rem] object-contain object-right sm:h-[6.5rem] sm:w-[11.75rem]";
 
-/** Wrapper for Daily homepage scooter (offline hero + marketing hero). */
+/** Wrapper: keep illustration inside the hero (no negative right + translate that gets clipped). */
 export const GP_DAILY_SCOOTER_HERO_WRAPPER_CLASS =
-  "pointer-events-none absolute -right-10 top-1/2 z-0 -translate-y-1/2 translate-x-8";
+  "pointer-events-none absolute right-0 top-1/2 z-0 w-[min(38vw,10.5rem)] max-w-[10.5rem] -translate-y-1/2";
 
 /** Logged-out marketing hero — scooter top aligns under Namaste / intro copy. */
 export const GP_DAILY_SCOOTER_HERO_MARKETING_GUEST_WRAPPER_CLASS =
-  "pointer-events-none absolute -right-10 -top-5 z-0 translate-x-8";
+  "pointer-events-none absolute right-0 -top-2 z-0 w-[min(38vw,10.5rem)] max-w-[10.5rem] sm:-top-1";
 
 
 

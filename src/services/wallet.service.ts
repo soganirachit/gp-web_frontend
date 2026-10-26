@@ -18,6 +18,11 @@ function mapTransactionRow(row: Record<string, unknown>): TransactionType {
     typeRaw === "DR" ||
     row.direction === "debit" ||
     amt < 0;
+  const statusRaw = String(row.status ?? "success").toLowerCase();
+  const paymentIdRaw = row.payment_id ?? row.paymentId;
+  const razorpayOrderIdRaw = row.razorpay_order_id ?? row.razorpayOrderId;
+  const failureReasonRaw = row.failure_reason ?? row.failureReason;
+
   return {
     amount: Math.abs(amt),
     type: isDebit ? "DEBIT" : "CREDIT",
@@ -26,6 +31,19 @@ function mapTransactionRow(row: Record<string, unknown>): TransactionType {
     balanceAfter: Number(row.balance_after ?? row.balanceAfter ?? row.closing_balance ?? 0),
     createdAt: String(row.created_at ?? row.createdAt ?? new Date().toISOString()),
     referenceId: String(row.reference_id ?? row.referenceId ?? row.id ?? ""),
+    status: statusRaw,
+    paymentId:
+      paymentIdRaw != null && String(paymentIdRaw).trim()
+        ? String(paymentIdRaw).trim()
+        : undefined,
+    razorpayOrderId:
+      razorpayOrderIdRaw != null && String(razorpayOrderIdRaw).trim()
+        ? String(razorpayOrderIdRaw).trim()
+        : undefined,
+    failureReason:
+      failureReasonRaw != null && String(failureReasonRaw).trim()
+        ? String(failureReasonRaw).trim()
+        : undefined,
   };
 }
 
@@ -89,7 +107,10 @@ class WalletService {
       if (error instanceof AxiosError && error.response?.status === 401) {
         throw new Error("Session expired");
       }
-      return { balance: 0, transactions: [], transactionLogs: [] };
+      console.error("getWalletBalance failed:", error);
+      throw error instanceof Error
+        ? error
+        : new Error("Failed to load wallet balance");
     }
   }
 

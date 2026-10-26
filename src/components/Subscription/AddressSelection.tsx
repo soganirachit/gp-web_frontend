@@ -23,6 +23,7 @@ import { orderService } from "../../services/order.service";
 import { subscriptionService } from "../../services/subscription.service";
 import { subscriptionCartService, isSubscriptionCartStoreChangeConfirmation, normalizeSubscriptionCartSetAddressResponse } from "../../services/subscriptionCart.service";
 import { CartConfirmModal } from "../cart/CartConfirmModal";
+import { GpButton } from "../ui/GpButton";
 import {
   validateGpDailyDeliveryAreaForAddressId,
   validateGpDailyDeliveryAreaFromCoordinates,
@@ -37,6 +38,8 @@ import {
   peekLandingAddressReturn,
 } from "../../utils/applySharedBrowseDeliveryAddress";
 import {
+  GUEST_CURRENT_LOCATION_SUBTITLE,
+  GUEST_CURRENT_LOCATION_TITLE,
   GUEST_EDIT_DELIVERY_SUBTITLE,
   GUEST_EDIT_DELIVERY_TITLE,
   GUEST_NEAREST_STORE_PREFIX,
@@ -88,8 +91,22 @@ import {
   formFieldsFromGuestBrowseAddress,
   guestHasSavedBrowseAddress,
 } from "../../utils/guestAddressEntry";
-import { getSessionPin } from "../../utils/locationSession";
+import {
+  getLocationSession,
+  getSessionPin,
+  isGuestLocationFrozen,
+} from "../../utils/locationSession";
+import {
+  pickLoggedInAddressSelection,
+  resolveGuestAddressFormSource,
+} from "../../utils/pickAddressSelection";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
+import {
+  clearSelectedDeliveryAddress,
+  readSelectedDeliveryAddress,
+  writeSelectedDeliveryAddress,
+} from "../../utils/selectedDeliveryAddressStorage";
+import { safeReturnUrl } from "../../utils/safeReturnUrl";
 
 const AddressSelection: React.FC = () => {
   const navigate = useNavigate();
@@ -98,7 +115,13 @@ const AddressSelection: React.FC = () => {
   const { isLoggedIn } = useAuth();
   const isGuestEntry = !isLoggedIn;
   const isGuestEditingSavedAddress =
-    isGuestEntry && guestHasSavedBrowseAddress();
+    isGuestEntry &&
+    guestHasSavedBrowseAddress() &&
+    isGuestLocationFrozen();
+  const isGuestShowingCurrentLocation =
+    isGuestEntry &&
+    !isGuestLocationFrozen() &&
+    getSessionPin() != null;
   const routeState = (location.state ?? {}) as {
     fromHome?: boolean;
     fromLandingHome?: boolean;
@@ -111,6 +134,7 @@ const AddressSelection: React.FC = () => {
     peekLandingAddressReturn();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
   const [loading, setLoading] = useState(true);
+  const [isAddressActionBusy, setIsAddressActionBusy] = useState(false);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -224,24 +248,25 @@ const AddressSelection: React.FC = () => {
     if (isGuestEntry) {
       setLoading(false);
       setShowAddForm(true);
-      const snap = storeService.getGuestBrowseAddress();
-      if (snap) {
-        const fields = formFieldsFromGuestBrowseAddress(snap);
+      const source = resolveGuestAddressFormSource({
+        frozen: isGuestLocationFrozen(),
+        pin: getSessionPin(),
+        snapshot: storeService.getGuestBrowseAddress(),
+      });
+      if (source.kind === "browse") {
+        const fields = formFieldsFromGuestBrowseAddress(source.snapshot);
         setFormData((prev) => ({ ...prev, ...fields }));
-        const coords = parseAddressCoordinates(snap.coordinates);
+        const coords = parseAddressCoordinates(source.snapshot.coordinates);
         if (coords) setSelectedPosition(coords);
-        if (snap.formattedLine?.trim()) {
-          setMapSearchQuery(snap.formattedLine.trim());
+        if (source.snapshot.formattedLine?.trim()) {
+          setMapSearchQuery(source.snapshot.formattedLine.trim());
         }
-      } else {
-        const pin = getSessionPin();
-        if (pin) {
-          setSelectedPosition(pin);
-          setFormData((prev) => ({
-            ...prev,
-            coordinates: `${pin.lat},${pin.lng}`,
-          }));
-        }
+      } else if (source.kind === "auto_pin" || source.kind === "manual_pin") {
+        setSelectedPosition(source.pin);
+        setFormData((prev) => ({
+          ...prev,
+          coordinates: `${source.pin.lat},${source.pin.lng}`,
+        }));
       }
       return;
     }
@@ -276,13 +301,45 @@ const AddressSelection: React.FC = () => {
     if (el && !el.value.trim()) el.value = text;
   }, [showAddForm, isLoaded, mapSearchQuery]);
 
+  useEffect(() => {
+    if (!isGuestEntry || !showAddForm) return;
+    const source = resolveGuestAddressFormSource({
+      frozen: isGuestLocationFrozen(),
+      pin: getSessionPin(),
+      snapshot: storeService.getGuestBrowseAddress(),
+    });
+    if (source.kind !== "auto_pin" && source.kind !== "manual_pin") return;
+    if (source.kind === "manual_pin" && mapSearchQuery.trim()) return;
+    const { lat, lng } = source.pin;
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+    if (!apiKey) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`,
+        );
+        const data = (await response.json()) as { results?: unknown[] };
+        if (cancelled) return;
+        applyGeocodeJsonToForm(data, lat, lng);
+      } catch {
+        /* pin-only form is enough */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Hydrate current GPS pin into the search field once the form opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuestEntry, showAddForm]);
+
   const handleAuthError = (error: Error) => {
     const isAuthError =
       error.message.includes("login") ||
       error.message.includes("session expired");
     if (isAuthError) {
       localStorage.setItem("redirectAfterLogin", location.pathname);
-      localStorage.removeItem("selectedDeliveryAddress");
+      clearSelectedDeliveryAddress();
       navigate(`${basePath}/login`, {
         state: {
           returnUrl: location.pathname,
@@ -304,40 +361,26 @@ const AddressSelection: React.FC = () => {
       const savedAddresses = await addressService.getAllAddresses();
       setAddresses(savedAddresses);
 
-      const sorted = [...savedAddresses].sort((a, b) => {
-        if (a.isDefault && !b.isDefault) return -1;
-        if (!a.isDefault && b.isDefault) return 1;
-        return 0;
-      });
-      const storedAddress = localStorage.getItem("selectedDeliveryAddress");
-      if (storedAddress) {
-        try {
-          const parsedAddress = JSON.parse(storedAddress);
-          const resolvedStored = resolveLiveDeviceToSavedAddress(
-            parsedAddress,
-            savedAddresses,
-          );
-          const addressExists =
-            String(resolvedStored.id) === LIVE_DEVICE_ADDRESS_ID ||
-            savedAddresses.some((addr) => addr.id === resolvedStored.id);
-          if (addressExists) {
-            if (resolvedStored.id !== parsedAddress.id) {
-              localStorage.setItem(
-                "selectedDeliveryAddress",
-                JSON.stringify(resolvedStored),
-              );
-            }
-            setSelectedAddress(resolvedStored);
-          } else {
-            localStorage.removeItem("selectedDeliveryAddress");
-            setSelectedAddress(sorted[0] ?? null);
-          }
-        } catch {
-          localStorage.removeItem("selectedDeliveryAddress");
-          setSelectedAddress(sorted[0] ?? null);
-        }
-      } else if (sorted.length > 0) {
-        setSelectedAddress(sorted[0]);
+      const stored = readSelectedDeliveryAddress();
+      const session = getLocationSession();
+      const highlighted = pickLoggedInAddressSelection(
+        session,
+        savedAddresses,
+        stored,
+      );
+      setSelectedAddress(highlighted);
+      if (
+        !highlighted &&
+        session.mode === "auto" &&
+        !session.addressId
+      ) {
+        clearSelectedDeliveryAddress();
+      } else if (
+        highlighted &&
+        stored &&
+        String(highlighted.id) !== String(stored.id)
+      ) {
+        writeSelectedDeliveryAddress(highlighted);
       }
     } catch (error: any) {
       handleAuthError(error);
@@ -535,10 +578,7 @@ const AddressSelection: React.FC = () => {
 
       await loadAddresses();
       setSelectedAddress(newAddress);
-      localStorage.setItem(
-        "selectedDeliveryAddress",
-        JSON.stringify(newAddress),
-      );
+      writeSelectedDeliveryAddress(newAddress);
 
       if (location.state?.fromCart) {
         navigate(`${basePath}/cart`, {
@@ -631,6 +671,9 @@ const AddressSelection: React.FC = () => {
   };
 
   const handleAddressSelect = async (address: Address) => {
+    if (isAddressActionBusy) return;
+    setIsAddressActionBusy(true);
+    try {
     let addressToUse = resolveLiveDeviceToSavedAddress(address, addresses);
 
     if (
@@ -676,7 +719,7 @@ const AddressSelection: React.FC = () => {
     }
 
     setSelectedAddress(addressToUse);
-    localStorage.setItem("selectedDeliveryAddress", JSON.stringify(addressToUse));
+    writeSelectedDeliveryAddress(addressToUse);
 
     if (location.state?.fromHome || fromLandingHome) {
       try {
@@ -721,7 +764,7 @@ const AddressSelection: React.FC = () => {
 
     const returnUrl = location.state?.returnUrl;
     if (returnUrl) {
-      navigate(returnUrl, {
+      navigate(safeReturnUrl(returnUrl, basePath), {
         state: {
           basePackId: location.state?.basePackId,
           subscriptionData: location.state?.subscriptionData,
@@ -731,6 +774,9 @@ const AddressSelection: React.FC = () => {
     }
 
     await proceedWithValidatedAddress(addressToUse);
+    } finally {
+      setIsAddressActionBusy(false);
+    }
   };
 
   const createStoreOrder = () => { };
@@ -800,7 +846,7 @@ const AddressSelection: React.FC = () => {
           }
         }
 
-        localStorage.setItem("selectedDeliveryAddress", JSON.stringify(address));
+        writeSelectedDeliveryAddress(address);
         const cartPath = feature === "gpStore" ? "/gp-store/basket" : "/gp-daily/basket";
         navigate(cartPath, {
           state: {
@@ -840,7 +886,7 @@ const AddressSelection: React.FC = () => {
         // Store product and metaData in localStorage for after Razorpay redirect
         localStorage.setItem("pendingStoreProduct", JSON.stringify(location.state.product));
         localStorage.setItem("pendingStoreMetaData", JSON.stringify(location.state.metaData));
-        localStorage.setItem("selectedDeliveryAddress", JSON.stringify(address));
+        writeSelectedDeliveryAddress(address);
 
         // Set loading to true to show "Processing..." on button
         setLoading(true);
@@ -890,7 +936,7 @@ const AddressSelection: React.FC = () => {
           // Get product and metaData from localStorage (after redirect) or location.state
           const storedProduct = localStorage.getItem("pendingStoreProduct");
           const storedMetaData = localStorage.getItem("pendingStoreMetaData");
-          const storedAddress = localStorage.getItem("selectedDeliveryAddress");
+          const storedAddress = readSelectedDeliveryAddress();
 
           let productToUse = location.state?.product;
           let metaDataToUse = location.state?.metaData;
@@ -906,11 +952,7 @@ const AddressSelection: React.FC = () => {
           }
 
           if (storedAddress) {
-            try {
-              addressToUse = JSON.parse(storedAddress);
-            } catch (e) {
-              console.error("Error parsing stored address:", e);
-            }
+            addressToUse = storedAddress;
           }
 
           if (!productToUse || !metaDataToUse || !addressToUse) {
@@ -1518,9 +1560,11 @@ const AddressSelection: React.FC = () => {
               title={
                 isGuestEditingSavedAddress
                   ? GUEST_EDIT_DELIVERY_TITLE
-                  : isGuestEntry
-                    ? "Add delivery address"
-                    : "Add New Address"
+                  : isGuestShowingCurrentLocation
+                    ? GUEST_CURRENT_LOCATION_TITLE
+                    : isGuestEntry
+                      ? "Add delivery address"
+                      : "Add New Address"
               }
               onBack={() =>
                 isGuestEntry ? navigate(-1) : setShowAddForm(false)
@@ -1533,12 +1577,16 @@ const AddressSelection: React.FC = () => {
                 <p className="text-sm font-semibold text-gray-900">
                   {isGuestEditingSavedAddress
                     ? GUEST_EDIT_DELIVERY_TITLE
-                    : GUEST_ORDERING_FOR_SOMEONE_TITLE}
+                    : isGuestShowingCurrentLocation
+                      ? GUEST_CURRENT_LOCATION_TITLE
+                      : GUEST_ORDERING_FOR_SOMEONE_TITLE}
                 </p>
                 <p className="mt-1 text-sm text-gray-600">
                   {isGuestEditingSavedAddress
                     ? GUEST_EDIT_DELIVERY_SUBTITLE
-                    : GUEST_ORDERING_FOR_SOMEONE_SUBTITLE}
+                    : isGuestShowingCurrentLocation
+                      ? GUEST_CURRENT_LOCATION_SUBTITLE
+                      : GUEST_ORDERING_FOR_SOMEONE_SUBTITLE}
                 </p>
               </div>
             ) : null}
@@ -1739,25 +1787,28 @@ const AddressSelection: React.FC = () => {
                 </div>
               ) : null}
 
-              <button
+              <GpButton
                 type="submit"
+                fullWidth
+                className="rounded-lg py-3 text-sm"
                 disabled={loading || isValidatingAddress}
-                className="w-full py-3 rounded-lg font-medium text-sm disabled:opacity-50"
+                loading={loading || isValidatingAddress}
+                loadingLabel={
+                  isValidatingAddress
+                    ? "Checking delivery area…"
+                    : "Saving…"
+                }
                 style={{
                   backgroundColor: theme.colors.primary,
                   color: feature === "gpDaily" ? "#111827" : "#ffffff",
                 }}
               >
-                {isValidatingAddress
-                  ? 'Checking delivery area...'
-                  : loading
-                    ? 'Saving...'
-                    : isGuestEditingSavedAddress
-                      ? "Save address"
-                      : isGuestEntry
-                      ? 'Confirm address'
-                      : 'Save Address'}
-              </button>
+                {isGuestEditingSavedAddress
+                  ? "Save address"
+                  : isGuestEntry
+                    ? "Confirm address"
+                    : "Save Address"}
+              </GpButton>
             </div>
           </form>
           </>
@@ -1801,6 +1852,17 @@ const AddressSelection: React.FC = () => {
                 </button>
               </div>
             )}
+
+            {isAddressActionBusy ? (
+              <div
+                className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm text-gray-700 shadow-sm"
+                role="status"
+                aria-live="polite"
+              >
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[#19411f]/25 border-t-[#19411f]" />
+                Applying address…
+              </div>
+            ) : null}
 
             {/* Address List — layout matches My Addresses: left details + right map */}
             <div className="mb-6 space-y-4">
@@ -2022,10 +2084,7 @@ const AddressSelection: React.FC = () => {
               return;
             }
             setDailyCartFromAddressModal(null);
-            localStorage.setItem(
-              "selectedDeliveryAddress",
-              JSON.stringify(m.address),
-            );
+            writeSelectedDeliveryAddress(m.address);
             navigate("/gp-daily/basket", {
               state: {
                 selectedAddress: m.address,

@@ -1,10 +1,21 @@
 import type { GuestBrowseAddressSnapshot } from "../services/store.service";
 import { storeService } from "../services/store.service";
 import { parseAddressCoordinates } from "./addressCoordinates";
+import { getSessionPin, isGuestLocationFrozen } from "./locationSession";
+import { guestShouldOpenAddressForm } from "./pickAddressSelection";
 
 /** Guest may save one local browse address and edit that same address without login. */
 export function guestHasSavedBrowseAddress(): boolean {
   return storeService.getGuestBrowseAddress() != null;
+}
+
+/** Tap Current location: leftover browse, or Auto GPS pin — not a stale Manual form. */
+export function guestShouldOpenAddressFormFromHeader(): boolean {
+  return guestShouldOpenAddressForm({
+    hasBrowseAddress: guestHasSavedBrowseAddress(),
+    frozen: isGuestLocationFrozen(),
+    hasPin: getSessionPin() != null,
+  });
 }
 
 /** First save and later edits of that one address stay on the guest form. */

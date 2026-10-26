@@ -2,6 +2,14 @@ import axios from "axios";
 import api from "./api";
 import { REQUIRED_TOAST } from "../constants/requiredToastMessages";
 import { errorMessageFromParsedBody, errorMessageFromCatch } from "../utils/apiErrorMessage";
+import { adoptAuthenticatedUserId, clearCrossUserClientCaches } from "../utils/clientSessionIsolation";
+import {
+  clearAuthTokens,
+  readAccessToken,
+  readRefreshToken,
+  writeAccessToken,
+  writeRefreshToken,
+} from "../utils/authTokenStorage";
 
 const API_URL = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL}/auth`
@@ -20,6 +28,8 @@ export interface SendOtpResult {
   success: boolean;
   message: string;
   phone?: string;
+  /** Required for otp-delivery-status polling (replaces raw phone param). */
+  otp_poll_token?: string;
   whatsapp_status?: WhatsappOtpStatus;
   /** When omitted by older APIs, callers may treat delivery as unknown / ok. */
   whatsapp_delivered?: boolean;
@@ -35,6 +45,8 @@ function normalizeSendOtpResponse(body: unknown): SendOtpResult {
     success: b?.success !== false,
     message: (typeof b?.message === "string" && b.message) || "OTP sent successfully",
     phone: typeof data.phone === "string" ? data.phone : undefined,
+    otp_poll_token:
+      typeof data.otp_poll_token === "string" ? data.otp_poll_token : undefined,
     whatsapp_status,
     whatsapp_delivered,
   };
@@ -95,14 +107,14 @@ const OTP_DELIVERY_POLL_MAX_ATTEMPTS = 5;
 
 /** Clears JWT + user session keys and notifies listeners (AuthContext, cart, etc.). */
 export function clearAuthSession(): void {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
+  clearAuthTokens();
   localStorage.removeItem("prevToken");
   localStorage.removeItem("phoneNumber");
   localStorage.removeItem("userName");
   localStorage.removeItem("userId");
   localStorage.removeItem("gp_store_cart");
   localStorage.removeItem("gp_store_cart_delivery_info");
+  clearCrossUserClientCaches();
   window.dispatchEvent(new Event("tokenRemoved"));
 }
 
@@ -169,12 +181,12 @@ export const authService = {
   /**
    * Latest WhatsApp delivery flags for an OTP send (used by polling or diagnostics).
    */
-  async getOtpDeliveryStatus(phone: string): Promise<OtpDeliveryStatusData> {
+  async getOtpDeliveryStatus(pollToken: string): Promise<OtpDeliveryStatusData> {
     if (!API_URL) {
       throw new Error("API base URL is not configured");
     }
     const response = await axios.get(`${API_URL}/otp-delivery-status/`, {
-      params: { phone },
+      params: { poll_token: pollToken },
     });
     return normalizeOtpDeliveryStatusBody(response.data);
   },
@@ -194,10 +206,10 @@ export const authService = {
 
         // Save JWT tokens to localStorage
         if (access_token) {
-          localStorage.setItem("access_token", access_token);
+          writeAccessToken(access_token);
         }
         if (refresh_token) {
-          localStorage.setItem("refresh_token", refresh_token);
+          writeRefreshToken(refresh_token);
         }
 
         // Store non-sensitive user info for UI display
@@ -208,7 +220,7 @@ export const authService = {
             localStorage.setItem("userName", user.full_name);
           }
           if (user.id) {
-            localStorage.setItem("userId", user.id.toString());
+            adoptAuthenticatedUserId(user.id);
           }
         }
 
@@ -284,7 +296,7 @@ export const authService = {
    * the previous refresh is blacklisted — always persist the new refresh_token.
    */
   async refreshToken(): Promise<string> {
-    const refreshToken = localStorage.getItem("refresh_token");
+    const refreshToken = readRefreshToken();
     if (!refreshToken) {
       throw new Error("No refresh token available");
     }
@@ -304,8 +316,8 @@ export const authService = {
         throw new Error("No refresh token in refresh response");
       }
 
-      localStorage.setItem("access_token", accessToken);
-      localStorage.setItem("refresh_token", newRefreshToken);
+      writeAccessToken(accessToken);
+      writeRefreshToken(newRefreshToken);
       return accessToken;
     } catch (error: unknown) {
       clearAuthSession();
@@ -321,7 +333,7 @@ export const authService = {
    * Checks if user is currently authenticated
    */
   isAuthenticated() {
-    return !!localStorage.getItem("access_token");
+    return !!readAccessToken();
   },
 
   /**
@@ -332,8 +344,8 @@ export const authService = {
     let apiResponse = null;
 
     try {
-      const token = localStorage.getItem("access_token");
-      const refreshToken = localStorage.getItem("refresh_token");
+      const token = readAccessToken();
+      const refreshToken = readRefreshToken();
       const response = await axios.post(
         `${API_URL}/logout/`,
         refreshToken ? { refresh: refreshToken } : {},
@@ -375,8 +387,11 @@ export const authService = {
  * Poll GET /auth/otp-delivery-status/?phone= every 3s, up to 5 times (~15s).
  * First request runs immediately. Returns `stop` — call on unmount or after OTP verify.
  */
-export function startOtpDeliveryPolling(phone: string, callbacks: OtpDeliveryPollCallbacks = {}): () => void {
-  if (!API_URL || !phone) {
+export function startOtpDeliveryPolling(
+  pollToken: string,
+  callbacks: OtpDeliveryPollCallbacks = {},
+): () => void {
+  if (!API_URL || !pollToken) {
     return () => {};
   }
 
@@ -396,7 +411,7 @@ export function startOtpDeliveryPolling(phone: string, callbacks: OtpDeliveryPol
     if (stopped) return;
     attempts += 1;
     try {
-      const status = await authService.getOtpDeliveryStatus(phone);
+      const status = await authService.getOtpDeliveryStatus(pollToken);
       if (stopped) return;
 
       if (status.not_on_whatsapp) {
@@ -432,7 +447,7 @@ export function startOtpDeliveryPolling(phone: string, callbacks: OtpDeliveryPol
  * Immediate attempt + short retries to avoid async status propagation race.
  */
 export async function checkNotOnWhatsappBeforeOtpRoute(
-  phone: string,
+  pollToken: string,
   maxAttempts = 4,
   retryDelayMs = 350
 ): Promise<{ notOnWhatsapp: boolean; message?: string }> {
@@ -440,7 +455,7 @@ export async function checkNotOnWhatsappBeforeOtpRoute(
 
   for (let i = 0; i < maxAttempts; i += 1) {
     try {
-      const status = await authService.getOtpDeliveryStatus(phone);
+      const status = await authService.getOtpDeliveryStatus(pollToken);
       if (status.not_on_whatsapp) {
         return {
           notOnWhatsapp: true,

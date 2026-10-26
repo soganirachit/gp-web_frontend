@@ -40,6 +40,10 @@ import {
   SWITCH_STORE_CONFIRM_TITLE,
 } from '../../../utils/cartConfirmCopy';
 import {
+  countRemovedCartSwitchItems,
+  toastAfterSuggestedStoreSwitch,
+} from '../../../utils/cartStoreSwitchFeedback';
+import {
   LIVE_DEVICE_ADDRESS_ID,
   resolveLiveDeviceToSavedAddress,
 } from '../../../utils/addressCoordinates';
@@ -47,7 +51,6 @@ import {
   GP_DAILY_ZONE_ELIGIBLE_TOAST,
   GP_DAILY_ZONE_CHECK_ERROR_TOAST,
   GP_DAILY_ZONE_STALE_TOAST,
-  GP_DAILY_STORE_UPDATED_TOAST,
   GP_DAILY_ADDRESS_OUTSIDE_ZONE_TOAST,
   GP_DAILY_DELIVERY_DETAILS_ERROR_TOAST,
 } from '../../../utils/gpDailyCustomerMessages';
@@ -70,16 +73,21 @@ import { getApiUrl } from '../../../config/api.config';
 import { useNetworkRecovery } from '../../../hooks/useNetworkRecovery';
 import { CART_PAYMENT_RECOVERED_EVENT, consumePendingCartRecoveredSession } from '../../../utils/pendingPayments';
 import {
-  getPlainDismissUserMessage,
   handlePlainRazorpayDismiss,
   isPaymentModalDismissed,
   pollStoreCheckoutRecovery,
 } from '../../../utils/razorpayCheckoutFailure';
+import { UserNotice } from '../../../components/common/UserNotice';
+import { USER_NOTICES } from '../../../constants/userNotices';
 import { SEO } from '../../../components/SEO';
 import { trackInitiateCheckout, trackPurchase } from '../../../lib/metaPixel';
 import { loadRazorpayScript } from '../../../lib/razorpayLoader';
 import { formatPhoneForDisplay } from '../../../utils/phoneDisplay';
 import { formatCartDeliveryAddress } from '../../../utils/formatCartDeliveryAddress';
+import {
+  readSelectedDeliveryAddress,
+  writeSelectedDeliveryAddress,
+} from '../../../utils/selectedDeliveryAddressStorage';
 import { errorMessageFromCatch, isCartLineUnavailableMessage } from '../../../utils/apiErrorMessage';
 import { presentCheckoutFailure } from '../../../utils/presentCheckoutFailure';
 import {
@@ -328,8 +336,9 @@ interface Coupon {
   scope: string;
   discount_label: string;  // e.g. "10% off (up to ₹100)" – use this directly
   applicable_to?: "store" | "daily" | "both";
-  /** When true, coupon is valid for GP Daily checkout (client-side sort until API exposes scope). */
   eligible_for_gp_daily?: boolean;
+  can_apply?: boolean;
+  ineligibility_reason?: string | null;
 }
 
 const DAILY_PROMO_INVALID_MESSAGE = REQUIRED_TOAST.PROMO_NOT_VALID_DAILY;
@@ -338,12 +347,8 @@ const DAILY_PROMO_INVALID_CODE = "PROMO_NOT_VALID_DAILY";
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
 const fetchCoupons = async (): Promise<Coupon[]> => {
-  try {
-    const list = await subscriptionCartService.listCoupons();
-    return list as Coupon[];
-  } catch {
-    return [];
-  }
+  const list = await subscriptionCartService.listCoupons();
+  return list as Coupon[];
 };
 
 const applyCouponAPI = async (couponCode: string): Promise<ApplyCouponResponse> => {
@@ -439,12 +444,8 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({
   const runApply = async (code: string) => {
     setApplyHint(null);
     try {
-      const result = await onApply(code);
-      const serverMsg = result && typeof result === 'object' && 'successMessage' in result ? result.successMessage : undefined;
-      setApplyHint({
-        kind: 'success',
-        text: (typeof serverMsg === 'string' && serverMsg.trim()) || `“${code}” applied successfully.`,
-      });
+      await onApply(code);
+      onClose();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Could not apply this code.';
       setApplyHint({ kind: 'error', text: msg });
@@ -577,6 +578,13 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({
                   const isApplied = appliedCode === coupon.code;
                   const ineligibleDaily =
                     isDailyMode && coupon.applicable_to === "store";
+                  const cannotApply =
+                    ineligibleDaily ||
+                    coupon.can_apply === false ||
+                    Boolean(coupon.ineligibility_reason);
+                  const blockReason =
+                    coupon.ineligibility_reason ||
+                    (ineligibleDaily ? "Not valid on GP Daily" : "");
                   return (
                     <div
                       key={coupon.id}
@@ -606,12 +614,14 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({
                             <p className="text-xs text-gray-500 mt-0.5 truncate">{coupon.description}</p>
                           )}
                           {/* Min order */}
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            Min. order ₹{coupon.min_order_amount}
-                          </p>
-                          {ineligibleDaily ? (
+                          {coupon.min_order_amount ? (
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              Min. order ₹{coupon.min_order_amount}
+                            </p>
+                          ) : null}
+                          {blockReason ? (
                             <p className="mt-1 text-xs font-semibold text-red-600">
-                              Not valid on Daily
+                              {blockReason}
                             </p>
                           ) : null}
                         </div>
@@ -619,20 +629,20 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({
 
                       <button
                         onClick={() => {
-                          if (!isApplied && ineligibleDaily) return;
+                          if (!isApplied && cannotApply) return;
                           void runApply(coupon.code);
                         }}
-                        disabled={isApplying || (!isApplied && ineligibleDaily)}
+                        disabled={isApplying || (!isApplied && cannotApply)}
                         className={`ml-3 flex-shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${isApplied
                           ? 'text-black'
-                          : ineligibleDaily
+                          : cannotApply
                             ? 'cursor-not-allowed border border-gray-300 bg-gray-200 text-gray-500'
                             : 'bg-white'
                           }`}
                         style={
                           isApplied
                             ? { backgroundColor: theme.colors.primary }
-                            : !ineligibleDaily
+                            : !cannotApply
                               ? { border: `1px solid ${theme.colors.primary}`, color: theme.colors.primary }
                               : undefined
                         }
@@ -641,7 +651,7 @@ const PromoCodeModal: React.FC<PromoCodeModalProps> = ({
                           <><FaCheck className="text-xs" /> Applied</>
                         ) : isApplying ? (
                           'Applying...'
-                        ) : ineligibleDaily ? (
+                        ) : cannotApply ? (
                           'N/A'
                         ) : (
                           'Apply'
@@ -668,7 +678,7 @@ const Cart: React.FC = () => {
   const { theme } = useFeatureTheme();
   // CartDaily should always follow gp-daily theming + routing.
   const basePath = '/gp-daily';
-  const browseProductsPath = '/gp-daily/Products';
+  const browseProductsPath = '/gp-daily/products';
   const { storePendingPayment, removePendingPayment, retryWithBackoff, recoverPendingPayments } =
     useNetworkRecovery();
   const {
@@ -952,6 +962,10 @@ const Cart: React.FC = () => {
     text: string;
   } | null>(null);
   const [checkoutInlineError, setCheckoutInlineError] = useState<string | null>(null);
+  const [paymentUserNotice, setPaymentUserNotice] = useState<
+    'cancelled' | 'unconfirmed' | null
+  >(null);
+  const [isPreparingCheckout, setIsPreparingCheckout] = useState(false);
 
   const [cartTotals, setCartTotals] = useState<CartTotalsState | null>(null);
   /** Fulfilment store label for basket (from GET /cart/ `store_name`). */
@@ -1649,10 +1663,7 @@ const Cart: React.FC = () => {
             const saved = await addressService.getAllAddresses();
             const resolved = resolveLiveDeviceToSavedAddress(fromNav, saved);
             if (resolved.id !== fromNav.id) {
-              localStorage.setItem(
-                'selectedDeliveryAddress',
-                JSON.stringify(resolved),
-              );
+              writeSelectedDeliveryAddress(resolved);
             }
             setDefaultAddress(resolved);
           } catch {
@@ -1664,37 +1675,24 @@ const Cart: React.FC = () => {
         setIsLoadingAddress(false);
         return;
       }
-      const storedAddress = localStorage.getItem('selectedDeliveryAddress');
-      if (storedAddress) {
-        try {
-          const parsed = JSON.parse(storedAddress);
-          const currentUserId = localStorage.getItem('userId');
-          const addrUserId = parsed?.userId?.toString();
-          if (currentUserId && addrUserId && addrUserId !== currentUserId) {
-            // Stale address from a different user session — discard it
-            localStorage.removeItem('selectedDeliveryAddress');
-          } else {
-            if (String(parsed?.id) === LIVE_DEVICE_ADDRESS_ID) {
-              try {
-                const saved = await addressService.getAllAddresses();
-                const resolved = resolveLiveDeviceToSavedAddress(parsed, saved);
-                if (resolved.id !== parsed.id) {
-                  localStorage.setItem(
-                    'selectedDeliveryAddress',
-                    JSON.stringify(resolved),
-                  );
-                }
-                setDefaultAddress(resolved);
-              } catch {
-                setDefaultAddress(parsed);
-              }
-            } else {
-              setDefaultAddress(parsed);
+      const parsed = readSelectedDeliveryAddress();
+      if (parsed) {
+        if (String(parsed.id) === LIVE_DEVICE_ADDRESS_ID) {
+          try {
+            const saved = await addressService.getAllAddresses();
+            const resolved = resolveLiveDeviceToSavedAddress(parsed, saved);
+            if (resolved.id !== parsed.id) {
+              writeSelectedDeliveryAddress(resolved);
             }
-            setIsLoadingAddress(false);
-            return;
+            setDefaultAddress(resolved);
+          } catch {
+            setDefaultAddress(parsed);
           }
-        } catch (_) { }
+        } else {
+          setDefaultAddress(parsed);
+        }
+        setIsLoadingAddress(false);
+        return;
       }
       try {
         setIsLoadingAddress(true);
@@ -1950,14 +1948,15 @@ const Cart: React.FC = () => {
     const target = suggestedStoreForAddress;
     try {
       setIsSwitchingSuggestedStore(true);
-      await cartService.switchCartStore(target.id);
+      const cartRes = await cartService.switchCartStore(target.id);
+      const removedCount = countRemovedCartSwitchItems(cartRes);
       await storeService.switchStore(target.id);
       deliveryStoreSyncKey.current = '';
       await loadCartFromAPI();
       await refreshDailyCart();
       setSuggestedStoreForAddress(null);
       setShowSuggestedStoreSwitchModal(false);
-      toast.success(GP_DAILY_STORE_UPDATED_TOAST, { id: 'gp-daily-store-updated' });
+      toastAfterSuggestedStoreSwitch(target.name, removedCount);
     } catch (e: unknown) {
       toast.error(errorMessageFromCatch(e, 'Could not switch store for this address.'));
     } finally {
@@ -1975,14 +1974,22 @@ const Cart: React.FC = () => {
   };
 
   const handleCheckout = async () => {
-    if (checkoutInFlightRef.current || isProcessingPayment || isConfirmingOrder) return;
+    if (
+      checkoutInFlightRef.current ||
+      isProcessingPayment ||
+      isConfirmingOrder ||
+      isPreparingCheckout
+    ) {
+      return;
+    }
     setCheckoutInlineError(null);
+    setPaymentUserNotice(null);
     if (!navigator.onLine) {
       toast.error(REQUIRED_TOAST.OFFLINE_CHECKOUT);
       return;
     }
     if (items.length === 0) { toast.error('Your cart is empty'); return; }
-    if (hasStaleDailyLine) {
+      if (hasStaleDailyLine) {
       toast.error('Remove unavailable items from your basket before checkout.');
       return;
     }
@@ -2027,6 +2034,7 @@ const Cart: React.FC = () => {
 
     // Daily cart checkout should use subscriptions/cart/checkout/
     // Prereq: set address on daily cart first.
+    setIsPreparingCheckout(true);
     checkoutInFlightRef.current = true;
     checkoutDismissedRef.current = false;
     try {
@@ -2166,6 +2174,7 @@ const Cart: React.FC = () => {
     } finally {
       setIsProcessingPayment(false);
       checkoutInFlightRef.current = false;
+      setIsPreparingCheckout(false);
     }
   };
 
@@ -2256,7 +2265,8 @@ const Cart: React.FC = () => {
       if (!recovered) {
         // Payment was taken by Razorpay but we couldn't confirm the order.
         // Keep the pending payment in localStorage so it can be retried on next app load.
-        toast.error(REQUIRED_TOAST.PAYMENT_NOT_CONFIRMED);
+        setPaymentUserNotice('unconfirmed');
+        toast.error(REQUIRED_TOAST.PAYMENT_NOT_CONFIRMED, { id: 'payment-not-confirmed' });
         setCheckoutInlineError(REQUIRED_TOAST.PAYMENT_NOT_CONFIRMED);
         checkoutInFlightRef.current = false;
         // Trigger immediate global retry; do not wait for focus/page reload.
@@ -2291,7 +2301,8 @@ const Cart: React.FC = () => {
     checkoutDismissedRef.current = true;
     if (isPaymentModalDismissed(error) || /cancel/i.test(error.message || '')) {
       handlePlainRazorpayDismiss(razorpayOrderId);
-      setCheckoutInlineError(getPlainDismissUserMessage());
+      setPaymentUserNotice('cancelled');
+      setCheckoutInlineError(null);
     } else {
       const msg = error.message?.trim() || REQUIRED_TOAST.PAYMENT_NOT_COMPLETED;
       toast.error(/not charged|no charge/i.test(msg) ? REQUIRED_TOAST.PAYMENT_NOT_CHARGED : msg);
@@ -2832,8 +2843,55 @@ const Cart: React.FC = () => {
                 </div>
               )}
 
+              {isConfirmingOrder ? (
+                <UserNotice
+                  variant="info"
+                  title={USER_NOTICES.PAYMENT_CONFIRMING_TITLE}
+                  className="mb-3"
+                  role="status"
+                >
+                  {USER_NOTICES.PAYMENT_CONFIRMING_BODY}
+                </UserNotice>
+              ) : null}
+              {paymentUserNotice === 'cancelled' ? (
+                <UserNotice
+                  variant="warning"
+                  title={USER_NOTICES.PAYMENT_CANCELLED_TITLE}
+                  className="mb-3"
+                  role="status"
+                >
+                  {USER_NOTICES.PAYMENT_CANCELLED_BODY}
+                </UserNotice>
+              ) : null}
+              {paymentUserNotice === 'unconfirmed' ? (
+                <UserNotice
+                  variant="error"
+                  title={USER_NOTICES.PAYMENT_UNCONFIRMED_TITLE}
+                  className="mb-3"
+                  role="alert"
+                  actions={[{ label: 'View my orders', to: `${basePath}/orders` }]}
+                >
+                  {USER_NOTICES.PAYMENT_UNCONFIRMED_BODY}
+                </UserNotice>
+              ) : null}
+              {defaultAddress &&
+              String(defaultAddress.id) === LIVE_DEVICE_ADDRESS_ID ? (
+                <UserNotice
+                  variant="warning"
+                  title={USER_NOTICES.GPS_ADDRESS_TITLE}
+                  className="mb-3"
+                  actions={[
+                    {
+                      label: 'Save address',
+                      to: `${basePath}/addresses/add`,
+                    },
+                  ]}
+                >
+                  {USER_NOTICES.GPS_ADDRESS_BODY}
+                </UserNotice>
+              ) : null}
               {/* Checkout */}
-              {checkoutInlineError ? (
+              {checkoutInlineError && !paymentUserNotice ? (
                 <div
                   className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700"
                   role="alert"
@@ -2842,8 +2900,10 @@ const Cart: React.FC = () => {
                 </div>
               ) : null}
               <button
+                type="button"
                 onClick={handleCheckout}
                 disabled={
+                  isPreparingCheckout ||
                   isProcessingPayment ||
                   isConfirmingOrder ||
                   hasStaleDailyLine ||
@@ -2851,19 +2911,26 @@ const Cart: React.FC = () => {
                   deliveryBlockedByStoreMismatch ||
                   storeOfflineBlocked
                 }
-                className="w-full py-4 rounded-[25px] text-base font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                aria-busy={
+                  isPreparingCheckout || isProcessingPayment || isConfirmingOrder
+                    ? true
+                    : undefined
+                }
+                className="w-full py-4 rounded-[25px] text-base font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
                 style={{ backgroundColor: theme.colors.primary, color: 'black' }}
               >
-                {(isProcessingPayment || isConfirmingOrder) && (
+                {(isPreparingCheckout || isProcessingPayment || isConfirmingOrder) && (
                   <Spinner size={22} variant="light" className="!inline-flex" />
                 )}
                 {isConfirmingOrder
                   ? 'Confirming your order…'
                   : isProcessingPayment
                     ? 'Preparing payment…'
-                    : storeOfflineBlocked
-                      ? STORE_OFFLINE_ORDER_BUTTON_LABEL
-                      : 'Subscribe'}
+                    : isPreparingCheckout
+                      ? 'Setting up subscription…'
+                      : storeOfflineBlocked
+                        ? STORE_OFFLINE_ORDER_BUTTON_LABEL
+                        : 'Subscribe'}
               </button>
             </>
           </div>

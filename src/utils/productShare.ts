@@ -1,16 +1,16 @@
 import toast from "react-hot-toast";
-
-const PRODUCT_SHARE_BASE = "https://customerapp.mygendaphool.com/products";
+import { buildProductShareDeepLink, normalizeProductShareUrl } from "../config/customerAppOrigin";
+import { sanitizeProductRouteSlug } from "./productSlug";
 
 export function resolveProductShareUrl(
   product: { share_url?: string | null; slug?: string | null } | null | undefined,
   slugFallback?: string,
 ): string | null {
-  const fromApi = product?.share_url?.trim();
-  if (fromApi) return fromApi;
-  const slug = (product?.slug ?? slugFallback ?? "").trim();
-  if (!slug) return null;
-  return `${PRODUCT_SHARE_BASE}/${encodeURIComponent(slug)}`;
+  const slug = sanitizeProductRouteSlug(product?.slug ?? slugFallback ?? "");
+  if (slug) {
+    return buildProductShareDeepLink(slug);
+  }
+  return normalizeProductShareUrl(product?.share_url, slugFallback);
 }
 
 export async function shareProductLink(options: {

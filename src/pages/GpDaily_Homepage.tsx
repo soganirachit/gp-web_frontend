@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { MdKeyboardArrowDown, MdChevronLeft, MdChevronRight } from "react-icons/md";
 import { SubscriptionResumeButton } from "../components/Subscription/SubscriptionResumeButton";
 import logo from "../assets/All/logo.png";
@@ -18,7 +19,6 @@ import {
 } from "../services/product.service";
 import {
   computeGpDailyWalletBanner,
-  PAUSE_REASON_INSUFFICIENT_WALLET,
   pickActiveSubscriptionDailyUnitRupees,
   shouldShowGpDailyWalletAlertCard,
   shouldShowGpDailyOrderInHoldCard,
@@ -40,13 +40,14 @@ import { customerService } from "../services/getcustomer.service";
 import { toast } from "react-hot-toast";
 import { REQUIRED_TOAST } from "../constants/requiredToastMessages";
 import {
+  isPausedOrOnHoldStatus,
   isSubscriptionPausedForInsufficientWallet,
-  isSubscriptionPausedForStoreOffline,
 } from "../utils/gpDailySubscriptionWalletPause";
 import ProductCard from "../components/common/ProductCard";
 import { BrandIntroPyramidCopy } from "../components/common/BrandIntroPyramidCopy";
 import { GpDailyHomeSection } from "../components/daily/GpDailyHomeSection";
 import { GpDailyHomeSkeleton } from "../components/common/PageSkeletons";
+import Spinner from "../components/common/Spinner";
 import {
   gpDailyHome,
   GP_DAILY_SCOOTER_HERO_COPY_PAD_CLASS,
@@ -85,7 +86,7 @@ import {
 import { navigateToGpDailyWalletForRecharge } from "../utils/gpDailyWalletRechargeRedirect";
 import {
   guestAddressFormNavState,
-  guestHasSavedBrowseAddress,
+  guestShouldOpenAddressFormFromHeader,
 } from "../utils/guestAddressEntry";
 import {
   formatNamasteDeliveryLine,
@@ -103,6 +104,7 @@ import {
 } from "../utils/guestHeaderLocation";
 import {
   formatSavedAddressLine,
+  pickHomeCatalogHeaderAddress,
   pickSessionHeaderAddress,
 } from "../utils/resolveHomeCatalogHeaderAddress";
 import {
@@ -111,6 +113,7 @@ import {
   getSessionPin,
   isGuestLocationFrozen,
 } from "../utils/locationSession";
+import { readSelectedDeliveryAddress } from "../utils/selectedDeliveryAddressStorage";
 import {
   GP_OPEN_GUEST_AREA_MODAL_EVENT,
 } from "../config/guestAreaModalCopy";
@@ -151,7 +154,7 @@ const dailyScooterHeroImg = OPTIMIZED_ILLUSTRATIONS.dailyScooter;
 const dailyScooterHeroImgClass = GP_DAILY_SCOOTER_HERO_IMG_CLASS;
 /** Logged-in home (Namaste + Manage) — scooter below Manage row; guests keep shared class. */
 const GP_DAILY_HOME_MARKETING_SCOOTER_LOGGED_IN_CLASS =
-  "pointer-events-none absolute -right-10 -top-3 z-0 translate-x-6 sm:top-11";
+  "pointer-events-none absolute right-0 top-0 z-0 w-[min(38vw,10.5rem)] max-w-[10.5rem] sm:top-8";
 const NAMASTE_MAX_VISIBLE_DOTS = 3;
 
 function getNamasteVisibleDotIndices(total: number, current: number): number[] {
@@ -185,10 +188,7 @@ const Home2: React.FC = () => {
   const [deliveryLocation, setDeliveryLocation] = useState<string>("");
   const [addressType, setAddressType] = useState<string>("Home");
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
-  /** Sync once from storage so we do not mount as false and trigger a second subscription fetch */
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    () => !!localStorage.getItem("phoneNumber")
-  );
+  const { isLoggedIn } = useAuth();
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
   const [insufficientWalletModal, setInsufficientWalletModal] =
@@ -243,6 +243,7 @@ const Home2: React.FC = () => {
     Record<string, unknown> | null
   >(null);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const initialBootDoneRef = useRef(false);
   const [userName, setUserName] = useState<string>("");
   const [userFirstName, setUserFirstName] = useState<string>("");
   const [showPauseModal, setShowPauseModal] = useState(false);
@@ -402,16 +403,16 @@ const Home2: React.FC = () => {
         /** Namaste carousel: active + paused only (same as mobile). */
         const rank = (s: (typeof fetchedSubscriptions)[0]) => {
           if (s.status === "ACTIVE") return 0;
-          if (s.status === "PAUSED" || s.status === "INACTIVE") return 1;
-          return 2;
+          if (s.status === "ON_HOLD") return 1;
+          if (s.status === "PAUSED" || s.status === "INACTIVE") return 2;
+          return 3;
         };
         const namasteList = fetchedSubscriptions
           .filter(
             (sub) =>
               sub.status === "ACTIVE" ||
               String(sub.status ?? "").toUpperCase() === "RUNNING" ||
-              sub.status === "PAUSED" ||
-              sub.status === "INACTIVE",
+              isPausedOrOnHoldStatus(sub.status),
           )
           .sort((a, b) => {
             const d = rank(a) - rank(b);
@@ -647,7 +648,7 @@ const Home2: React.FC = () => {
   const fetchLatestAddress = useCallback(async () => {
     try {
       setIsLoadingAddress(true);
-      if (!localStorage.getItem("phoneNumber")) {
+      if (!isLoggedIn) {
         const guestAddr = storeService.getGuestBrowseAddress();
         if (isGuestLocationFrozen() && guestAddr) {
           setAddressType(resolveGuestHeaderPrimaryLabel(guestAddr.label));
@@ -667,23 +668,33 @@ const Home2: React.FC = () => {
         setDeliveryLocation(formatSavedAddressLine(selectedAddress));
         setAddressType(selectedAddress.type || "Home");
       } else {
-        setAddressType(GUEST_HEADER_LOCATION_TITLE);
-        setDeliveryLocation(localStorage.getItem("userLocation") || "");
+        const session = getLocationSession();
+        if (
+          session.mode === "auto" &&
+          session.lat != null &&
+          session.lng != null &&
+          !session.addressId
+        ) {
+          const header = await resolveGuestHeaderLocationLabel();
+          setAddressType(header.title);
+          setDeliveryLocation(header.line);
+        } else {
+          const fallback = pickHomeCatalogHeaderAddress(addresses);
+          if (fallback) {
+            setDeliveryLocation(formatSavedAddressLine(fallback));
+            setAddressType(fallback.type || "Home");
+          } else {
+            setAddressType(GUEST_HEADER_LOCATION_TITLE);
+            setDeliveryLocation(localStorage.getItem("userLocation") || "");
+          }
+        }
       }
     } catch (error) {
       console.error("Error fetching address:", error);
-      const stored = localStorage.getItem("selectedDeliveryAddress");
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored) as Parameters<
-            typeof formatSavedAddressLine
-          >[0];
-          setDeliveryLocation(formatSavedAddressLine(parsed));
-          setAddressType(parsed.type || "Home");
-        } catch {
-          setDeliveryLocation(localStorage.getItem("userLocation") || "");
-          setAddressType("Home");
-        }
+      const parsed = readSelectedDeliveryAddress();
+      if (parsed) {
+        setDeliveryLocation(formatSavedAddressLine(parsed));
+        setAddressType(parsed.type || "Home");
       } else {
         setDeliveryLocation(localStorage.getItem("userLocation") || "");
         setAddressType("Home");
@@ -691,16 +702,13 @@ const Home2: React.FC = () => {
     } finally {
       setIsLoadingAddress(false);
     }
-  }, []);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     const needLocation = localStorage.getItem("needLocation") === "true";
     if (needLocation) {
       localStorage.removeItem("needLocation");
     }
-
-    const isLoggedIn = !!localStorage.getItem("phoneNumber");
-    setIsLoggedIn(isLoggedIn);
 
     if (isLoggedIn) {
       fetchWalletBalance();
@@ -715,7 +723,7 @@ const Home2: React.FC = () => {
     fetchProducts();
     validateDeliveryZone(false);
     void fetchLatestAddress();
-  }, [fetchLatestAddress]);
+  }, [fetchLatestAddress, isLoggedIn]);
 
   useEffect(() => {
     const onCatalogLocationChange = () => {
@@ -808,7 +816,7 @@ const Home2: React.FC = () => {
 
   const handleLocationClick = () => {
     if (!isLoggedIn) {
-      if (guestHasSavedBrowseAddress()) {
+      if (guestShouldOpenAddressFormFromHeader()) {
         navigate(`${basePath}/address-selection`, {
           state: guestAddressFormNavState(),
         });
@@ -885,16 +893,6 @@ const Home2: React.FC = () => {
     () => getNamasteVisibleDotIndices(namasteSlideCount, subscriptionCarouselIndex),
     [namasteSlideCount, subscriptionCarouselIndex],
   );
-  const currentNamasteCarouselSlide =
-    namasteCarouselSlides[subscriptionCarouselIndex] ?? null;
-  const currentNamasteSub =
-    currentNamasteCarouselSlide?.kind === "subscription"
-      ? currentNamasteCarouselSlide.sub
-      : null;
-  const currentNamasteSubPaused =
-    currentNamasteSub?.status === "PAUSED" ||
-    currentNamasteSub?.status === "INACTIVE";
-
   const getNamasteRealIndexFromVirtual = useCallback(
     (virtualIdx: number) => {
       const n = namasteSlideCount;
@@ -1183,12 +1181,6 @@ const Home2: React.FC = () => {
     const subscription =
       activeSubscriptions.find((s) => String(s.id) === String(subId)) ??
       customerSubscriptions.find((s) => String(s.id) === String(subId));
-    if (subscription && isSubscriptionPausedForStoreOffline(subscription)) {
-      toast.error(REQUIRED_TOAST.SUBSCRIPTION_RESUME_STORE_OFFLINE, {
-        id: REQUIRED_TOAST.SUBSCRIPTION_RESUME_STORE_OFFLINE,
-      });
-      return;
-    }
     try {
       setResumingSubId(subId);
       await subscriptionService.toggleSubscriptionStatus(subId);
@@ -1289,7 +1281,7 @@ const Home2: React.FC = () => {
                 Active
               </span>
             ) : null}
-            {sub.status === "PAUSED" || sub.status === "INACTIVE" ? (
+            {isPausedOrOnHoldStatus(sub.status) ? (
               <SubscriptionResumeButton
                 compact
                 variant="olive"
@@ -1370,13 +1362,7 @@ const Home2: React.FC = () => {
     walletAutoPauseInFlightRef.current = true;
     void (async () => {
       try {
-        await Promise.all(
-          activeIds.map((id) =>
-            subscriptionService.pauseSubscriptionWithPayload(id, {
-              pause_reason: PAUSE_REASON_INSUFFICIENT_WALLET,
-            }),
-          ),
-        );
+        await subscriptionService.applyWalletHold();
         await fetchSubscriptions({ silent: true });
       } catch {
         /* backend cron should also handle */
@@ -1428,17 +1414,35 @@ const Home2: React.FC = () => {
     [walletBanner],
   );
 
-  if (isPageLoading) {
+  if (!isPageLoading) {
+    initialBootDoneRef.current = true;
+  }
+
+  if (isPageLoading && !initialBootDoneRef.current) {
     return <GpDailyHomeSkeleton />;
   }
+
+  const catalogRefreshing =
+    initialBootDoneRef.current &&
+    (isLoadingProducts || isLoadingAddress || isLoadingBalance);
 
   return (
     <ErrorBoundary>
       <>
       <div className="min-h-screen bg-[#f8f6f1] pb-nav-bottom">
         <div className="mx-auto w-full max-w-[min(800px,100vw)]">
+          {catalogRefreshing ? (
+            <div
+              className="flex items-center justify-center gap-2 border-b border-[#19411f]/10 bg-[#f8f6f1] px-4 py-2 text-sm text-gray-600"
+              role="status"
+              aria-live="polite"
+            >
+              <Spinner size={18} />
+              Refreshing…
+            </div>
+          ) : null}
           <div
-            className={`relative px-4 pt-4 rounded-b-2xl overflow-hidden ${showNamasteMarketing ? "pb-0" : "pb-1"}`}
+            className={`relative px-4 pt-4 rounded-b-2xl overflow-x-clip overflow-y-visible ${showNamasteMarketing ? "pb-0" : "pb-1"}`}
             style={{
               background:
                 "linear-gradient(90deg, rgba(250, 193, 20, 0.4) 0%, rgba(250, 193, 20, 0.2) 100%)",
@@ -1732,8 +1736,11 @@ const Home2: React.FC = () => {
                     <p className={gpDailyHome.holdCardBody}>
                       {orderOnHold.showRunningLow
                         ? `Your wallet balance will only last until ${orderOnHold.pauseDateLabel}. Please recharge to keep your deliveries running.`
-                        : "Your wallet balance is low. Recharge now to continue your daily deliveries."}
+                        : walletBanner.hasWalletHoldPause
+                          ? "Your wallet cannot cover active deliveries. Recharge, then tap Resume — we will re-check the balance first."
+                          : "Your wallet balance is low. Recharge now to continue your daily deliveries."}
                     </p>
+                    <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() =>
@@ -1751,6 +1758,30 @@ const Home2: React.FC = () => {
                     >
                       Recharge Now
                     </button>
+                    {walletBanner.hasWalletHoldPause
+                      ? (() => {
+                          const holdSub =
+                            customerSubscriptions.find((s) =>
+                              isPausedOrOnHoldStatus(s.status) &&
+                              isSubscriptionPausedForInsufficientWallet(s),
+                            ) ??
+                            customerSubscriptions.find((s) =>
+                              isPausedOrOnHoldStatus(s.status),
+                            );
+                          if (!holdSub) return null;
+                          return (
+                            <SubscriptionResumeButton
+                              compact
+                              variant="olive"
+                              loading={resumingSubId === holdSub.id}
+                              onClick={(e) =>
+                                void handleNamasteResume(e, holdSub.id)
+                              }
+                            />
+                          );
+                        })()
+                      : null}
+                    </div>
                   </div>
                 </div>
               </div>

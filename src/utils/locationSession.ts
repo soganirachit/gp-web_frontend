@@ -1,5 +1,6 @@
 import type { Address } from "../services/address.service";
 import { parseAddressCoordinates } from "./addressCoordinates";
+import { clearStoreVisitOverride } from "./storeVisitOverride";
 
 export const LOCATION_SESSION_KEY = "gp_location_session";
 export const LOCATION_SESSION_UPDATED_EVENT = "gp-location-session-updated";
@@ -103,6 +104,7 @@ export function coordsFromAddress(
 
 /** Manual pick: saved address or “order for others”. Sticky until the next page load. */
 export function markManualSavedAddress(address: Address): void {
+  clearStoreVisitOverride();
   const coords = coordsFromAddress(address);
   setLocationSession({
     mode: "manual",
@@ -117,6 +119,7 @@ export function markManualGuest(coords?: {
   lat: number;
   lng: number;
 } | null): void {
+  clearStoreVisitOverride();
   setLocationSession({
     mode: "manual",
     addressId: null,
@@ -131,6 +134,7 @@ export function markManualGuest(coords?: {
 
 /** “Use current location” — GPS is in charge again. */
 export function resumeAutoMode(): void {
+  clearStoreVisitOverride();
   setLocationSession({
     mode: "auto",
     addressId: null,
@@ -157,6 +161,7 @@ export function skipStickyManualPin(input: {
 }): boolean {
   if (getLocationSession().mode !== "manual") return false;
   if (!input.gpsAvailable && !input.loggedIn) return false;
+  clearStoreVisitOverride();
   setLocationSession({
     mode: "auto",
     addressId: null,
@@ -194,25 +199,28 @@ export function recordGpsSample(lat: number, lng: number): void {
 /** Explicit session pin only — never last GPS. City-pick freeze must not reuse a leftover fix. */
 export type LocationChannel = "home" | "store" | "daily";
 
+const NON_CATALOG_SEGMENTS = new Set([
+  "account",
+  "basket",
+  "login",
+  "otp",
+  "choose-location",
+  "address-selection",
+  "addresses",
+  "profile",
+]);
+
 export function channelFromPathname(pathname: string): LocationChannel | null {
   if (pathname === "/home" || pathname === "/") return "home";
-  if (
-    /^\/gp-daily\/?$/.test(pathname) ||
-    /^\/gp-daily\/Products/i.test(pathname) ||
-    /^\/gp-daily\/product\//i.test(pathname) ||
-    /^\/gp-daily\/explore-more/i.test(pathname)
-  ) {
-    return "daily";
-  }
-  if (
-    /^\/gp-store\/?$/.test(pathname) ||
-    /^\/gp-store\/products/.test(pathname) ||
-    /^\/gp-store\/product\//.test(pathname) ||
-    /^\/gp-store\/explore-more/.test(pathname)
-  ) {
-    return "store";
-  }
-  return null;
+  const isDaily =
+    pathname === "/gp-daily" || pathname.startsWith("/gp-daily/");
+  const isStore =
+    pathname === "/gp-store" || pathname.startsWith("/gp-store/");
+  if (!isDaily && !isStore) return null;
+  const rest = pathname.replace(/^\/gp-(daily|store)\/?/, "");
+  const first = rest.split("/").filter(Boolean)[0] ?? "";
+  if (first && NON_CATALOG_SEGMENTS.has(first)) return null;
+  return isDaily ? "daily" : "store";
 }
 
 export function getSessionPin(): { lat: number; lng: number } | null {

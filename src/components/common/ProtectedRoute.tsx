@@ -23,7 +23,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     const loginPath = `${basePath}/login`;
     
     // Redirect to feature-prefixed login page but save the attempted location
-    return <Navigate to={loginPath} state={{ from: location, returnUrl: location.pathname }} replace />;
+    const returnUrl = `${location.pathname}${location.search}`;
+    return (
+      <Navigate
+        to={loginPath}
+        state={{ from: location, returnUrl }}
+        replace
+      />
+    );
   }
 
   return <>{children}</>;

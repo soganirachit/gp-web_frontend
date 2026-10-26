@@ -22,7 +22,11 @@ import {
   resolveOrderListCardTitle,
 } from '../../utils/orderListDisplay';
 import { hydrateMissingCustomerOrders } from '../../utils/customerOrderHistoryCache';
+import toast from 'react-hot-toast';
 import { OrderListThumb } from './OrderListThumb';
+import { UserNotice } from '../common/UserNotice';
+import { USER_NOTICES } from '../../constants/userNotices';
+import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
 
 const ORDER_LIST_PAGE_SIZE = 6;
 
@@ -98,6 +102,7 @@ const MyOrders: React.FC = () => {
   const [nextPageUrl, setNextPageUrl] = useState<string | null>(null);
   /** Max filtered rows to show; steps by 6 per “Load more” (6 → 12 → 18 …). */
   const [displayLimit, setDisplayLimit] = useState(ORDER_LIST_PAGE_SIZE);
+  const [listError, setListError] = useState(false);
 
   const subscriptionListOnly = feature === "gpDaily";
 
@@ -178,6 +183,7 @@ const MyOrders: React.FC = () => {
   };
 
   const fetchOrders = async () => {
+    setListError(false);
     try {
       setLoading(true);
       setNextPageUrl(null);
@@ -233,6 +239,8 @@ const MyOrders: React.FC = () => {
       console.error("Failed to fetch orders", error);
       setOrders([]);
       setNextPageUrl(null);
+      setListError(true);
+      toast.error(REQUIRED_TOAST.NETWORK_ISSUE, { id: 'orders-list-load' });
     } finally {
       setLoading(false);
     }
@@ -388,6 +396,18 @@ const MyOrders: React.FC = () => {
             className="mb-4 bg-transparent"
             titleClassName={MY_ORDER_HEADER_TITLE_CLASS}
           />
+
+          {listError ? (
+            <UserNotice
+              variant="error"
+              title={USER_NOTICES.ORDERS_LOAD_FAILED_TITLE}
+              className="mb-4"
+              role="alert"
+              actions={[{ label: 'Try again', onClick: () => void fetchOrders() }]}
+            >
+              {USER_NOTICES.ORDERS_LOAD_FAILED_BODY}
+            </UserNotice>
+          ) : null}
 
           {/* Search Bar — scrolls with list (not sticky) */}
           <div className="flex gap-3 pb-4">

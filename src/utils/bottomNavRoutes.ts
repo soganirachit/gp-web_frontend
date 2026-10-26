@@ -12,6 +12,7 @@ export function isGpStoreHubRoute(pathname: string): boolean {
 export function isGpDailyHubRoute(pathname: string): boolean {
   return (
     pathname === '/gp-daily' ||
+    pathname === '/gp-daily/products' ||
     pathname === '/gp-daily/Products' ||
     pathname.startsWith('/gp-daily/product/') ||
     pathname.startsWith('/gp-daily/explore-more')
@@ -29,11 +30,13 @@ export function isAccountSectionRoute(pathname: string, basePath: string): boole
     `${basePath}/customer-support`,
     `${basePath}/manage-my-subscription`,
     `${basePath}/manage-subscription`,
+    `${basePath}/manage-my-store-products`,
     `${basePath}/manage-my-storeProducts`,
     `${basePath}/pause-subscription`,
     `${basePath}/subscription-paused`,
-    `${basePath}/Cancel-Subscription`,
     `${basePath}/cancel-subscription`,
+    `${basePath}/Cancel-Subscription`,
+    `${basePath}/modify-subscription`,
     `${basePath}/modify-Subscription`,
   ];
   return prefixes.some(

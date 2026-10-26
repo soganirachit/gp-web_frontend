@@ -22,9 +22,9 @@ export const REQUIRED_TOAST = {
   SUBSCRIPTION_UPDATE_STORE_OFFLINE:
     "This store is currently offline. You can update the subscription when the store is back online.",
   SUBSCRIPTION_RESUME_WALLET_HOLD:
-    "This subscription is paused due to Insufficient Wallet Balance. Recharge your wallet to resume deliveries.",
+    "This subscription is on hold due to Insufficient Wallet Balance. Recharge your wallet, then tap Resume.",
   SUBSCRIPTION_RESUME_STORE_OFFLINE:
-    "This subscription is paused because the store is currently offline. It will resume when the store is back online.",
+    "This subscription is on hold because the store is currently offline. Resume when the store is accepting orders.",
   ACCOUNT_DELETED: "Account deleted successfully",
   MESSAGE_SENT: "Message sent successfully",
   COPIED: "Copied!",

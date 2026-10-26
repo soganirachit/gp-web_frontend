@@ -14,6 +14,7 @@ import { openPrivacyPolicy, openTermsOfService } from "../../../../utils/openLeg
 import { errorMessageFromCatch } from "../../../../utils/apiErrorMessage";
 import { toast } from "react-hot-toast";
 import { REQUIRED_TOAST } from "../../../../constants/requiredToastMessages";
+import { safeReturnUrl } from "../../../../utils/safeReturnUrl";
 
 const Login = () => {
     const [phoneNumber, setPhoneNumber] = useState("");
@@ -55,7 +56,11 @@ const Login = () => {
                 setError(result.message || "Failed to send OTP");
                 return;
             }
-            const pollPhone = result.phone ?? phoneNumber;
+            const pollToken = result.otp_poll_token;
+            if (!pollToken) {
+                setError("Could not start OTP session. Please try again.");
+                return;
+            }
             let shouldBlockEntry = shouldBlockOtpEntryAfterSendOtp(result);
             let blockMessage =
                 result.message && result.message.toLowerCase() !== "success"
@@ -63,7 +68,7 @@ const Login = () => {
                     : OTP_NOT_ON_WHATSAPP_MESSAGE;
 
             if (!shouldBlockEntry) {
-                const guard = await checkNotOnWhatsappBeforeOtpRoute(pollPhone);
+                const guard = await checkNotOnWhatsappBeforeOtpRoute(pollToken);
                 if (guard.notOnWhatsapp) {
                     shouldBlockEntry = true;
                     blockMessage = guard.message || OTP_NOT_ON_WHATSAPP_MESSAGE;
@@ -90,14 +95,24 @@ const Login = () => {
             }
 
             const otpPath = `${basePath}/otp-verification`;
-            const incoming = location.state as { returnUrl?: string; fromCart?: boolean } | null;
+            const incoming = location.state as {
+                returnUrl?: string;
+                fromCart?: boolean;
+                from?: { pathname?: string; search?: string };
+            } | null;
+            const mergedReturnUrl = safeReturnUrl(
+                incoming?.returnUrl?.trim() ||
+                (incoming?.from?.pathname
+                    ? `${incoming.from.pathname}${incoming.from.search ?? ""}`
+                    : undefined),
+                basePath,
+            );
             navigate(otpPath, {
                 state: {
                     phoneNumber,
                     whatsappOtpLikelyDelivered: whatsappOtpLikelyDelivered(result),
-                    /** E.164 or backend-normalized phone for GET otp-delivery-status */
-                    deliveryPollPhone: pollPhone,
-                    returnUrl: incoming?.returnUrl,
+                    otpPollToken: pollToken,
+                    returnUrl: mergedReturnUrl,
                     fromCart: incoming?.fromCart,
                 },
             });
@@ -108,9 +123,13 @@ const Login = () => {
             if (errorMessage.includes("throttled") || errorMessage.includes("Expected available")) {
                 const match = errorMessage.match(/(\d+)\s*seconds?/i);
                 if (match) {
-                    const seconds = parseInt(match[1]);
-                    const minutes = Math.ceil(seconds / 60);
-                    errorMessage = REQUIRED_TOAST.TOO_MANY_REQUESTS;
+                    const seconds = parseInt(match[1], 10);
+                    if (seconds >= 60) {
+                        const minutes = Math.ceil(seconds / 60);
+                        errorMessage = `Too many OTP requests. Please wait about ${minutes} minute${minutes === 1 ? '' : 's'} before trying again.`;
+                    } else {
+                        errorMessage = `Too many OTP requests. Please wait ${seconds} seconds before trying again.`;
+                    }
                 } else {
                     errorMessage = "Too many OTP requests. Please wait a few minutes before trying again.";
                 }

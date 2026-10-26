@@ -17,6 +17,32 @@ process.env.JITI_CACHE_DIR ??= jitiCacheDir;
  * `VITE_API_BASE_URL=/api/v1`, the browser calls same-origin `/api/v1/...` and Vite
  * forwards `/api` to the real API — avoids CORS and fixes 404 on auth/login.
  */
+function customerAppHtmlEnvPlugin(env: Record<string, string>) {
+  const google = String(env.VITE_GOOGLE_SITE_VERIFICATION ?? "").trim();
+  const pixel = String(env.VITE_META_PIXEL_ID ?? "").trim();
+  const pixelOk = /^\d{8,24}$/.test(pixel);
+
+  return {
+    name: "customer-app-html-env",
+    transformIndexHtml(html: string) {
+      let out = html;
+      out = out.replace(
+        "<!--INJECT_GOOGLE_SITE_VERIFICATION-->",
+        google
+          ? `<meta name="google-site-verification" content="${google}" />`
+          : "",
+      );
+      out = out.replace(
+        "<!--INJECT_META_PIXEL_NOSCRIPT-->",
+        pixelOk
+          ? `<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=${pixel}&ev=PageView&noscript=1" alt="" /></noscript>`
+          : "",
+      );
+      return out;
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, configDir, "");
   const proxyTarget = String(env.VITE_DEV_PROXY_TARGET ?? "")
@@ -25,7 +51,7 @@ export default defineConfig(({ mode }) => {
   const enableApiProxy = Boolean(proxyTarget);
 
   return {
-    plugins: [react()],
+    plugins: [react(), customerAppHtmlEnvPlugin(env)],
     resolve: {
       alias: {
         "@": path.resolve(configDir, "./src"),

@@ -43,6 +43,20 @@
     box-sizing: border-box;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    html:focus-within {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
   body {
     @apply bg-[#f8f6f1] font-sans antialiased;
     /* Minimum supported width (360px budget Android) */

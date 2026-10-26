@@ -19,6 +19,7 @@ import Spinner from '../../../common/Spinner';
 import { errorMessageFromCatch } from '../../../../utils/apiErrorMessage';
 import { toast } from 'react-hot-toast';
 import { REQUIRED_TOAST } from '../../../../constants/requiredToastMessages';
+import { safeReturnUrl } from '../../../../utils/safeReturnUrl';
 
 interface LocationState {
   phoneNumber: string;
@@ -36,11 +37,11 @@ const OTPVerification: React.FC = () => {
   const { login } = useAuth();
   const { syncCartToAPI, items } = useCart();
   const locState = (location.state as LocationState) || ({} as LocationState);
+  const basePath = location.pathname.startsWith("/gp-store") ? "/gp-store" : "/gp-daily";
   const phoneNumber = locState.phoneNumber;
-  const returnUrl = locState.returnUrl;
+  const returnUrl = safeReturnUrl(locState.returnUrl, basePath);
   const fromCart = locState.fromCart;
   const { theme } = useFeatureTheme();
-  const basePath = location.pathname.startsWith("/gp-store") ? "/gp-store" : "/gp-daily";
 
   const [otp, setOtp] = useState<string[]>(new Array(6).fill(""));
   const [countdown, setCountdown] = useState<number>(0);
@@ -217,6 +218,27 @@ const OTPVerification: React.FC = () => {
 
         try {
           const hasAddresses = await hydrateProfileFromApi();
+
+          const postLoginPath =
+            fromCart && returnUrl
+              ? returnUrl
+              : returnUrl?.trim() && returnUrl.trim() !== basePath
+                ? returnUrl.trim()
+                : basePath;
+          try {
+            const { refreshLocationForChannel } = await import(
+              "../../../../services/locationSession.service"
+            );
+            const { channelFromPathname } = await import(
+              "../../../../utils/locationSession"
+            );
+            const channel = channelFromPathname(postLoginPath);
+            if (channel) {
+              await refreshLocationForChannel(channel);
+            }
+          } catch {
+            /* location refresh is best-effort after login */
+          }
 
           if (!hasAddresses) {
             navigate(`${basePath}/location`, {
@@ -410,7 +432,7 @@ const OTPVerification: React.FC = () => {
                   onChange={(e) => handleChange(e.target, index)}
                   onKeyDown={(e) => handleKeyDown(e, index)}
                   onPaste={(e) => handlePaste(e)}
-                  className={`w-10 h-12 sm:w-12 sm:h-14 md:w-14 md:h-16 border-2 rounded-lg sm:rounded-xl text-center text-lg sm:text-xl md:text-2xl font-semibold focus:outline-none focus:ring-2 transition-all duration-200 bg-white ${theme.classes.otpInputBorder}`}
+                  className={`w-10 h-12 sm:w-12 sm:h-14 md:w-14 md:h-16 border-2 rounded-lg sm:rounded-xl text-center text-lg sm:text-xl md:text-2xl font-semibold focus:outline-none focus-visible:ring-2 transition-[border-color,box-shadow] duration-200 bg-white ${theme.classes.otpInputBorder}`}
                   disabled={isSubmitting}
                   data-testid={index === 0 ? "gp-otp-input-first" : undefined}
                 />

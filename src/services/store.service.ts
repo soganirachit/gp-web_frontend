@@ -21,7 +21,9 @@ import {
   markManualGuest,
   setLocationSession,
 } from "../utils/locationSession";
+import { getStoreVisitOverrideId } from "../utils/storeVisitOverride";
 import { parseAddressCoordinates } from "../utils/addressCoordinates";
+import { writeSelectedDeliveryAddress } from "../utils/selectedDeliveryAddressStorage";
 
 /** Dispatched on `window` after a guest picks a store from the city picker (home / products refresh). */
 export const GUEST_STORE_UPDATED_EVENT = "gp-guest-temporary-store-updated";
@@ -579,6 +581,8 @@ class StoreService {
    * Get store ID - returns logged-in user's store ID if available, otherwise temporary store ID
    */
   getStoreIdForProducts(): number | null {
+    const override = getStoreVisitOverrideId();
+    if (override != null) return override;
     const live = getLocationSession().storeId;
     if (live != null && Number.isFinite(live) && live > 0) return live;
     if (localStorage.getItem("phoneNumber")) {
@@ -640,7 +644,7 @@ class StoreService {
     }
     this.setGpStoreCatalogAddressOverrideId(String(address.id));
     try {
-      localStorage.setItem("selectedDeliveryAddress", JSON.stringify(address));
+      writeSelectedDeliveryAddress(address);
       const headerLine = formatSavedAddressLine(address);
       if (headerLine.trim()) {
         localStorage.setItem("userLocation", headerLine);

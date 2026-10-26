@@ -402,7 +402,7 @@ const ModifySubscription: React.FC = () => {
       const updateBody: Parameters<typeof subscriptionService.updateSubscription>[1] = {
         type: subscriptionType,
         selectedDays: apiSelectedDays,
-        status: subscription.status as "ACTIVE" | "PAUSED" | "CANCELLED" | "INACTIVE",
+        status: subscription.status as "ACTIVE" | "PAUSED" | "ON_HOLD" | "CANCELLED" | "INACTIVE",
       };
 
       if (itemPayload.length === 1) {

@@ -1,5 +1,6 @@
 import { useRouteError, isRouteErrorResponse } from 'react-router-dom';
 import { IoRefresh } from 'react-icons/io5';
+import { resolveSmartHomeOrHub } from '../../utils/resolveSmartHomePath';
 
 function isChunkOrModuleLoadError(error: unknown): boolean {
   if (!error) return false;
@@ -48,7 +49,7 @@ export default function RouteErrorPage() {
   };
 
   const handleGoHome = () => {
-    window.location.assign('/gp-store');
+    window.location.assign(resolveSmartHomeOrHub());
   };
 
   return (
@@ -62,7 +63,7 @@ export default function RouteErrorPage() {
           <button
             type="button"
             onClick={handleReload}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#19411F] text-white py-3 text-sm font-semibold hover:opacity-95 active:opacity-90"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#19411F] text-white py-3 text-sm font-semibold hover:opacity-95 active:scale-[0.99] transition-transform"
           >
             <IoRefresh className="text-lg" />
             Refresh page

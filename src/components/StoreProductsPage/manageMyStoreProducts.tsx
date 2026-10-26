@@ -13,6 +13,7 @@ import { ManageStoreSkeleton } from "../common/PageSkeletons";
 import { format } from "date-fns";
 import { orderService } from "@/services/order.service";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
+import { DAILY_WALLET_PATH } from "../../config/routes.config";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
 import { pickPrimaryImageUrl, type ProductImageLike } from "../../utils/pickPrimaryImageUrl";
 
@@ -175,7 +176,7 @@ const ManageMyStoreProducts: React.FC = () => {
 
   const handleRechargeWallet = () => {
     setShowInsufficientBalanceModal(false);
-    navigate(`${basePath}/wallet`, {
+    navigate(DAILY_WALLET_PATH, {
       state: {
         requiredAmount: balanceDetails.shortageAmount,
         currentBalance: balanceDetails.currentBalance,
@@ -456,7 +457,7 @@ const ManageMyStoreProducts: React.FC = () => {
                 src={walletImage}
                 alt="Wallet"
                 className="w-10 h-10 md:w-10 md:h-10 cursor-pointer"
-                onClick={() => navigate(`${basePath}/wallet`)}
+                onClick={() => navigate(DAILY_WALLET_PATH)}
               />
               <img
                 src={profileImage}

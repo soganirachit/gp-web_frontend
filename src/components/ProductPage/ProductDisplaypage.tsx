@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import "react-datepicker/dist/react-datepicker.css";
 import { basePackService } from "../../services/basepack.service";
 import { BasePack } from "../../services/basepack.service";
@@ -36,6 +36,11 @@ import { ProductImageTag } from "../common/ProductImageTag";
 import { HorizontalScrollSection } from "../common/HorizontalScrollSection";
 import cautionIcon from "../../assets/svg/gp_daily svg/caution.svg";
 import { OPTIMIZED_ILLUSTRATIONS } from "../../config/optimizedIllustrations";
+import { DAILY_WALLET_PATH } from "../../config/routes.config";
+import {
+  productSlugRouteDiffersFromParam,
+  sanitizeProductRouteSlug,
+} from "../../utils/productSlug";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { storeService } from "../../services/store.service";
@@ -240,8 +245,10 @@ const ExistingSubscriptionModal: React.FC<ExistingSubscriptionModalProps> = ({
 );
 
 const ProductPage: React.FC = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug: slugParam } = useParams<{ slug: string }>();
+  const slug = sanitizeProductRouteSlug(slugParam);
   const navigate = useNavigate();
+  const location = useLocation();
   const { feature, theme } = useFeatureTheme();
   const { isLoggedIn } = useAuth();
   const basePath = feature === 'gpStore' ? '/gp-store' : '/gp-daily';
@@ -552,6 +559,14 @@ const ProductPage: React.FC = () => {
       fetchOtherPacks();
     }
   }, [slug, feature, productListAvailability]);
+
+  useEffect(() => {
+    if (!productSlugRouteDiffersFromParam(slugParam, slug)) return;
+    navigate(
+      `${basePath}/product/${encodeURIComponent(slug)}${location.search}`,
+      { replace: true, state: location.state },
+    );
+  }, [slug, slugParam, basePath, location.search, location.state, navigate]);
 
   useEffect(() => {
     setProductUnavailable(false);
@@ -1176,7 +1191,7 @@ const ProductPage: React.FC = () => {
   }) => {
     const currentProduct = product || basePack;
     if (!currentProduct || !slug) {
-      navigate(`${basePath}/wallet`);
+      navigate(DAILY_WALLET_PATH);
       return;
     }
 
@@ -1422,7 +1437,7 @@ const ProductPage: React.FC = () => {
                   {catalogGallerySlides.map((_, idx) => (
                     <span
                       key={idx}
-                      className={`h-1.5 rounded-full transition-all ${
+                      className={`h-1.5 rounded-full transition-[width,background-color] duration-200 ${
                         idx === pdpImageIndex
                           ? feature === "gpStore"
                             ? "w-5 bg-[#19411F]"
@@ -1530,7 +1545,7 @@ const ProductPage: React.FC = () => {
                             setStockLimitMessage(null);
                             setSelectedVariant(variant);
                           }}
-                          className={`flex min-h-[5.5rem] min-w-[108px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 px-3 py-3 text-center transition-all ${
+                          className={`flex min-h-[5.5rem] min-w-[108px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 px-3 py-3 text-center transition-[border-color,background-color,box-shadow] duration-150 ${
                             selected
                               ? "border-[#FAA222] bg-[#FFF4E5]"
                               : "border-gray-200 bg-white"

@@ -60,11 +60,14 @@ import {
 import { pickActiveSubscriptionDailyUnitRupees } from "../../utils/gpDailyWalletHold";
 import {
   getSubscriptionPauseReasonLabel,
+  isOnHoldStatus,
+  isPausedOrOnHoldStatus,
   isSubscriptionPausedForInsufficientWallet,
   isSubscriptionPausedForStoreOffline,
   pausedSubscriptionUpdateToast,
 } from "../../utils/gpDailySubscriptionWalletPause";
 import { resolveSubscriptionPerDeliveryDisplayTotal } from "../../utils/gpDailySubscriptionPricingSnapshot";
+import { formatDeliveryAddress } from "../../utils/formatDeliveryAddress";
 import { navigateToGpDailyWalletForRecharge } from "../../utils/gpDailyWalletRechargeRedirect";
 import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
 const GP_DAILY_BASE = "/gp-daily";
@@ -96,6 +99,29 @@ function historyOrderUndelivered(o: Record<string, unknown>): boolean {
 }
 
 const DELIVERY_HISTORY_PAGE_SIZE = 6;
+
+function formatSubscriptionDeliveryLine(
+  subscription: Subscription,
+): string {
+  const raw = subscription.deliveryAddress as
+    | (Subscription["deliveryAddress"] & Record<string, unknown>)
+    | undefined;
+  if (!raw) return "Delivery address on file";
+
+  const fromApiFields = formatDeliveryAddress(raw as Record<string, unknown>);
+  if (fromApiFields) return fromApiFields;
+
+  const parts = [
+    [raw.houseNo, raw.streetName].filter(Boolean).join(" "),
+    raw.area,
+    raw.city,
+    raw.state,
+    raw.pincode,
+  ]
+    .map((p) => String(p ?? "").trim())
+    .filter(Boolean);
+  return parts.join(", ") || "Delivery address on file";
+}
 
 function isSubscriptionOrderType(o: Record<string, unknown>): boolean {
   const t = String(o.order_type ?? o.orderType ?? "")
@@ -164,6 +190,8 @@ const ManageMySubscription: React.FC = () => {
   const [packsExpandedBySubId, setPacksExpandedBySubId] = useState<
     Record<string, boolean>
   >({});
+  const [deliveryDetailsExpandedBySubId, setDeliveryDetailsExpandedBySubId] =
+    useState<Record<string, boolean>>({});
   const [resumingSubId, setResumingSubId] = useState<string | null>(null);
   const [highlightedSubId, setHighlightedSubId] = useState<string | null>(null);
   const [refreshingSubscriptions, setRefreshingSubscriptions] =
@@ -326,10 +354,7 @@ const ManageMySubscription: React.FC = () => {
     if (subscription.status === "CANCELLED") {
       return null;
     }
-    if (
-      subscription.status === "PAUSED" ||
-      subscription.status === "INACTIVE"
-    ) {
+    if (isPausedOrOnHoldStatus(subscription.status)) {
       return formatPausedDeliveryLine(subscription);
     }
     const upcoming = resolveUpcomingSubscriptionDeliveryDate(subscription);
@@ -361,11 +386,15 @@ const ManageMySubscription: React.FC = () => {
         await subscriptionService.getCustomerSubscriptions();
 
       if (fetchedSubscriptions && fetchedSubscriptions.length > 0) {
+        const rank = (s: Subscription) => {
+          if (s.status === "ACTIVE") return 0;
+          if (s.status === "ON_HOLD") return 1;
+          if (s.status === "PAUSED" || s.status === "INACTIVE") return 2;
+          return 3;
+        };
         const sortedSubscriptions = fetchedSubscriptions.sort((a, b) => {
-          if (a.status === "ACTIVE" && b.status !== "ACTIVE") return -1;
-          if (a.status !== "ACTIVE" && b.status === "ACTIVE") return 1;
-          if (a.status === "PAUSED" && b.status === "CANCELLED") return -1;
-          if (a.status === "CANCELLED" && b.status === "PAUSED") return 1;
+          const d = rank(a) - rank(b);
+          if (d !== 0) return d;
           return (
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           );
@@ -407,14 +436,8 @@ const ManageMySubscription: React.FC = () => {
     const subscription = subscriptions.find((s) => String(s.id) === subId);
     if (!subscription) return;
 
-    if (isSubscriptionPausedForStoreOffline(subscription)) {
-      toast.error(REQUIRED_TOAST.SUBSCRIPTION_RESUME_STORE_OFFLINE, {
-        id: REQUIRED_TOAST.SUBSCRIPTION_RESUME_STORE_OFFLINE,
-      });
-      return;
-    }
-
     const perDeliveryTotal = pickActiveSubscriptionDailyUnitRupees(subscription);
+    const storeOfflineHold = isSubscriptionPausedForStoreOffline(subscription);
     const walletHoldPause = isSubscriptionPausedForInsufficientWallet(subscription);
 
     const openWalletRechargePrompt = async (toastMessage: string) => {
@@ -442,7 +465,16 @@ const ManageMySubscription: React.FC = () => {
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : REQUIRED_TOAST.COULD_NOT_RESUME;
-      if (walletHoldPause) {
+      const lower = String(msg).toLowerCase();
+      if (storeOfflineHold || (lower.includes("store") && lower.includes("offline"))) {
+        toast.error(msg || REQUIRED_TOAST.SUBSCRIPTION_RESUME_STORE_OFFLINE, {
+          id: REQUIRED_TOAST.SUBSCRIPTION_RESUME_STORE_OFFLINE,
+        });
+      } else if (
+        walletHoldPause ||
+        lower.includes("wallet") ||
+        lower.includes("recharge")
+      ) {
         await openWalletRechargePrompt(
           msg || REQUIRED_TOAST.SUBSCRIPTION_RESUME_WALLET_HOLD,
         );
@@ -553,8 +585,8 @@ const ManageMySubscription: React.FC = () => {
   const renderSubscriptionCard = (subscription: Subscription) => {
     const isActive = subscription.status === "ACTIVE";
     const isCancelled = subscription.status === "CANCELLED";
-    const isPaused =
-      subscription.status === "PAUSED" || subscription.status === "INACTIVE";
+    const isOnHold = isOnHoldStatus(subscription.status);
+    const isPaused = isPausedOrOnHoldStatus(subscription.status);
     const nextDeliveryLabel = getNextDeliveryLine(subscription);
     const pauseReasonLabel = getSubscriptionPauseReasonLabel(subscription);
 
@@ -624,6 +656,10 @@ const ManageMySubscription: React.FC = () => {
       subscriptions.findIndex((x) => x.id === subscription.id) === 0;
     const packsExpanded =
       packsExpandedBySubId[subIdKey] ?? defaultExpanded;
+    const deliveryDetailsExpanded =
+      deliveryDetailsExpandedBySubId[subIdKey] ?? defaultExpanded;
+    const couponDiscountAmt = subscription.couponDiscount ?? 0;
+    const deliveryFeeAmt = subscription.deliveryFee ?? 0;
 
     const statusBadge = isActive ? (
       <span className="shrink-0 rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-xs font-semibold text-[#166534]">
@@ -632,6 +668,10 @@ const ManageMySubscription: React.FC = () => {
     ) : isCancelled ? (
       <span className="shrink-0 rounded-full bg-[#FCE7F3] px-2.5 py-0.5 text-xs font-semibold text-[#DC2626]">
         Cancelled
+      </span>
+    ) : isOnHold ? (
+      <span className="shrink-0 rounded-full bg-[#FEE2E2] px-2.5 py-0.5 text-xs font-semibold text-[#991B1B]">
+        On Hold
       </span>
     ) : isPaused ? (
       <span className="shrink-0 rounded-full bg-[#FFF3CD] px-2.5 py-0.5 text-xs font-semibold text-[#664D03]">
@@ -713,7 +753,7 @@ const ManageMySubscription: React.FC = () => {
                               return;
                             }
                             setSelectedSubscription(subscription);
-                            navigate("/gp-daily/modify-Subscription", {
+                            navigate("/gp-daily/modify-subscription", {
                               state: { subscription },
                             });
                           }}
@@ -842,6 +882,74 @@ const ManageMySubscription: React.FC = () => {
                   </div>
                 </div>
               ))}
+              {(couponDiscountAmt > 0 || deliveryFeeAmt > 0) && (
+                <div className="space-y-1 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs text-[#4B5563]">
+                  <div className="flex justify-between">
+                    <span>Packs subtotal</span>
+                    <span>₹{formatRupees(itemsSubtotal)}</span>
+                  </div>
+                  {deliveryFeeAmt > 0 ? (
+                    <div className="flex justify-between">
+                      <span>Delivery fee</span>
+                      <span>₹{formatRupees(deliveryFeeAmt)}</span>
+                    </div>
+                  ) : null}
+                  {couponDiscountAmt > 0 ? (
+                    <div className="flex justify-between text-[#166534]">
+                      <span>
+                        Promo{subscription.couponCode ? ` ${subscription.couponCode}` : ""}
+                      </span>
+                      <span>− ₹{formatRupees(couponDiscountAmt)}</span>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-4 border-t border-gray-100 pt-3">
+          <button
+            type="button"
+            onClick={() =>
+              setDeliveryDetailsExpandedBySubId((prev) => ({
+                ...prev,
+                [subIdKey]: !(prev[subIdKey] ?? defaultExpanded),
+              }))
+            }
+            className="flex w-full items-center justify-between gap-2 py-1 text-left"
+            aria-expanded={deliveryDetailsExpanded}
+          >
+            <span className="text-sm font-bold tracking-wide text-[#1A1A1A]">
+              Delivery details
+            </span>
+            {deliveryDetailsExpanded ? (
+              <IoChevronUp className="shrink-0 text-lg text-gray-500" aria-hidden />
+            ) : (
+              <IoChevronDown className="shrink-0 text-lg text-gray-500" aria-hidden />
+            )}
+          </button>
+          {deliveryDetailsExpanded ? (
+            <div className="mt-2 space-y-3 rounded-xl bg-[#F9FAFB] p-3 text-sm">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6B7280]">
+                  From store
+                </p>
+                <p className="mt-0.5 font-medium text-[#1A1A1A]">
+                  {subscription.storeName?.trim() || "GP Daily store"}
+                </p>
+                {subscription.zoneName ? (
+                  <p className="text-xs text-[#6B7280]">{subscription.zoneName}</p>
+                ) : null}
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6B7280]">
+                  Deliver to
+                </p>
+                <p className="mt-0.5 leading-snug text-[#1A1A1A] [overflow-wrap:anywhere]">
+                  {formatSubscriptionDeliveryLine(subscription)}
+                </p>
+              </div>
             </div>
           ) : null}
         </div>
@@ -951,7 +1059,7 @@ const ManageMySubscription: React.FC = () => {
             </p>
             <button
               type="button"
-              onClick={() => navigate("/gp-daily/Products")}
+              onClick={() => navigate("/gp-daily/products")}
               className="rounded-lg px-6 py-3 font-medium text-[#111827] transition-opacity hover:opacity-90"
               style={{ backgroundColor: theme.colors.primary }}
             >
@@ -987,7 +1095,7 @@ const ManageMySubscription: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setActiveTab("subscriptions");
-                  navigate(`${GP_DAILY_BASE}/manage-my-subscription`, {
+                  navigate(`${GP_DAILY_BASE}/manage-subscription`, {
                     replace: true,
                   });
                 }}
@@ -1003,7 +1111,7 @@ const ManageMySubscription: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setActiveTab("history");
-                  navigate(`${GP_DAILY_BASE}/manage-my-subscription?tab=history`, {
+                  navigate(`${GP_DAILY_BASE}/manage-subscription?tab=history`, {
                     replace: true,
                   });
                 }}

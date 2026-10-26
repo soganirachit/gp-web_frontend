@@ -3,6 +3,7 @@ import { composeCompleteAddress } from "../services/address.service";
 import { storeService } from "../services/store.service";
 import { sanitizeAddressDisplayPart } from "./formatCartDeliveryAddress";
 import { getLocationSession } from "./locationSession";
+import { readSelectedDeliveryAddress } from "./selectedDeliveryAddressStorage";
 
 export function formatSavedAddressLine(address: Address): string {
   const line = composeCompleteAddress(address.houseNo, address.streetName);
@@ -28,21 +29,16 @@ export function pickHomeCatalogHeaderAddress(
     if (fromOverride) return fromOverride;
   }
 
-  const storedRaw = localStorage.getItem("selectedDeliveryAddress");
-  if (storedRaw) {
-    try {
-      const parsed = JSON.parse(storedRaw) as Address;
-      if (parsed?.id) {
-        const fromList = addresses.find(
-          (a) => String(a.id) === String(parsed.id),
-        );
-        if (fromList) return fromList;
-      }
-      if (parsed?.streetName || parsed?.area || parsed?.houseNo) {
-        return parsed;
-      }
-    } catch {
-      /* ignore malformed cache */
+  const parsed = readSelectedDeliveryAddress();
+  if (parsed) {
+    if (parsed.id) {
+      const fromList = addresses.find(
+        (a) => String(a.id) === String(parsed.id),
+      );
+      if (fromList) return fromList;
+    }
+    if (parsed.streetName || parsed.area || parsed.houseNo) {
+      return parsed;
     }
   }
 

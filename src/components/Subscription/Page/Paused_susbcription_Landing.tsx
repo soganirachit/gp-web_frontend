@@ -81,7 +81,7 @@ const PausedSubscriptionLanding: React.FC = () => {
           transition={{ delay: 0.5 }}
         >
           <button
-            onClick={() => navigate('/gp-daily/Products')}
+            onClick={() => navigate('/gp-daily/products')}
             className="text-gray-800 text-sm font-medium hover:text-gray-600 transition-colors"
           >
             Explore Other Packs

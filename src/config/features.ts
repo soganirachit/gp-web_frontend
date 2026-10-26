@@ -18,6 +18,7 @@ import storeWhiteLogo from "../assets/svg/gp_store_svg/whitelogo.svg";
 import storeWhiteProfileLogo from "../assets/svg/gp_store_svg/whiteprofilelogo.svg";
 import storeFaqIcon from "../assets/svg/gp_store_svg/storefaq.svg";
 import storeFaqUpIcon from "../assets/svg/gp_store_svg/storefaqup.svg";
+import { getLastUsedFeature } from "../utils/lastUsedFeature";
 
 export type Feature = "gpDaily" | "gpStore";
 
@@ -147,6 +148,8 @@ export const getFeatureFromPath = (pathname: string): Feature => {
   if (pathname.startsWith("/gp-daily")) {
     return "gpDaily";
   }
-  // Default to gpStore if gp-daily is disabled, otherwise gpDaily
-  return FEATURE_FLAGS.gpDailyEnabled ? "gpDaily" : "gpStore";
+  return getLastUsedFeature();
 };
+
+/** Theme for paths without `/gp-store` or `/gp-daily` prefix (wallet, faq, errors). */
+export const getFeatureForAmbiguousPath = (): Feature => getLastUsedFeature();

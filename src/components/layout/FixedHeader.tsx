@@ -315,7 +315,7 @@ const FixedHeader: React.FC = () => {
                   src={walletImage}
                   alt="Wallet"
                   className="w-10 h-10 md:w-10 md:h-10"
-                  onClick={() => navigate("/wallet")}
+                  onClick={() => navigate("/gp-daily/wallet")}
                 />
           </div>
         </div>

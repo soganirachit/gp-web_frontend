@@ -15,6 +15,7 @@ import { orderService } from "@/services/order.service";
 import RazorpayPayment from "../Payment/Razorpay/RazorpayPayment";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import Spinner from "../common/Spinner";
+import { GpButton } from "../ui/GpButton";
 import { SubscriptionFlowSkeleton } from "../common/PageSkeletons";
 import { formatCartDeliveryAddress } from "../../utils/formatCartDeliveryAddress";
 import { formatDeliveryAddressOrFallback } from "../../utils/formatDeliveryAddress";
@@ -29,6 +30,10 @@ import {
   InsufficientWalletModal,
   type InsufficientWalletDetails,
 } from "../daily/InsufficientWalletModal";
+import {
+  readSelectedDeliveryAddress,
+  writeSelectedDeliveryAddress,
+} from "../../utils/selectedDeliveryAddressStorage";
 
 export type SubscriptionConfirmOrderLine = {
   productName: string;
@@ -506,7 +511,7 @@ const ConfirmSubscription: React.FC = () => {
 
         // Get subscription details from multiple sources
         const details = localStorage.getItem("currentSubscription");
-        const address = localStorage.getItem("selectedDeliveryAddress");
+        const storedSelectedAddress = readSelectedDeliveryAddress();
         const urlParams = new URLSearchParams(window.location.search);
         const queryBasePackId = urlParams.get("basePackId");
         const locationState = window.history.state?.usr;
@@ -572,19 +577,15 @@ const ConfirmSubscription: React.FC = () => {
           // Check for address from location state first, then localStorage
           let addressToUse = locationState?.selectedAddress || location?.state?.selectedAddress;
 
-          if (!addressToUse && address) {
-            try {
-              addressToUse = JSON.parse(address);
-            } catch (e) {
-              console.error("Error parsing address:", e);
-            }
+          if (!addressToUse && storedSelectedAddress) {
+            addressToUse = storedSelectedAddress;
           }
 
           // For store products, also check if address is in location.state
           if (!addressToUse && isStoreProduct && location?.state?.selectedAddress) {
             addressToUse = location.state.selectedAddress;
             // Store in localStorage for after Razorpay redirect
-            localStorage.setItem("selectedDeliveryAddress", JSON.stringify(addressToUse));
+            writeSelectedDeliveryAddress(addressToUse);
           }
 
           // console.log('Selected address:', addressToUse);
@@ -592,7 +593,7 @@ const ConfirmSubscription: React.FC = () => {
           if (!addressToUse && !isStoreProduct) {
             navigate(`${basePath}/subscription/confirm`, {
               state: {
-                selectedAddress: address,
+                selectedAddress: storedSelectedAddress,
                 basePackId: normalizedDetails.basePackId,
                 subscriptionData: normalizedDetails,
               },
@@ -1158,14 +1159,20 @@ const ConfirmSubscription: React.FC = () => {
               </>
             ) : (
               <>
-                <button
-                  onClick={handleConfirm}
+                <GpButton
+                  fullWidth
+                  className="mb-3 rounded-full text-[15px]"
+                  onClick={() => void handleConfirm()}
+                  loading={loading}
+                  loadingLabel="Confirming…"
                   disabled={loading}
-                  className="w-full text-white py-3.5 rounded-full text-[15px] font-medium mb-3 hover:opacity-90 transition-colors disabled:opacity-50"
-                  style={{ backgroundColor: theme.colors.primary }}
+                  style={{
+                    backgroundColor: theme.colors.primary,
+                    color: feature === "gpDaily" ? "#111827" : "#ffffff",
+                  }}
                 >
-                  {loading ? "Confirming..." : "Confirm Subscription"}
-                </button>
+                  Confirm Subscription
+                </GpButton>
                 <button
                   onClick={() => navigate(basePath)}
                   className="w-full text-[#015D3A] text-[15px] mt-3 font-medium hover:opacity-80 transition-opacity"

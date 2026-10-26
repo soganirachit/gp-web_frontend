@@ -167,15 +167,36 @@ function isActiveSubscriptionStatus(status: unknown): boolean {
 }
 
 function isPausedSubscriptionStatus(status: unknown): boolean {
-  return String(status ?? "").toUpperCase() === "PAUSED";
+  const s = String(status ?? "").toUpperCase();
+  return s === "PAUSED" || s === "ON_HOLD";
+}
+
+function isOnHoldSubscriptionStatus(status: unknown): boolean {
+  return String(status ?? "").toUpperCase() === "ON_HOLD";
 }
 
 function isWalletHoldPause(sub: Record<string, unknown>): boolean {
-  if (!isPausedSubscriptionStatus(sub.status)) return false;
+  const status = sub.status;
+  if (!isPausedSubscriptionStatus(status) && !isOnHoldSubscriptionStatus(status)) {
+    return false;
+  }
+  const pauseSource = String(sub.pause_source ?? sub.pauseSource ?? "")
+    .trim()
+    .toLowerCase();
+  if (pauseSource === "insufficient_wallet") return true;
+  if (
+    sub.paused_by_insufficient_wallet === true ||
+    sub.pausedByInsufficientWallet === true
+  ) {
+    return true;
+  }
+  if (isOnHoldSubscriptionStatus(status) && pauseSource !== "store_offline") {
+    return true;
+  }
   const reason = String(
     sub.pause_reason ?? sub.pauseReason ?? "",
   ).toLowerCase();
-  if (!reason) return true;
+  if (!reason) return isOnHoldSubscriptionStatus(status);
   return reason.includes("wallet") || reason.includes("insufficient");
 }
 
@@ -231,7 +252,7 @@ function toSubscriptionEntries(
   });
 }
 
-/** Active subs for costing; when all are paused, use paused rows so hold/recommend UI still works. */
+/** Active subs only — on-hold / paused amounts must not inflate hold totals. */
 export function pickSubscriptionsForWalletCosting(
   subscriptions: Array<{
     sub: Subscription | Record<string, unknown>;
@@ -241,12 +262,8 @@ export function pickSubscriptionsForWalletCosting(
   sub: Subscription | Record<string, unknown>;
   extra?: Record<string, unknown> | null;
 }> {
-  const active = subscriptions.filter(({ sub }) =>
-    isActiveSubscriptionStatus((sub as Record<string, unknown>).status),
-  );
-  if (active.length > 0) return active;
   return subscriptions.filter(({ sub }) =>
-    isPausedSubscriptionStatus((sub as Record<string, unknown>).status),
+    isActiveSubscriptionStatus((sub as Record<string, unknown>).status),
   );
 }
 
@@ -411,20 +428,20 @@ export function computeGpDailyWalletBanner(
   const activeSubs = subs.filter((s) =>
     isActiveSubscriptionStatus((s as Record<string, unknown>).status),
   );
-  const pausedSubs = subs.filter((s) =>
-    isPausedSubscriptionStatus((s as Record<string, unknown>).status),
-  );
   const pausedForWallet = subs.some((s) =>
     isWalletHoldPause(s as Record<string, unknown>),
   );
-  const subscriptionsPausedOnly =
-    activeSubs.length === 0 && pausedSubs.length > 0;
+  const onHoldSubs = subs.filter((s) =>
+    isOnHoldSubscriptionStatus((s as Record<string, unknown>).status),
+  );
+  const subscriptionsOnHoldOnly =
+    activeSubs.length === 0 && onHoldSubs.length > 0;
   const hasAnySubscription = subs.some((s) => {
     const st = String((s as Record<string, unknown>).status ?? "").toUpperCase();
     return st !== "CANCELLED" && st !== "CANCELED" && st !== "INACTIVE";
   });
 
-  if (!hasAnySubscription && !pausedForWallet && !subscriptionsPausedOnly) {
+  if (!hasAnySubscription && !pausedForWallet && !subscriptionsOnHoldOnly) {
     return emptyBanner();
   }
 
@@ -441,7 +458,10 @@ export function computeGpDailyWalletBanner(
   const fallbackThreshold = 100;
   const balance = input.walletBalance;
 
-  if (pausedForWallet || subscriptionsPausedOnly) {
+  if (pausedForWallet || subscriptionsOnHoldOnly) {
+    const belowOneDayTotal =
+      oneDayTotal > 0 &&
+      balance + GP_DAILY_WALLET_NEGATIVE_LIMIT < oneDayTotal;
     return {
       kind: "on_hold",
       threeDayTotal,
@@ -452,10 +472,10 @@ export function computeGpDailyWalletBanner(
         threeDayTotal > 0 ? threeDayTotal - balance : oneDayTotal - balance,
         fallbackThreshold,
       ),
-      hasWalletHoldPause: pausedForWallet || subscriptionsPausedOnly,
+      hasWalletHoldPause: pausedForWallet || subscriptionsOnHoldOnly,
       runwayLastCoveredDate: null,
       nextStoredPauseScheduleYmd: input.storedPauseScheduleYmd ?? null,
-      shouldAutoPauseActiveSubs: false,
+      shouldAutoPauseActiveSubs: activeSubs.length > 0 && belowOneDayTotal,
     };
   }
 

@@ -22,6 +22,7 @@ import {
   isGpDailyHubRoute,
   isGpStoreHubRoute,
 } from "../../utils/bottomNavRoutes";
+import { DAILY_WALLET_PATH } from "../../config/routes.config";
 
 /** Side tab icons (Home, Basket, Wallet, etc.) */
 const BOTTOM_NAV_SIDE_ICON = "mb-1 h-7 w-7";
@@ -180,7 +181,7 @@ const BottomNav: React.FC = () => {
     if (!isLoggedIn) {
       e.preventDefault();
       navigate(`${basePath}/login`, {
-        state: { returnUrl: `${basePath}/wallet` },
+        state: { returnUrl: DAILY_WALLET_PATH },
       });
     }
   };
@@ -377,20 +378,20 @@ const BottomNav: React.FC = () => {
           </Link>
 
           <Link
-            to={isLoggedIn ? `${basePath}/wallet` : "#"}
+            to={isLoggedIn ? DAILY_WALLET_PATH : "#"}
             onClick={handleWalletClick}
-            className={`flex flex-col items-center justify-center flex-1 relative min-h-[44px] ${isActive(`${basePath}/wallet`)
+            className={`flex flex-col items-center justify-center flex-1 relative min-h-[44px] ${isActive(DAILY_WALLET_PATH)
               ? theme.classes.bottomNavActiveText
               : theme.classes.bottomNavInactiveText
               }`}
           >
-            {isActive(`${basePath}/wallet`) && dailyActivePill}
+            {isActive(DAILY_WALLET_PATH) && dailyActivePill}
             <DailyNavMonoIcon
               src={walletIcon}
-              active={isActive(`${basePath}/wallet`)}
+              active={isActive(DAILY_WALLET_PATH)}
               className={`relative z-10 ${BOTTOM_NAV_SIDE_ICON}`}
             />
-            <span className={`text-[10px] font-medium relative z-10 ${isActive(`${basePath}/wallet`) ? "text-[#222222]" : "text-[#6B7280]"}`}>Wallet</span>
+            <span className={`text-[10px] font-medium relative z-10 ${isActive(DAILY_WALLET_PATH) ? "text-[#222222]" : "text-[#6B7280]"}`}>Wallet</span>
           </Link>
 
           <Link

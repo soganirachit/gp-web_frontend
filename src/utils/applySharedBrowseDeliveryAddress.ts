@@ -5,6 +5,7 @@ import { cartService } from "../services/cart.service";
 import { applyGpDailyBrowseDeliveryAddress } from "./gpDailyAddressStoreChange";
 import { formatSavedAddressLine } from "./resolveHomeCatalogHeaderAddress";
 import { markManualSavedAddress, setLocationSession } from "./locationSession";
+import { writeSelectedDeliveryAddress } from "./selectedDeliveryAddressStorage";
 
 const LANDING_ADDRESS_RETURN_KEY = "gpLandingAddressReturn";
 
@@ -37,7 +38,7 @@ export function peekLandingAddressReturn(): boolean {
 export function persistSelectedBrowseAddress(address: Address): void {
   storeService.setGpStoreCatalogAddressOverrideId(String(address.id));
   try {
-    localStorage.setItem("selectedDeliveryAddress", JSON.stringify(address));
+    writeSelectedDeliveryAddress(address);
     const headerLine = formatSavedAddressLine(address);
     if (headerLine.trim()) {
       localStorage.setItem("userLocation", headerLine);

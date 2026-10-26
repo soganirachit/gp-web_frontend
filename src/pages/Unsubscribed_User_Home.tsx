@@ -93,10 +93,10 @@ function Unsubscribed_User_Home() {
               className="w-6 h-6 sm:w-8 sm:h-8 md:w-8 md:h-8 mb-1 sm:mb-4 md:mb-4" 
               onClick={(e) => { e.stopPropagation(); navigate('/home'); }}
             />
-            <button onClick={() => navigate('/wallet')} className="w-12 h-12 mb-2 md:w-14 md:h-14">
+            <button onClick={() => navigate('/gp-daily/wallet')} className="w-12 h-12 mb-2 md:w-14 md:h-14" aria-label="Wallet">
               <img src={wallet} alt="Wallet" className="w-full h-full" />
             </button>
-            <button onClick={() => navigate('/Account')} className="w-8 h-8 mb-2 md:w-10 md:h-10">
+            <button onClick={() => navigate('/gp-daily/account')} className="w-8 h-8 mb-2 md:w-10 md:h-10" aria-label="Account">
               <img src={Profile} alt="Profile" className="w-full h-full" />
             </button>
           </div>
@@ -292,7 +292,7 @@ function Unsubscribed_User_Home() {
           <div className="mt-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl md:text-2xl font-semibold text-gray-800">Flowers</h2>
-              <button className="text-green-600 text-sm md:text-base font-medium" onClick={() => navigate('/products?category=flowers')}>
+              <button className="text-green-600 text-sm md:text-base font-medium" onClick={() => navigate('/gp-store/products?category=flowers')}>
                 View All
               </button>
             </div>
@@ -343,7 +343,7 @@ function Unsubscribed_User_Home() {
           <div className="mt-8 mb-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl md:text-2xl font-semibold text-gray-800">Leaves</h2>
-              <button className="text-green-600 text-sm md:text-base font-medium" onClick={() => navigate('/products?category=leaves')}>
+              <button className="text-green-600 text-sm md:text-base font-medium" onClick={() => navigate('/gp-store/products?category=leaves')}>
                 View All
               </button>
             </div>

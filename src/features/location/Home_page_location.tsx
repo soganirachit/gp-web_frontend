@@ -448,7 +448,7 @@ const HomePageLocation: React.FC = () => {
 
   const handleViewProducts = () => {
     // Even though we're not in the service area, allow them to browse
-    navigate("/products");
+    navigate("/gp-store/products");
   };
 
   const handleMapDrag = () => {

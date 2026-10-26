@@ -57,6 +57,9 @@ import {
 import { UniformPageHeader } from "../../layout/UniformPageHeader";
 import { gpDailyHome } from "../../../utils/gpDailyHomeDesignSystem";
 import { tryCompleteGpDailyPendingSubscriptionAfterRecharge } from "../../../utils/resumeGpDailySubscriptionCheckout";
+import { shouldResumeGpDailyCheckoutAfterWalletRecharge } from "../../../utils/walletRechargeNavigation";
+import { UserNotice } from "../../common/UserNotice";
+import { USER_NOTICES } from "../../../constants/userNotices";
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
 const MIN_AMOUNT = 1;
@@ -141,7 +144,17 @@ const Wallet = () => {
   const location = useLocation();
   const { isLoggedIn } = useAuth();
   const { feature } = useFeatureTheme();
-  const basePath = feature === "gpStore" ? "/gp-store" : "/gp-daily";
+  /** Wallet is GP Daily only — store checkout uses Razorpay per order. */
+  const basePath = "/gp-daily";
+
+  useEffect(() => {
+    if (!location.pathname.startsWith("/gp-daily/wallet")) {
+      navigate(
+        `/gp-daily/wallet${location.search}`,
+        { replace: true, state: location.state },
+      );
+    }
+  }, [location.pathname, location.search, location.state, navigate]);
   const [customAmount, setCustomAmount] = useState<string>("1000");
   const [balance, setBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<TransactionType[]>([]);
@@ -385,8 +398,27 @@ const Wallet = () => {
 
     if (st.subscriptionRechargePrompt === true) {
       setSubscriptionRechargePrompt(true);
+    } else {
+      setSubscriptionRechargePrompt(false);
     }
   }, [location.state]);
+
+  const maybeResumeSubscriptionOrReturn = useCallback(async () => {
+    if (
+      shouldResumeGpDailyCheckoutAfterWalletRecharge(subscriptionRechargePrompt)
+    ) {
+      const completed = await tryCompleteGpDailyPendingSubscriptionAfterRecharge(
+        (path, opts) => navigate(path, opts),
+        feature,
+      );
+      if (completed) return true;
+    }
+    if (returnUrl && subscriptionRechargePrompt) {
+      navigate(returnUrl);
+      return true;
+    }
+    return false;
+  }, [subscriptionRechargePrompt, returnUrl, navigate, feature]);
 
   // Fetch wallet balance on mount (auth is enforced by ProtectedRoute + BottomNav)
   useEffect(() => {
@@ -504,14 +536,60 @@ const Wallet = () => {
 
   const filteredWalletRows = useMemo(() => {
     const all = [...transactions, ...(transactionLogs || [])];
-    if (showDepositHistoryOnly) {
-      return transactions.filter((t) => t.type === "CREDIT");
-    }
-    if (feature === "gpDaily") {
-      return transactions;
-    }
-    return all;
+    const rows =
+      showDepositHistoryOnly
+        ? transactions.filter(
+            (t) =>
+              t.type === "CREDIT" &&
+              String(t.status ?? "success").toLowerCase() === "success",
+          )
+        : feature === "gpDaily"
+          ? transactions
+          : all;
+    return rows;
   }, [transactions, transactionLogs, feature, showDepositHistoryOnly]);
+
+  /** Poll Razorpay status per open top-up Payment (not a time-based guess). */
+  useEffect(() => {
+    const pendingOrders = [
+      ...new Set(
+        transactions
+          .filter(
+            (t) =>
+              String(t.status ?? "").toLowerCase() === "pending" &&
+              Boolean(t.razorpayOrderId?.trim()),
+          )
+          .map((t) => t.razorpayOrderId!.trim()),
+      ),
+    ];
+    if (pendingOrders.length === 0) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 12;
+
+    const tick = async () => {
+      if (cancelled || attempts >= maxAttempts) return;
+      attempts += 1;
+      for (const orderId of pendingOrders) {
+        try {
+          await walletService.checkPaymentStatus(orderId, { sync: true });
+        } catch {
+          /* next poll */
+        }
+      }
+      if (!cancelled) {
+        await fetchWalletBalance();
+      }
+    };
+
+    void tick();
+    const intervalId = window.setInterval(() => void tick(), 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [transactions, fetchWalletBalance]);
 
   /** Most recent credit (app: last successful deposit from `transaction_type` / type). */
   const latestWalletRechargeAmount = useMemo(() => {
@@ -836,19 +914,37 @@ const Wallet = () => {
                 toast.success(REQUIRED_TOAST.PAYMENT_SUCCESSFUL);
                 toast.success(REQUIRED_TOAST.MONEY_ADDED_WALLET);
                 await fetchWalletBalance();
-                const completed = await tryCompleteGpDailyPendingSubscriptionAfterRecharge(
-                  (path, opts) => navigate(path, opts),
-                  feature,
-                );
-                if (completed) return;
-                if (returnUrl) {
-                  navigate(returnUrl);
-                }
+                await new Promise((r) => setTimeout(r, 400));
+                await fetchWalletBalance();
+                if (await maybeResumeSubscriptionOrReturn()) return;
               } catch (error: any) {
                 console.error("Payment verification failed:", error);
 
+                try {
+                  const synced = await walletService.pollPaymentStatus(
+                    data.razorpay_order_id,
+                    6,
+                    1200,
+                    { sync: true },
+                  );
+                  if (synced) {
+                    removePendingPayment(pendingPaymentId);
+                    setPaymentFieldMessage(REQUIRED_TOAST.PAYMENT_SUCCESSFUL);
+                    toast.success(REQUIRED_TOAST.PAYMENT_SUCCESSFUL);
+                    toast.success(REQUIRED_TOAST.MONEY_ADDED_WALLET);
+                    await fetchWalletBalance();
+                    await new Promise((r) => setTimeout(r, 400));
+                    await fetchWalletBalance();
+                    if (await maybeResumeSubscriptionOrReturn()) return;
+                    return;
+                  }
+                } catch (syncErr) {
+                  console.error("Post-pay Razorpay sync failed:", syncErr);
+                }
+
                 // Better error handling based on error type
-                let errorMessage = "Payment verification failed.";
+                let errorMessage =
+                  "Payment could not be confirmed. If money was debited, open Wallet and tap Refresh — or check Recent Transactions for a failed entry.";
                 let shouldKeepPending = false;
 
                 if (error.response?.status === 402) {
@@ -886,16 +982,17 @@ const Wallet = () => {
             }}
             onError={(error) => {
               if (isPaymentModalDismissed(error)) {
-                toast.error(getPlainDismissUserMessage());
+                setPaymentFieldMessage(USER_NOTICES.PAYMENT_CANCELLED_BODY);
                 return;
               }
-              toast.error(
-                error.message || "Payment failed. Please try again."
-              );
+              const msg = error.message || "Payment failed. Please try again.";
+              setPaymentFieldMessage(msg);
+              toast.error(msg, { id: "wallet-topup-error" });
             }}
-            className="mt-2.5 block w-full rounded-[12px] bg-[#FFB343] py-3 text-center text-sm font-sans font-semibold text-[#222222] transition-opacity disabled:cursor-not-allowed disabled:opacity-70"
+            className="mt-2.5 block w-full rounded-[12px] bg-[#FFB343] py-3 text-center text-sm font-sans font-semibold text-[#222222] transition-[opacity,transform] disabled:cursor-not-allowed disabled:opacity-70"
+            externalLoading={isProcessingPayment}
             buttonText={
-              isProcessingPayment ? "Processing..." : `Proceed to Pay ₹${customAmount}`
+              isProcessingPayment ? "Processing…" : `Proceed to Pay ₹${customAmount}`
             }
             disabled={
               isProcessingPayment ||
@@ -904,9 +1001,17 @@ const Wallet = () => {
             }
           />
           {paymentFieldMessage ? (
-            <p className="mt-2 text-xs font-medium text-green-700">
+            <UserNotice
+              variant={
+                /fail|not confirm|debit/i.test(paymentFieldMessage)
+                  ? "error"
+                  : "success"
+              }
+              className="mt-3"
+              role="status"
+            >
               {paymentFieldMessage}
-            </p>
+            </UserNotice>
           ) : null}
           {feature === "gpDaily" && subscriptionRechargePrompt ? (
             <p className="mt-2 text-center text-xs text-gray-600">
@@ -1033,8 +1138,10 @@ const Wallet = () => {
                   const isDailyWallet = feature === "gpDaily";
 
                   let isCredit = false;
+                  let txnStatus: string | null = null;
                   if (isTransaction) {
-                    isCredit = item.type === "CREDIT";
+                    txnStatus = String(item.status ?? "success").toLowerCase();
+                    isCredit = item.type === "CREDIT" && txnStatus !== "failed";
                   } else {
                     const status = (item as { status?: string }).status?.toLowerCase();
                     isCredit =
@@ -1047,8 +1154,10 @@ const Wallet = () => {
                   const status = !isTransaction
                     ? (item as { status?: string }).status?.toLowerCase()
                     : null;
+                  const isFailed = txnStatus === "failed";
                   const isPending =
-                    !isTransaction && (status === "created" || status === "pending");
+                    txnStatus === "pending" ||
+                    (!isTransaction && (status === "created" || status === "pending"));
 
                   const amount = Math.abs(
                     isTransaction ? item.amount : (item as { amount?: number }).amount ?? 0,
@@ -1108,13 +1217,17 @@ const Wallet = () => {
                           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                             isPending
                               ? "bg-yellow-50"
-                              : isCredit
-                                ? "bg-[#ecfdf3]"
-                                : "bg-[#fef2f2]"
+                              : isFailed
+                                ? "bg-[#fef2f2]"
+                                : isCredit
+                                  ? "bg-[#ecfdf3]"
+                                  : "bg-[#fef2f2]"
                           }`}
                         >
                           {isPending ? (
                             <IoWarningOutline className="h-3.5 w-3.5 text-yellow-500" />
+                          ) : isFailed ? (
+                            <IoAlertCircle className="h-3.5 w-3.5 text-[#ef4444]" />
                           ) : isCredit ? (
                             <IoMdArrowUp className="-rotate-[135deg] h-3.5 w-3.5 text-[#16a34a]" />
                           ) : (
@@ -1135,17 +1248,43 @@ const Wallet = () => {
                           className={`text-xs font-sans font-semibold ${
                             isPending
                               ? "text-yellow-600"
-                              : isCredit
-                                ? "text-[rgb(0,113,42)]"
-                                : "text-[rgb(205,21,24)]"
+                              : isFailed
+                                ? "text-[rgb(205,21,24)]"
+                                : isCredit
+                                  ? "text-[rgb(0,113,42)]"
+                                  : "text-[rgb(205,21,24)]"
                           }`}
                         >
-                          {!isPending
+                          {!isPending && !isFailed
                             ? `${isCredit ? "+" : "-"}₹${amount.toLocaleString("en-IN", {
                                 maximumFractionDigits: 2,
                               })}`
                             : null}
+                          {isFailed
+                            ? `₹${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
+                            : null}
                         </div>
+                        {(isTransaction && (isFailed || isPending)) && (
+                          <div
+                            className={`text-[10px] font-medium ${
+                              isPending ? "text-yellow-600" : "text-[rgb(205,21,24)]"
+                            }`}
+                          >
+                            {isPending ? "Pending" : "Failed"}
+                          </div>
+                        )}
+                        {isFailed ? (
+                          <p className="mt-1 max-w-[7.5rem] text-right text-[9px] leading-tight text-gray-500 line-clamp-2">
+                            {isTransaction && item.failureReason
+                              ? item.failureReason
+                              : USER_NOTICES.WALLET_TOPUP_FAILED_ROW}
+                          </p>
+                        ) : null}
+                        {isPending ? (
+                          <p className="mt-1 max-w-[9rem] text-right text-[9px] leading-snug text-gray-500">
+                            {USER_NOTICES.WALLET_TOPUP_PENDING_ROW}
+                          </p>
+                        ) : null}
                         {!isTransaction && (
                           <div
                             className={`text-xs ${

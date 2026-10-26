@@ -108,12 +108,12 @@ export function useSupportChatWebSocket(options: {
     if (!wsUrl) return;
     if (failureCountRef.current >= MAX_RECONNECT_ATTEMPTS) return;
 
-    const url = `${wsUrl}?token=${encodeURIComponent(token)}`;
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
       failureCountRef.current = 0;
+      ws.send(JSON.stringify({ type: "authenticate", token }));
     };
 
     ws.onmessage = (event) => {

@@ -6,12 +6,16 @@
 /** Matches `[Admin: Name]` anywhere in the string (not only at the start). */
 const ADMIN_TAG_PATTERN = /\[Admin:\s*[^\]]+\]\s*/gi;
 
+/** Internal top-up Payment id — not shown in the app. */
+const TOPUP_MARKER_PATTERN = /\[topup:\d+\]\s*/gi;
+
 /** Removes all `[Admin: Name]` tags; admin identity is not shown in the app. */
 export function stripAdminTagFromWalletDescription(
   description: string | null | undefined,
 ): string {
   if (!description) return "";
   return String(description)
+    .replace(TOPUP_MARKER_PATTERN, " ")
     .replace(ADMIN_TAG_PATTERN, " ")
     .replace(/\s{2,}/g, " ")
     .trim();

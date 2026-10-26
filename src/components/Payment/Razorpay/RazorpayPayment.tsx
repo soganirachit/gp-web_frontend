@@ -26,6 +26,8 @@ interface RazorpayPaymentProps {
   className?: string;
   buttonText?: string;
   disabled?: boolean;
+  /** Parent verification / fulfillment in progress (after Razorpay success). */
+  externalLoading?: boolean;
 }
 
 const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
@@ -36,8 +38,10 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
   className = "w-full py-3 bg-[#FF5722] text-white rounded-lg font-medium",
   buttonText = "Pay Now",
   disabled = false,
+  externalLoading = false,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const busy = isLoading || externalLoading;
 
   const handlePayment = async () => {
     try {
@@ -109,12 +113,17 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
 
   return (
     <button
+      type="button"
       onClick={handlePayment}
-      className={className}
-      disabled={isLoading || disabled}
+      className={`${className} inline-flex items-center justify-center gap-2 active:scale-[0.99] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#19411f]`}
+      disabled={busy || disabled}
+      aria-busy={busy || undefined}
     >
-      {isLoading ? (
-        <Spinner size={24} variant="light" className="flex-shrink-0" />
+      {busy ? (
+        <>
+          <Spinner size={24} variant="light" className="flex-shrink-0" />
+          <span>{buttonText}</span>
+        </>
       ) : (
         buttonText
       )}

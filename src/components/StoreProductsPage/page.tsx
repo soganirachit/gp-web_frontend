@@ -13,6 +13,9 @@ import {
   type ProductAvailabilityChannel,
 } from "../../services/product.service";
 import { ProductBrowseSkeleton } from "../common/PageSkeletons";
+import Spinner from "../common/Spinner";
+import { REQUIRED_TOAST } from "../../constants/requiredToastMessages";
+import toast from "react-hot-toast";
 import { SearchBar } from "../common/SearchBar";
 import { useFeatureTheme } from "../../context/FeatureThemeContext";
 import { useAuth } from "../../context/AuthContext";
@@ -23,6 +26,8 @@ import { formatProductTitleCase } from "../../lib/formatProductTitleCase";
 import { ProductImageTag } from "../common/ProductImageTag";
 import { HorizontalScrollSection } from "../common/HorizontalScrollSection";
 import { UniformPageHeader } from "../layout/UniformPageHeader";
+import { UserNotice } from "../common/UserNotice";
+import { USER_NOTICES } from "../../constants/userNotices";
 
 function storeSortByToApiOrdering(sortType: string): string | undefined {
   switch (sortType) {
@@ -58,7 +63,7 @@ const StoreProductsPages: React.FC = () => {
   const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Memoize the category slug from URL
+  // Shareable catalog filter: `/gp-store/products?category=<slug>` (also via `/products?category=` redirect).
   const categorySlug = useMemo(() => searchParams.get('category'), [searchParams]);
   const availabilityChannel = useMemo(
     (): ProductAvailabilityChannel => (feature === "gpDaily" ? "daily" : "store"),
@@ -214,6 +219,7 @@ const StoreProductsPages: React.FC = () => {
         setNextProductPageUrl(nextUrl);
       } catch (e) {
         console.error("Error loading more products:", e);
+        toast.error(REQUIRED_TOAST.NETWORK_ISSUE, { id: "catalog-load-more" });
       } finally {
         loadingMoreRef.current = false;
         setLoadingMoreProducts(false);
@@ -338,6 +344,10 @@ const StoreProductsPages: React.FC = () => {
     ? `https://customerapp.mygendaphool.com/gp-store/products?category=${categorySlug}`
     : 'https://customerapp.mygendaphool.com/gp-store/products';
 
+  const showProductUnavailableNotice =
+    (location.state as { catalogNotice?: string } | null)?.catalogNotice ===
+    "product_unavailable";
+
   return (
     <div className="min-h-screen bg-[#f8f6f1]">
       <SEO
@@ -356,6 +366,17 @@ const StoreProductsPages: React.FC = () => {
               padXClassName="px-0"
               padYClassName="py-0"
             />
+
+            {showProductUnavailableNotice ? (
+              <UserNotice
+                variant="warning"
+                title={USER_NOTICES.PRODUCT_UNAVAILABLE_TITLE}
+                className="mb-3"
+                role="status"
+              >
+                {USER_NOTICES.PRODUCT_UNAVAILABLE_BODY}
+              </UserNotice>
+            ) : null}
 
             <SearchBar
               mode="product"
@@ -574,7 +595,14 @@ const StoreProductsPages: React.FC = () => {
                 />
               )}
               {loadingMoreProducts ? (
-                <p className="mb-4 text-center text-sm text-gray-500">Loading more…</p>
+                <div
+                  className="mb-4 flex items-center justify-center gap-2 py-2 text-sm text-gray-600"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <Spinner size={22} />
+                  Loading more products…
+                </div>
               ) : null}
             </>
           )}

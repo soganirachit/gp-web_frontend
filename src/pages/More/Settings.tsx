@@ -11,13 +11,33 @@ import {
   IoLogInOutline,
 } from 'react-icons/io5';
 import { customerService } from '@/services/getcustomer.service';
-import { storeService, Store, storeIsWithinDeliveryRadius } from '../../services/store.service';
+import {
+  GUEST_STORE_UPDATED_EVENT,
+  storeService,
+  Store,
+  storeIsWithinDeliveryRadius,
+} from '../../services/store.service';
 import { storeAcceptsCustomerOrders } from '../../utils/storeOperatingHours';
 import { addressService } from '../../services/address.service';
 import { SettingsListSkeleton } from '../../components/common/PageSkeletons';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
-import { cartService, CartSwitchStoreResponse } from '../../services/cart.service';
+import { cartService } from '../../services/cart.service';
+import {
+  countRemovedCartSwitchItems,
+  toastAfterSettingsStoreSwitch,
+} from '../../utils/cartStoreSwitchFeedback';
+import {
+  applyGpStoreAccountSelection,
+  pickGpStoreForAccount,
+  rememberAccountStoreForVisit,
+} from '../../utils/reconcileGpStoreAccountSelection';
+import { clearStoreVisitOverride } from '../../utils/storeVisitOverride';
+import {
+  getLocationSession,
+  LOCATION_SESSION_UPDATED_EVENT,
+} from '../../utils/locationSession';
+import { DAILY_WALLET_PATH } from '../../config/routes.config';
 import { toast } from 'react-hot-toast';
 import { REQUIRED_TOAST } from '../../constants/requiredToastMessages';
 import { editCustomerService } from '../../services/editcustomer.service';
@@ -169,6 +189,18 @@ const Settings: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: refetch on route focus only
   }, [location.pathname, basePath, isLoggedIn, showAsLoggedOut, feature]);
 
+  useEffect(() => {
+    if (feature !== "gpStore") return;
+    if (!isLoggedIn || showAsLoggedOut) return;
+    if (location.pathname !== `${basePath}/account`) return;
+    const onSession = () => {
+      void fetchStores();
+    };
+    window.addEventListener(LOCATION_SESSION_UPDATED_EVENT, onSession);
+    return () => window.removeEventListener(LOCATION_SESSION_UPDATED_EVENT, onSession);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feature, isLoggedIn, showAsLoggedOut, location.pathname, basePath]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -248,40 +280,13 @@ const Settings: React.FC = () => {
         return;
       }
 
-      // Check if there's a previously selected store in localStorage FIRST
-      // Only use nearest store if user hasn't selected a store before
-      const savedStoreId = localStorage.getItem("selectedStoreId");
-      if (savedStoreId) {
-        const savedStore = storesList.find(s => s.id === parseInt(savedStoreId));
-        if (savedStore) {
-          // User has a saved store selection - use it
-          setSelectedStore(savedStore.name);
-          setSelectedStoreId(savedStore.id);
-        } else {
-          // Saved store ID not found in available stores - use nearest or first
-          if (nearestStore) {
-            setSelectedStore(nearestStore.name);
-            setSelectedStoreId(nearestStore.id);
-            localStorage.setItem("selectedStoreId", nearestStore.id.toString());
-          } else if (storesList.length > 0) {
-            const firstStore = storesList[0];
-            setSelectedStore(firstStore.name);
-            setSelectedStoreId(firstStore.id);
-            localStorage.setItem("selectedStoreId", firstStore.id.toString());
-          }
-        }
-      } else {
-        // No saved store - set nearest store as default if available
-        if (nearestStore) {
-          setSelectedStore(nearestStore.name);
-          setSelectedStoreId(nearestStore.id);
-          localStorage.setItem("selectedStoreId", nearestStore.id.toString());
-        } else if (storesList.length > 0) {
-          // If no nearest store, use first store
-          const firstStore = storesList[0];
-          setSelectedStore(firstStore.name);
-          setSelectedStoreId(firstStore.id);
-          localStorage.setItem("selectedStoreId", firstStore.id.toString());
+      const previousId = storeService.getSelectedStoreId();
+      const picked = pickGpStoreForAccount(storesList, nearestStore);
+      if (picked) {
+        setSelectedStore(picked.name);
+        setSelectedStoreId(picked.id);
+        if (picked.id !== previousId || getLocationSession().storeId !== picked.id) {
+          await applyGpStoreAccountSelection(picked, previousId);
         }
       }
     } catch (err: any) {
@@ -383,7 +388,7 @@ const Settings: React.FC = () => {
     {
       icon: walletIcon,
       title: 'Wallet',
-      path: `${basePath}/wallet`,
+      path: DAILY_WALLET_PATH,
       isSvg: true
     },
     {
@@ -485,23 +490,17 @@ const Settings: React.FC = () => {
 
   const storeIsSelectable = (store: Store) => storeIsOnline(store) && storeIsWithinDeliveryRadius(store);
 
-  const countRemovedCartItems = (res: CartSwitchStoreResponse) => {
-    const arr = res?.data?.removed_items ?? res?.removed_items;
-    return Array.isArray(arr) ? arr.length : 0;
-  };
-
   const handleStoreSwitchConfirm = async () => {
     try {
       if (pendingStoreId !== null) {
+        let removedFromBasket = 0;
         // Cart switch-store migrates the basket and switches the active store on the backend
         try {
           const cartRes = await cartService.switchCartStore(pendingStoreId);
           await loadCartFromAPI();
-          const removed = countRemovedCartItems(cartRes);
-          if (removed > 0) {
-            toast.success(
-              `Store updated. ${removed} item${removed === 1 ? '' : 's'} not sold at this store ${removed === 1 ? 'was' : 'were'} removed from your basket.`
-            );
+          removedFromBasket = countRemovedCartSwitchItems(cartRes);
+          if (removedFromBasket > 0) {
+            toastAfterSettingsStoreSwitch(removedFromBasket);
           }
         } catch (cartErr: unknown) {
           console.error('Cart switch-store:', cartErr);
@@ -517,11 +516,21 @@ const Settings: React.FC = () => {
         setSelectedStore(pendingStoreName);
         setSelectedStoreId(pendingStoreId);
         localStorage.setItem("selectedStoreId", pendingStoreId.toString());
+        rememberAccountStoreForVisit(pendingStoreId);
+        try {
+          await storeService.switchStore(pendingStoreId);
+        } catch (switchErr) {
+          console.error("Backend store switch after cart migrate:", switchErr);
+        }
+        window.dispatchEvent(new Event(GUEST_STORE_UPDATED_EVENT));
+        if (removedFromBasket === 0) {
+          toastAfterSettingsStoreSwitch(0);
+        }
       } else {
-        // Clearing store selection - just remove from localStorage
         setSelectedStore('');
         setSelectedStoreId(null);
         localStorage.removeItem("selectedStoreId");
+        clearStoreVisitOverride();
       }
       setShowStoreSwitchWarning(false);
       setPendingStoreId(null);
@@ -754,10 +763,23 @@ const Settings: React.FC = () => {
                               setShowStoreSwitchWarning(true);
                               setIsStoreDropdownOpen(false);
                             } else {
-                              setSelectedStore(store.name);
-                              setSelectedStoreId(store.id);
-                              localStorage.setItem('selectedStoreId', String(store.id));
-                              setIsStoreDropdownOpen(false);
+                              void (async () => {
+                                let removedFromBasket = 0;
+                                try {
+                                  const cartRes = await cartService.switchCartStore(store.id);
+                                  removedFromBasket = countRemovedCartSwitchItems(cartRes);
+                                  await storeService.switchStore(store.id);
+                                } catch (e) {
+                                  console.error("Initial store selection sync:", e);
+                                }
+                                setSelectedStore(store.name);
+                                setSelectedStoreId(store.id);
+                                localStorage.setItem('selectedStoreId', String(store.id));
+                                rememberAccountStoreForVisit(store.id);
+                                window.dispatchEvent(new Event(GUEST_STORE_UPDATED_EVENT));
+                                setIsStoreDropdownOpen(false);
+                                toastAfterSettingsStoreSwitch(removedFromBasket);
+                              })();
                             }
                           }}
                           className={`w-full px-3 sm:px-4 py-3 text-left text-sm sm:text-base transition-colors ${

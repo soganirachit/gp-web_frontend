@@ -174,7 +174,7 @@ assert(channelFromPathname("/gp-store") === "store", "/gp-store");
 assert(channelFromPathname("/gp-store/") === "store", "/gp-store/");
 assert(channelFromPathname("/gp-store/products") === "store", "store products");
 assert(channelFromPathname("/gp-daily") === "daily", "/gp-daily");
-assert(channelFromPathname("/gp-daily/Products") === "daily", "daily products");
+assert(channelFromPathname("/gp-daily/products") === "daily", "daily products");
 assert(
   channelFromPathname("/gp-store/basket") === null,
   "cart is not a catalog channel",

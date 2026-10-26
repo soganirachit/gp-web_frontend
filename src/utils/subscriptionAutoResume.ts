@@ -18,6 +18,7 @@ function getPauseReason(sub: Record<string, unknown>): string {
 
 export function shouldAutoResumeSubscription(sub: Record<string, unknown>): boolean {
   if (normalizeStatus(sub) !== "paused") return false;
+  if (normalizeStatus(sub) === "on_hold") return false;
   if (isSubscriptionPausedForInsufficientWallet(sub)) return false;
   if (isSubscriptionPausedForStoreOffline(sub)) return false;
   const reason = getPauseReason(sub).toLowerCase();

@@ -10,6 +10,7 @@ import { resolveGpDailyZoneAtLatLng } from "../services/subscriptionZone.service
 import { formatSavedAddressLine } from "./resolveHomeCatalogHeaderAddress";
 import { notifyDailyCartUpdated } from "./dailyCartEvents";
 import { setLocationSession } from "./locationSession";
+import { writeSelectedDeliveryAddress } from "./selectedDeliveryAddressStorage";
 
 export const GP_DAILY_ADDRESS_STORE_CHANGE_EVENT = "gp-daily-address-store-change";
 
@@ -55,7 +56,7 @@ export async function applyGpDailyBrowseDeliveryAddress(
 
   storeService.setGpStoreCatalogAddressOverrideId(String(address.id));
   try {
-    localStorage.setItem("selectedDeliveryAddress", JSON.stringify(address));
+    writeSelectedDeliveryAddress(address);
     const headerLine = formatSavedAddressLine(address);
     if (headerLine.trim()) {
       localStorage.setItem("userLocation", headerLine);

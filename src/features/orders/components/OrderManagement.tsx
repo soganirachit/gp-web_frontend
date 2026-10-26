@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaArrowLeft, FaMinus, FaPlus, FaCheck } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { walletService } from '../../../services/wallet.service';
 
@@ -22,6 +22,7 @@ interface DayInfo {
 
 const OrderManagement: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selectedDays, setSelectedDays] = useState<DayInfo[]>([
     { day: 'SUNDAY', isSelected: false, quantity: 1 },
@@ -41,11 +42,17 @@ const OrderManagement: React.FC = () => {
   const [walletBalance, setWalletBalance] = useState(0);
 
   useEffect(() => {
-    const savedItems = localStorage.getItem('cartItems');
+    const userId = localStorage.getItem('userId');
+    const key = userId ? `cartItems:${userId}` : 'cartItems';
+    const savedItems = localStorage.getItem(key);
     if (savedItems) {
-      const items = JSON.parse(savedItems);
-      setCartItems(items);
-      calculateTotal(items);
+      try {
+        const items = JSON.parse(savedItems) as CartItem[];
+        setCartItems(items);
+        calculateTotal(items);
+      } catch {
+        localStorage.removeItem(key);
+      }
     }
   }, []);
 
@@ -109,7 +116,9 @@ const OrderManagement: React.FC = () => {
           startDate,
           createdAt: new Date().toISOString()
         };
-        localStorage.setItem('currentOrder', JSON.stringify(orderDetails));
+        const userId = localStorage.getItem('userId');
+        const orderKey = userId ? `currentOrder:${userId}` : 'currentOrder';
+        localStorage.setItem(orderKey, JSON.stringify(orderDetails));
 
         const daysText = selectedDays
           .filter(day => day.isSelected)
@@ -170,7 +179,7 @@ const OrderManagement: React.FC = () => {
             <button
               onClick={() => {
                 setShowInsufficientBalanceModal(false);
-                navigate('/wallet');
+                navigate('/gp-daily/wallet');
               }}
               className="flex-1 bg-green-500 text-white py-3 rounded-lg"
             >

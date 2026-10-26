@@ -160,7 +160,7 @@ const CancelSubscriptionLanding: React.FC = () => {
             Cancel Subscription
           </button>
           <button
-            onClick={() => navigate('/gp-daily/Products')}
+            onClick={() => navigate('/gp-daily/products')}
             className="flex-1 border-2 py-3 rounded-[20px] font-semibold text-m bg-[rgb(250,162,34)] border-[rgb(250,162,34)] active:bg-[rgb(250,162,34)] text-gray-900 active:border-[rgb(250,162,34)] transition-colors"
           >
             Explore Packs

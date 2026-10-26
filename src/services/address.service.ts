@@ -3,6 +3,10 @@ import api from "./api";
 import { getApiUrl } from "../config/api.config";
 import { sanitizeAddressDisplayPart } from "../utils/formatCartDeliveryAddress";
 import { formatPhoneForDisplay, toIndianE164 } from "../utils/phoneDisplay";
+import {
+  readSelectedDeliveryAddress,
+  writeSelectedDeliveryAddress,
+} from "../utils/selectedDeliveryAddressStorage";
 
 /** API/DB used "unknown" as a missing-value sentinel — never show or resave it. */
 export function stripUnknownAddressToken(value?: string | null): string {
@@ -336,12 +340,9 @@ class AddressService {
       if (response.data.success && response.data.data) {
         const updated = mapApiToFrontend(response.data.data);
         try {
-          const stored = localStorage.getItem("selectedDeliveryAddress");
-          if (stored) {
-            const parsed = JSON.parse(stored) as { id?: string };
-            if (String(parsed.id) === String(updated.id)) {
-              localStorage.setItem("selectedDeliveryAddress", JSON.stringify(updated));
-            }
+          const stored = readSelectedDeliveryAddress();
+          if (stored && String(stored.id) === String(updated.id)) {
+            writeSelectedDeliveryAddress(updated);
           }
         } catch {
           /* ignore stale cache */

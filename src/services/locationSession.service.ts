@@ -7,6 +7,7 @@ import {
 import { resolveGpDailyZoneAtLatLng } from "./subscriptionZone.service";
 import { applyGpDailyBrowseDeliveryAddress } from "../utils/gpDailyAddressStoreChange";
 import { persistSelectedBrowseAddress } from "../utils/applySharedBrowseDeliveryAddress";
+import { clearSelectedDeliveryAddress } from "../utils/selectedDeliveryAddressStorage";
 import { requestBrowserGeolocation } from "../utils/requestBrowserGeolocation";
 import { pickSavedAddressNearGps } from "../utils/pickSavedAddressNearGps";
 import { haversineMeters } from "../utils/geoMeters";
@@ -26,6 +27,7 @@ import {
   type LocationSession,
 } from "../utils/locationSession";
 import { parseAddressCoordinates } from "../utils/addressCoordinates";
+import { getStoreVisitOverrideId } from "../utils/storeVisitOverride";
 import { GP_OPEN_GUEST_AREA_MODAL_EVENT } from "../config/guestAreaModalCopy";
 
 function isLoggedIn(): boolean {
@@ -54,6 +56,10 @@ async function readGps(): Promise<{ lat: number; lng: number } | null> {
 }
 
 async function applyStorePin(lat: number, lng: number): Promise<number | null> {
+  const visitStoreId = getStoreVisitOverrideId();
+  if (visitStoreId != null) {
+    return visitStoreId;
+  }
   try {
     const cov = await addressService.validateAddressInDeliveryArea(`${lat},${lng}`);
     if (!cov.isValid) {
@@ -131,13 +137,18 @@ function applySavedAutoAddress(address: Address): void {
   );
 }
 
-function applyGpsOnlyAuto(lat: number, lng: number): void {
+function clearStaleManualBrowsePins(): void {
+  storeService.clearGuestBrowseAddress();
   storeService.setGpStoreCatalogAddressOverrideId(null);
   try {
-    localStorage.removeItem("selectedDeliveryAddress");
+    clearSelectedDeliveryAddress();
   } catch {
     /* ignore */
   }
+}
+
+function applyGpsOnlyAuto(lat: number, lng: number): void {
+  clearStaleManualBrowsePins();
   setLocationSession(
     {
       mode: "auto",
@@ -232,6 +243,7 @@ async function resolveGuestAuto(channel: LocationChannel): Promise<void> {
     }
     return;
   }
+  clearStaleManualBrowsePins();
   setLocationSession(
     { mode: "auto", addressId: null, lat: gps.lat, lng: gps.lng },
     false,

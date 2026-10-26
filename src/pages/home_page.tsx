@@ -8,11 +8,19 @@ import { MdLocationOn, MdKeyboardArrowDown, MdAccessTime } from 'react-icons/md'
 import { FaLeaf, FaUsers, FaBox } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { addressService } from '../services/address.service';
-import { pickSessionHeaderAddress, formatSavedAddressLine } from '../utils/resolveHomeCatalogHeaderAddress';
-import { LOCATION_SESSION_UPDATED_EVENT, isGuestLocationFrozen } from '../utils/locationSession';
+import {
+  pickSessionHeaderAddress,
+  pickHomeCatalogHeaderAddress,
+  formatSavedAddressLine,
+} from '../utils/resolveHomeCatalogHeaderAddress';
+import {
+  LOCATION_SESSION_UPDATED_EVENT,
+  getLocationSession,
+  isGuestLocationFrozen,
+} from '../utils/locationSession';
 import {
   guestAddressFormNavState,
-  guestHasSavedBrowseAddress,
+  guestShouldOpenAddressFormFromHeader,
 } from '../utils/guestAddressEntry';
 import { GP_OPEN_GUEST_AREA_MODAL_EVENT } from '../config/guestAreaModalCopy';
 import { markLandingAddressReturn } from '../utils/applySharedBrowseDeliveryAddress';
@@ -150,8 +158,26 @@ const HomePage: React.FC = () => {
         setDeliveryLocation(formattedAddress);
         setAddressType(selectedAddress.type || 'Home');
       } else {
-        setAddressType(GUEST_HEADER_LOCATION_TITLE);
-        setDeliveryLocation(localStorage.getItem('userLocation') || '');
+        const session = getLocationSession();
+        if (
+          session.mode === 'auto' &&
+          session.lat != null &&
+          session.lng != null &&
+          !session.addressId
+        ) {
+          const header = await resolveGuestHeaderLocationLabel();
+          setAddressType(header.title);
+          setDeliveryLocation(header.line);
+        } else {
+          const fallback = pickHomeCatalogHeaderAddress(addresses);
+          if (fallback) {
+            setDeliveryLocation(formatSavedAddressLine(fallback));
+            setAddressType(fallback.type || 'Home');
+          } else {
+            setAddressType(GUEST_HEADER_LOCATION_TITLE);
+            setDeliveryLocation(localStorage.getItem('userLocation') || '');
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching address:', error);
@@ -212,7 +238,7 @@ const HomePage: React.FC = () => {
   const handleLocationClick = () => {
     markLandingAddressReturn();
     if (!isLoggedIn) {
-      if (guestHasSavedBrowseAddress()) {
+      if (guestShouldOpenAddressFormFromHeader()) {
         navigate('/gp-store/address-selection', {
           state: guestAddressFormNavState({
             fromLandingHome: true,

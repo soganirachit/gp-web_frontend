@@ -1,6 +1,10 @@
 import { format, addDays } from "date-fns";
 import type { Subscription } from "../services/subscription.service";
-import { isSubscriptionPausedForInsufficientWallet, INSUFFICIENT_WALLET_BALANCE_LABEL } from "./gpDailySubscriptionWalletPause";
+import {
+  isSubscriptionPausedForInsufficientWallet,
+  isSubscriptionPausedForStoreOffline,
+  INSUFFICIENT_WALLET_BALANCE_LABEL,
+} from "./gpDailySubscriptionWalletPause";
 
 /** Mon … Sun labels for UI (delivery int 0 = Monday). */
 export const WEEK_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
@@ -110,6 +114,7 @@ export function computeNextDeliveryFromSubscribedDays(
 ): Date | null {
   if (
     subscription.status === "PAUSED" ||
+    subscription.status === "ON_HOLD" ||
     subscription.status === "INACTIVE" ||
     subscription.status === "CANCELLED"
   ) {
@@ -230,8 +235,17 @@ export function getPausedResumeDate(subscription: Subscription): Date | null {
   return null;
 }
 
-/** Paused copy — wallet pauses omit "paused till"; manual pauses show future resume date. */
+/** Paused / on-hold copy — wallet holds omit "paused till"; user pauses show resume date. */
 export function formatPausedDeliveryLine(subscription: Subscription): string {
+  if (String(subscription.status ?? "").toUpperCase() === "ON_HOLD") {
+    if (isSubscriptionPausedForInsufficientWallet(subscription)) {
+      return `On hold — ${INSUFFICIENT_WALLET_BALANCE_LABEL}`;
+    }
+    if (isSubscriptionPausedForStoreOffline(subscription)) {
+      return "On hold — store offline";
+    }
+    return "On hold";
+  }
   if (isSubscriptionPausedForInsufficientWallet(subscription)) {
     return `Paused — ${INSUFFICIENT_WALLET_BALANCE_LABEL}`;
   }
@@ -245,12 +259,15 @@ export function formatPausedDeliveryLine(subscription: Subscription): string {
 /** Namaste carousel — subscription status (replaces delivery time slot row). */
 function isNamastePausedStatus(status: Subscription["status"] | undefined): boolean {
   const s = String(status ?? "").toUpperCase();
-  return s === "PAUSED" || s === "INACTIVE";
+  return s === "PAUSED" || s === "INACTIVE" || s === "ON_HOLD";
 }
 
 export function formatNamasteSubscriptionStatusLine(
   subscription: Subscription,
 ): string {
+  if (String(subscription.status ?? "").toUpperCase() === "ON_HOLD") {
+    return "On hold";
+  }
   if (isNamastePausedStatus(subscription.status)) {
     return "Paused";
   }

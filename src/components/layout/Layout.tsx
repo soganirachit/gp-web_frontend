@@ -11,12 +11,17 @@ import { trackPageView } from "../../lib/metaPixel";
 import { AppToaster } from "../ui/AppToaster";
 import { SessionImageCacheManager } from "../common/SessionImageCacheManager";
 import { useDoubleBackToExit } from "../../hooks/useDoubleBackToExit";
+import { rememberFeatureFromPath } from "../../utils/lastUsedFeature";
 
 const Layout: React.FC = () => {
   const location = useLocation();
 
   useEffect(() => {
     window.scrollTo(0, 0);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    rememberFeatureFromPath(location.pathname);
   }, [location.pathname]);
 
   // Fire Meta Pixel PageView on every route change (critical for SPAs)
@@ -49,9 +54,13 @@ const Layout: React.FC = () => {
 
   // Routes that should not show BottomNav (landing, location pages, BloomBar kiosk flow)
   const routesWithoutBottomNav = ["/home", "/location", "/sajawat", "/sajawat/gallery"];
+  const isProductDeepLinkResolve =
+    location.pathname.startsWith("/products/") &&
+    location.pathname !== "/products";
   const shouldHideBottomNav =
     routesWithoutBottomNav.includes(location.pathname) ||
-    location.pathname.startsWith('/bloombar');
+    location.pathname.startsWith('/bloombar') ||
+    isProductDeepLinkResolve;
 
   // Routes that should not have top padding.
   // Important: pathname is like `/gp-store/orders`, so we must use prefix matching.
@@ -103,6 +112,12 @@ const Layout: React.FC = () => {
       }
       data-testid="gp-root-layout"
     >
+      <a
+        href="#gp-main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[#19411f] focus:shadow-md focus:outline focus:outline-2 focus:outline-[#19411f]"
+      >
+        Skip to main content
+      </a>
       <GuestStoreLocationBootstrap />
       <LocationSessionHost />
       <GpDailyAddressStoreChangeHost />
@@ -110,6 +125,7 @@ const Layout: React.FC = () => {
       {/* {!isAuthRoute && <FixedHeader />} */}
 
       <main
+        id="gp-main-content"
         className={
           !isAuthRoute
             ? isSupportDockedComposer

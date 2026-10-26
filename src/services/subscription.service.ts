@@ -8,6 +8,7 @@ import { getSubscriptionsUrl } from "../config/api.config";
 import { pickPrimaryImageUrl, type ProductImageLike } from "../utils/pickPrimaryImageUrl";
 import { errorMessageFromCatch } from "../utils/apiErrorMessage";
 import { REQUIRED_TOAST } from "../constants/requiredToastMessages";
+import { sanitizeAddressDisplayPart } from "../utils/formatCartDeliveryAddress";
 
 const base = () => getSubscriptionsUrl();
 
@@ -138,6 +139,37 @@ export function subscriptionLineItemsFromApiRaw(
 ): SubscriptionLineItem[] {
   const itemsRaw = Array.isArray(raw?.items) ? (raw.items as Record<string, unknown>[]) : [];
   return mapRawItemsToSubscriptionLineItems(itemsRaw);
+}
+
+function mapSubscriptionDeliveryAddress(
+  raw: unknown,
+): Subscription["deliveryAddress"] | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const a = raw as Record<string, unknown>;
+  const line1 = sanitizeAddressDisplayPart(
+    String(a.address_line1 ?? a.houseNo ?? ""),
+  );
+  const line2 = sanitizeAddressDisplayPart(
+    String(a.address_line2 ?? a.streetName ?? ""),
+  );
+  const landmark = sanitizeAddressDisplayPart(
+    String(a.landmark ?? a.area ?? ""),
+  );
+  const city = sanitizeAddressDisplayPart(String(a.city ?? ""));
+  const state = sanitizeAddressDisplayPart(String(a.state ?? ""));
+  const pincode = String(a.pincode ?? a.postal_code ?? "").trim();
+  if (!line1 && !line2 && !landmark && !city) return undefined;
+  return {
+    id: String(a.id ?? ""),
+    houseNo: line1,
+    streetName: line2,
+    area: landmark,
+    city,
+    state,
+    pincode,
+    phoneNumber: String(a.receiver_phone ?? a.phoneNumber ?? ""),
+    isDefault: Boolean(a.is_default ?? a.isDefault),
+  };
 }
 
 function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
@@ -284,7 +316,19 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
     status: String(raw.status ?? "ACTIVE").toUpperCase() as Subscription["status"],
     basePackId: String(raw.plan_id ?? raw.base_pack_id ?? raw.basePackId ?? ""),
     basePackDetails: raw.base_pack_details as Subscription["basePackDetails"],
-    deliveryAddress: raw.delivery_address as Subscription["deliveryAddress"],
+    deliveryAddress: mapSubscriptionDeliveryAddress(raw.delivery_address),
+    storeName:
+      typeof raw.store_name === "string"
+        ? raw.store_name.trim()
+        : typeof raw.storeName === "string"
+          ? raw.storeName.trim()
+          : undefined,
+    zoneName:
+      typeof raw.zone_name === "string"
+        ? raw.zone_name.trim()
+        : typeof raw.zoneName === "string"
+          ? raw.zoneName.trim()
+          : undefined,
     amount:
       Number.isFinite(amountParsed) && amountParsed > 0
         ? amountParsed
@@ -311,6 +355,9 @@ function mapSubscriptionFromApi(raw: Record<string, unknown>): Subscription {
     })(),
     pausedByInsufficientWallet: Boolean(
       raw.paused_by_insufficient_wallet ?? raw.pausedByInsufficientWallet,
+    ),
+    pausedByStoreOffline: Boolean(
+      raw.paused_by_store_offline ?? raw.pausedByStoreOffline,
     ),
     pauseSource:
       raw.pause_source != null || raw.pauseSource != null
@@ -350,7 +397,7 @@ export interface Subscription {
   selectedDays: string[];
   startDate: Date;
   endDate?: Date;
-  status: "ACTIVE" | "PAUSED" | "CANCELLED" | "INACTIVE";
+  status: "ACTIVE" | "PAUSED" | "ON_HOLD" | "CANCELLED" | "INACTIVE";
   basePackId: string;
   basePackDetails?: {
     name: string;
@@ -362,6 +409,8 @@ export interface Subscription {
       quantity: number;
     }>;
   };
+  storeName?: string;
+  zoneName?: string;
   deliveryAddress?: {
     id: string;
     houseNo: string;
@@ -406,8 +455,10 @@ export interface Subscription {
   pausedUntilDate?: Date;
   /** Why the subscription was paused (`pause_reason` from API). */
   pauseReason?: string;
-  /** True when auto-paused for low wallet (`paused_by_insufficient_wallet`). */
+  /** True when on hold for low wallet (`paused_by_insufficient_wallet`). */
   pausedByInsufficientWallet?: boolean;
+  /** True when on hold because the store is offline. */
+  pausedByStoreOffline?: boolean;
   /** API `pause_source`: insufficient_wallet | store_offline | manual */
   pauseSource?: string;
   isPausedAutomatically?: boolean;
@@ -582,8 +633,8 @@ class SubscriptionService {
       const { data } = await api.get(`${base()}/plans/`);
       const list = unwrapList(data);
       return list.map((item) => item as Record<string, unknown>);
-    } catch {
-      return [];
+    } catch (e: unknown) {
+      throw new Error(errorMessageFromCatch(e, "Failed to load subscription plans"));
     }
   }
 
@@ -781,6 +832,17 @@ class SubscriptionService {
     await api.post(`${base()}/${subscriptionId}/pause/`, payload ?? {});
   }
 
+  /** Place all active wallet subscriptions on hold if the wallet cannot cover them. */
+  async applyWalletHold(): Promise<{ held_count?: number }> {
+    const { data } = await api.post(`${base()}/apply-wallet-hold/`);
+    const payload = data as Record<string, unknown>;
+    const inner =
+      payload.data && typeof payload.data === "object"
+        ? (payload.data as Record<string, unknown>)
+        : payload;
+    return { held_count: Number(inner.held_count ?? 0) };
+  }
+
   async resumeSubscription(subscriptionId: string): Promise<void> {
     try {
       const { data } = await api.post(`${base()}/${subscriptionId}/resume/`);
@@ -799,7 +861,7 @@ class SubscriptionService {
       type?: "DAILY" | "CUSTOM";
       selectedDays?: string[];
       endDate?: Date;
-      status?: "ACTIVE" | "PAUSED" | "CANCELLED" | "INACTIVE";
+      status?: "ACTIVE" | "PAUSED" | "ON_HOLD" | "CANCELLED" | "INACTIVE";
       /** Top-level quantity (single-product subscriptions). */
       quantity?: number;
       /** Per-product quantities when subscription has multiple items. */

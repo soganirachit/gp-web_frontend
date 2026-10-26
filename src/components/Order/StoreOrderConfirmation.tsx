@@ -239,8 +239,13 @@ const StoreOrderConfirmation: React.FC = () => {
         setLoading(false);
         return;
       }
+      // Checkout already passes a snapshot; avoid a redundant detail fetch (and 404 noise when session lags).
+      if (initialSnapshot) {
+        setLoading(false);
+        return;
+      }
       try {
-        if (!initialSnapshot) setLoading(true);
+        setLoading(true);
         setError(null);
         const data = await orderService.getOrderByOrderNumber(orderNumber);
         if (!cancelled) {
